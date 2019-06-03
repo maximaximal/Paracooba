@@ -1,0 +1,16 @@
+﻿---
+BasedOnStyle: Mozilla
+AccessModifierOffset: '0'
+AlignEscapedNewlinesLeft: 'true'
+AlignOperands: 'true'
+AlignTrailingComments: 'true'
+AllowShortBlocksOnASingleLine: 'false'
+SortIncludes: 'true'
+SpaceBeforeParens: Never
+SpaceInEmptyParentheses: 'false'
+SpacesBeforeTrailingComments: '0'
+Standard: Cpp11
+TabWidth: '2'
+UseTab: Never
+
+...
