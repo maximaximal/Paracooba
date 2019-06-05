@@ -1,0 +1,139 @@
+#include "../include/paracuber/log.hpp"
+#include "../include/paracuber/config.hpp"
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/log/attributes.hpp>
+#include <boost/log/core.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/sinks/text_file_backend.hpp>
+#include <boost/log/sources/record_ostream.hpp>
+#include <boost/log/sources/severity_logger.hpp>
+#include <boost/log/support/date_time.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/console.hpp>
+#include <boost/log/utility/setup/file.hpp>
+
+namespace logging = boost::log;
+namespace sinks = boost::log::sinks;
+namespace expr = boost::log::expressions;
+namespace keywords = boost::log::keywords;
+
+BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_severity,
+                            "Severity",
+                            ::paracuber::Log::Severity)
+BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_file, "File", std::string)
+BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_function, "Function", std::string)
+BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_line, "Line", int)
+BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_localname,
+                            "LocalName",
+                            std::string_view)
+BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_timestamp,
+                            "Timestamp",
+                            boost::posix_time::ptime)
+
+namespace paracuber {
+Log::Log(std::shared_ptr<Config> config)
+  : m_config(config)
+{
+  // Initialise global logging attributes for all loggers.
+  try {
+    logging::core::get()->add_global_attribute(
+      "Line", logging::attributes::mutable_constant<int>(5));
+    logging::core::get()->add_global_attribute(
+      "File", logging::attributes::mutable_constant<std::string>(""));
+    logging::core::get()->add_global_attribute(
+      "Function", logging::attributes::mutable_constant<std::string>(""));
+    logging::core::get()->add_global_attribute(
+      "Timestamp", logging::attributes::local_clock());
+    logging::core::get()->add_global_attribute(
+      "LocalName",
+      logging::attributes::constant<std::string_view>(
+        config->getString(Config::LocalName)));
+    logging::add_common_attributes();
+  } catch(const std::exception& e) {
+    std::cerr
+      << "> Exception during initialisation of global log variables! Error: "
+      << e.what() << std::endl;
+    BOOST_THROW_EXCEPTION(e);
+  }
+  try {
+    m_consoleSink = logging::add_console_log(
+      std::clog,
+      keywords::format =
+        (expr::stream << "[" << paracuber_logger_timestamp << "] ["
+                      << paracuber_logger_localname << "] ["
+                      << expr::attr<Log::Severity, Log::Severity_Tag>(
+                           "Severity")
+                      << "] " << expr::smessage));
+    boost::log::core::get()->add_sink(m_consoleSink);
+  } catch(const std::exception& e) {
+    std::cerr << "> Exception during initialisation of log sinks! Error: "
+              << e.what() << std::endl;
+    BOOST_THROW_EXCEPTION(e);
+  }
+}
+Log::~Log() {}
+
+boost::log::sources::severity_logger<Log::Severity>
+Log::createLogger()
+{
+  auto logger = boost::log::sources::severity_logger<Log::Severity>();
+  return logger;
+}
+
+std::ostream&
+operator<<(std::ostream& strm, ::paracuber::Log::Severity level)
+{
+  static const char* strings[] = { "Trace",       "Debug",
+                                   "Info",        "LocalWarning",
+                                   "LocalError",  "GlobalWarning",
+                                   "GlobalError", "Fatal" };
+  if(static_cast<std::size_t>(level) < sizeof(strings) / sizeof(*strings))
+    strm << strings[level];
+  else
+    strm << static_cast<int>(level);
+
+  return strm;
+}
+
+boost::log::formatting_ostream&
+operator<<(
+  boost::log::formatting_ostream& strm,
+  boost::log::to_log_manip<::paracuber::Log::Severity,
+                           ::paracuber::Log::Severity_Tag> const& manip)
+{
+  static const char* colorised_strings[] = {
+    "\033[30mTRCE\033[0m", "\033[32mDEBG\033[0m", "\033[37mINFO\033[0m",
+    "\033[33mLWRN\033[0m", "\033[33mLERR\033[0m", "\033[31mGWRN\033[0m",
+    "\033[31mGERR\033[0m", "\033[31mFTAL\033[0m"
+  };
+  static const char* uncolorised_strings[] = { "TRCE", "DEBG", "INFO", "LWRN",
+                                               "LERR", "GWRN", "GERR", "FTAL" };
+
+  static const char** strings = uncolorised_strings;
+
+  if(strings == nullptr) {
+    const char* terminal = std::getenv("TERM");
+
+    if(terminal == NULL) {
+      strings = uncolorised_strings;
+    } else {
+      if(std::strlen(terminal) > 7) {
+        strings = colorised_strings;
+      } else {
+        strings = uncolorised_strings;
+      }
+    }
+  }
+
+  ::paracuber::Log::Severity level = manip.get();
+
+  if(static_cast<std::size_t>(level) <
+     sizeof(colorised_strings) / sizeof(*colorised_strings))
+    strm << strings[level];
+  else
+    strm << static_cast<int>(level);
+
+  return strm;
+}
+}
