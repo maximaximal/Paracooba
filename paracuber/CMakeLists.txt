@@ -44,3 +44,14 @@ define_file_basename_for_sources(parac)
 target_link_libraries(parac PUBLIC paracuber)
 target_link_libraries(parac PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(parac PUBLIC Boost::log Boost::program_options)
+
+# Documentation
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+    add_custom_target(doc ALL
+	${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+	COMMENT "Generating API documentation with Doxygen" VERBATIM
+	)
+endif(DOXYGEN_FOUND)
