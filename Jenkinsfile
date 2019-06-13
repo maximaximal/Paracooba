@@ -7,10 +7,10 @@ pipeline {
     dir('paracuber') {
 	stages {
 	    stage('Build') {
-		steps [
-		    sh 'cmake . -G "Ninja" -B./build'
-		    sh 'cd build && ninja'
-		]
+		steps {
+		    cmake arguments: installation: 'InSearchPath'
+		    cmakeBuild buildType: 'Release', cleanBuild: true, installation: 'InSearchPath', steps: [[withCmake: true]]
+		}
 	    }
 	}	
     }
