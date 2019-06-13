@@ -5,7 +5,9 @@ project(paracuber
 # Libraries
 find_package(Threads)
 
-set(Boost_USE_STATIC_LIBS ON)
+# Ubuntu standard package is lame.
+# set(Boost_USE_STATIC_LIBS ON)
+set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 find_package(Boost COMPONENTS log program_options)
 
