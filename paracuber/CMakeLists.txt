@@ -44,6 +44,7 @@ define_file_basename_for_sources(parac)
 target_link_libraries(parac PUBLIC paracuber)
 target_link_libraries(parac PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(parac PUBLIC Boost::log Boost::program_options)
+target_include_directories(parac PUBLIC ${libcadical_INCLUDE_DIRS})
 
 # Documentation
 find_package(Doxygen)
