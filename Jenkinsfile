@@ -8,8 +8,8 @@ pipeline {
 	stages {
 	    stage('Build') {
 		steps [
-		    cmake arguments: installation: 'InSearchPath'
-		    cmakeBuild buildType: 'Release', cleanBuild: true, installation: 'InSearchPath', steps: [[withCmake: true]]
+		    sh 'cmake . -G "Ninja" -B./build'
+		    sh 'cd build && ninja'
 		]
 	    }
 	}	
