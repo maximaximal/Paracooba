@@ -8,7 +8,7 @@ pipeline {
 	stage('Build') {
 	    steps {
 		dir('paracuber') {
-		    cmake installation: 'InSearchPath'
+		    sh 'touch build/third_party/cadical-out/build/libcadical.a'
 		    cmakeBuild buildType: 'Release', cleanBuild: true, installation: 'InSearchPath', steps: [[withCmake: true]]
 		}
 	    }
