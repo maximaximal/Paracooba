@@ -8,6 +8,9 @@
 #include <string_view>
 
 namespace paracuber {
+/** @brief Store for communication options specific for each node.
+ *
+ */
 class Config
 {
   public:

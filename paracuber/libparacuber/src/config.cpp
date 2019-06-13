@@ -8,8 +8,8 @@ namespace po = boost::program_options;
 namespace paracuber {
 Config::Config()
   : m_optionsCLI("CLI-only options")
-  , m_optionsFile("Config file options")
   , m_optionsCommon("CLI and config file options")
+  , m_optionsFile("Config file options")
 {
   /* CLI ONLY OPTIONS
    * --------------------------------------- */
