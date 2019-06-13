@@ -4,14 +4,14 @@ pipeline {
 	buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
-    dir('paracuber') {
-	stages {
-	    stage('Build') {
-		steps {
+    stages {
+	stage('Build') {
+	    steps {
+		dir('paracuber') {
 		    cmake installation: 'InSearchPath'
 		    cmakeBuild buildType: 'Release', cleanBuild: true, installation: 'InSearchPath', steps: [[withCmake: true]]
 		}
 	    }
-	}	
-    }
+	}
+    }	
 }
