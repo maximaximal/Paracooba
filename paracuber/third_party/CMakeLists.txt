@@ -6,10 +6,10 @@ ExternalProject_Add(cadical
     URL ${CMAKE_CURRENT_SOURCE_DIR}/cadical-sc18-58331fd.tar.xz
     URL_HASH SHA256=86937cd789aefc381b8bbaf23fa09384962d457241a550c2ad1a747cedbbcd54
     BUILD_IN_SOURCE 1
-    CONFIGURE_COMMAND ./configure
-    BUILD_COMMAND make
+    BUILD_COMMAND bash -c "CXXFLAGS=-fPIC ./configure && make"
     UPDATE_COMMAND ""
     INSTALL_COMMAND ""
+    CONFIGURE_COMMAND ""
 )
 ExternalProject_Add_Step (
     cadical CopyHeaders
