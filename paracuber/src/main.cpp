@@ -2,7 +2,9 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 
+#include <paracuber/client.hpp>
 #include <paracuber/config.hpp>
+#include <paracuber/daemon.hpp>
 #include <paracuber/log.hpp>
 
 namespace po = boost::program_options;
@@ -20,9 +22,32 @@ main(int argc, char* argv[])
   std::shared_ptr<Log> log = std::make_shared<Log>(config);
   auto logger = log->createLogger();
 
-  PARACUBER_LOG(logger, Info) << "Starting paracuber \""
-                          << config->getString(Config::LocalName) << "\"";
+  PARACUBER_LOG(logger, Trace)
+    << "Starting paracuber \"" << config->getString(Config::LocalName) << "\"";
 
-  PARACUBER_LOG(logger, Info) << "Ending paracuber.";
+  if(config->isDaemonMode()) {
+    // Daemon mode. The program should now wait for incoming connections.
+    Daemon daemon(config);
+
+  } else {
+    // Client mode. There should be some action.
+    Client client(config, log);
+    client.readDIMACSFromConfig();
+    int status = client.solve();
+
+    switch(status) {
+      case 0:
+        PARACUBER_LOG(logger, Info) << "Unsolved!";
+        break;
+      case 10:
+        PARACUBER_LOG(logger, Info) << "Satisfied!";
+        break;
+      case 20:
+        PARACUBER_LOG(logger, Info) << "Unsatisfiable!";
+        break;
+    }
+  }
+
+  PARACUBER_LOG(logger, Trace) << "Ending paracuber.";
   return EXIT_SUCCESS;
 }

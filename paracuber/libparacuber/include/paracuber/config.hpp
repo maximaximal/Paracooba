@@ -18,8 +18,8 @@ class Config
    */
   enum Key
   {
-    Debug,
     LocalName,
+    InputFile,
 
     _KEY_COUNT
   };
@@ -81,6 +81,16 @@ class Config
    */
   std::any operator[](Key key) { return get(key); }
 
+  /** @brief Check if debug mode is active. */
+  inline bool isDebugMode() { return m_debugMode; }
+  /** @brief Check if daemon mode is active. */
+  inline bool isDaemonMode() { return m_daemonMode; }
+
+  /** @brief Set debug mode active. */
+  inline void setDebugMode(bool v) { m_debugMode = v; }
+  /** @brief Set daemon mode active. */
+  inline void setDaemonMode(bool v) { m_daemonMode = v; }
+
   private:
   bool processCommonParameters(
     const boost::program_options::variables_map& map);
@@ -92,16 +102,19 @@ class Config
   boost::program_options::options_description m_optionsCLI;
   boost::program_options::options_description m_optionsCommon;
   boost::program_options::options_description m_optionsFile;
+
+  bool m_debugMode = false;
+  bool m_daemonMode = false;
 };
 
 constexpr const char*
 GetConfigNameFromEnum(Config::Key key)
 {
   switch(key) {
-    case Config::Debug:
-      return "debug";
     case Config::LocalName:
       return "local-name";
+    case Config::InputFile:
+      return "input-file";
     default:
       return "";
   }

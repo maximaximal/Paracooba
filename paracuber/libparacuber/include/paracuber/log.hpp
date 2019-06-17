@@ -37,6 +37,7 @@
 
 namespace paracuber {
 class Config;
+using ConfigPtr = std::shared_ptr<Config>;
 
 /** @brief Utility class to manage logging.
  */
@@ -66,7 +67,7 @@ class Log
 
   /** @brief Constructor
    */
-  Log(std::shared_ptr<Config> config);
+  Log(ConfigPtr config);
   /** @brief Destructor.
    */
   ~Log();
@@ -77,11 +78,14 @@ class Log
   boost::log::sources::severity_logger<Severity> createLogger();
 
   private:
-  std::shared_ptr<Config> m_config;
+  ConfigPtr m_config;
   boost::shared_ptr<boost::log::sinks::synchronous_sink<
     boost::log::sinks::basic_text_ostream_backend<char>>>
     m_consoleSink;
 };
+
+using LogPtr = std::shared_ptr<Log>;
+using Logger = boost::log::sources::severity_logger<Log::Severity>;
 
 std::ostream&
 operator<<(std::ostream& strm, ::paracuber::Log::Severity level);

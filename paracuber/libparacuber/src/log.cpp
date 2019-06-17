@@ -32,7 +32,7 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_timestamp,
                             boost::posix_time::ptime)
 
 namespace paracuber {
-Log::Log(std::shared_ptr<Config> config)
+Log::Log(ConfigPtr config)
   : m_config(config)
 {
   // Initialise global logging attributes for all loggers.
@@ -52,7 +52,7 @@ Log::Log(std::shared_ptr<Config> config)
     logging::add_common_attributes();
 
     // Logging Filter
-    if(!config->getBool(Config::Debug)) {
+    if(!config->isDebugMode()) {
       boost::log::core::get()->set_filter(paracuber_logger_severity >=
                                           Severity::LocalWarning);
     }

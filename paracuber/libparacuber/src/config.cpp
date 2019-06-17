@@ -29,8 +29,10 @@ Config::Config()
   m_optionsCommon.add_options()
     (GetConfigNameFromEnum(Config::LocalName),
          po::value<std::string>()->default_value("Unnamed"), "local name of this solver node")
-    (GetConfigNameFromEnum(Config::Debug),
-         po::value<bool>()->default_value(false), "debug mode")
+    (GetConfigNameFromEnum(Config::InputFile),
+         po::value<std::string>()->default_value(""), "input file (problem) to parse")
+    ("debug,d", po::bool_switch(&m_debugMode)->default_value(false), "debug mode")
+    ("daemon", po::bool_switch(&m_daemonMode)->default_value(false), "daemon mode")
     ;
   // clang-format on
 }
@@ -40,11 +42,18 @@ Config::~Config() {}
 bool
 Config::parseParameters(int argc, char** argv)
 {
+  po::positional_options_description positionalOptions;
+  positionalOptions.add("input-file", 1);
+
   po::options_description cliGroup;
   cliGroup.add(m_optionsCommon).add(m_optionsCLI);
   po::variables_map vm;
-  po::store(po::parse_command_line(argc, argv, cliGroup), vm);
-  notify(vm);
+  po::store(po::command_line_parser(argc, argv)
+              .options(cliGroup)
+              .positional(positionalOptions)
+              .run(),
+            vm);
+  po::notify(vm);
 
   if(vm.count("help")) {
     std::cout << m_optionsCLI << std::endl;
@@ -78,7 +87,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
 {
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::LocalName);
-  conditionallySetConfigOptionToArray<bool>(vm, m_config.data(), Config::Debug);
+  conditionallySetConfigOptionToArray<std::string>(
+    vm, m_config.data(), Config::InputFile);
 
   return true;
 }
