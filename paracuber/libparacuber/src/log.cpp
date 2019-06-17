@@ -50,6 +50,12 @@ Log::Log(std::shared_ptr<Config> config)
       logging::attributes::constant<std::string_view>(
         config->getString(Config::LocalName)));
     logging::add_common_attributes();
+
+    // Logging Filter
+    if(!config->getBool(Config::Debug)) {
+      boost::log::core::get()->set_filter(paracuber_logger_severity >=
+                                          Severity::LocalWarning);
+    }
   } catch(const std::exception& e) {
     std::cerr
       << "> Exception during initialisation of global log variables! Error: "

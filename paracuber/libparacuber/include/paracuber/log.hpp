@@ -38,10 +38,20 @@
 namespace paracuber {
 class Config;
 
+/** @brief Utility class to manage logging.
+ */
 class Log
 {
   public:
+  /** @brief Tag to associate severity internally.
+   */
   struct Severity_Tag;
+  /** @brief Severity of a log message.
+   *
+   * Local errors should be differentiated from global errors! Local errors only
+   * affect local node, a global error may affect the entire distributed solving
+   * process over multiple nodes.
+   */
   enum Severity
   {
     Trace,
@@ -54,9 +64,16 @@ class Log
     Fatal
   };
 
+  /** @brief Constructor
+   */
   Log(std::shared_ptr<Config> config);
-  virtual ~Log();
+  /** @brief Destructor.
+   */
+  ~Log();
 
+  /** @brief Create a logger for a specific environment, which may receive
+   * multiple custom attributes.
+   */
   boost::log::sources::severity_logger<Severity> createLogger();
 
   private:

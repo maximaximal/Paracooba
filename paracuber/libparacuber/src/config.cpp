@@ -29,6 +29,8 @@ Config::Config()
   m_optionsCommon.add_options()
     (GetConfigNameFromEnum(Config::LocalName),
          po::value<std::string>()->default_value("Unnamed"), "local name of this solver node")
+    (GetConfigNameFromEnum(Config::Debug),
+         po::value<bool>()->default_value(false), "debug mode")
     ;
   // clang-format on
 }
@@ -76,6 +78,7 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
 {
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::LocalName);
+  conditionallySetConfigOptionToArray<bool>(vm, m_config.data(), Config::Debug);
 
   return true;
 }
