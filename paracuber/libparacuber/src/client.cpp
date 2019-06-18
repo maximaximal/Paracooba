@@ -1,13 +1,15 @@
 #include "../include/paracuber/client.hpp"
 #include "../include/paracuber/config.hpp"
+#include "../include/paracuber/communicator.hpp"
 
 #include <cadical/cadical.hpp>
 
 namespace paracuber {
-Client::Client(ConfigPtr config, LogPtr log)
+Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
   : m_config(config)
   , m_solver(std::make_shared<CaDiCaL::Solver>())
   , m_logger(log->createLogger())
+  , m_communicator(communicator)
 {}
 Client::~Client() {}
 

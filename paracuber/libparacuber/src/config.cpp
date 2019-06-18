@@ -2,6 +2,7 @@
 #include <boost/program_options.hpp>
 #include <cstddef>
 #include <iostream>
+#include <thread>
 
 namespace po = boost::program_options;
 
@@ -31,6 +32,9 @@ Config::Config()
          po::value<std::string>()->default_value("Unnamed"), "local name of this solver node")
     (GetConfigNameFromEnum(Config::InputFile),
          po::value<std::string>()->default_value(""), "input file (problem) to parse")
+    (GetConfigNameFromEnum(Config::ThreadCount),
+         po::value<uint32_t>()->default_value(std::thread::hardware_concurrency()),
+         "number of worker threads to execute tasks on")
     ("debug,d", po::bool_switch(&m_debugMode)->default_value(false), "debug mode")
     ("daemon", po::bool_switch(&m_daemonMode)->default_value(false), "daemon mode")
     ;
@@ -89,6 +93,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::LocalName);
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::InputFile);
+  conditionallySetConfigOptionToArray<uint32_t>(
+    vm, m_config.data(), Config::ThreadCount);
 
   return true;
 }

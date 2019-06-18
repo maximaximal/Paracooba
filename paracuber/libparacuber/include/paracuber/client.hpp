@@ -12,6 +12,7 @@ class Solver;
 
 namespace paracuber {
 class Config;
+class Communicator;
 
 /** @brief Main interaction point with the solver as a user.
  */
@@ -20,12 +21,15 @@ class Client
   public:
   /** @brief Constructor
    */
-  Client(ConfigPtr config, LogPtr log);
+  Client(ConfigPtr config,
+         LogPtr log,
+         std::shared_ptr<Communicator> communicator);
   /** @brief Destructor.
    */
   ~Client();
 
-  /** @brief Read DIMACS file into the internal solver instance, get path from config. */
+  /** @brief Read DIMACS file into the internal solver instance, get path from
+   * config. */
   const char* readDIMACSFromConfig();
 
   /** @brief Read DIMACS file into the internal solver instance. */
@@ -42,6 +46,7 @@ class Client
 
   private:
   ConfigPtr m_config;
+  std::shared_ptr<Communicator> m_communicator;
 
   std::shared_ptr<CaDiCaL::Solver> m_solver;
 

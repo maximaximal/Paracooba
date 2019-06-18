@@ -20,6 +20,7 @@ class Config
   {
     LocalName,
     InputFile,
+    ThreadCount,
 
     _KEY_COUNT
   };
@@ -66,6 +67,12 @@ class Config
   /** @brief Get an int64 configuration variable.
    */
   inline int64_t getInt64(Key key) { return get<int64_t>(key); }
+  /** @brief Get an uint32 configuration variable.
+   */
+  inline uint32_t getUint32(Key key) { return get<uint32_t>(key); }
+  /** @brief Get an uint64 configuration variable.
+   */
+  inline uint64_t getUint64(Key key) { return get<uint64_t>(key); }
   /** @brief Get a bool configuration variable.
    */
   inline bool getBool(Key key) { return get<bool>(key); }
@@ -115,6 +122,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "local-name";
     case Config::InputFile:
       return "input-file";
+    case Config::ThreadCount:
+      return "threads";
     default:
       return "";
   }

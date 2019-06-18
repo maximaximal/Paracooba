@@ -1,9 +1,12 @@
 #include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/log.hpp"
+#include "../include/paracuber/communicator.hpp"
 
 namespace paracuber {
-Daemon::Daemon(std::shared_ptr<Config> config)
+Daemon::Daemon(ConfigPtr config,
+               LogPtr log,
+               std::shared_ptr<Communicator> communicator)
   : m_config(config)
 {}
 

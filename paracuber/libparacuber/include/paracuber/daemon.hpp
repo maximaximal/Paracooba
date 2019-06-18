@@ -1,10 +1,11 @@
 #ifndef PARACUBER_DAEMON_HPP
 #define PARACUBER_DAEMON_HPP
 
+#include "log.hpp"
 #include <memory>
 
 namespace paracuber {
-class Config;
+class Communicator;
 /** @brief Daemonised solver mode that waits for tasks and sends and receives
  * statistics to/from other solvers.
  */
@@ -13,7 +14,9 @@ class Daemon
   public:
   /** @brief Constructor
    */
-  Daemon(std::shared_ptr<Config> config);
+  Daemon(ConfigPtr config,
+         LogPtr log,
+         std::shared_ptr<Communicator> communicator);
   /** @brief Destructor
    */
   ~Daemon();

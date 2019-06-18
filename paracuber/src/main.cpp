@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <paracuber/client.hpp>
+#include <paracuber/communicator.hpp>
 #include <paracuber/config.hpp>
 #include <paracuber/daemon.hpp>
 #include <paracuber/log.hpp>
@@ -25,13 +26,15 @@ main(int argc, char* argv[])
   PARACUBER_LOG(logger, Trace)
     << "Starting paracuber \"" << config->getString(Config::LocalName) << "\"";
 
+  CommunicatorPtr communicator = std::make_shared<Communicator>(config, log);
+
   if(config->isDaemonMode()) {
     // Daemon mode. The program should now wait for incoming connections.
-    Daemon daemon(config);
+    Daemon daemon(config, log, communicator);
 
   } else {
     // Client mode. There should be some action.
-    Client client(config, log);
+    Client client(config, log, communicator);
     client.readDIMACSFromConfig();
     int status = client.solve();
 
@@ -47,6 +50,8 @@ main(int argc, char* argv[])
         break;
     }
   }
+
+  communicator->run();
 
   PARACUBER_LOG(logger, Trace) << "Ending paracuber.";
   return EXIT_SUCCESS;

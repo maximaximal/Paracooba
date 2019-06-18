@@ -1,0 +1,6 @@
+digraph {
+    "Original CaDiCaL Solver Instance" -> "Cap'n Proto Message";
+    "Cap'n Proto Message" -> "TCP Stream";
+    "TCP Stream" -> "Cap'n Proto Message Reconstruction";
+    "Cap'n Proto Message Reconstruction" -> "Reconstructed CaDiCaL Solver Instance";
+}
