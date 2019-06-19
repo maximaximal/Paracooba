@@ -9,12 +9,18 @@ namespace boost {
 namespace asio {
 class io_context;
 using io_service = io_context;
+class signal_set;
+}
+namespace system {
+class error_code;
 }
 }
 
 using IOServicePtr = std::shared_ptr<boost::asio::io_service>;
 
 namespace paracuber {
+class Runner;
+
 /** @brief Hub for all local & network communication processes between nodes.
  *
  * This node owns the boost asio io_service that is responsible for all timing
@@ -28,7 +34,7 @@ namespace paracuber {
  *
  * \dotfile solver-network-flow.dot
  */
-class Communicator
+class Communicator : public std::enable_shared_from_this<Communicator>
 {
   public:
   /** @brief Constructor */
@@ -43,11 +49,20 @@ class Communicator
    */
   void run();
 
+  /** @brief Get the active \ref Runner class instance for running \ref Task
+   * objects.
+   */
+  inline std::shared_ptr<Runner> getRunner() { return m_runner; }
+
   private:
+  ConfigPtr m_config;
   IOServicePtr m_ioService;
   std::any m_ioServiceWork;
-  ConfigPtr m_config;
   Logger m_logger;
+  std::unique_ptr<boost::asio::signal_set> m_signalSet;
+  std::shared_ptr<Runner> m_runner;
+
+  void signalHandler(const boost::system::error_code& error, int signalNumber);
 };
 
 using CommunicatorPtr = std::shared_ptr<Communicator>;

@@ -25,9 +25,7 @@ class Runner
   /** @brief Create a runner for tasks.
    *
    * This constructor does not start the internal thread pool yet. */
-  Runner(ConfigPtr config,
-         LogPtr log,
-         std::shared_ptr<Communicator> communicator);
+  Runner(ConfigPtr config, LogPtr log);
   /** Destructor */
   ~Runner();
 
@@ -38,18 +36,17 @@ class Runner
   /** @brief Ends the thread-pool synchronously.
    *
    * This function returns once the last thread has finished. */
-  void end();
+  void stop();
 
   /** @brief Push a new task to the internal task queue.
    *
    * The task will be run as soon as priorities, dependencies, ..., are sorted
    * out. */
-  std::future<TaskResult> push(std::unique_ptr<Task> task);
+  std::future<std::unique_ptr<TaskResult>>& push(std::unique_ptr<Task> task);
 
   private:
   ConfigPtr m_config;
   LogPtr m_log;
-  std::shared_ptr<Communicator> m_communicator;
   Logger m_logger;
   volatile bool m_running = true;
 
@@ -57,9 +54,28 @@ class Runner
 
   void worker(uint32_t workerId, Logger logger);
 
-  std::priority_queue<std::unique_ptr<Task>> m_taskQueue;
+  struct QueueEntry
+  {
+    /** @brief Quick Constructor for a QueueEntry object.
+     */
+    QueueEntry(std::unique_ptr<Task> task, int priority);
+    ~QueueEntry();
+    std::unique_ptr<Task> task;
+    std::future<std::unique_ptr<TaskResult>> result;
+    int priority = 0;
+
+    inline bool operator<(QueueEntry const& b) const
+    {
+      return priority < b.priority;
+    }
+  };
+
+  void push_(std::unique_ptr<QueueEntry> entry);
+  std::unique_ptr<QueueEntry> pop_();
+  std::vector<std::unique_ptr<QueueEntry>> m_taskQueue;
+
   std::mutex m_taskQueueMutex;
-  std::condition_variable new_tasks;
+  std::condition_variable m_newTasks;
 };
 }
 

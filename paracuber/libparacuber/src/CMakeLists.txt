@@ -5,6 +5,7 @@ set(PARACUBER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/config.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/task.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/taskresult.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/client.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/daemon.cpp
     PARENT_SCOPE)

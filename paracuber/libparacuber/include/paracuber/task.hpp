@@ -1,6 +1,8 @@
 #ifndef PARACUBER_TASK_HPP
 #define PARACUBER_TASK_HPP
 
+#include "taskresult.hpp"
+
 namespace paracuber {
 /** @brief Environment for tasks anywhere in the distributed system.
  *
@@ -12,23 +14,14 @@ class Task
   /** @brief Constructor */
   Task();
   /** @brief Destructor */
-  ~Task();
-
-  /** @brief The status code task can result in. This affects execution of other
-   * tasks.
-   */
-  enum Status
-  {
-    SUCCESS,
-    MISSING_INPUTS
-  };
+  virtual ~Task();
 
   /** @brief Execute this task.
    *
    * Must be implemented by actual tasks. May be called multiple times to re-use
    * old task objects.
    * */
-  virtual Status execute() = 0;
+  virtual TaskResultPtr execute() = 0;
 
   private:
 };
