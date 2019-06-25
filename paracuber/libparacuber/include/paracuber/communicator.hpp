@@ -17,7 +17,7 @@ class io_service;
 class signal_set_service;
 template<typename SignalSetService = signal_set_service>
 class basic_signal_set;
-typedef class basic_signal_set<> signal_set;
+typedef basic_signal_set<> signal_set;
 #endif
 class signal_set;
 }
