@@ -18,10 +18,10 @@ pipeline {
 		// Publish Doxygen Documentation.
 		publishHTML (target: [
 		    allowMissing: false,
-		    alwaysLinkToLastBuild: false,
-		    keepAll: true,
+		    alwaysLinkToLastBuild: true,
+		    keepAll: false,
 		    reportDir: 'paracuber/doc/html',
-		    reportName: 'Doxygen Documentation'
+		    reportName: 'Doxygen-Documentation'
 		])
 	    }
 	}
