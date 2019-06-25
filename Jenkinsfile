@@ -16,7 +16,7 @@ pipeline {
 	stage('Archive') {
 	    steps {
 		// Publish Doxygen Documentation.
-		publishHTML([allowMissing: false, alwaysLinkToLastBuild: true, keepAll: false, reportDir: 'paracuber/doc/html', reportFiles: 'index.html', reportName: 'Doxygen Documentation', reportTitles: ''])
+		publishHTML([allowMissing: false, alwaysLinkToLastBuild: true, keepAll: false, reportDir: 'paracuber/doc/html', reportFiles: '**', reportName: 'Doxygen Documentation', reportTitles: ''])
 	    }
 	}
     }	
