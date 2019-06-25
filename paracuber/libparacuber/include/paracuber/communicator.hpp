@@ -6,6 +6,7 @@
 #include <memory>
 
 #include <boost/version.hpp>
+#include <boost/asio/signal_set.hpp>
 
 namespace boost {
 namespace asio {
@@ -15,10 +16,6 @@ using io_service = io_context;
 class signal_set;
 #else
 class io_service;
-class signal_set_service;
-template<typename SignalSetService = signal_set_service>
-class basic_signal_set;
-typedef basic_signal_set<> signal_set;
 #endif
 }
 namespace system {
