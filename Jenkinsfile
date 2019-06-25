@@ -13,5 +13,17 @@ pipeline {
 		}
 	    }
 	}
+	stage('Archive') {
+	    steps {
+		// Publish Doxygen Documentation.
+		publishHTML (target: {
+		    allowMissing: false,
+		    alwaysLinkToLastBuild: false,
+		    keepAll: true,
+		    reportDir: 'build/doc/html',
+		    reportName: 'Doxygen Documentation'
+		})
+	    }
+	}
     }	
 }
