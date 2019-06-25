@@ -9,11 +9,15 @@
 
 namespace boost {
 namespace asio {
-#if (BOOST_VERSION / 100 % 1000) >= 69
+#if(BOOST_VERSION / 100 % 1000) >= 69
 class io_context;
 using io_service = io_context;
 #else
 class io_service;
+class signal_set_service;
+template<typename SignalSetService = signal_set_service>
+class basic_signal_set;
+typedef class basic_signal_set<> signal_set;
 #endif
 class signal_set;
 }
