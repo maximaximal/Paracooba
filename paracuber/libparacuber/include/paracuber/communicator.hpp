@@ -12,6 +12,7 @@ namespace asio {
 #if(BOOST_VERSION / 100 % 1000) >= 69
 class io_context;
 using io_service = io_context;
+class signal_set;
 #else
 class io_service;
 class signal_set_service;
@@ -19,7 +20,6 @@ template<typename SignalSetService = signal_set_service>
 class basic_signal_set;
 typedef basic_signal_set<> signal_set;
 #endif
-class signal_set;
 }
 namespace system {
 class error_code;
