@@ -20,7 +20,7 @@ pipeline {
 		    allowMissing: false,
 		    alwaysLinkToLastBuild: false,
 		    keepAll: true,
-		    reportDir: 'build/doc/html',
+		    reportDir: 'paracuber/build/doc/html',
 		    reportName: 'Doxygen Documentation'
 		])
 	    }
