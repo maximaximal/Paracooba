@@ -5,10 +5,16 @@
 #include <any>
 #include <memory>
 
+#include <boost/version.hpp>
+
 namespace boost {
 namespace asio {
+#if (BOOST_VERSION / 100 % 1000) >= 69
 class io_context;
 using io_service = io_context;
+#else
+class io_service;
+#endif
 class signal_set;
 }
 namespace system {
