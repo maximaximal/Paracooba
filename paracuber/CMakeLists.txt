@@ -12,7 +12,7 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost COMPONENTS log program_options REQUIRED)
+find_package(Boost COMPONENTS log program_options thread REQUIRED)
 
 find_package(CapnProto REQUIRED)
 

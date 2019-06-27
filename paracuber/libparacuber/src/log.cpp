@@ -5,6 +5,8 @@
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/sinks/text_file_backend.hpp>
+#include <boost/log/sources/global_logger_storage.hpp>
+#include <boost/log/sources/logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/support/date_time.hpp>
@@ -31,18 +33,29 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_timestamp,
                             "Timestamp",
                             boost::posix_time::ptime)
 
+thread_local MutableConstant<int> lineAttr = MutableConstant<int>(5);
+thread_local MutableConstant<const char*> fileAttr =
+  MutableConstant<const char*>("");
+thread_local MutableConstant<const char*> functionAttr =
+  MutableConstant<const char*>("");
+
 namespace paracuber {
+
+BOOST_LOG_INLINE_GLOBAL_LOGGER_INIT(global_logger,
+                                    ::boost::log::sources::logger)
+{
+  logging::sources::logger lg;
+  lg.add_attribute("Line", lineAttr);
+  lg.add_attribute("File", fileAttr);
+  lg.add_attribute("Function", functionAttr);
+  return lg;
+}
+
 Log::Log(ConfigPtr config)
   : m_config(config)
 {
   // Initialise global logging attributes for all loggers.
   try {
-    logging::core::get()->add_global_attribute(
-      "Line", logging::attributes::mutable_constant<int>(5));
-    logging::core::get()->add_global_attribute(
-      "File", logging::attributes::mutable_constant<std::string>(""));
-    logging::core::get()->add_global_attribute(
-      "Function", logging::attributes::mutable_constant<std::string>(""));
     logging::core::get()->add_global_attribute(
       "Timestamp", logging::attributes::local_clock());
     logging::core::get()->add_global_attribute(
@@ -83,8 +96,8 @@ Log::~Log() {}
 boost::log::sources::severity_logger<Log::Severity>
 Log::createLogger()
 {
-  auto logger = boost::log::sources::severity_logger<Log::Severity>();
-  return logger;
+  auto lg = boost::log::sources::severity_logger<Log::Severity>();
+  return std::move(lg);
 }
 
 std::ostream&

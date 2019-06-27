@@ -76,6 +76,7 @@ class Runner
 
   std::mutex m_taskQueueMutex;
   std::condition_variable m_newTasks;
+  volatile bool m_newTasksVerifier = false;
 };
 }
 

@@ -16,18 +16,17 @@
 #define FILE_BASENAME "Basename not supported."
 #endif
 
-#define PARACUBER_LOG_LOCATION(lg)                                           \
-  boost::log::attribute_cast<boost::log::attributes::mutable_constant<int>>( \
-    boost::log::core::get()->get_global_attributes()["Line"])                \
-    .set(__LINE__);                                                          \
-  boost::log::attribute_cast<                                                \
-    boost::log::attributes::mutable_constant<std::string>>(                  \
-    boost::log::core::get()->get_global_attributes()["File"])                \
-    .set(FILE_BASENAME);                                                     \
-  boost::log::attribute_cast<                                                \
-    boost::log::attributes::mutable_constant<std::string>>(                  \
-    boost::log::core::get()->get_global_attributes()["Function"])            \
-    .set(__PRETTY_FUNCTION__);
+template<typename T>
+using MutableConstant = boost::log::attributes::mutable_constant<T>;
+
+extern thread_local MutableConstant<int> lineAttr;
+extern thread_local MutableConstant<const char*> fileAttr;
+extern thread_local MutableConstant<const char*> functionAttr;
+
+#define PARACUBER_LOG_LOCATION(lg) \
+  lineAttr.set(__LINE__);          \
+  fileAttr.set(FILE_BASENAME);     \
+  functionAttr.set(__PRETTY_FUNCTION__);
 
 #define PARACUBER_LOG(LOGGER, SEVERITY) \
   do {                                  \

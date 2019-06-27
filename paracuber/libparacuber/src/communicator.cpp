@@ -13,10 +13,10 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   boost::asio::io_service::work work(*m_ioService);
   m_ioServiceWork = work;
 
-  using namespace std::placeholders;
-
-  m_signalSet->async_wait(
-    std::bind(&Communicator::signalHandler, this, _1, _2));
+  m_signalSet->async_wait(std::bind(&Communicator::signalHandler,
+                                    this,
+                                    std::placeholders::_1,
+                                    std::placeholders::_2));
 }
 
 Communicator::~Communicator()
