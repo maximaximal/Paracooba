@@ -15,10 +15,17 @@ Runner::~Runner() {}
 void
 Runner::start()
 {
-  m_running = true;
-  for(uint32_t i = 0; i < m_config->getUint32(Config::ThreadCount); ++i) {
-    m_pool.push_back(
-      std::thread(std::bind(&Runner::worker, this, i, m_log->createLogger())));
+  uint32_t i = 0;
+  try {
+    m_running = true;
+    for(i = 0; i < m_config->getUint32(Config::ThreadCount); ++i) {
+      m_pool.push_back(std::thread(
+        std::bind(&Runner::worker, this, i, m_log->createLogger())));
+    }
+  } catch(std::system_error& e) {
+    PARACUBER_LOG(m_logger, LocalError)
+      << "Could only initialize " << i << " of "
+      << m_config->getUint32(Config::ThreadCount) << " requested threads!";
   }
 }
 
@@ -51,7 +58,8 @@ Runner::worker(uint32_t workerId, Logger logger)
     {
       std::unique_lock<std::mutex> lock(m_taskQueueMutex);
       while(m_running && !m_newTasksVerifier) {
-        PARACUBER_LOG(logger, Trace) << "Worker " << workerId << " waiting for tasks.";
+        PARACUBER_LOG(logger, Trace)
+          << "Worker " << workerId << " waiting for tasks.";
         m_newTasks.wait(lock);
         m_newTasksVerifier = false;
         entry = pop_();
