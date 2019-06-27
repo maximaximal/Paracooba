@@ -5,10 +5,7 @@
 #include <string_view>
 
 #include "log.hpp"
-
-namespace CaDiCaL {
-class Solver;
-}
+#include "taskresult.hpp"
 
 namespace paracuber {
 class Config;
@@ -30,25 +27,20 @@ class Client
 
   /** @brief Read DIMACS file into the internal solver instance, get path from
    * config. */
-  const char* readDIMACSFromConfig();
-
-  /** @brief Read DIMACS file into the internal solver instance. */
-  const char* readDIMACS(std::string_view sourcePath);
+  std::string_view getDIMACSSourcePathFromConfig();
 
   /** @brief Try to solve the current formula.
    *
    * @return status code,
-   *         - 0 UNSOLVED
-   *         - 10 SATISFIED
-   *         - 20 UNSATISFIABLE
+   *         - TaskResult::Status::Unsolved
+   *         - TaskResult::Status::Satisfiable
+   *         - TaskResult::Status::Unsatisfiable
    */
-  int solve();
+  TaskResult::Status solve();
 
   private:
   ConfigPtr m_config;
   std::shared_ptr<Communicator> m_communicator;
-
-  std::shared_ptr<CaDiCaL::Solver> m_solver;
 
   Logger m_logger;
 };

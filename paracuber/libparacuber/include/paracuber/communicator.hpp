@@ -5,8 +5,8 @@
 #include <any>
 #include <memory>
 
-#include <boost/version.hpp>
 #include <boost/asio/signal_set.hpp>
+#include <boost/version.hpp>
 
 namespace boost {
 namespace asio {
@@ -55,6 +55,9 @@ class Communicator : public std::enable_shared_from_this<Communicator>
    * completed.
    */
   void run();
+
+  /** @brief Start the internal runner thread pool without blocking. */
+  void startRunner();
 
   /** @brief Get the active \ref Runner class instance for running \ref Task
    * objects.

@@ -38,11 +38,14 @@ class Runner
    * This function returns once the last thread has finished. */
   void stop();
 
+  /** @brief Reports if the runner is already running. */
+  inline bool isRunning() { return m_running; }
+
   /** @brief Push a new task to the internal task queue.
    *
    * The task will be run as soon as priorities, dependencies, ..., are sorted
    * out. */
-  std::future<std::unique_ptr<TaskResult>>& push(std::unique_ptr<Task> task);
+  std::future<std::unique_ptr<TaskResult>> push(std::unique_ptr<Task> task);
 
   private:
   ConfigPtr m_config;
@@ -61,7 +64,7 @@ class Runner
     QueueEntry(std::unique_ptr<Task> task, int priority);
     ~QueueEntry();
     std::unique_ptr<Task> task;
-    std::future<std::unique_ptr<TaskResult>> result;
+    std::promise<std::unique_ptr<TaskResult>> result;
     int priority = 0;
 
     inline bool operator<(QueueEntry const& b) const
@@ -76,7 +79,7 @@ class Runner
 
   std::mutex m_taskQueueMutex;
   std::condition_variable m_newTasks;
-  volatile bool m_newTasksVerifier = false;
+  bool m_newTasksVerifier = false;
 };
 }
 

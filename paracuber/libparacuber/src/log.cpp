@@ -69,6 +69,10 @@ Log::Log(ConfigPtr config)
       boost::log::core::get()->set_filter(paracuber_logger_severity >=
                                           Severity::LocalWarning);
     }
+    if(config->isInfoMode()) {
+      boost::log::core::get()->set_filter(paracuber_logger_severity >=
+                                          Severity::Info);
+    }
   } catch(const std::exception& e) {
     std::cerr
       << "> Exception during initialisation of global log variables! Error: "

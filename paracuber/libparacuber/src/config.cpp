@@ -35,7 +35,8 @@ Config::Config()
     (GetConfigNameFromEnum(Config::ThreadCount),
          po::value<uint32_t>()->default_value(std::thread::hardware_concurrency()),
          "number of worker threads to execute tasks on")
-    ("debug,d", po::bool_switch(&m_debugMode)->default_value(false), "debug mode")
+    ("debug,d", po::bool_switch(&m_debugMode)->default_value(false), "debug mode (all debug output)")
+    ("info,i", po::bool_switch(&m_infoMode)->default_value(false), "info mode (more information)")
     ("daemon", po::bool_switch(&m_daemonMode)->default_value(false), "daemon mode")
     ;
   // clang-format on

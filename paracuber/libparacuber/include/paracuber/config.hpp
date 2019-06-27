@@ -90,11 +90,15 @@ class Config
 
   /** @brief Check if debug mode is active. */
   inline bool isDebugMode() { return m_debugMode; }
+  /** @brief Check if info mode is active. */
+  inline bool isInfoMode() { return m_infoMode; }
   /** @brief Check if daemon mode is active. */
   inline bool isDaemonMode() { return m_daemonMode; }
 
   /** @brief Set debug mode active. */
   inline void setDebugMode(bool v) { m_debugMode = v; }
+  /** @brief Set info mode active. */
+  inline void setInfoMode(bool v) { m_infoMode = v; }
   /** @brief Set daemon mode active. */
   inline void setDaemonMode(bool v) { m_daemonMode = v; }
 
@@ -111,6 +115,7 @@ class Config
   boost::program_options::options_description m_optionsFile;
 
   bool m_debugMode = false;
+  bool m_infoMode = false;
   bool m_daemonMode = false;
 };
 

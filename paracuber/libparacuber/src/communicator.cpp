@@ -27,11 +27,19 @@ Communicator::~Communicator()
 void
 Communicator::run()
 {
-  m_runner->start();
+  if(!m_runner->isRunning()) {
+    m_runner->start();
+  }
   PARACUBER_LOG(m_logger, Trace) << "Communicator io_service started.";
   m_ioService->run();
   PARACUBER_LOG(m_logger, Trace) << "Communicator io_service ended.";
   m_runner->stop();
+}
+
+void
+Communicator::startRunner()
+{
+  m_runner->start();
 }
 
 void

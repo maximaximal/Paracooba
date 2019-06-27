@@ -16,8 +16,12 @@ class TaskResult
    */
   enum Status
   {
-    SUCCESS,
-    MISSING_INPUTS
+    Success,
+    MissingInputs,
+
+    Satisfiable,
+    Unsolved,
+    Unsatisfiable
   };
 
   /** @brief Create a task result with an assigned status. */

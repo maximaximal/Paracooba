@@ -28,24 +28,24 @@ main(int argc, char* argv[])
 
   CommunicatorPtr communicator = std::make_shared<Communicator>(config, log);
 
+  communicator->startRunner();
+
   if(config->isDaemonMode()) {
     // Daemon mode. The program should now wait for incoming connections.
     Daemon daemon(config, log, communicator);
-
   } else {
     // Client mode. There should be some action.
     Client client(config, log, communicator);
-    client.readDIMACSFromConfig();
-    int status = client.solve();
+    TaskResult::Status status = client.solve();
 
     switch(status) {
-      case 0:
+      case TaskResult::Unsolved:
         PARACUBER_LOG(logger, Info) << "Unsolved!";
         break;
-      case 10:
+      case TaskResult::Satisfiable:
         PARACUBER_LOG(logger, Info) << "Satisfied!";
         break;
-      case 20:
+      case TaskResult::Unsatisfiable:
         PARACUBER_LOG(logger, Info) << "Unsatisfiable!";
         break;
     }

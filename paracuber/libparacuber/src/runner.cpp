@@ -37,16 +37,17 @@ Runner::stop()
   std::for_each(m_pool.begin(), m_pool.end(), [](auto& t) { t.join(); });
 }
 
-std::future<std::unique_ptr<TaskResult>>&
+std::future<std::unique_ptr<TaskResult>>
 Runner::push(std::unique_ptr<Task> task)
 {
   std::unique_ptr<QueueEntry> entry =
     std::make_unique<QueueEntry>(std::move(task), 0);
-  std::future<std::unique_ptr<TaskResult>>& future = entry->result;
+  std::promise<std::unique_ptr<TaskResult>>& promise = entry->result;
   push_(std::move(entry));
+  std::unique_lock<std::mutex> lock(m_taskQueueMutex);
   m_newTasksVerifier = true;
   m_newTasks.notify_one();
-  return future;
+  return promise.get_future();
 }
 
 void
@@ -61,14 +62,21 @@ Runner::worker(uint32_t workerId, Logger logger)
         PARACUBER_LOG(logger, Trace)
           << "Worker " << workerId << " waiting for tasks.";
         m_newTasks.wait(lock);
-        m_newTasksVerifier = false;
         entry = pop_();
+      }
+
+      if(entry) {
+        // Only reset the verifier if this really was the thread to receive the
+        // notification and this thread was not just started.
+        m_newTasksVerifier = false;
       }
     }
 
     if(entry) {
       PARACUBER_LOG(logger, Trace)
-        << "Worker " << workerId << " has received new task.";
+        << "Worker " << workerId << " has received a new task.";
+
+      entry->result.set_value(std::move(entry->task->execute()));
     }
   }
   PARACUBER_LOG(logger, Trace) << "Worker " << workerId << " ended.";
@@ -83,7 +91,6 @@ Runner::QueueEntry::~QueueEntry() {}
 void
 Runner::push_(std::unique_ptr<QueueEntry> entry)
 {
-  std::unique_lock<std::mutex> lock(m_taskQueueMutex);
   m_taskQueue.push_back(std::move(entry));
   std::push_heap(m_taskQueue.begin(), m_taskQueue.end());
 }
