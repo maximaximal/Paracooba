@@ -1,6 +1,6 @@
 #include "../include/paracuber/cdcl_task.hpp"
 #include <cadical/cadical.hpp>
-#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <cassert>
 
 namespace paracuber {
@@ -13,7 +13,7 @@ CDCLTask::~CDCLTask() {}
 const char*
 CDCLTask::readDIMACSFile(std::string_view sourcePath)
 {
-  if(!std::filesystem::exists(sourcePath)) {
+  if(!boost::filesystem::exists(std::string(sourcePath))) {
     return "file does not exist";
   }
 
