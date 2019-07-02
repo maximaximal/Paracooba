@@ -18,6 +18,7 @@ class TaskResult
   {
     Success,
     MissingInputs,
+    ParsingError,
 
     Satisfiable,
     Unsolved,
