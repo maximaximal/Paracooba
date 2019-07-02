@@ -1,7 +1,7 @@
 # EditorConfig: http://EditorConfig.org
 
 # top-most EditorConfig file
-root = false
+root = true
 
 # Unix-style newlines with a newline ending every file
 [*]
@@ -18,7 +18,7 @@ indent_style = space
 indent_size = 4
 
 # 2 space indentation
-[*.{cxx,cpp,hxx,hpp,h,ino}]
+[*.{cxx,cpp,hxx,hpp,h,ino,capnp}]
 indent_style = space
 indent_size = 2
 
