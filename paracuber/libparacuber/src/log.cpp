@@ -152,7 +152,7 @@ operator<<(
   ::paracuber::Log::Severity level = manip.get();
 
   if(static_cast<std::size_t>(level) <
-     sizeof(colorised_strings) / sizeof(*colorised_strings))
+     sizeof(strings) / sizeof(*strings))
     strm << strings[level];
   else
     strm << static_cast<int>(level);

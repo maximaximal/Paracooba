@@ -44,6 +44,9 @@ class Runner;
 class Communicator : public std::enable_shared_from_this<Communicator>
 {
   public:
+  class UDPServer;
+  class TCPServer;
+
   /** @brief Constructor */
   Communicator(ConfigPtr config, LogPtr log);
   /** @brief Destructor */
@@ -56,6 +59,10 @@ class Communicator : public std::enable_shared_from_this<Communicator>
    */
   void run();
 
+  /** @brief Ends the communicator and stops all running services.
+   */
+  void exit();
+
   /** @brief Start the internal runner thread pool without blocking. */
   void startRunner();
 
@@ -63,9 +70,11 @@ class Communicator : public std::enable_shared_from_this<Communicator>
    * objects.
    */
   inline std::shared_ptr<Runner> getRunner() { return m_runner; }
+  inline IOServicePtr getIOService() { return m_ioService; }
 
   private:
   ConfigPtr m_config;
+  LogPtr m_log;
   IOServicePtr m_ioService;
   std::any m_ioServiceWork;
   Logger m_logger;
@@ -73,6 +82,16 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   std::shared_ptr<Runner> m_runner;
 
   void signalHandler(const boost::system::error_code& error, int signalNumber);
+
+  // Listeners
+  void listenForIncomingUDP(uint16_t port);
+  void listenForIncomingTCP(uint16_t port);
+
+  std::unique_ptr<UDPServer> m_udpServer;
+  std::unique_ptr<TCPServer> m_tcpServer;
+
+  // Tasks
+  void task_firstContact();
 };
 
 using CommunicatorPtr = std::shared_ptr<Communicator>;

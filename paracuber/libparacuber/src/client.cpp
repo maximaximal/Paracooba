@@ -1,5 +1,5 @@
 #include "../include/paracuber/client.hpp"
-#include "../include/paracuber/cdcl_task.hpp"
+#include "../include/paracuber/cadical_task.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/runner.hpp"
@@ -27,9 +27,8 @@ Client::getDIMACSSourcePathFromConfig()
 TaskResult::Status
 Client::solve()
 {
-  auto task = std::make_unique<CDCLTask>();
-  const char* readStatus =
-    task->readDIMACSFile(getDIMACSSourcePathFromConfig());
+  auto task = std::make_unique<CaDiCaLTask>();
+  task->readDIMACSFile(getDIMACSSourcePathFromConfig());
   auto future = m_communicator->getRunner()->push(std::move(task));
   auto resultValue = future.get();
   return resultValue->getStatus();

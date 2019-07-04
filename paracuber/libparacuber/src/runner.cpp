@@ -1,14 +1,18 @@
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/task.hpp"
+#include <boost/log/attributes/constant.hpp>
 
 #include <algorithm>
 
 namespace paracuber {
-Runner::Runner(ConfigPtr config, LogPtr log)
+Runner::Runner(Communicator *communicator,
+               ConfigPtr config,
+               LogPtr log)
   : m_config(config)
   , m_log(log)
   , m_logger(log->createLogger())
+  , m_communicator(communicator)
 {}
 Runner::~Runner() {}
 
@@ -32,14 +36,21 @@ Runner::start()
 void
 Runner::stop()
 {
-  m_running = false;
-  m_newTasks.notify_all();
-  std::for_each(m_pool.begin(), m_pool.end(), [](auto& t) { t.join(); });
+  if(m_running) {
+    m_running = false;
+    m_newTasks.notify_all();
+    std::for_each(m_pool.begin(), m_pool.end(), [](auto& t) { t.join(); });
+  }
 }
 
 std::future<std::unique_ptr<TaskResult>>
 Runner::push(std::unique_ptr<Task> task)
 {
+  task->m_runner = this;
+  task->m_log = m_log.get();
+  task->m_config = m_config.get();
+  task->m_communicator = m_communicator;
+
   std::unique_ptr<QueueEntry> entry =
     std::make_unique<QueueEntry>(std::move(task), 0);
   std::promise<std::unique_ptr<TaskResult>>& promise = entry->result;
@@ -53,6 +64,8 @@ Runner::push(std::unique_ptr<Task> task)
 void
 Runner::worker(uint32_t workerId, Logger logger)
 {
+  logger.add_attribute(
+    "workerID", boost::log::attributes::constant<decltype(workerId)>(workerId));
   PARACUBER_LOG(logger, Trace) << "Worker " << workerId << " started.";
   while(m_running) {
     std::unique_ptr<QueueEntry> entry;
@@ -75,6 +88,9 @@ Runner::worker(uint32_t workerId, Logger logger)
     if(entry) {
       PARACUBER_LOG(logger, Trace)
         << "Worker " << workerId << " has received a new task.";
+
+      // Insert the logger from this worker thread.
+      entry->task->m_logger = &logger;
 
       entry->result.set_value(std::move(entry->task->execute()));
     }

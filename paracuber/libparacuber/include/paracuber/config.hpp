@@ -21,6 +21,7 @@ class Config
     LocalName,
     InputFile,
     ThreadCount,
+    UDPPort,
 
     _KEY_COUNT
   };
@@ -67,6 +68,9 @@ class Config
   /** @brief Get an int64 configuration variable.
    */
   inline int64_t getInt64(Key key) { return get<int64_t>(key); }
+  /** @brief Get an uint16 configuration variable.
+   */
+  inline uint32_t getUint16(Key key) { return get<uint16_t>(key); }
   /** @brief Get an uint32 configuration variable.
    */
   inline uint32_t getUint32(Key key) { return get<uint32_t>(key); }
@@ -129,6 +133,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "input-file";
     case Config::ThreadCount:
       return "threads";
+    case Config::UDPPort:
+      return "udp-port";
     default:
       return "";
   }

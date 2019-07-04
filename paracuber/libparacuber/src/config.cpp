@@ -35,6 +35,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::ThreadCount),
          po::value<uint32_t>()->default_value(std::thread::hardware_concurrency()),
          "number of worker threads to execute tasks on")
+    (GetConfigNameFromEnum(Config::UDPPort),
+         po::value<uint16_t>()->default_value(18001),
+         "udp port for incoming & outgoing control messages")
     ("debug,d", po::bool_switch(&m_debugMode)->default_value(false), "debug mode (all debug output)")
     ("info,i", po::bool_switch(&m_infoMode)->default_value(false), "info mode (more information)")
     ("daemon", po::bool_switch(&m_daemonMode)->default_value(false), "daemon mode")
@@ -96,6 +99,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::InputFile);
   conditionallySetConfigOptionToArray<uint32_t>(
     vm, m_config.data(), Config::ThreadCount);
+  conditionallySetConfigOptionToArray<uint16_t>(
+    vm, m_config.data(), Config::UDPPort);
 
   return true;
 }

@@ -13,6 +13,7 @@ namespace paracuber {
 class Communicator;
 class Task;
 class TaskResult;
+class Log;
 
 /** @brief Environment for running a \ref Task in.
  *
@@ -25,7 +26,9 @@ class Runner
   /** @brief Create a runner for tasks.
    *
    * This constructor does not start the internal thread pool yet. */
-  Runner(ConfigPtr config, LogPtr log);
+  Runner(Communicator *communicator,
+         ConfigPtr config,
+         LogPtr log);
   /** Destructor */
   ~Runner();
 
@@ -51,6 +54,7 @@ class Runner
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
+  Communicator *m_communicator;
   volatile bool m_running = true;
 
   std::vector<std::thread> m_pool;
