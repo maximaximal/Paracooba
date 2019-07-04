@@ -90,7 +90,7 @@ Communicator::run()
 
   // The first task to run is to make contact with the specified daemon solver.
   listenForIncomingUDP(m_config->getUint16(Config::UDPPort));
-  post(*m_ioService, std::bind(&Communicator::task_firstContact, this));
+  m_ioService->post(std::bind(&Communicator::task_firstContact, this));
 
   PARACUBER_LOG(m_logger, Trace) << "Communicator io_service started.";
   m_ioService->run();
