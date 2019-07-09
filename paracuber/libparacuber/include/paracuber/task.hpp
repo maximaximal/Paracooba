@@ -3,6 +3,7 @@
 
 #include "log.hpp"
 #include "taskresult.hpp"
+#include <boost/signals2/signal.hpp>
 
 namespace paracuber {
 class Runner;
@@ -16,6 +17,8 @@ class Config;
 class Task
 {
   public:
+  using FinishedSignal = boost::signals2::signal<void(const TaskResult&)>;
+
   /** @brief Constructor */
   Task();
   /** @brief Destructor */
@@ -28,8 +31,19 @@ class Task
    * */
   virtual TaskResultPtr execute() = 0;
 
+  /** @brief Returns the signal marking finished task.
+   *
+   * A given slot must not directly save the given reference, as it is only a
+   * temporary reference to a result handled by a unique_ptr in \ref Runner (and
+   * consequently in the return of \ref Task::execute).
+   */
+  inline FinishedSignal& getFinishedSignal() { return m_finishedSignal; }
+
   protected:
   friend class Runner;
+
+  FinishedSignal m_finishedSignal;
+  void finish(const TaskResult& result);
 
   /// Pointer to the runner that runs this task. Guaranteed to be available in
   /// execute().

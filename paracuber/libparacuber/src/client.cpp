@@ -24,14 +24,18 @@ Client::getDIMACSSourcePathFromConfig()
   return sourcePath;
 }
 
-TaskResult::Status
+void
 Client::solve()
 {
   auto task = std::make_unique<CaDiCaLTask>();
+  auto& finishedSignal = task->getFinishedSignal();
   task->readDIMACSFile(getDIMACSSourcePathFromConfig());
-  auto future = m_communicator->getRunner()->push(std::move(task));
-  auto resultValue = future.get();
-  return resultValue->getStatus();
+  m_communicator->getRunner()->push(std::move(task));
+  finishedSignal.connect([this](const TaskResult& result) {
+    m_status = result.getStatus();
+    // Finished solving, the communicator can be stopped!
+    m_communicator->exit();
+  });
 }
 
 }

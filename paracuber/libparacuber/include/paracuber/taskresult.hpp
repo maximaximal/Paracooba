@@ -33,7 +33,7 @@ class TaskResult
   ~TaskResult() {}
 
   /** @brief Get the status of this task. */
-  Status getStatus() { return m_status; }
+  Status getStatus() const { return m_status; }
 
   private:
   Status m_status;

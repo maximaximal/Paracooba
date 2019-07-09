@@ -30,13 +30,14 @@ main(int argc, char* argv[])
 
   communicator->startRunner();
 
-  if(config->isDaemonMode()) {
-    // Daemon mode. The program should now wait for incoming connections.
-    Daemon daemon(config, log, communicator);
-  } else {
+  Client client(config, log, communicator);
+  client.solve();
+
+  communicator->run();
+
+  if(!config->isDaemonMode()) {
     // Client mode. There should be some action.
-    Client client(config, log, communicator);
-    TaskResult::Status status = client.solve();
+    TaskResult::Status status = client.getStatus();
 
     switch(status) {
       case TaskResult::Unsolved:
@@ -50,8 +51,6 @@ main(int argc, char* argv[])
         break;
     }
   }
-
-  communicator->run();
 
   PARACUBER_LOG(logger, Trace) << "Ending paracuber.";
   return EXIT_SUCCESS;

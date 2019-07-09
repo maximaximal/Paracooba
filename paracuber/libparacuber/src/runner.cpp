@@ -92,7 +92,10 @@ Runner::worker(uint32_t workerId, Logger logger)
       // Insert the logger from this worker thread.
       entry->task->m_logger = &logger;
 
-      entry->result.set_value(std::move(entry->task->execute()));
+      auto result = std::move(entry->task->execute());
+      entry->task->finish(*result);
+
+      entry->result.set_value(std::move(result));
     }
   }
   PARACUBER_LOG(logger, Trace) << "Worker " << workerId << " ended.";

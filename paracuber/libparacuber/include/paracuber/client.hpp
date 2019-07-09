@@ -36,11 +36,13 @@ class Client
    *         - TaskResult::Status::Satisfiable
    *         - TaskResult::Status::Unsatisfiable
    */
-  TaskResult::Status solve();
+  void solve();
+  inline TaskResult::Status getStatus() { return m_status; }
 
   private:
   ConfigPtr m_config;
   std::shared_ptr<Communicator> m_communicator;
+  TaskResult::Status m_status;
 
   Logger m_logger;
 };

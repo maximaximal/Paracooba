@@ -101,13 +101,15 @@ Communicator::run()
 void
 Communicator::exit()
 {
-  m_runner->stop();
+  m_ioService->post([this]() {
+    m_runner->stop();
 
-  // Destruct all servers before io Service is stopped.
-  m_udpServer.reset();
-  m_tcpServer.reset();
+    // Destruct all servers before io Service is stopped.
+    m_udpServer.reset();
+    m_tcpServer.reset();
 
-  m_ioService->stop();
+    m_ioService->stop();
+  });
 }
 
 void
