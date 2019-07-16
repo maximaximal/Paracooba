@@ -11,6 +11,7 @@ Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
   , m_log(log)
   , m_logger(log->createLogger())
   , m_communicator(communicator)
+  , m_numberOfRunningTasks(0)
 {}
 Runner::~Runner() {}
 
@@ -98,7 +99,9 @@ Runner::worker(uint32_t workerId, Logger logger)
       entry->task->m_logger = &logger;
 
       m_currentlyRunningTasks[workerId] = entry->task.get();
+      ++m_numberOfRunningTasks;
       auto result = std::move(entry->task->execute());
+      --m_numberOfRunningTasks;
       m_currentlyRunningTasks[workerId] = nullptr;
       entry->task->finish(*result);
 

@@ -26,9 +26,7 @@ class Runner
   /** @brief Create a runner for tasks.
    *
    * This constructor does not start the internal thread pool yet. */
-  Runner(Communicator *communicator,
-         ConfigPtr config,
-         LogPtr log);
+  Runner(Communicator* communicator, ConfigPtr config, LogPtr log);
   /** Destructor */
   ~Runner();
 
@@ -56,7 +54,7 @@ class Runner
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
-  Communicator *m_communicator;
+  Communicator* m_communicator;
   volatile bool m_running = true;
 
   std::vector<std::thread> m_pool;
@@ -85,9 +83,13 @@ class Runner
 
   std::mutex m_taskQueueMutex;
   std::condition_variable m_newTasks;
+
+  /// Used against spurious wake-ups:
+  /// https://en.cppreference.com/w/cpp/thread/condition_variable
   bool m_newTasksVerifier = false;
 
   std::vector<Task*> m_currentlyRunningTasks;
+  std::atomic<uint32_t> m_numberOfRunningTasks;
 };
 }
 
