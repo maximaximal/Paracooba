@@ -51,6 +51,8 @@ class Runner
   std::future<std::unique_ptr<TaskResult>> push(std::unique_ptr<Task> task);
 
   private:
+  friend class Communicator;
+
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;

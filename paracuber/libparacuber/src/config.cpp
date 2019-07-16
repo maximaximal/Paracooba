@@ -2,6 +2,7 @@
 #include <boost/program_options.hpp>
 #include <cstddef>
 #include <iostream>
+#include <random>
 #include <thread>
 
 namespace po = boost::program_options;
@@ -24,6 +25,11 @@ Config::Config()
    * --------------------------------------- */
   // clang-forma // clang-format on
 
+  std::random_device dev;
+  std::mt19937_64 rng(dev());
+  std::uniform_int_distribution<std::mt19937_64::result_type> dist_mac(
+    -((int64_t)1 << 47), ((int64_t)1 << 47) - 1);
+
   /* COMMON OPTIONS
    * --------------------------------------- */
   // clang-format off
@@ -38,6 +44,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::UDPPort),
          po::value<uint16_t>()->default_value(18001),
          "udp port for incoming & outgoing control messages")
+    (GetConfigNameFromEnum(Config::Id),
+         po::value<int64_t>()->default_value(dist_mac(rng)),
+         "Unique Number (only 48 Bit) (can be MAC address)")
     ("debug,d", po::bool_switch(&m_debugMode)->default_value(false), "debug mode (all debug output)")
     ("info,i", po::bool_switch(&m_infoMode)->default_value(false), "info mode (more information)")
     ("daemon", po::bool_switch(&m_daemonMode)->default_value(false), "daemon mode")
@@ -101,6 +110,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::ThreadCount);
   conditionallySetConfigOptionToArray<uint16_t>(
     vm, m_config.data(), Config::UDPPort);
+  conditionallySetConfigOptionToArray<int64_t>(
+    vm, m_config.data(), Config::Id);
 
   return true;
 }

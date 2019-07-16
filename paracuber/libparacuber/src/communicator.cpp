@@ -3,6 +3,10 @@
 #include "../include/paracuber/runner.hpp"
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
+#include <mutex>
+
+#include <capnp-schemas/message.capnp.h>
+#include <capnp/serialize.h>
 
 using boost::asio::ip::udp;
 
@@ -12,11 +16,16 @@ namespace paracuber {
 class Communicator::UDPServer
 {
   public:
-  UDPServer(LogPtr log, boost::asio::io_service& ioService, uint16_t port)
-    : m_socket(ioService, udp::endpoint(udp::v4(), port))
+  UDPServer(Communicator* comm,
+            LogPtr log,
+            boost::asio::io_service& ioService,
+            uint16_t port)
+    : m_communicator(comm)
+    , m_socket(ioService, udp::endpoint(udp::v4(), port))
     , m_logger(log->createLogger())
     , m_port(port)
   {
+    startReceive();
     PARACUBER_LOG(m_logger, Trace) << "UDPServer started at port " << port;
   }
   ~UDPServer()
@@ -28,7 +37,8 @@ class Communicator::UDPServer
   void startReceive()
   {
     m_socket.async_receive_from(
-      boost::asio::buffer(m_recBuf),
+      boost::asio::buffer(reinterpret_cast<std::byte*>(&m_recBuf[0]),
+                          m_recBuf.size() * sizeof(::capnp::word)),
       m_remoteEndpoint,
       boost::bind(&UDPServer::handleReceive,
                   this,
@@ -40,17 +50,107 @@ class Communicator::UDPServer
   {
     // No framing required. A single receive always maps directly to a message.
     if(!error || error == boost::asio::error::message_size) {
+      PARACUBER_LOG(m_logger, Trace)
+        << "Received " << bytes << " on UDP listener.";
+
+      // Alignment handled by the creation of m_recBuf.
+
+      ::capnp::FlatArrayMessageReader reader(
+        kj::arrayPtr(reinterpret_cast<::capnp::word*>(m_recBuf.begin()),
+                     bytes / sizeof(::capnp::word)));
+
+      Message::Reader msg = reader.getRoot<Message>();
+      switch(msg.which()) {
+        case Message::ONLINE_ANNOUNCEMENT:
+          PARACUBER_LOG(m_logger, Trace) << "  -> Online Announcement.";
+          break;
+        case Message::OFFLINE_ANNOUNCEMENT:
+          PARACUBER_LOG(m_logger, Trace) << "  -> Offline Announcement.";
+          break;
+        case Message::ANNOUNCEMENT_REQUEST:
+          PARACUBER_LOG(m_logger, Trace) << "  -> Announcement Request.";
+          break;
+        case Message::NODE_STATUS:
+          PARACUBER_LOG(m_logger, Trace) << "  -> Node Status.";
+          break;
+      }
+
       startReceive();
+    } else {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Error receiving data from UDP socket. Error: " << error;
+    }
+  }
+  void handleSend(const boost::system::error_code& error,
+                  std::size_t bytes,
+                  std::mutex* sendBufMutex)
+  {
+    sendBufMutex->unlock();
+
+    if(!error || error == boost::asio::error::message_size) {
+      PARACUBER_LOG(m_logger, Trace) << "Sent " << bytes << " on UDP listener.";
+    } else {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Error sending data from UDP socket. Error: " << error;
+    }
+  }
+
+  inline ::capnp::MallocMessageBuilder& getMallocMessageBuilder()
+  {
+    return m_mallocMessageBuilder;
+  }
+  Message::Builder getMessageBuilder()
+  {
+    auto msg = getMallocMessageBuilder().getRoot<Message>();
+    msg.setOrigin(m_communicator->getNodeId());
+    msg.setId(m_communicator->getAndIncrementCurrentMessageId());
+    return std::move(msg);
+  }
+  void sendBuiltMessage(boost::asio::ip::udp::endpoint&& endpoint)
+  {
+    // One copy cannot be avoided.
+    auto buf = std::move(::capnp::messageToFlatArray(m_mallocMessageBuilder));
+
+    {
+      // Lock the mutex when sending and unlock it when the data has been sent
+      // in the handleSend function. This way, async sending is still fast when
+      // calculating stuff and does not block, but it DOES block when more
+      // messages are sent.
+      m_sendBufMutex.lock();
+
+      m_sendBuf = std::move(buf);
+
+      m_socket.async_send_to(
+        boost::asio::buffer(reinterpret_cast<std::byte*>(&m_sendBuf[0]),
+                            m_sendBuf.size() * sizeof(::capnp::word)),
+        endpoint,
+        boost::bind(&UDPServer::handleSend,
+                    this,
+                    boost::asio::placeholders::error,
+                    boost::asio::placeholders::bytes_transferred,
+                    &m_sendBufMutex));
     }
   }
 
   private:
-  udp::socket m_socket;
-  udp::endpoint m_remoteEndpoint;
-  boost::array<char, REC_BUF_SIZE> m_recBuf;
+  Communicator* m_communicator;
   Logger m_logger;
   uint16_t m_port;
+
+  udp::socket m_socket;
+  udp::endpoint m_remoteEndpoint;
+  boost::array<::capnp::word, REC_BUF_SIZE> m_recBuf;
+
+  static thread_local kj::Array<::capnp::word> m_sendBuf;
+  static thread_local ::capnp::MallocMessageBuilder m_mallocMessageBuilder;
+  static thread_local std::mutex m_sendBufMutex;
 };
+
+thread_local kj::Array<::capnp::word> Communicator::UDPServer::m_sendBuf;
+thread_local std::mutex Communicator::UDPServer::m_sendBufMutex;
+thread_local ::capnp::MallocMessageBuilder
+  Communicator::UDPServer::m_mallocMessageBuilder;
+
 class Communicator::TCPServer
 {};
 
@@ -61,6 +161,12 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   , m_logger(log->createLogger())
   , m_signalSet(std::make_unique<boost::asio::signal_set>(*m_ioService, SIGINT))
 {
+  // Set current ID
+  int16_t pid = static_cast<int16_t>(::getpid());
+  int64_t uniqueNumber = config->getInt64(Config::Id);
+  m_nodeId = ((int64_t)pid << 48) | uniqueNumber;
+
+  // Initialize communicator
   boost::asio::io_service::work work(*m_ioService);
   m_ioServiceWork = work;
 
@@ -101,6 +207,10 @@ Communicator::run()
 void
 Communicator::exit()
 {
+  // Early stop m_runner, so that threads must not be notified more often if
+  // this is called from a runner thread.
+  m_runner->m_running = false;
+
   m_ioService->post([this]() {
     m_runner->stop();
 
@@ -136,8 +246,11 @@ Communicator::listenForIncomingUDP(uint16_t port)
 {
   using namespace boost::asio;
   try {
-    m_udpServer = std::make_unique<UDPServer>(m_log, *m_ioService, port);
+    m_udpServer = std::make_unique<UDPServer>(this, m_log, *m_ioService, port);
   } catch(std::exception& e) {
+    PARACUBER_LOG(m_logger, LocalError)
+      << "Could not initialize server for incoming UDP connections on port "
+      << port << "! Error: " << e.what();
   }
 }
 
@@ -149,6 +262,15 @@ void
 Communicator::task_firstContact()
 {
   PARACUBER_LOG(m_logger, Trace) << "First contact ioService task started.";
+
+  auto msg = m_udpServer->getMessageBuilder();
+
+  auto status = msg.initNodeStatus();
+
+  PARACUBER_LOG(m_logger, Trace) << "Sending Data.";
+  m_udpServer->sendBuiltMessage(
+    boost::asio::ip::udp::endpoint(boost::asio::ip::make_address("127.0.0.1"),
+                                   m_config->getUint16(Config::UDPPort)));
 }
 
 }

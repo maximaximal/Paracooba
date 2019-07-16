@@ -72,6 +72,12 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   inline std::shared_ptr<Runner> getRunner() { return m_runner; }
   inline IOServicePtr getIOService() { return m_ioService; }
 
+  inline int64_t getAndIncrementCurrentMessageId()
+  {
+    return m_currentMessageId++;
+  }
+  inline int64_t getNodeId() { return m_nodeId; }
+
   private:
   ConfigPtr m_config;
   LogPtr m_log;
@@ -80,6 +86,9 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   Logger m_logger;
   std::unique_ptr<boost::asio::signal_set> m_signalSet;
   std::shared_ptr<Runner> m_runner;
+
+  int64_t m_currentMessageId = INT64_MIN;
+  int64_t m_nodeId;
 
   void signalHandler(const boost::system::error_code& error, int signalNumber);
 

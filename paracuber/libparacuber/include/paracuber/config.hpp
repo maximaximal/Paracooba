@@ -22,6 +22,7 @@ class Config
     InputFile,
     ThreadCount,
     UDPPort,
+    Id,
 
     _KEY_COUNT
   };
@@ -135,6 +136,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "threads";
     case Config::UDPPort:
       return "udp-port";
+    case Config::Id:
+      return "id";
     default:
       return "";
   }

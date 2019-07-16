@@ -6,9 +6,7 @@
 #include <algorithm>
 
 namespace paracuber {
-Runner::Runner(Communicator *communicator,
-               ConfigPtr config,
-               LogPtr log)
+Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
   : m_config(config)
   , m_log(log)
   , m_logger(log->createLogger())
@@ -36,11 +34,10 @@ Runner::start()
 void
 Runner::stop()
 {
-  if(m_running) {
-    m_running = false;
-    m_newTasks.notify_all();
-    std::for_each(m_pool.begin(), m_pool.end(), [](auto& t) { t.join(); });
-  }
+  m_running = false;
+  m_newTasks.notify_all();
+  std::for_each(m_pool.begin(), m_pool.end(), [](auto& t) { t.join(); });
+  m_pool.clear();
 }
 
 std::future<std::unique_ptr<TaskResult>>
