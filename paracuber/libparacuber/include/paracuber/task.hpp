@@ -31,6 +31,8 @@ class Task
    * */
   virtual TaskResultPtr execute() = 0;
 
+  virtual void terminate() = 0;
+
   /** @brief Returns the signal marking finished task.
    *
    * A given slot must not directly save the given reference, as it is only a

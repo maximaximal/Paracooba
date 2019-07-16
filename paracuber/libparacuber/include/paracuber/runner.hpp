@@ -86,6 +86,8 @@ class Runner
   std::mutex m_taskQueueMutex;
   std::condition_variable m_newTasks;
   bool m_newTasksVerifier = false;
+
+  std::vector<Task*> m_currentlyRunningTasks;
 };
 }
 

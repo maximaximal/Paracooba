@@ -11,9 +11,26 @@ using std::endl;
 #include <cadical/cadical.hpp>
 
 namespace paracuber {
+class Terminator : public CaDiCaL::Terminator
+{
+  public:
+  Terminator(CaDiCaLTask* task)
+    : m_task(task)
+  {}
+  virtual ~Terminator() {}
+
+  virtual bool terminate() { return m_task->m_terminate; }
+
+  private:
+  CaDiCaLTask* m_task;
+};
+
 CaDiCaLTask::CaDiCaLTask()
-  : m_solver(std::make_unique<CaDiCaL::Solver>())
-{}
+  : m_terminator(std::make_unique<Terminator>(this))
+  , m_solver(std::make_unique<CaDiCaL::Solver>())
+{
+  m_solver->connect_terminator(m_terminator.get());
+}
 CaDiCaLTask::~CaDiCaLTask() {}
 
 void
@@ -62,5 +79,11 @@ CaDiCaLTask::execute()
 
   auto result = std::make_unique<TaskResult>(status);
   return std::move(result);
+}
+
+void
+CaDiCaLTask::terminate()
+{
+  m_terminate = true;
 }
 }

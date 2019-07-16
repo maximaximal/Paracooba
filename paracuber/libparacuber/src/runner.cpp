@@ -17,17 +17,19 @@ Runner::~Runner() {}
 void
 Runner::start()
 {
-  uint32_t i = 0;
+  uint32_t i = 0, threadCount = m_config->getUint32(Config::ThreadCount);
+  m_currentlyRunningTasks.assign(threadCount, nullptr);
+
   try {
     m_running = true;
-    for(i = 0; i < m_config->getUint32(Config::ThreadCount); ++i) {
+    for(i = 0; i < threadCount; ++i) {
       m_pool.push_back(std::thread(
         std::bind(&Runner::worker, this, i, m_log->createLogger())));
     }
   } catch(std::system_error& e) {
     PARACUBER_LOG(m_logger, LocalError)
-      << "Could only initialize " << i << " of "
-      << m_config->getUint32(Config::ThreadCount) << " requested threads!";
+      << "Could only initialize " << i << " of " << threadCount
+      << " requested threads!";
   }
 }
 
@@ -36,6 +38,12 @@ Runner::stop()
 {
   m_running = false;
   m_newTasks.notify_all();
+  std::for_each(m_currentlyRunningTasks.begin(),
+                m_currentlyRunningTasks.end(),
+                [](auto& t) {
+                  if(t)
+                    t->terminate();
+                });
   std::for_each(m_pool.begin(), m_pool.end(), [](auto& t) { t.join(); });
   m_pool.clear();
 }
@@ -89,7 +97,9 @@ Runner::worker(uint32_t workerId, Logger logger)
       // Insert the logger from this worker thread.
       entry->task->m_logger = &logger;
 
+      m_currentlyRunningTasks[workerId] = entry->task.get();
       auto result = std::move(entry->task->execute());
+      m_currentlyRunningTasks[workerId] = nullptr;
       entry->task->finish(*result);
 
       entry->result.set_value(std::move(result));
