@@ -268,9 +268,9 @@ Communicator::task_firstContact()
   auto status = msg.initNodeStatus();
 
   PARACUBER_LOG(m_logger, Trace) << "Sending Data.";
-  m_udpServer->sendBuiltMessage(
-    boost::asio::ip::udp::endpoint(boost::asio::ip::make_address("127.0.0.1"),
-                                   m_config->getUint16(Config::UDPPort)));
+  m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
+    boost::asio::ip::address_v4::from_string("127.0.0.1"),
+    m_config->getUint16(Config::UDPPort)));
 }
 
 }
