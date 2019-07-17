@@ -47,6 +47,12 @@ Config::Config()
     (GetConfigNameFromEnum(Config::Id),
          po::value<int64_t>()->default_value(dist_mac(rng)),
          "Unique Number (only 48 Bit) (can be MAC address)")
+    (GetConfigNameFromEnum(Config::WorkQueueCapacity),
+         po::value<uint64_t>()->default_value(100),
+         "Capacity of the internal work queue. Should be high on daemons and low on clients.")
+    (GetConfigNameFromEnum(Config::DaemonHost),
+     po::value<std::string>()->default_value("127.0.0.1"),
+         "Initial peer to connect to. Should should be a long-running daemon.")
     ("debug,d", po::bool_switch(&m_debugMode)->default_value(false), "debug mode (all debug output)")
     ("info,i", po::bool_switch(&m_infoMode)->default_value(false), "info mode (more information)")
     ("daemon", po::bool_switch(&m_daemonMode)->default_value(false), "daemon mode")
@@ -110,8 +116,11 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::ThreadCount);
   conditionallySetConfigOptionToArray<uint16_t>(
     vm, m_config.data(), Config::UDPPort);
-  conditionallySetConfigOptionToArray<int64_t>(
-    vm, m_config.data(), Config::Id);
+  conditionallySetConfigOptionToArray<int64_t>(vm, m_config.data(), Config::Id);
+  conditionallySetConfigOptionToArray<uint64_t>(
+    vm, m_config.data(), Config::WorkQueueCapacity);
+  conditionallySetConfigOptionToArray<std::string>(
+    vm, m_config.data(), Config::DaemonHost);
 
   return true;
 }

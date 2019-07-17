@@ -23,6 +23,8 @@ class Config
     ThreadCount,
     UDPPort,
     Id,
+    DaemonHost,
+    WorkQueueCapacity,
 
     _KEY_COUNT
   };
@@ -138,6 +140,10 @@ GetConfigNameFromEnum(Config::Key key)
       return "udp-port";
     case Config::Id:
       return "id";
+    case Config::DaemonHost:
+      return "daemon-host";
+    case Config::WorkQueueCapacity:
+      return "work-queue-capacity";
     default:
       return "";
   }

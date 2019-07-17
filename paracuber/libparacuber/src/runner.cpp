@@ -12,6 +12,7 @@ Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
   , m_logger(log->createLogger())
   , m_communicator(communicator)
   , m_numberOfRunningTasks(0)
+  , m_taskQueue(config->getUint64(Config::WorkQueueCapacity))
 {}
 Runner::~Runner() {}
 
@@ -120,12 +121,14 @@ Runner::QueueEntry::~QueueEntry() {}
 void
 Runner::push_(std::unique_ptr<QueueEntry> entry)
 {
+  ++m_taskCount;
   m_taskQueue.push_back(std::move(entry));
   std::push_heap(m_taskQueue.begin(), m_taskQueue.end());
 }
 std::unique_ptr<Runner::QueueEntry>
 Runner::pop_()
 {
+  --m_taskCount;
   if(m_taskQueue.size() > 0) {
     std::pop_heap(m_taskQueue.begin(), m_taskQueue.end());
     auto result = std::move(m_taskQueue.back());

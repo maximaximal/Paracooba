@@ -265,11 +265,19 @@ Communicator::task_firstContact()
 
   auto msg = m_udpServer->getMessageBuilder();
 
-  auto status = msg.initNodeStatus();
+  auto req = msg.initAnnouncementRequest();
+  req.initNameMatch().setNoRestriction();
+
+  auto requester = req.initRequester();
+  requester.setName(std::string(m_config->getString(Config::LocalName)));
+  requester.setId(m_nodeId);
+  requester.setAvailableWorkers(m_config->getUint32(Config::ThreadCount));
+  requester.setWorkQueueCapacity(m_config->getUint64(Config::WorkQueueCapacity));
 
   PARACUBER_LOG(m_logger, Trace) << "Sending Data.";
   m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
-    boost::asio::ip::address_v4::from_string("127.0.0.1"),
+    boost::asio::ip::address_v4::from_string(
+      std::string(m_config->getString(Config::DaemonHost))),
     m_config->getUint16(Config::UDPPort)));
 }
 

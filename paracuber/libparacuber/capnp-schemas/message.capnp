@@ -1,10 +1,22 @@
 @0xead81247730f0294;
 
+struct Node
+{
+  name @0 : Text; # Name of the node
+  id @1 : Int64; # Id of the node
+  availableWorkers @2 : UInt16; # number of available worker threads on the node
+  workQueueCapacity @3 : UInt64; # number of tasks the work queue can hold
+  maximumCPUFrequency @4 : UInt16; # maximum frequency of the cpu on this node
+  uptime @5 : UInt32; # uptime (in seconds) of the node
+}
+
 struct AnnouncementRequest
 {
+  requester @0 : Node;
+
   nameMatch : union {
-    noRestriction @0 : Void;
-    regex @1 : Text;
+    noRestriction @1 : Void;
+    regex @2 : Text;
   }
 }
 # Request announcements of online nodes with given
@@ -12,11 +24,8 @@ struct AnnouncementRequest
 
 struct OnlineAnnouncement
 {
-  name @0 : Text; # Name of the node
-  availableWorkers @1 : UInt16; # number of available worker threads on the node
-  workerQueueCapacity @2 : UInt64; # number of tasks the worker queue can hold
-  maximumCPUFrequency @3 : UInt16; # maximum frequency of the cpu on this node
-  uptime @4 : UInt32; # uptime (in seconds) of the node
+  node @0 : Node;
+  knownNodes @1 : List(Node);
 }
 # Announce a node is online. May be sent regularily or
 # after issuing an AnnouncementRequest.
@@ -29,7 +38,7 @@ struct OfflineAnnouncement
 
 struct NodeStatus
 {
-  workerQueueSize @0 : UInt64; # number of tasks in worker queue
+  workQueueSize @0 : UInt64; # number of tasks in worker queue
 }
 # An update about node statistics. Sent to all other
 # known online nodes approximately every second.

@@ -42,6 +42,8 @@ class Runner
   /** @brief Reports if the runner is already running. */
   inline bool isRunning() { return m_running; }
 
+  inline uint64_t getWorkQueueSize() { return m_taskCount; }
+
   /** @brief Push a new task to the internal task queue.
    *
    * The task will be run as soon as priorities, dependencies, ..., are sorted
@@ -90,6 +92,7 @@ class Runner
 
   std::vector<Task*> m_currentlyRunningTasks;
   std::atomic<uint32_t> m_numberOfRunningTasks;
+  std::atomic<uint64_t> m_taskCount;
 };
 }
 
