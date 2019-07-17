@@ -1,7 +1,9 @@
 #ifndef PARACUBER_COMMUNICATOR_HPP
 #define PARACUBER_COMMUNICATOR_HPP
 
+#include "cluster-statistics.hpp"
 #include "log.hpp"
+
 #include <any>
 #include <memory>
 
@@ -86,6 +88,7 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   Logger m_logger;
   std::unique_ptr<boost::asio::signal_set> m_signalSet;
   std::shared_ptr<Runner> m_runner;
+  std::shared_ptr<ClusterStatistics> m_clusterStatistics;
 
   int64_t m_currentMessageId = INT64_MIN;
   int64_t m_nodeId;

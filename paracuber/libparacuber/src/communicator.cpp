@@ -160,6 +160,7 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   , m_ioService(std::make_shared<boost::asio::io_service>())
   , m_logger(log->createLogger())
   , m_signalSet(std::make_unique<boost::asio::signal_set>(*m_ioService, SIGINT))
+  , m_clusterStatistics(std::make_shared<ClusterStatistics>(config, log))
 {
   // Set current ID
   int16_t pid = static_cast<int16_t>(::getpid());
@@ -272,7 +273,8 @@ Communicator::task_firstContact()
   requester.setName(std::string(m_config->getString(Config::LocalName)));
   requester.setId(m_nodeId);
   requester.setAvailableWorkers(m_config->getUint32(Config::ThreadCount));
-  requester.setWorkQueueCapacity(m_config->getUint64(Config::WorkQueueCapacity));
+  requester.setWorkQueueCapacity(
+    m_config->getUint64(Config::WorkQueueCapacity));
 
   PARACUBER_LOG(m_logger, Trace) << "Sending Data.";
   m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
