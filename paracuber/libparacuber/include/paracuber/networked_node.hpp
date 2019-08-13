@@ -12,7 +12,9 @@ class NetworkedNode
   {}
   ~NetworkedNode() {}
 
-  boost::asio::ip::udp::endpoint getRemoteEndpoint() {return m_remoteEndoint;}
+  boost::asio::ip::udp::endpoint getRemoteEndpoint() { return m_remoteEndoint; }
+
+  void setPort(uint16_t p) { m_remoteEndoint.port(p); }
 
   private:
   boost::asio::ip::udp::endpoint m_remoteEndoint;

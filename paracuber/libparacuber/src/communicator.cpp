@@ -27,7 +27,7 @@ applyMessageNodeToStatsNode(const message::Node::Reader& src,
   tgt.setUptime(src.getUptime());
   tgt.setWorkQueueCapacity(src.getWorkQueueCapacity());
   tgt.setWorkQueueSize(src.getWorkQueueSize());
-  tgt.setFullyKnown(true);
+  tgt.setUdpListenPort(src.getUdpListenPort());
 }
 void
 applyMessageNodeStatusToStatsNode(const message::NodeStatus::Reader& src,
@@ -118,7 +118,12 @@ class Communicator::UDPServer
     if(!nn) {
       std::unique_ptr<NetworkedNode> networkedNode =
         std::make_unique<NetworkedNode>(m_remoteEndpoint);
+      networkedNode->setPort(node.getUdpListenPort());
       node.setNetworkedNode(std::move(networkedNode));
+      nn = node.getNetworkedNode();
+
+      PARACUBER_LOG(m_logger, Trace)
+        << "Remote Endpoint: " << nn->getRemoteEndpoint();
     }
 
     if(!node.getFullyKnown()) {
@@ -128,6 +133,7 @@ class Communicator::UDPServer
                   node.getId(),
                   "",
                   nn));
+      node.setFullyKnown(true);
     }
   }
 
@@ -184,7 +190,9 @@ class Communicator::UDPServer
     }
 
     m_communicator->m_ioService->post(
-      std::bind(&Communicator::task_announce, m_communicator, nullptr));
+      std::bind(&Communicator::task_announce,
+                m_communicator,
+                statisticsNode.getNetworkedNode()));
   }
   void handleNodeStatus(Message::Reader& msg)
   {
@@ -227,7 +235,8 @@ class Communicator::UDPServer
     msg.setId(m_communicator->getAndIncrementCurrentMessageId());
     return std::move(msg);
   }
-  void sendBuiltMessage(boost::asio::ip::udp::endpoint&& endpoint)
+  void sendBuiltMessage(boost::asio::ip::udp::endpoint&& endpoint,
+                        bool fromRunner = true)
   {
     // One copy cannot be avoided.
     auto buf = std::move(::capnp::messageToFlatArray(m_mallocMessageBuilder));
@@ -238,7 +247,13 @@ class Communicator::UDPServer
       // in the handleSend function. This way, async sending is still fast when
       // calculating stuff and does not block, but it DOES block when more
       // messages are sent.
-      m_sendBufMutex.lock();
+      //
+      // This is only required when sending from a runner thread, which is the
+      // default. Messages sent from boost asio do not need this synchronisation
+      // safe-guard.
+      if(fromRunner) {
+        m_sendBufMutex.lock();
+      }
 
       auto bufBytes = buf.asBytes();
       std::copy(bufBytes.begin(), bufBytes.end(), m_sendBufBytes.begin());
@@ -392,6 +407,16 @@ Communicator::listenForIncomingTCP(uint16_t port)
 {}
 
 void
+setupNode(Node::Builder& n, Config& config)
+{
+  n.setName(std::string(config.getString(Config::LocalName)));
+  n.setId(config.getInt64(Config::Id));
+  n.setAvailableWorkers(config.getUint32(Config::ThreadCount));
+  n.setWorkQueueCapacity(config.getUint64(Config::WorkQueueCapacity));
+  n.setUdpListenPort(config.getUint16(Config::UDPListenPort));
+}
+
+void
 Communicator::task_requestAnnounce(int64_t id,
                                    std::string regex,
                                    NetworkedNode* nn)
@@ -410,18 +435,15 @@ Communicator::task_requestAnnounce(int64_t id,
   }
 
   auto requester = req.initRequester();
-  requester.setName(std::string(m_config->getString(Config::LocalName)));
-  requester.setId(m_nodeId);
-  requester.setAvailableWorkers(m_config->getUint32(Config::ThreadCount));
-  requester.setWorkQueueCapacity(
-    m_config->getUint64(Config::WorkQueueCapacity));
+  setupNode(requester, *m_config);
 
   if(nn) {
-    m_udpServer->sendBuiltMessage(nn->getRemoteEndpoint());
+    m_udpServer->sendBuiltMessage(nn->getRemoteEndpoint(), false);
   } else {
     m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
-      boost::asio::ip::address_v4::broadcast(),
-      m_config->getUint16(Config::UDPTargetPort)));
+                                    boost::asio::ip::address_v4::broadcast(),
+                                    m_config->getUint16(Config::UDPTargetPort)),
+                                  false);
   }
 }
 void
@@ -434,17 +456,15 @@ Communicator::task_announce(NetworkedNode* nn)
   auto req = msg.initOnlineAnnouncement();
 
   auto node = req.initNode();
-  node.setName(std::string(m_config->getString(Config::LocalName)));
-  node.setId(m_nodeId);
-  node.setAvailableWorkers(m_config->getUint32(Config::ThreadCount));
-  node.setWorkQueueCapacity(m_config->getUint64(Config::WorkQueueCapacity));
+  setupNode(node, *m_config);
 
   if(nn) {
-    m_udpServer->sendBuiltMessage(nn->getRemoteEndpoint());
+    m_udpServer->sendBuiltMessage(nn->getRemoteEndpoint(), false);
   } else {
     m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
-      boost::asio::ip::address_v4::broadcast(),
-      m_config->getUint16(Config::UDPTargetPort)));
+                                    boost::asio::ip::address_v4::broadcast(),
+                                    m_config->getUint16(Config::UDPTargetPort)),
+                                  false);
   }
 }
 

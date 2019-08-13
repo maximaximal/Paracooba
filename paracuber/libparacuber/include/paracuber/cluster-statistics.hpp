@@ -52,11 +52,16 @@ class ClusterStatistics
     void setWorkQueueSize(uint64_t workQueueSize);
     void setId(int64_t id) { m_id = id; }
     void setFullyKnown(bool fullyKnown) { m_fullyKnown = fullyKnown; }
+    void setUdpListenPort(uint16_t udpListenPort)
+    {
+      m_udpListenPort = udpListenPort;
+    }
 
     NetworkedNode* getNetworkedNode() { return m_networkedNode.get(); }
 
     int64_t getId() { return m_id; }
     bool getFullyKnown() { return m_fullyKnown; }
+    uint16_t getUdpListenPort() { return m_udpListenPort; }
 
     private:
     friend class ClusterStatistics;
@@ -67,6 +72,7 @@ class ClusterStatistics
 
     uint16_t m_maximumCPUFrequency = 0;
     uint16_t m_availableWorkers = 0;
+    uint16_t m_udpListenPort = 0;
     uint32_t m_uptime = 0;
     uint64_t m_workQueueCapacity = 0;
     uint64_t m_workQueueSize = 0;

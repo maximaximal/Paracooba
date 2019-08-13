@@ -12,6 +12,7 @@ struct Node
   workQueueSize @4 : UInt64; # number of tasks currently in the work queue, like in the status message
   maximumCPUFrequency @5 : UInt16; # maximum frequency of the cpu on this node
   uptime @6 : UInt32; # uptime (in seconds) of the node
+  udpListenPort @7 : UInt16; # listen port for udp control messages
 }
 
 struct AnnouncementRequest
@@ -21,7 +22,7 @@ struct AnnouncementRequest
   nameMatch : union {
     noRestriction @1 : Void;
     regex @2 : Text;
-    id @3: Int64 request;
+    id @3: Int64;
   }
 }
 # Request announcements of online nodes with given
