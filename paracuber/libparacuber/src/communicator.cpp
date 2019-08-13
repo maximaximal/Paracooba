@@ -224,6 +224,9 @@ class Communicator::UDPServer
 
   inline ::capnp::MallocMessageBuilder& getMallocMessageBuilder()
   {
+    // This mechanism destructs the message builder, so it can be reconstructed
+    // afterwards. This should be able to be improved at a later stage, but
+    // could require deeper modifications of Capn'Proto.
     m_mallocMessageBuilder.~MallocMessageBuilder();
     new(&m_mallocMessageBuilder)::capnp::MallocMessageBuilder(m_sendBuf);
     return m_mallocMessageBuilder;
