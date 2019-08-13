@@ -21,7 +21,8 @@ class Config
     LocalName,
     InputFile,
     ThreadCount,
-    UDPPort,
+    UDPTargetPort,
+    UDPListenPort,
     Id,
     DaemonHost,
     WorkQueueCapacity,
@@ -136,8 +137,10 @@ GetConfigNameFromEnum(Config::Key key)
       return "input-file";
     case Config::ThreadCount:
       return "threads";
-    case Config::UDPPort:
-      return "udp-port";
+    case Config::UDPListenPort:
+      return "udp-listen-port";
+    case Config::UDPTargetPort:
+      return "udp-target-port";
     case Config::Id:
       return "id";
     case Config::DaemonHost:

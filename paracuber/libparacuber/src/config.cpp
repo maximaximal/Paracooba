@@ -41,9 +41,12 @@ Config::Config()
     (GetConfigNameFromEnum(Config::ThreadCount),
          po::value<uint32_t>()->default_value(std::thread::hardware_concurrency()),
          "number of worker threads to execute tasks on")
-    (GetConfigNameFromEnum(Config::UDPPort),
+    (GetConfigNameFromEnum(Config::UDPListenPort),
          po::value<uint16_t>()->default_value(18001),
-         "udp port for incoming & outgoing control messages")
+         "udp port for incoming control messages")
+    (GetConfigNameFromEnum(Config::UDPTargetPort),
+         po::value<uint16_t>()->default_value(18001),
+         "udp port for outgoing control messages")
     (GetConfigNameFromEnum(Config::Id),
          po::value<int64_t>()->default_value(dist_mac(rng)),
          "Unique Number (only 48 Bit) (can be MAC address)")
@@ -115,7 +118,9 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
   conditionallySetConfigOptionToArray<uint32_t>(
     vm, m_config.data(), Config::ThreadCount);
   conditionallySetConfigOptionToArray<uint16_t>(
-    vm, m_config.data(), Config::UDPPort);
+    vm, m_config.data(), Config::UDPListenPort);
+  conditionallySetConfigOptionToArray<uint16_t>(
+    vm, m_config.data(), Config::UDPTargetPort);
   conditionallySetConfigOptionToArray<int64_t>(vm, m_config.data(), Config::Id);
   conditionallySetConfigOptionToArray<uint64_t>(
     vm, m_config.data(), Config::WorkQueueCapacity);

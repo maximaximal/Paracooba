@@ -28,7 +28,11 @@ class error_code;
 using IOServicePtr = std::shared_ptr<boost::asio::io_service>;
 
 namespace paracuber {
+
 class Runner;
+
+using RunnerPtr = std::shared_ptr<Runner>;
+using ClusterStatisticsPtr = std::shared_ptr<ClusterStatistics>;
 
 /** @brief Hub for all local & network communication processes between nodes.
  *
@@ -71,8 +75,12 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   /** @brief Get the active \ref Runner class instance for running \ref Task
    * objects.
    */
-  inline std::shared_ptr<Runner> getRunner() { return m_runner; }
+  inline RunnerPtr getRunner() { return m_runner; }
   inline IOServicePtr getIOService() { return m_ioService; }
+  inline ClusterStatisticsPtr getClusterStatistics()
+  {
+    return m_clusterStatistics;
+  }
 
   inline int64_t getAndIncrementCurrentMessageId()
   {
@@ -87,8 +95,8 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   std::any m_ioServiceWork;
   Logger m_logger;
   std::unique_ptr<boost::asio::signal_set> m_signalSet;
-  std::shared_ptr<Runner> m_runner;
-  std::shared_ptr<ClusterStatistics> m_clusterStatistics;
+  RunnerPtr m_runner;
+  ClusterStatisticsPtr m_clusterStatistics;
 
   int64_t m_currentMessageId = INT64_MIN;
   int64_t m_nodeId;
@@ -103,7 +111,8 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   std::unique_ptr<TCPServer> m_tcpServer;
 
   // Tasks
-  void task_firstContact();
+  void task_announce(NetworkedNode *nn = nullptr);
+  void task_requestAnnounce(int64_t id = 0, std::string regex = "", NetworkedNode *nn = nullptr);
 };
 
 using CommunicatorPtr = std::shared_ptr<Communicator>;

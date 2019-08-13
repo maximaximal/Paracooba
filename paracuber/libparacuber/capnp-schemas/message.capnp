@@ -1,13 +1,17 @@
 @0xead81247730f0294;
 
+using Cxx = import "/capnp/c++.capnp";
+$Cxx.namespace("paracuber::message");
+
 struct Node
 {
   name @0 : Text; # Name of the node
   id @1 : Int64; # Id of the node
   availableWorkers @2 : UInt16; # number of available worker threads on the node
   workQueueCapacity @3 : UInt64; # number of tasks the work queue can hold
-  maximumCPUFrequency @4 : UInt16; # maximum frequency of the cpu on this node
-  uptime @5 : UInt32; # uptime (in seconds) of the node
+  workQueueSize @4 : UInt64; # number of tasks currently in the work queue, like in the status message
+  maximumCPUFrequency @5 : UInt16; # maximum frequency of the cpu on this node
+  uptime @6 : UInt32; # uptime (in seconds) of the node
 }
 
 struct AnnouncementRequest
@@ -17,6 +21,7 @@ struct AnnouncementRequest
   nameMatch : union {
     noRestriction @1 : Void;
     regex @2 : Text;
+    id @3: Int64 request;
   }
 }
 # Request announcements of online nodes with given
