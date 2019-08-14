@@ -3,6 +3,7 @@
 
 #include "log.hpp"
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -57,11 +58,11 @@ class ClusterStatistics
       m_udpListenPort = udpListenPort;
     }
 
-    NetworkedNode* getNetworkedNode() { return m_networkedNode.get(); }
+    NetworkedNode* getNetworkedNode() const { return m_networkedNode.get(); }
 
-    int64_t getId() { return m_id; }
-    bool getFullyKnown() { return m_fullyKnown; }
-    uint16_t getUdpListenPort() { return m_udpListenPort; }
+    int64_t getId() const { return m_id; }
+    bool getFullyKnown() const { return m_fullyKnown; }
+    uint16_t getUdpListenPort() const { return m_udpListenPort; }
 
     private:
     friend class ClusterStatistics;
@@ -84,6 +85,21 @@ class ClusterStatistics
       uint64_t,
       ::boost::accumulators::stats<::boost::accumulators::tag::rolling_mean>>
       m_acc_workQueueSize;
+
+    bool operator=(const Node& n) { return m_id == n.m_id; }
+
+    friend std::ostream& operator<<(std::ostream& o, const Node& n)
+    {
+      o << "\"name\": \"" << n.m_name << "\","
+        << "\"id\": " << n.m_id << ","
+        << "\"maximumCPUFrequency\": " << n.m_maximumCPUFrequency << ","
+        << "\"availableWorkers\": " << n.m_availableWorkers << ","
+        << "\"udpListenPort\": " << n.m_udpListenPort << ","
+        << "\"uptime\": " << n.m_uptime << ","
+        << "\"workQueueCapacity\": " << n.m_workQueueCapacity << ","
+        << "\"workQueueSize\": " << n.m_workQueueSize;
+      return o;
+    }
   };
 
   /** @brief Constructor
@@ -95,13 +111,32 @@ class ClusterStatistics
 
   Node& getOrCreateNode(int64_t id);
 
+  friend std::ostream& operator<<(std::ostream& o, const ClusterStatistics& c)
+  {
+    bool first = true;
+    o << "{ \"ClusterStatistics\": [";
+    for(auto& it : c.m_nodeMap) {
+      auto& node = it.second;
+      o << "{" << node << "}";
+      if(first) {
+        o << ",";
+        first = false;
+      }
+    }
+    o << "]}";
+    return o;
+  }
+
+  using NodeMap = std::unordered_map<int64_t, Node>;
+
+  const NodeMap& getNodeMap() { return m_nodeMap; }
+
   protected:
   friend class Communicator;
   void addNode(Node&& node);
   void removeNode(int64_t id);
 
   private:
-  using NodeMap = std::unordered_map<int64_t, Node>;
   NodeMap m_nodeMap;
 
   ConfigPtr m_config;

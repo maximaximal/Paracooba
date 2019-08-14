@@ -1,4 +1,5 @@
 #include "../include/paracuber/config.hpp"
+#include <boost/asio/ip/host_name.hpp>
 #include <boost/program_options.hpp>
 #include <cstddef>
 #include <iostream>
@@ -21,9 +22,13 @@ Config::Config()
     ;
   // clang-format on
 
+  {
+    m_generatedLocalName =
+      boost::asio::ip::host_name() + ".local;" + std::to_string(getpid());
+  }
+
   /* CONFIG FILES ONLY OPTIONS
    * --------------------------------------- */
-  // clang-forma // clang-format on
 
   std::random_device dev;
   std::mt19937_64 rng(dev());
@@ -35,7 +40,7 @@ Config::Config()
   // clang-format off
   m_optionsCommon.add_options()
     (GetConfigNameFromEnum(Config::LocalName),
-         po::value<std::string>()->default_value("Unnamed"), "local name of this solver node")
+         po::value<std::string>()->default_value(m_generatedLocalName), "local name of this solver node")
     (GetConfigNameFromEnum(Config::InputFile),
          po::value<std::string>()->default_value(""), "input file (problem) to parse")
     (GetConfigNameFromEnum(Config::ThreadCount),
@@ -64,6 +69,13 @@ Config::Config()
 }
 
 Config::~Config() {}
+
+int64_t
+Config::generateId(int64_t uniqueNumber)
+{
+  int16_t pid = static_cast<int16_t>(::getpid());
+  return ((int64_t)pid << 48) | uniqueNumber;
+}
 
 bool
 Config::parseParameters(int argc, char** argv)
@@ -121,11 +133,15 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::UDPListenPort);
   conditionallySetConfigOptionToArray<uint16_t>(
     vm, m_config.data(), Config::UDPTargetPort);
-  conditionallySetConfigOptionToArray<int64_t>(vm, m_config.data(), Config::Id);
   conditionallySetConfigOptionToArray<uint64_t>(
     vm, m_config.data(), Config::WorkQueueCapacity);
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::DaemonHost);
+
+  if(vm.count(GetConfigNameFromEnum(Id))) {
+    m_config.data()[Id] =
+      generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());
+  }
 
   return true;
 }

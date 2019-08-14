@@ -110,6 +110,8 @@ class Config
   /** @brief Set daemon mode active. */
   inline void setDaemonMode(bool v) { m_daemonMode = v; }
 
+  int64_t generateId(int64_t uniqueNumber);
+
   private:
   bool processCommonParameters(
     const boost::program_options::variables_map& map);
@@ -125,6 +127,7 @@ class Config
   bool m_debugMode = false;
   bool m_infoMode = false;
   bool m_daemonMode = false;
+  std::string m_generatedLocalName;
 };
 
 constexpr const char*

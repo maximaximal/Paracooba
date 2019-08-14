@@ -86,7 +86,6 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   {
     return m_currentMessageId++;
   }
-  inline int64_t getNodeId() { return m_nodeId; }
 
   private:
   ConfigPtr m_config;
@@ -99,7 +98,6 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   ClusterStatisticsPtr m_clusterStatistics;
 
   int64_t m_currentMessageId = INT64_MIN;
-  int64_t m_nodeId;
 
   void signalHandler(const boost::system::error_code& error, int signalNumber);
 
@@ -113,6 +111,7 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   // Tasks
   void task_announce(NetworkedNode *nn = nullptr);
   void task_requestAnnounce(int64_t id = 0, std::string regex = "", NetworkedNode *nn = nullptr);
+  void task_offlineAnnouncement(NetworkedNode *nn = nullptr);
 };
 
 using CommunicatorPtr = std::shared_ptr<Communicator>;

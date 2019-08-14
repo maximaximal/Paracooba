@@ -28,6 +28,7 @@ applyMessageNodeToStatsNode(const message::Node::Reader& src,
   tgt.setWorkQueueCapacity(src.getWorkQueueCapacity());
   tgt.setWorkQueueSize(src.getWorkQueueSize());
   tgt.setUdpListenPort(src.getUdpListenPort());
+  tgt.setFullyKnown(true);
 }
 void
 applyMessageNodeStatusToStatsNode(const message::NodeStatus::Reader& src,
@@ -76,9 +77,6 @@ class Communicator::UDPServer
   {
     // No framing required. A single receive always maps directly to a message.
     if(!error || error == boost::asio::error::message_size) {
-      PARACUBER_LOG(m_logger, Trace)
-        << "Received " << bytes << " on UDP listener.";
-
       // Alignment handled by the creation of m_recBuf.
 
       ::capnp::FlatArrayMessageReader reader(
@@ -121,19 +119,16 @@ class Communicator::UDPServer
       networkedNode->setPort(node.getUdpListenPort());
       node.setNetworkedNode(std::move(networkedNode));
       nn = node.getNetworkedNode();
-
-      PARACUBER_LOG(m_logger, Trace)
-        << "Remote Endpoint: " << nn->getRemoteEndpoint();
     }
 
-    if(!node.getFullyKnown()) {
+    if(!node.getFullyKnown() &&
+       node.getId() != m_communicator->m_config->getInt64(Config::Id)) {
       m_communicator->m_ioService->post(
         std::bind(&Communicator::task_requestAnnounce,
                   m_communicator,
                   node.getId(),
                   "",
                   nn));
-      node.setFullyKnown(true);
     }
   }
 
@@ -150,12 +145,16 @@ class Communicator::UDPServer
     applyMessageNodeToStatsNode(messageNode, statisticsNode);
 
     networkStatisticsNode(statisticsNode);
+
+    PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
   }
   void handleOfflineAnnouncement(Message::Reader& msg)
   {
     const OfflineAnnouncement::Reader& reader = msg.getOfflineAnnouncement();
 
     m_clusterStatistics->removeNode(msg.getOrigin());
+
+    PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
   }
   void handleAnnouncementRequest(Message::Reader& msg)
   {
@@ -168,6 +167,8 @@ class Communicator::UDPServer
     applyMessageNodeToStatsNode(requester, statisticsNode);
 
     networkStatisticsNode(statisticsNode);
+
+    PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
 
     auto nameMatch = reader.getNameMatch();
     switch(nameMatch.which()) {
@@ -189,10 +190,12 @@ class Communicator::UDPServer
         }
     }
 
-    m_communicator->m_ioService->post(
-      std::bind(&Communicator::task_announce,
-                m_communicator,
-                statisticsNode.getNetworkedNode()));
+    if(requester.getId() != m_communicator->m_config->getInt64(Config::Id)) {
+      m_communicator->m_ioService->post(
+        std::bind(&Communicator::task_announce,
+                  m_communicator,
+                  statisticsNode.getNetworkedNode()));
+    }
   }
   void handleNodeStatus(Message::Reader& msg)
   {
@@ -215,7 +218,6 @@ class Communicator::UDPServer
     sendBufMutex->unlock();
 
     if(!error || error == boost::asio::error::message_size) {
-      PARACUBER_LOG(m_logger, Trace) << "Sent " << bytes << " on UDP listener.";
     } else {
       PARACUBER_LOG(m_logger, LocalError)
         << "Error sending data from UDP socket. Error: " << error;
@@ -234,12 +236,13 @@ class Communicator::UDPServer
   Message::Builder getMessageBuilder()
   {
     auto msg = getMallocMessageBuilder().getRoot<Message>();
-    msg.setOrigin(m_communicator->getNodeId());
+    msg.setOrigin(m_communicator->m_config->getInt64(Config::Id));
     msg.setId(m_communicator->getAndIncrementCurrentMessageId());
     return std::move(msg);
   }
   void sendBuiltMessage(boost::asio::ip::udp::endpoint&& endpoint,
-                        bool fromRunner = true)
+                        bool fromRunner = true,
+                        bool async = true)
   {
     // One copy cannot be avoided.
     auto buf = std::move(::capnp::messageToFlatArray(m_mallocMessageBuilder));
@@ -261,15 +264,26 @@ class Communicator::UDPServer
       auto bufBytes = buf.asBytes();
       std::copy(bufBytes.begin(), bufBytes.end(), m_sendBufBytes.begin());
 
-      m_socket.async_send_to(
-        boost::asio::buffer(reinterpret_cast<std::byte*>(&m_sendBufBytes[0]),
-                            size * sizeof(::capnp::word)),
-        endpoint,
-        boost::bind(&UDPServer::handleSend,
-                    this,
-                    boost::asio::placeholders::error,
-                    boost::asio::placeholders::bytes_transferred,
-                    &m_sendBufMutex));
+      if(async) {
+        m_socket.async_send_to(
+          boost::asio::buffer(reinterpret_cast<std::byte*>(&m_sendBufBytes[0]),
+                              size * sizeof(::capnp::word)),
+          endpoint,
+          boost::bind(&UDPServer::handleSend,
+                      this,
+                      boost::asio::placeholders::error,
+                      boost::asio::placeholders::bytes_transferred,
+                      &m_sendBufMutex));
+      } else {
+        m_socket.send_to(
+          boost::asio::buffer(reinterpret_cast<std::byte*>(&m_sendBufBytes[0]),
+                              size * sizeof(::capnp::word)),
+          endpoint);
+
+        if(fromRunner) {
+          m_sendBufMutex.unlock();
+        }
+      }
     }
   }
 
@@ -311,11 +325,6 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   , m_signalSet(std::make_unique<boost::asio::signal_set>(*m_ioService, SIGINT))
   , m_clusterStatistics(std::make_shared<ClusterStatistics>(config, log))
 {
-  // Set current ID
-  int16_t pid = static_cast<int16_t>(::getpid());
-  int64_t uniqueNumber = config->getInt64(Config::Id);
-  m_nodeId = ((int64_t)pid << 48) | uniqueNumber;
-
   // Initialize communicator
   boost::asio::io_service::work work(*m_ioService);
   m_ioServiceWork = work;
@@ -358,6 +367,14 @@ Communicator::run()
 void
 Communicator::exit()
 {
+  if(m_runner->m_running) {
+    task_offlineAnnouncement();
+    for(auto& it : m_clusterStatistics->getNodeMap()) {
+      auto& node = it.second;
+      task_offlineAnnouncement(node.getNetworkedNode());
+    }
+  }
+
   // Early stop m_runner, so that threads must not be notified more often if
   // this is called from a runner thread.
   m_runner->m_running = false;
@@ -471,4 +488,25 @@ Communicator::task_announce(NetworkedNode* nn)
   }
 }
 
+void
+Communicator::task_offlineAnnouncement(NetworkedNode* nn)
+{
+  PARACUBER_LOG(m_logger, Trace) << "Send offline announcement.";
+
+  auto msg = m_udpServer->getMessageBuilder();
+
+  auto off = msg.initOfflineAnnouncement();
+
+  off.setReason("Shutdown");
+
+  if(nn) {
+    m_udpServer->sendBuiltMessage(nn->getRemoteEndpoint(), false);
+  } else {
+    m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
+                                    boost::asio::ip::address_v4::broadcast(),
+                                    m_config->getUint16(Config::UDPTargetPort)),
+                                  false,
+                                  false);
+  }
+}
 }

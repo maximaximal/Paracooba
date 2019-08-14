@@ -62,11 +62,6 @@ ClusterStatistics::addNode(Node&& node)
 void
 ClusterStatistics::removeNode(int64_t id)
 {
-  if(m_nodeMap.count(id) > 0) {
-    m_nodeMap.erase(id);
-  } else {
-    PARACUBER_LOG(m_logger, GlobalWarning)
-      << "Could not find statistics for node with id " << id << "!";
-  }
+  m_nodeMap.erase(id);
 }
 }
