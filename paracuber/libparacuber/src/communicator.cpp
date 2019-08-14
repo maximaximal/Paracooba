@@ -441,6 +441,8 @@ Communicator::task_requestAnnounce(int64_t id,
                                    std::string regex,
                                    NetworkedNode* nn)
 {
+  if(!m_udpServer) return;
+
   PARACUBER_LOG(m_logger, Trace) << "Send announcement request.";
 
   auto msg = m_udpServer->getMessageBuilder();
@@ -469,6 +471,7 @@ Communicator::task_requestAnnounce(int64_t id,
 void
 Communicator::task_announce(NetworkedNode* nn)
 {
+  if(!m_udpServer) return;
   PARACUBER_LOG(m_logger, Trace) << "Send announcement.";
 
   auto msg = m_udpServer->getMessageBuilder();
@@ -491,6 +494,7 @@ Communicator::task_announce(NetworkedNode* nn)
 void
 Communicator::task_offlineAnnouncement(NetworkedNode* nn)
 {
+  if(!m_udpServer) return;
   PARACUBER_LOG(m_logger, Trace) << "Send offline announcement.";
 
   auto msg = m_udpServer->getMessageBuilder();
