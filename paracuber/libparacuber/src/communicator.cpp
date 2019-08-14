@@ -368,7 +368,6 @@ void
 Communicator::exit()
 {
   if(m_runner->m_running) {
-    task_offlineAnnouncement();
     for(auto& it : m_clusterStatistics->getNodeMap()) {
       auto& node = it.second;
       task_offlineAnnouncement(node.getNetworkedNode());
