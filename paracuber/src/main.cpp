@@ -24,20 +24,28 @@ main(int argc, char* argv[])
   auto logger = log->createLogger();
 
   PARACUBER_LOG(logger, Trace)
-    << "Starting paracuber \"" << config->getString(Config::LocalName) << "\"";
+    << "Starting paracuber \"" << config->getString(Config::LocalName)
+    << "\" in " << (config->isDaemonMode() ? "daemon mode" : "client mode");
 
   CommunicatorPtr communicator = std::make_shared<Communicator>(config, log);
 
   communicator->startRunner();
 
-  Client client(config, log, communicator);
-  client.solve();
+  std::unique_ptr<Client> client;
+  std::unique_ptr<Daemon> daemon;
+
+  if(config->isDaemonMode()) {
+    daemon = std::make_unique<Daemon>(config, log, communicator);
+  } else {
+    client = std::make_unique<Client>(config, log, communicator);
+    client->solve();
+  }
 
   communicator->run();
 
   if(!config->isDaemonMode()) {
     // Client mode. There should be some action.
-    TaskResult::Status status = client.getStatus();
+    TaskResult::Status status = client->getStatus();
 
     switch(status) {
       case TaskResult::Unsolved:
