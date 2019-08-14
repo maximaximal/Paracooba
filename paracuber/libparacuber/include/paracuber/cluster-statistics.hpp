@@ -118,7 +118,7 @@ class ClusterStatistics
     for(auto& it : c.m_nodeMap) {
       auto& node = it.second;
       o << "{" << node << "}";
-      if(first) {
+      if(first && c.m_nodeMap.size() > 1) {
         o << ",";
         first = false;
       }
