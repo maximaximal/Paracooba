@@ -325,6 +325,7 @@ class Communicator::TCPServer
             uint16_t port)
     : m_communicator(comm)
     , m_logger(log->createLogger())
+    , m_log(log)
     , m_port(port)
     , m_ioService(ioService)
     , m_acceptor(
@@ -343,25 +344,72 @@ class Communicator::TCPServer
   class TCPServerClient : public std::enable_shared_from_this<TCPServerClient>
   {
     public:
-    TCPServerClient(boost::asio::io_service& ioService)
+    TCPServerClient(boost::asio::io_service& ioService, LogPtr log)
       : m_ioService(ioService)
       , m_socket(ioService)
+      , m_logger(log->createLogger())
     {}
     virtual ~TCPServerClient() {}
 
+    enum State
+    {
+      NewConnection,
+      ReceivingFile
+    };
+
     boost::asio::ip::tcp::socket& socket() { return m_socket; }
 
-    void start() {}
+    void start() {
+      startReceive();
+    }
+
+    void startReceive()
+    {
+      using namespace boost::asio;
+      m_socket.async_receive(buffer(&m_recBuffer[0], m_recBuffer.size()),
+                             boost::bind(&TCPServerClient::handleReceive,
+                                         shared_from_this(),
+                                         placeholders::error,
+                                         placeholders::bytes_transferred));
+    }
+
+    void handleReceive(const boost::system::error_code& error,
+                       std::size_t bytes)
+    {
+      if(error) {
+        PARACUBER_LOG(m_logger, LocalError)
+          << "Could read from TCP connection! Error: " << error.message();
+        return;
+      }
+
+      switch(m_state) {
+        case NewConnection:
+          // If the connection is new, this client must be initialised first. A
+          // connection has a header containing its type and assorted data. This
+          // is extracted in this stage (first few bytes of the TCP stream).
+          break;
+        case ReceivingFile:
+          // The receiving file state exists to shuffle data from the network
+          // stream into the locally created file. After finishing, the created
+          // file can be given to a new task to be solved.
+          break;
+      }
+
+      startReceive();
+    }
 
     private:
     boost::asio::io_service& m_ioService;
     boost::asio::ip::tcp::socket m_socket;
+    boost::array<std::byte, REC_BUF_SIZE> m_recBuffer;
+    Logger m_logger;
+    State m_state = NewConnection;
   };
 
   void startAccept()
   {
     std::shared_ptr<TCPServerClient> newConn =
-      std::make_shared<TCPServerClient>(m_ioService);
+      std::make_shared<TCPServerClient>(m_ioService, m_log);
 
     m_acceptor.async_accept(newConn->socket(),
                             boost::bind(&TCPServer::handleAccept,
@@ -388,6 +436,7 @@ class Communicator::TCPServer
   private:
   Communicator* m_communicator;
   Logger m_logger;
+  LogPtr m_log;
   uint16_t m_port;
   boost::asio::ip::tcp::acceptor m_acceptor;
   boost::asio::io_service& m_ioService;
