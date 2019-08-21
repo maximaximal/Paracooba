@@ -3,6 +3,7 @@
 #include "../include/paracuber/networked_node.hpp"
 #include "../include/paracuber/runner.hpp"
 #include <boost/asio.hpp>
+#include <boost/asio/socket_base.hpp>
 #include <boost/bind.hpp>
 #include <mutex>
 #include <regex>
@@ -116,7 +117,8 @@ class Communicator::UDPServer
     if(!nn) {
       std::unique_ptr<NetworkedNode> networkedNode =
         std::make_unique<NetworkedNode>(m_remoteEndpoint);
-      networkedNode->setPort(node.getUdpListenPort());
+      networkedNode->setUdpPort(node.getUdpListenPort());
+      networkedNode->setTcpPort(node.getTcpListenPort());
       node.setNetworkedNode(std::move(networkedNode));
       nn = node.getNetworkedNode();
     }
@@ -315,7 +317,81 @@ thread_local ::capnp::MallocMessageBuilder
   Communicator::UDPServer::m_mallocMessageBuilder;
 
 class Communicator::TCPServer
-{};
+{
+  public:
+  TCPServer(Communicator* comm,
+            LogPtr log,
+            boost::asio::io_service& ioService,
+            uint16_t port)
+    : m_communicator(comm)
+    , m_logger(log->createLogger())
+    , m_port(port)
+    , m_ioService(ioService)
+    , m_acceptor(
+        ioService,
+        boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port))
+  {
+    startAccept();
+    PARACUBER_LOG(m_logger, Trace) << "TCPServer started at port " << port;
+  }
+  virtual ~TCPServer()
+  {
+    PARACUBER_LOG(m_logger, Trace)
+      << "TCPServer at port " << m_port << " stopped.";
+  }
+
+  class TCPServerClient : public std::enable_shared_from_this<TCPServerClient>
+  {
+    public:
+    TCPServerClient(boost::asio::io_service& ioService)
+      : m_ioService(ioService)
+      , m_socket(ioService)
+    {}
+    virtual ~TCPServerClient() {}
+
+    boost::asio::ip::tcp::socket& socket() { return m_socket; }
+
+    void start() {}
+
+    private:
+    boost::asio::io_service& m_ioService;
+    boost::asio::ip::tcp::socket m_socket;
+  };
+
+  void startAccept()
+  {
+    std::shared_ptr<TCPServerClient> newConn =
+      std::make_shared<TCPServerClient>(m_ioService);
+
+    m_acceptor.async_accept(newConn->socket(),
+                            boost::bind(&TCPServer::handleAccept,
+                                        this,
+                                        newConn,
+                                        boost::asio::placeholders::error()));
+  }
+  void handleAccept(std::shared_ptr<TCPServerClient> newConn,
+                    const boost::system::error_code& error)
+  {
+    if(error) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not accept new TCP connection! Error: " << error.message();
+      return;
+    }
+    newConn->socket().non_blocking(true);
+    newConn->start();
+
+    PARACUBER_LOG(m_logger, Trace) << "New TCP connection started!";
+
+    startAccept();
+  }
+
+  private:
+  Communicator* m_communicator;
+  Logger m_logger;
+  uint16_t m_port;
+  boost::asio::ip::tcp::acceptor m_acceptor;
+  boost::asio::io_service& m_ioService;
+};
 
 Communicator::Communicator(ConfigPtr config, LogPtr log)
   : m_config(config)
@@ -353,8 +429,8 @@ Communicator::run()
     m_runner->start();
   }
 
-  // The first task to run is to make contact with the specified daemon solver.
   listenForIncomingUDP(m_config->getUint16(Config::UDPListenPort));
+  listenForIncomingTCP(m_config->getUint16(Config::TCPListenPort));
   m_ioService->post(
     std::bind(&Communicator::task_requestAnnounce, this, 0, "", nullptr));
 
@@ -423,7 +499,16 @@ Communicator::listenForIncomingUDP(uint16_t port)
 
 void
 Communicator::listenForIncomingTCP(uint16_t port)
-{}
+{
+  using namespace boost::asio;
+  try {
+    m_tcpServer = std::make_unique<TCPServer>(this, m_log, *m_ioService, port);
+  } catch(std::exception& e) {
+    PARACUBER_LOG(m_logger, LocalError)
+      << "Could not initialize server for incoming TCP connections on port "
+      << port << "! Error: " << e.what();
+  }
+}
 
 void
 setupNode(Node::Builder& n, Config& config)
@@ -440,7 +525,8 @@ Communicator::task_requestAnnounce(int64_t id,
                                    std::string regex,
                                    NetworkedNode* nn)
 {
-  if(!m_udpServer) return;
+  if(!m_udpServer)
+    return;
 
   PARACUBER_LOG(m_logger, Trace) << "Send announcement request.";
 
@@ -459,7 +545,7 @@ Communicator::task_requestAnnounce(int64_t id,
   setupNode(requester, *m_config);
 
   if(nn) {
-    m_udpServer->sendBuiltMessage(nn->getRemoteEndpoint(), false);
+    m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false);
   } else {
     m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
                                     boost::asio::ip::address_v4::broadcast(),
@@ -470,7 +556,8 @@ Communicator::task_requestAnnounce(int64_t id,
 void
 Communicator::task_announce(NetworkedNode* nn)
 {
-  if(!m_udpServer) return;
+  if(!m_udpServer)
+    return;
   PARACUBER_LOG(m_logger, Trace) << "Send announcement.";
 
   auto msg = m_udpServer->getMessageBuilder();
@@ -481,7 +568,7 @@ Communicator::task_announce(NetworkedNode* nn)
   setupNode(node, *m_config);
 
   if(nn) {
-    m_udpServer->sendBuiltMessage(nn->getRemoteEndpoint(), false);
+    m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false);
   } else {
     m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
                                     boost::asio::ip::address_v4::broadcast(),
@@ -493,7 +580,8 @@ Communicator::task_announce(NetworkedNode* nn)
 void
 Communicator::task_offlineAnnouncement(NetworkedNode* nn)
 {
-  if(!m_udpServer) return;
+  if(!m_udpServer)
+    return;
   PARACUBER_LOG(m_logger, Trace) << "Send offline announcement.";
 
   auto msg = m_udpServer->getMessageBuilder();
@@ -503,7 +591,7 @@ Communicator::task_offlineAnnouncement(NetworkedNode* nn)
   off.setReason("Shutdown");
 
   if(nn) {
-    m_udpServer->sendBuiltMessage(nn->getRemoteEndpoint(), false);
+    m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false);
   } else {
     m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
                                     boost::asio::ip::address_v4::broadcast(),

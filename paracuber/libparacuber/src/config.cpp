@@ -52,6 +52,12 @@ Config::Config()
     (GetConfigNameFromEnum(Config::UDPTargetPort),
          po::value<uint16_t>()->default_value(18001),
          "udp port for outgoing control messages")
+    (GetConfigNameFromEnum(Config::TCPListenPort),
+         po::value<uint16_t>()->default_value(18001),
+         "tcp port for incoming data messages")
+    (GetConfigNameFromEnum(Config::TCPTargetPort),
+         po::value<uint16_t>()->default_value(18001),
+         "tcp port for outgoing data messages")
     (GetConfigNameFromEnum(Config::Id),
          po::value<int64_t>()->default_value(dist_mac(rng)),
          "Unique Number (only 48 Bit) (can be MAC address)")
@@ -133,6 +139,10 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::UDPListenPort);
   conditionallySetConfigOptionToArray<uint16_t>(
     vm, m_config.data(), Config::UDPTargetPort);
+  conditionallySetConfigOptionToArray<uint16_t>(
+    vm, m_config.data(), Config::TCPListenPort);
+  conditionallySetConfigOptionToArray<uint16_t>(
+    vm, m_config.data(), Config::TCPTargetPort);
   conditionallySetConfigOptionToArray<uint64_t>(
     vm, m_config.data(), Config::WorkQueueCapacity);
   conditionallySetConfigOptionToArray<std::string>(

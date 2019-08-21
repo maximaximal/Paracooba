@@ -23,6 +23,8 @@ class Config
     ThreadCount,
     UDPTargetPort,
     UDPListenPort,
+    TCPTargetPort,
+    TCPListenPort,
     Id,
     DaemonHost,
     WorkQueueCapacity,
@@ -144,6 +146,10 @@ GetConfigNameFromEnum(Config::Key key)
       return "udp-listen-port";
     case Config::UDPTargetPort:
       return "udp-target-port";
+    case Config::TCPListenPort:
+      return "tcp-listen-port";
+    case Config::TCPTargetPort:
+      return "tcp-target-port";
     case Config::Id:
       return "id";
     case Config::DaemonHost:

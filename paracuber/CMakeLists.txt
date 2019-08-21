@@ -14,6 +14,11 @@ add_definitions(-DBOOST_ALL_DYN_LINK)
 set(Boost_USE_MULTITHREADED ON)
 find_package(Boost COMPONENTS log program_options thread filesystem REQUIRED)
 
+# Add Catch2 unit testing framework.
+include(CTest)
+include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/catch/Catch2-2.9.2/contrib/Catch.cmake)
+enable_testing()
+
 find_package(CapnProto REQUIRED)
 
 add_subdirectory(third_party)
@@ -22,6 +27,7 @@ add_subdirectory(libparacuber)
 
 # Files
 add_subdirectory(src)
+add_subdirectory(test)
 
 # Basenames for logging
 # This macro has been taken from https://stackoverflow.com/a/27990434

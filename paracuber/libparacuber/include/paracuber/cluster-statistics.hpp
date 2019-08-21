@@ -63,6 +63,7 @@ class ClusterStatistics
     int64_t getId() const { return m_id; }
     bool getFullyKnown() const { return m_fullyKnown; }
     uint16_t getUdpListenPort() const { return m_udpListenPort; }
+    uint16_t getTcpListenPort() const { return m_tcpListenPort; }
 
     private:
     friend class ClusterStatistics;
@@ -74,6 +75,7 @@ class ClusterStatistics
     uint16_t m_maximumCPUFrequency = 0;
     uint16_t m_availableWorkers = 0;
     uint16_t m_udpListenPort = 0;
+    uint16_t m_tcpListenPort = 0;
     uint32_t m_uptime = 0;
     uint64_t m_workQueueCapacity = 0;
     uint64_t m_workQueueSize = 0;

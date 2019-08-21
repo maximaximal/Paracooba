@@ -13,6 +13,7 @@ struct Node
   maximumCPUFrequency @5 : UInt16; # maximum frequency of the cpu on this node
   uptime @6 : UInt32; # uptime (in seconds) of the node
   udpListenPort @7 : UInt16; # listen port for udp control messages
+  tcpListenPort @8 : UInt16; # listen port for tcp data messages
 }
 
 struct AnnouncementRequest
