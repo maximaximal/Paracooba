@@ -30,6 +30,7 @@ using IOServicePtr = std::shared_ptr<boost::asio::io_service>;
 namespace paracuber {
 
 class Runner;
+class CNF;
 
 using RunnerPtr = std::shared_ptr<Runner>;
 using ClusterStatisticsPtr = std::shared_ptr<ClusterStatistics>;
@@ -52,6 +53,7 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   public:
   class UDPServer;
   class TCPServer;
+  class TCPClient;
 
   /** @brief Constructor */
   Communicator(ConfigPtr config, LogPtr log);
@@ -87,6 +89,8 @@ class Communicator : public std::enable_shared_from_this<Communicator>
     return m_currentMessageId++;
   }
 
+  void sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn);
+
   private:
   ConfigPtr m_config;
   LogPtr m_log;
@@ -109,9 +113,11 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   std::unique_ptr<TCPServer> m_tcpServer;
 
   // Tasks
-  void task_announce(NetworkedNode *nn = nullptr);
-  void task_requestAnnounce(int64_t id = 0, std::string regex = "", NetworkedNode *nn = nullptr);
-  void task_offlineAnnouncement(NetworkedNode *nn = nullptr);
+  void task_announce(NetworkedNode* nn = nullptr);
+  void task_requestAnnounce(int64_t id = 0,
+                            std::string regex = "",
+                            NetworkedNode* nn = nullptr);
+  void task_offlineAnnouncement(NetworkedNode* nn = nullptr);
 };
 
 using CommunicatorPtr = std::shared_ptr<Communicator>;

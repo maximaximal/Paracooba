@@ -47,11 +47,11 @@ ClusterStatistics::ClusterStatistics(ConfigPtr config, LogPtr log)
 
 ClusterStatistics::~ClusterStatistics() {}
 
-ClusterStatistics::Node&
+std::pair<ClusterStatistics::Node&, bool>
 ClusterStatistics::getOrCreateNode(int64_t id)
 {
   auto [it, inserted] = m_nodeMap.emplace(std::make_pair(id, Node(id)));
-  return it->second;
+  return { it->second, inserted };
 }
 
 void

@@ -57,6 +57,10 @@ class ClusterStatistics
     {
       m_udpListenPort = udpListenPort;
     }
+    void setTcpListenPort(uint16_t tcpListenPort)
+    {
+      m_tcpListenPort = tcpListenPort;
+    }
 
     NetworkedNode* getNetworkedNode() const { return m_networkedNode.get(); }
 
@@ -111,7 +115,7 @@ class ClusterStatistics
    */
   ~ClusterStatistics();
 
-  Node& getOrCreateNode(int64_t id);
+  std::pair<ClusterStatistics::Node&, bool> getOrCreateNode(int64_t id);
 
   friend std::ostream& operator<<(std::ostream& o, const ClusterStatistics& c)
   {

@@ -1,8 +1,13 @@
 #ifndef PARACUBER_CNF_HPP
 #define PARACUBER_CNF_HPP
 
+#include <fstream>
+#include <functional>
+#include <set>
 #include <string>
 #include <string_view>
+
+#include <boost/asio/ip/tcp.hpp>
 
 namespace paracuber {
 class NetworkedNode;
@@ -24,11 +29,28 @@ class CNF
   int64_t getPrevious() { return m_previous; }
   std::string_view getDimacsFile() { return m_dimacsFile; }
 
-  void send();
+  using SendFinishedCB = std::function<void()>;
+
+  void send(boost::asio::ip::tcp::socket* socket,
+            SendFinishedCB finishedCallback);
+  void receiveFile(char* buf, std::size_t length);
 
   private:
   int64_t m_previous = -1;
   std::string m_dimacsFile = "";
+
+  // Ofstream for outputting the original CNF file.
+  std::ofstream m_ofstream;
+
+  int m_fd = 0;
+  size_t m_fileSize = 0;
+
+  struct SendDataStruct {
+    off_t offset;
+    SendFinishedCB cb;
+  };
+
+  std::map<boost::asio::ip::tcp::socket*, SendDataStruct> m_sendData;
 };
 }
 

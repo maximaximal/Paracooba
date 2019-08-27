@@ -8,6 +8,9 @@
 #include <string_view>
 
 namespace paracuber {
+class Client;
+class Daemon;
+
 /** @brief Store for communication options specific for each node.
  *
  */
@@ -114,7 +117,13 @@ class Config
 
   int64_t generateId(int64_t uniqueNumber);
 
+  Client* getClient() { return m_client; }
+  Daemon* getDaemon() { return m_daemon; }
+
   private:
+  friend class Client;
+  friend class Daemon;
+
   bool processCommonParameters(
     const boost::program_options::variables_map& map);
 
@@ -130,6 +139,9 @@ class Config
   bool m_infoMode = false;
   bool m_daemonMode = false;
   std::string m_generatedLocalName;
+
+  Client* m_client = nullptr;
+  Daemon* m_daemon = nullptr;
 };
 
 constexpr const char*

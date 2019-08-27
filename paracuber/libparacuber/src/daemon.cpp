@@ -8,7 +8,9 @@ Daemon::Daemon(ConfigPtr config,
                LogPtr log,
                std::shared_ptr<Communicator> communicator)
   : m_config(config)
-{}
+{
+  m_config->m_daemon = this;
+}
 
 Daemon::~Daemon() {}
 }

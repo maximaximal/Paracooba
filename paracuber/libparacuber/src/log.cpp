@@ -103,6 +103,12 @@ Log::createLogger()
   auto lg = boost::log::sources::severity_logger<Log::Severity>();
   return std::move(lg);
 }
+boost::log::sources::severity_logger_mt<Log::Severity>
+Log::createLoggerMT()
+{
+  auto lg = boost::log::sources::severity_logger_mt<Log::Severity>();
+  return std::move(lg);
+}
 
 std::ostream&
 operator<<(std::ostream& strm, ::paracuber::Log::Severity level)
@@ -151,8 +157,7 @@ operator<<(
 
   ::paracuber::Log::Severity level = manip.get();
 
-  if(static_cast<std::size_t>(level) <
-     sizeof(strings) / sizeof(*strings))
+  if(static_cast<std::size_t>(level) < sizeof(strings) / sizeof(*strings))
     strm << strings[level];
   else
     strm << static_cast<int>(level);

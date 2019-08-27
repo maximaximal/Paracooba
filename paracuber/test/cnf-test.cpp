@@ -10,7 +10,6 @@ TEST_CASE("Send and receive a CNF formula with previous = 1")
 
   REQUIRE(to.getPrevious() == -1);
   REQUIRE(from.getPrevious() == 1);
-
 }
 
 TEST_CASE("Send and receive a CNF formula with previous = 0") {}

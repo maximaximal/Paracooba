@@ -75,6 +75,7 @@ class Log
    * multiple custom attributes.
    */
   boost::log::sources::severity_logger<Severity> createLogger();
+  boost::log::sources::severity_logger_mt<Severity> createLoggerMT();
 
   private:
   ConfigPtr m_config;
@@ -85,6 +86,7 @@ class Log
 
 using LogPtr = std::shared_ptr<Log>;
 using Logger = boost::log::sources::severity_logger<Log::Severity>;
+using LoggerMT = boost::log::sources::severity_logger_mt<Log::Severity>;
 
 std::ostream&
 operator<<(std::ostream& strm, ::paracuber::Log::Severity level);

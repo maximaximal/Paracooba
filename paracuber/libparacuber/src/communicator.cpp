@@ -1,5 +1,8 @@
 #include "../include/paracuber/communicator.hpp"
+#include "../include/paracuber/client.hpp"
+#include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/config.hpp"
+#include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/networked_node.hpp"
 #include "../include/paracuber/runner.hpp"
 #include <boost/asio.hpp>
@@ -29,6 +32,7 @@ applyMessageNodeToStatsNode(const message::Node::Reader& src,
   tgt.setWorkQueueCapacity(src.getWorkQueueCapacity());
   tgt.setWorkQueueSize(src.getWorkQueueSize());
   tgt.setUdpListenPort(src.getUdpListenPort());
+  tgt.setTcpListenPort(src.getTcpListenPort());
   tgt.setFullyKnown(true);
 }
 void
@@ -141,12 +145,17 @@ class Communicator::UDPServer
 
     int64_t id = msg.getOrigin();
 
-    ClusterStatistics::Node& statisticsNode =
-      m_clusterStatistics->getOrCreateNode(id);
+    auto [statisticsNode, inserted] = m_clusterStatistics->getOrCreateNode(id);
 
     applyMessageNodeToStatsNode(messageNode, statisticsNode);
 
     networkStatisticsNode(statisticsNode);
+
+    if(inserted && !m_communicator->m_config->isDaemonMode()) {
+      m_communicator->sendCNFToNode(
+        m_communicator->m_config->getClient()->getRootCNF(),
+        statisticsNode.getNetworkedNode());
+    }
 
     PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
   }
@@ -163,7 +172,7 @@ class Communicator::UDPServer
     const AnnouncementRequest::Reader& reader = msg.getAnnouncementRequest();
     const Node::Reader& requester = reader.getRequester();
 
-    ClusterStatistics::Node& statisticsNode =
+    auto [statisticsNode, inserted] =
       m_clusterStatistics->getOrCreateNode(requester.getId());
 
     applyMessageNodeToStatsNode(requester, statisticsNode);
@@ -171,6 +180,12 @@ class Communicator::UDPServer
     networkStatisticsNode(statisticsNode);
 
     PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
+
+    if(!m_communicator->m_config->isDaemonMode()) {
+      // A client does not need to send online announcements after the initial
+      // announcement request.
+      return;
+    }
 
     auto nameMatch = reader.getNameMatch();
     switch(nameMatch.which()) {
@@ -205,8 +220,7 @@ class Communicator::UDPServer
 
     int64_t id = msg.getOrigin();
 
-    ClusterStatistics::Node& statisticsNode =
-      m_clusterStatistics->getOrCreateNode(id);
+    auto [statisticsNode, inserted] = m_clusterStatistics->getOrCreateNode(id);
 
     applyMessageNodeStatusToStatsNode(reader, statisticsNode);
 
@@ -316,6 +330,90 @@ thread_local std::mutex Communicator::UDPServer::m_sendBufMutex;
 thread_local ::capnp::MallocMessageBuilder
   Communicator::UDPServer::m_mallocMessageBuilder;
 
+class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
+{
+  public:
+  TCPClient(Communicator* comm,
+            LogPtr log,
+            boost::asio::io_service& ioService,
+            boost::asio::ip::tcp::endpoint endpoint,
+            std::shared_ptr<CNF> cnf)
+    : m_comm(comm)
+    , m_cnf(cnf)
+    , m_endpoint(endpoint)
+    , m_socket(ioService)
+  {}
+  virtual ~TCPClient()
+  {
+    PARACUBER_LOG(m_logger, Trace) << "Destroy TCPClient to " << m_endpoint;
+  }
+
+  void connect()
+  {
+    m_socket.async_connect(m_endpoint,
+                           boost::bind(&TCPClient::handleConnect,
+                                       shared_from_this(),
+                                       boost::asio::placeholders::error));
+  }
+
+  void handleConnect(const boost::system::error_code& err)
+  {
+    if(err) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not connect to remote endpoint " << m_endpoint
+        << " over TCP! Error: " << err;
+      return;
+    }
+
+    PARACUBER_LOG(m_logger, Trace)
+      << "Sending the CNF with previous=" << m_cnf->getPrevious() << " to "
+      << m_endpoint << " started.";
+
+    auto prev = m_cnf->getPrevious();
+    m_socket.write_some(boost::asio::buffer(&prev, sizeof(prev)));
+
+    auto ptr = shared_from_this();
+
+    // Let the sending be handled by the CNF itself.
+    m_cnf->send(&m_socket, [this, ptr]() {
+      // Finished sending CNF!
+      PARACUBER_LOG(m_logger, Trace)
+        << "Sending the CNF with previous=" << m_cnf->getPrevious() << " to "
+        << m_endpoint << " finished.";
+    });
+
+    asyncRead();
+  }
+  void handleRead(size_t bytes, const boost::system::error_code& err)
+  {
+    if(err) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not read from remote endpoint " << m_endpoint
+        << " over TCP! Error: " << err;
+      return;
+    }
+    asyncRead();
+  }
+
+  void asyncRead()
+  {
+    m_socket.async_receive(
+      boost::asio::buffer(m_recBuffer),
+      boost::bind(&TCPClient::handleRead,
+                  this,
+                  boost::asio::placeholders::bytes_transferred,
+                  boost::asio::placeholders::error));
+  }
+
+  private:
+  LoggerMT m_logger;
+  Communicator* m_comm;
+  std::shared_ptr<CNF> m_cnf;
+  boost::asio::ip::tcp::socket m_socket;
+  boost::asio::ip::tcp::endpoint m_endpoint;
+  boost::array<char, REC_BUF_SIZE> m_recBuffer;
+};
+
 class Communicator::TCPServer
 {
   public:
@@ -354,14 +452,13 @@ class Communicator::TCPServer
     enum State
     {
       NewConnection,
-      ReceivingFile
+      ReceivingFile,
+      ReceivingCube,
     };
 
     boost::asio::ip::tcp::socket& socket() { return m_socket; }
 
-    void start() {
-      startReceive();
-    }
+    void start() { startReceive(); }
 
     void startReceive()
     {
@@ -381,27 +478,63 @@ class Communicator::TCPServer
           << "Could read from TCP connection! Error: " << error.message();
         return;
       }
+      m_pos = 0;
 
       switch(m_state) {
-        case NewConnection:
-          // If the connection is new, this client must be initialised first. A
-          // connection has a header containing its type and assorted data. This
-          // is extracted in this stage (first few bytes of the TCP stream).
+        case NewConnection: {
+          state_newConnection(bytes);
           break;
-        case ReceivingFile:
-          // The receiving file state exists to shuffle data from the network
-          // stream into the locally created file. After finishing, the created
-          // file can be given to a new task to be solved.
+        }
+        case ReceivingFile: {
+          state_receivingFile(bytes);
           break;
+        }
+        case ReceivingCube: {
+          state_receivingCube(bytes);
+          break;
+        }
       }
 
       startReceive();
     }
 
     private:
+    void state_newConnection(std::size_t bytes)
+    {
+      // If the connection is new, this client must be initialised first. A
+      // connection has a header containing its type and assorted data. This
+      // is extracted in this stage (first few bytes of the TCP stream).
+      int64_t previous = static_cast<int64_t>(m_recBuffer[0]);
+      m_pos += sizeof(int64_t);
+      m_cnf = std::make_unique<CNF>(previous);
+
+      // Handle remaining data of the stream.
+      if(m_cnf->getPrevious() == 0) {
+        state_receivingFile(bytes - m_pos);
+        m_state = ReceivingFile;
+      } else {
+        m_state = ReceivingCube;
+      }
+    }
+    void state_receivingFile(std::size_t bytes)
+    {
+      // The receiving file state exists to shuffle data from the network
+      // stream into the locally created file. After finishing, the created
+      // file can be given to a new task to be solved.
+
+      m_cnf->receiveFile(&m_recBuffer[m_pos], bytes);
+    }
+    void state_receivingCube(std::size_t bytes)
+    {
+      // This state is active if this is a subsequent cube transfer.
+    }
+
+    std::unique_ptr<CNF> m_cnf;
+
     boost::asio::io_service& m_ioService;
     boost::asio::ip::tcp::socket m_socket;
-    boost::array<std::byte, REC_BUF_SIZE> m_recBuffer;
+    boost::array<char, REC_BUF_SIZE> m_recBuffer;
+    std::size_t m_pos = 0;
     Logger m_logger;
     State m_state = NewConnection;
   };
@@ -560,6 +693,17 @@ Communicator::listenForIncomingTCP(uint16_t port)
 }
 
 void
+Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn)
+{
+  // This indirection is required to make this work from worker threads.
+  m_ioService->post([this, cnf, nn]() {
+    auto client = std::make_shared<TCPClient>(
+      this, m_log, *m_ioService, nn->getRemoteTcpEndpoint(), cnf);
+    client->connect();
+  });
+}
+
+void
 setupNode(Node::Builder& n, Config& config)
 {
   n.setName(std::string(config.getString(Config::LocalName)));
@@ -567,6 +711,7 @@ setupNode(Node::Builder& n, Config& config)
   n.setAvailableWorkers(config.getUint32(Config::ThreadCount));
   n.setWorkQueueCapacity(config.getUint64(Config::WorkQueueCapacity));
   n.setUdpListenPort(config.getUint16(Config::UDPListenPort));
+  n.setTcpListenPort(config.getUint16(Config::TCPListenPort));
 }
 
 void

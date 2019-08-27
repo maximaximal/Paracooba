@@ -10,6 +10,7 @@
 namespace paracuber {
 class Config;
 class Communicator;
+class CNF;
 
 /** @brief Main interaction point with the solver as a user.
  */
@@ -39,10 +40,13 @@ class Client
   void solve();
   inline TaskResult::Status getStatus() { return m_status; }
 
+  std::shared_ptr<CNF> getRootCNF() { return m_rootCNF; }
+
   private:
   ConfigPtr m_config;
   std::shared_ptr<Communicator> m_communicator;
   TaskResult::Status m_status;
+  std::shared_ptr<CNF> m_rootCNF;
 
   Logger m_logger;
 };
