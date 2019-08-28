@@ -365,6 +365,15 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
       return;
     }
 
+    // Optimizes TCP sending on Linux by waiting for more data to arrive before
+    // sending.
+    int option = 1;
+    setsockopt(m_socket.native_handle(),
+               SOL_TCP,
+               TCP_CORK,
+               (char*)&option,
+               sizeof(option));
+
     PARACUBER_LOG(m_logger, Trace)
       << "Sending the CNF with previous=" << m_cnf->getPrevious() << " to "
       << m_endpoint << " started.";
@@ -374,6 +383,8 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
 
     auto ptr = shared_from_this();
 
+    m_socket.native_non_blocking(true);
+
     // Let the sending be handled by the CNF itself.
     m_cnf->send(&m_socket, [this, ptr]() {
       // Finished sending CNF!
@@ -381,28 +392,6 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
         << "Sending the CNF with previous=" << m_cnf->getPrevious() << " to "
         << m_endpoint << " finished.";
     });
-
-    asyncRead();
-  }
-  void handleRead(size_t bytes, const boost::system::error_code& err)
-  {
-    if(err) {
-      PARACUBER_LOG(m_logger, LocalError)
-        << "Could not read from remote endpoint " << m_endpoint
-        << " over TCP! Error: " << err;
-      return;
-    }
-    asyncRead();
-  }
-
-  void asyncRead()
-  {
-    m_socket.async_receive(
-      boost::asio::buffer(m_recBuffer),
-      boost::bind(&TCPClient::handleRead,
-                  this,
-                  boost::asio::placeholders::bytes_transferred,
-                  boost::asio::placeholders::error));
   }
 
   private:
@@ -473,6 +462,20 @@ class Communicator::TCPServer
     void handleReceive(const boost::system::error_code& error,
                        std::size_t bytes)
     {
+      if(error == boost::asio::error::eof) {
+        switch(m_state) {
+          case NewConnection:
+            break;
+          case ReceivingFile:
+            m_cnf->receiveFile(nullptr, 0);
+            break;
+          case ReceivingCube:
+            break;
+        }
+        PARACUBER_LOG(m_logger, Trace)
+          << "TCP Connection ended from " << m_socket.remote_endpoint();
+        return;
+      }
       if(error) {
         PARACUBER_LOG(m_logger, LocalError)
           << "Could read from TCP connection! Error: " << error.message();
@@ -521,6 +524,11 @@ class Communicator::TCPServer
       // The receiving file state exists to shuffle data from the network
       // stream into the locally created file. After finishing, the created
       // file can be given to a new task to be solved.
+
+      if(bytes == 0) {
+        // This can happen in the initial request.
+        return;
+      }
 
       m_cnf->receiveFile(&m_recBuffer[m_pos], bytes);
     }

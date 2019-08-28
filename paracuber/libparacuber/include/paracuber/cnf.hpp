@@ -36,6 +36,14 @@ class CNF
   void receiveFile(char* buf, std::size_t length);
 
   private:
+  struct SendDataStruct
+  {
+    off_t offset = 0;
+    SendFinishedCB cb;
+  };
+
+  void sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket);
+
   int64_t m_previous = -1;
   std::string m_dimacsFile = "";
 
@@ -44,11 +52,6 @@ class CNF
 
   int m_fd = 0;
   size_t m_fileSize = 0;
-
-  struct SendDataStruct {
-    off_t offset;
-    SendFinishedCB cb;
-  };
 
   std::map<boost::asio::ip::tcp::socket*, SendDataStruct> m_sendData;
 };

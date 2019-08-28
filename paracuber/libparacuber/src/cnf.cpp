@@ -2,11 +2,15 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <iostream>
 
+extern "C"
+{
 #include <fcntl.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+}
 
 namespace paracuber {
 CNF::CNF(int64_t previous, std::string_view dimacsFile)
@@ -35,10 +39,31 @@ CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb)
   if(m_previous == 0) {
     // This is the root CNF, send over the file directly using the sendfile()
     // syscall.
-    sendfile(socket->native_handle(), m_fd, &data->offset, m_fileSize);
+    int ret = sendfile(socket->native_handle(), m_fd, &data->offset, m_fileSize);
+    if(ret == -1) {
+      std::cerr << "ERROR DURING SENDFILE: " << strerror(errno) << std::endl;
+      m_sendData.erase(socket);
+    }
 
     socket->async_write_some(boost::asio::null_buffers(),
-                             std::bind([data]() { data->cb(); }));
+                             std::bind(&CNF::sendCB, this, data, socket));
+  }
+}
+
+void
+CNF::sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket)
+{
+  if(data->offset >= m_fileSize) {
+    data->cb();
+    // This not only erases the send data structure,
+    // but also frees the last reference to the
+    // shared_ptr of the TCPClient instance that was
+    // calling this function. The connection is then
+    // closed.
+    m_sendData.erase(socket);
+  } else {
+    // Repeated sends, as long as the file is transferred.
+    send(socket, data->cb);
   }
 }
 
@@ -47,9 +72,16 @@ CNF::receiveFile(char* buf, std::size_t length)
 {
   using namespace boost::filesystem;
   if(m_dimacsFile == "") {
-    path p = temp_directory_path() / unique_path();
+    path dir =
+      temp_directory_path() / ("paracuber-" + std::to_string(getpid()));
+    path p = dir / unique_path();
     m_dimacsFile = p.string();
-    m_ofstream.open(m_dimacsFile);
+
+    if(!exists(dir)) {
+      create_directory(dir);
+    }
+
+    m_ofstream.open(m_dimacsFile, std::ios::out);
   }
   if(length == 0) {
     // This marks the end of the transmission, the file is finished.
