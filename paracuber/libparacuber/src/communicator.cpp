@@ -152,6 +152,13 @@ class Communicator::UDPServer
     networkStatisticsNode(statisticsNode);
 
     if(inserted && !m_communicator->m_config->isDaemonMode()) {
+      // Send announcement of this client to the other node before transferring
+      // the root CNF.
+      m_communicator->m_ioService->post(
+        std::bind(&Communicator::task_announce,
+                  m_communicator,
+                  statisticsNode.getNetworkedNode()));
+
       m_communicator->sendCNFToNode(
         m_communicator->m_config->getClient()->getRootCNF(),
         statisticsNode.getNetworkedNode());
@@ -379,7 +386,13 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
       << m_endpoint << " started.";
 
     auto prev = m_cnf->getPrevious();
-    m_socket.write_some(boost::asio::buffer(&prev, sizeof(prev)));
+    auto id = m_comm->m_config->getInt64(Config::Id);
+
+    char buf[sizeof(prev) + sizeof(id)];
+    *(reinterpret_cast<int64_t*>(buf)) = prev;
+    *(reinterpret_cast<int64_t*>(buf + sizeof(id))) = id;
+
+    m_socket.write_some(boost::asio::buffer(buf, sizeof(buf)));
 
     auto ptr = shared_from_this();
 
@@ -431,10 +444,13 @@ class Communicator::TCPServer
   class TCPServerClient : public std::enable_shared_from_this<TCPServerClient>
   {
     public:
-    TCPServerClient(boost::asio::io_service& ioService, LogPtr log)
+    TCPServerClient(boost::asio::io_service& ioService,
+                    LogPtr log,
+                    Communicator* comm)
       : m_ioService(ioService)
       , m_socket(ioService)
       , m_logger(log->createLogger())
+      , m_comm(comm)
     {}
     virtual ~TCPServerClient() {}
 
@@ -507,9 +523,13 @@ class Communicator::TCPServer
       // If the connection is new, this client must be initialised first. A
       // connection has a header containing its type and assorted data. This
       // is extracted in this stage (first few bytes of the TCP stream).
-      int64_t previous = static_cast<int64_t>(m_recBuffer[0]);
+      int64_t previous = *reinterpret_cast<int64_t*>(&m_recBuffer[0]);
       m_pos += sizeof(int64_t);
-      m_cnf = std::make_unique<CNF>(previous);
+      m_cnf = std::make_shared<CNF>(previous);
+
+      int64_t originator = *reinterpret_cast<int64_t*>(&m_recBuffer[m_pos]);
+      m_comm->m_config->getDaemon()->getOrCreateContext(m_cnf, originator);
+      m_pos += sizeof(int64_t);
 
       // Handle remaining data of the stream.
       if(m_cnf->getPrevious() == 0) {
@@ -537,20 +557,21 @@ class Communicator::TCPServer
       // This state is active if this is a subsequent cube transfer.
     }
 
-    std::unique_ptr<CNF> m_cnf;
+    std::shared_ptr<CNF> m_cnf;
 
     boost::asio::io_service& m_ioService;
     boost::asio::ip::tcp::socket m_socket;
     boost::array<char, REC_BUF_SIZE> m_recBuffer;
     std::size_t m_pos = 0;
     Logger m_logger;
+    Communicator* m_comm;
     State m_state = NewConnection;
   };
 
   void startAccept()
   {
     std::shared_ptr<TCPServerClient> newConn =
-      std::make_shared<TCPServerClient>(m_ioService, m_log);
+      std::make_shared<TCPServerClient>(m_ioService, m_log, m_communicator);
 
     m_acceptor.async_accept(newConn->socket(),
                             boost::bind(&TCPServer::handleAccept,
