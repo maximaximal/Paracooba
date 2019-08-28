@@ -190,7 +190,15 @@ class Communicator::UDPServer
 
     if(!m_communicator->m_config->isDaemonMode()) {
       // A client does not need to send online announcements after the initial
-      // announcement request.
+      // announcement request. Only the root CNF needs to be sent, so the
+      // context is initiated on the remote side, but this only if the remote is
+      // a daemon that is accepting work.
+      if(requester.getDaemonMode()) {
+        m_communicator->sendCNFToNode(
+          m_communicator->m_config->getClient()->getRootCNF(),
+          statisticsNode.getNetworkedNode());
+      }
+
       return;
     }
 
@@ -528,8 +536,14 @@ class Communicator::TCPServer
       m_cnf = std::make_shared<CNF>(previous);
 
       int64_t originator = *reinterpret_cast<int64_t*>(&m_recBuffer[m_pos]);
-      m_comm->m_config->getDaemon()->getOrCreateContext(m_cnf, originator);
       m_pos += sizeof(int64_t);
+
+      if(m_comm->m_config->isDaemonMode()) {
+        m_comm->m_config->getDaemon()->getOrCreateContext(m_cnf, originator);
+      } else {
+        // This is some other CNF that was sent back to the client. Handle it
+        // using the main orchestrator.
+      }
 
       // Handle remaining data of the stream.
       if(m_cnf->getPrevious() == 0) {
@@ -741,6 +755,7 @@ setupNode(Node::Builder& n, Config& config)
   n.setWorkQueueCapacity(config.getUint64(Config::WorkQueueCapacity));
   n.setUdpListenPort(config.getUint16(Config::UDPListenPort));
   n.setTcpListenPort(config.getUint16(Config::TCPListenPort));
+  n.setDaemonMode(config.isDaemonMode());
 }
 
 void

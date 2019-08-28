@@ -14,6 +14,7 @@ struct Node
   uptime @6 : UInt32; # uptime (in seconds) of the node
   udpListenPort @7 : UInt16; # listen port for udp control messages
   tcpListenPort @8 : UInt16; # listen port for tcp data messages
+  daemonMode @9 : Bool; # determines if the node is in daemon or client mode
 }
 
 struct AnnouncementRequest
