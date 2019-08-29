@@ -132,32 +132,30 @@ operator<<(
                            ::paracuber::Log::Severity_Tag> const& manip)
 {
   static const char* colorised_strings[] = {
-    "\033[30mTRCE\033[0m", "\033[32mDEBG\033[0m", "\033[37mINFO\033[0m",
-    "\033[33mLWRN\033[0m", "\033[33mLERR\033[0m", "\033[31mGWRN\033[0m",
-    "\033[31mGERR\033[0m", "\033[31mFTAL\033[0m"
+    "\033[0;37mTRCE\033[0m", "\033[0;32mDEBG\033[0m", "\033[1;37mINFO\033[0m",
+    "\033[0;33mLWRN\033[0m", "\033[0;33mLERR\033[0m", "\033[0;31mGWRN\033[0m",
+    "\033[0;31mGERR\033[0m", "\033[0;35mFTAL\033[0m"
   };
   static const char* uncolorised_strings[] = { "TRCE", "DEBG", "INFO", "LWRN",
                                                "LERR", "GWRN", "GERR", "FTAL" };
 
   static const char** strings = uncolorised_strings;
 
-  if(strings == nullptr) {
-    const char* terminal = std::getenv("TERM");
+  const char* terminal = std::getenv("TERM");
 
-    if(terminal == NULL) {
-      strings = uncolorised_strings;
+  if(terminal == NULL) {
+    strings = uncolorised_strings;
+  } else {
+    if(std::strlen(terminal) > 7) {
+      strings = colorised_strings;
     } else {
-      if(std::strlen(terminal) > 7) {
-        strings = colorised_strings;
-      } else {
-        strings = uncolorised_strings;
-      }
+      strings = uncolorised_strings;
     }
   }
 
   ::paracuber::Log::Severity level = manip.get();
 
-  if(static_cast<std::size_t>(level) < sizeof(strings) / sizeof(*strings))
+  if(static_cast<std::size_t>(level) < sizeof(*strings) / sizeof(**strings))
     strm << strings[level];
   else
     strm << static_cast<int>(level);
