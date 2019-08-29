@@ -25,9 +25,10 @@ class Terminator : public CaDiCaL::Terminator
   CaDiCaLTask* m_task;
 };
 
-CaDiCaLTask::CaDiCaLTask()
+CaDiCaLTask::CaDiCaLTask(uint32_t* varCount)
   : m_terminator(std::make_unique<Terminator>(this))
   , m_solver(std::make_unique<CaDiCaL::Solver>())
+  , m_varCount(varCount)
 {
   m_solver->connect_terminator(m_terminator.get());
 }
@@ -55,6 +56,11 @@ CaDiCaLTask::execute()
   if(parse_status != 0) {
     return std::move(std::make_unique<TaskResult>(TaskResult::ParsingError));
   }
+
+  if(m_varCount != nullptr) {
+    *m_varCount = vars;
+  }
+
   PARACUBER_LOG((*m_logger), Trace)
     << "CNF formula parsed with " << vars << " variables.";
 

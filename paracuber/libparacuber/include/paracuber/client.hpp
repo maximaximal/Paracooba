@@ -38,15 +38,18 @@ class Client
    *         - TaskResult::Status::Unsatisfiable
    */
   void solve();
-  inline TaskResult::Status getStatus() { return m_status; }
+  inline TaskResult::Status getStatus() const { return m_status; }
 
-  std::shared_ptr<CNF> getRootCNF() { return m_rootCNF; }
+  std::shared_ptr<CNF> getRootCNF() const { return m_rootCNF; }
+
+  uint32_t getCNFVarCount() const { return m_cnfVarCount; }
 
   private:
   ConfigPtr m_config;
   std::shared_ptr<Communicator> m_communicator;
   TaskResult::Status m_status;
   std::shared_ptr<CNF> m_rootCNF;
+  uint32_t m_cnfVarCount = 0;
 
   Logger m_logger;
 };

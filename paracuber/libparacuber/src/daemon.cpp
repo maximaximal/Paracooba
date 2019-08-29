@@ -6,16 +6,19 @@
 namespace paracuber {
 Daemon::Context::Context(std::shared_ptr<CNF> rootCNF,
                          int64_t originatorID,
+                         uint32_t cnfVarCount,
                          Daemon* daemon,
                          ClusterStatistics::Node& statsNode)
   : m_rootCNF(rootCNF)
   , m_originatorID(originatorID)
+  , m_cnfVarCount(cnfVarCount)
   , m_daemon(daemon)
   , m_logger(daemon->m_log->createLogger())
   , m_statisticsNode(statsNode)
 {
   PARACUBER_LOG(m_logger, Trace)
-    << "Create new context with origin " << m_originatorID;
+    << "Create new context with origin " << m_originatorID
+    << " and a CNF variable count of " << m_cnfVarCount;
 }
 Daemon::Context::~Context()
 {
@@ -34,7 +37,9 @@ Daemon::Daemon(ConfigPtr config,
 }
 
 std::pair<Daemon::Context&, bool>
-Daemon::getOrCreateContext(std::shared_ptr<CNF> rootCNF, int64_t id)
+Daemon::getOrCreateContext(std::shared_ptr<CNF> rootCNF,
+                           int64_t id,
+                           uint32_t varCount)
 {
   if(m_contextMap.count(id) > 0) {
     return { *m_contextMap.find(id)->second, false };
@@ -43,7 +48,7 @@ Daemon::getOrCreateContext(std::shared_ptr<CNF> rootCNF, int64_t id)
       m_communicator->getClusterStatistics()->getOrCreateNode(id);
 
     auto p = std::make_pair(
-      id, std::make_unique<Context>(rootCNF, id, this, statsNode));
+      id, std::make_unique<Context>(rootCNF, id, varCount, this, statsNode));
     Context& context = *p.second;
     m_contextMap.insert(std::move(p));
     return { context, true };

@@ -15,7 +15,7 @@ class Terminator;
 class CaDiCaLTask : public Task
 {
   public:
-  CaDiCaLTask();
+  CaDiCaLTask(uint32_t* varCount = nullptr);
   virtual ~CaDiCaLTask();
 
   /** @brief Queue parsing a DIMACS file into the internal solver instance.
@@ -35,6 +35,7 @@ class CaDiCaLTask : public Task
   std::unique_ptr<CaDiCaL::Solver> m_solver;
   std::string m_sourcePath;
   bool m_terminate = false;
+  uint32_t* m_varCount = nullptr;
 };
 }
 

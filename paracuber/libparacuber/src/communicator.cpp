@@ -8,6 +8,7 @@
 #include <boost/asio.hpp>
 #include <boost/asio/socket_base.hpp>
 #include <boost/bind.hpp>
+#include <cassert>
 #include <mutex>
 #include <regex>
 
@@ -394,11 +395,28 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
       << m_endpoint << " started.";
 
     auto prev = m_cnf->getPrevious();
-    auto id = m_comm->m_config->getInt64(Config::Id);
 
-    char buf[sizeof(prev) + sizeof(id)];
-    *(reinterpret_cast<int64_t*>(buf)) = prev;
-    *(reinterpret_cast<int64_t*>(buf + sizeof(id))) = id;
+    int64_t id = 0;
+    if(m_comm->m_config->isDaemonMode()) {
+      id = m_cnf->getOriginId();
+    } else {
+      id = m_comm->m_config->getInt64(Config::Id);
+    };
+
+    uint32_t varCount = 0;
+    if(m_comm->m_config->isDaemonMode()) {
+      auto [context, inserted] =
+        m_comm->m_config->getDaemon()->getOrCreateContext(nullptr, id);
+      assert(!inserted);
+      varCount = context.getCNFVarCount();
+    } else {
+      varCount = m_comm->m_config->getClient()->getCNFVarCount();
+    }
+
+    char buf[sizeof(prev) + sizeof(id) + sizeof(varCount)];
+    *(reinterpret_cast<uint64_t*>(buf)) = prev;
+    *(reinterpret_cast<uint32_t*>(buf + sizeof(prev))) = varCount;
+    *(reinterpret_cast<int64_t*>(buf + sizeof(prev) + sizeof(varCount))) = id;
 
     m_socket.write_some(boost::asio::buffer(buf, sizeof(buf)));
 
@@ -491,7 +509,7 @@ class Communicator::TCPServer
           case NewConnection:
             break;
           case ReceivingFile:
-            m_cnf->receiveFile(nullptr, 0);
+            m_cnf->receive(nullptr, 0);
             break;
           case ReceivingCube:
             break;
@@ -531,15 +549,28 @@ class Communicator::TCPServer
       // If the connection is new, this client must be initialised first. A
       // connection has a header containing its type and assorted data. This
       // is extracted in this stage (first few bytes of the TCP stream).
-      int64_t previous = *reinterpret_cast<int64_t*>(&m_recBuffer[0]);
-      m_pos += sizeof(int64_t);
-      m_cnf = std::make_shared<CNF>(previous);
+      uint64_t previous = *reinterpret_cast<uint64_t*>(&m_recBuffer[0]);
+      m_pos += sizeof(previous);
+      uint32_t varCount = *reinterpret_cast<uint32_t*>(&m_recBuffer[m_pos]);
+      m_pos += sizeof(varCount);
+      m_cnf = std::make_shared<CNF>(previous, varCount);
 
       int64_t originator = *reinterpret_cast<int64_t*>(&m_recBuffer[m_pos]);
       m_pos += sizeof(int64_t);
 
       if(m_comm->m_config->isDaemonMode()) {
-        m_comm->m_config->getDaemon()->getOrCreateContext(m_cnf, originator);
+        auto [context, inserted] =
+          m_comm->m_config->getDaemon()->getOrCreateContext(
+            m_cnf, originator, varCount);
+        if(previous == 0 && inserted) {
+          PARACUBER_LOG(m_logger, GlobalWarning)
+            << "The same context should not have been created twice! "
+               "Is a DIMACS file transmitted more than once?";
+        }
+        // The variable count may change if in the first transmission happens
+        // before the CNF has been parsed by the client.
+        context.setCNFVarCount(varCount);
+
       } else {
         // This is some other CNF that was sent back to the client. Handle it
         // using the main orchestrator.
@@ -564,7 +595,7 @@ class Communicator::TCPServer
         return;
       }
 
-      m_cnf->receiveFile(&m_recBuffer[m_pos], bytes);
+      m_cnf->receive(&m_recBuffer[m_pos], bytes);
     }
     void state_receivingCube(std::size_t bytes)
     {

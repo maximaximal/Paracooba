@@ -6,6 +6,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <boost/asio/ip/tcp.hpp>
 
@@ -20,20 +21,48 @@ class NetworkedNode;
 class CNF
 {
   public:
+  /** @brief Maximum depth means 64, which is too high.
+   *
+   * This encodes a CNF which is not yet assigned.
+   */
+  static const uint64_t UNINITIALIZED_CNF_PREV = 0b00111111u;
+
+  using CubeVarType = int32_t;
+  using CubeVector = std::vector<CubeVarType>;
+
   /** @brief Construct a CNF from existing literals based on DIMACS file or on
    * previous CNF.
    */
-  CNF(int64_t previous = -1, std::string_view dimacsFile = "");
+  CNF(int64_t originId,
+      uint64_t previous = UNINITIALIZED_CNF_PREV,
+      std::string_view dimacsFile = "");
+  /** @brief Constructs a CNF using a variable count for then applying a cube to
+   * it.
+   *
+   * The variable count is reserved internally.
+   */
+  CNF(int64_t originId, uint64_t previous, size_t varCount);
   virtual ~CNF();
 
-  int64_t getPrevious() { return m_previous; }
+  uint64_t getPrevious() { return m_previous; }
   std::string_view getDimacsFile() { return m_dimacsFile; }
 
   using SendFinishedCB = std::function<void()>;
 
   void send(boost::asio::ip::tcp::socket* socket,
             SendFinishedCB finishedCallback);
-  void receiveFile(char* buf, std::size_t length);
+  void receive(char* buf, std::size_t length);
+
+  inline uint64_t getPath()
+  {
+    return m_previous & (0xFFFFFFFFFFFFFFFFu & 0b11000000u);
+  }
+  inline uint8_t getDepth() { return m_previous & 0b00111111u; }
+
+  /** @brief Get a writeable reference to the internal cube vector. */
+  inline CubeVector& getCube() { return m_cubeVector; }
+
+  inline int64_t getOriginId() { return m_originId; }
 
   private:
   struct SendDataStruct
@@ -44,7 +73,8 @@ class CNF
 
   void sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket);
 
-  int64_t m_previous = -1;
+  int64_t m_originId = 0;
+  uint64_t m_previous = -1;
   std::string m_dimacsFile = "";
 
   // Ofstream for outputting the original CNF file.
@@ -54,6 +84,7 @@ class CNF
   size_t m_fileSize = 0;
 
   std::map<boost::asio::ip::tcp::socket*, SendDataStruct> m_sendData;
+  CubeVector m_cubeVector;
 };
 }
 

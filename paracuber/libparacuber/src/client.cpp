@@ -12,7 +12,8 @@ Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
   , m_communicator(communicator)
 {
   m_config->m_client = this;
-  m_rootCNF = std::make_shared<CNF>(0, getDIMACSSourcePathFromConfig());
+  m_rootCNF = std::make_shared<CNF>(
+    config->getInt64(Config::Id), 0, getDIMACSSourcePathFromConfig());
 }
 Client::~Client() {}
 
@@ -31,7 +32,7 @@ Client::getDIMACSSourcePathFromConfig()
 void
 Client::solve()
 {
-  auto task = std::make_unique<CaDiCaLTask>();
+  auto task = std::make_unique<CaDiCaLTask>(&m_cnfVarCount);
   auto& finishedSignal = task->getFinishedSignal();
   task->readDIMACSFile(getDIMACSSourcePathFromConfig());
   m_communicator->getRunner()->push(std::move(task));
