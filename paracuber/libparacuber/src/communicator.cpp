@@ -562,9 +562,9 @@ class Communicator::TCPServer
         auto [context, inserted] =
           m_comm->m_config->getDaemon()->getOrCreateContext(
             m_cnf, originator, varCount);
-        if(previous == 0 && inserted) {
+        if(previous == 0 && !inserted) {
           PARACUBER_LOG(m_logger, GlobalWarning)
-            << "The same context should not have been created twice! "
+            << "The same context should not have been sent twice! "
                "Is a DIMACS file transmitted more than once?";
         }
         // The variable count may change if in the first transmission happens
