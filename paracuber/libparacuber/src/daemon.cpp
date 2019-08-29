@@ -1,7 +1,9 @@
 #include "../include/paracuber/daemon.hpp"
+#include "../include/paracuber/cadical_task.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/log.hpp"
+#include "../include/paracuber/runner.hpp"
 
 namespace paracuber {
 Daemon::Context::Context(std::shared_ptr<CNF> rootCNF,
@@ -24,6 +26,27 @@ Daemon::Context::~Context()
 {
   PARACUBER_LOG(m_logger, Trace)
     << "Destroy context with origin " << m_originatorID;
+}
+
+void
+Daemon::Context::start()
+{
+  // The context should be started! After creating a context, the root DIMACS
+  // file that created this context must be parsed. This is done in a new
+  // CaDiCaL task.
+
+  auto task =
+    std::make_unique<CaDiCaLTask>(&m_cnfVarCount, CaDiCaLTask::ParseOnly);
+  task->readCNF(m_rootCNF);
+
+  auto& finishedSignal = task->getFinishedSignal();
+
+  finishedSignal.connect([this](const TaskResult& result) {
+    PARACUBER_LOG(m_logger, Info)
+      << "Successfully parsed received CNF and reached callback!";
+  });
+
+  m_daemon->m_communicator->getRunner()->push(std::move(task));
 }
 
 Daemon::Daemon(ConfigPtr config,

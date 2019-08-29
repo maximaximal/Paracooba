@@ -510,6 +510,9 @@ class Communicator::TCPServer
             break;
           case ReceivingFile:
             m_cnf->receive(nullptr, 0);
+            if(m_context) {
+              m_context->start();
+            }
             break;
           case ReceivingCube:
             break;
@@ -562,6 +565,9 @@ class Communicator::TCPServer
         auto [context, inserted] =
           m_comm->m_config->getDaemon()->getOrCreateContext(
             m_cnf, originator, varCount);
+
+        m_context = &context;
+
         if(previous == 0 && !inserted) {
           PARACUBER_LOG(m_logger, GlobalWarning)
             << "The same context should not have been sent twice! "
@@ -611,6 +617,7 @@ class Communicator::TCPServer
     Logger m_logger;
     Communicator* m_comm;
     State m_state = NewConnection;
+    Daemon::Context* m_context = nullptr;
   };
 
   void startAccept()

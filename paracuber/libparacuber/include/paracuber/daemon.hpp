@@ -28,6 +28,8 @@ class Daemon
     void setCNFVarCount(uint32_t varCount) { m_cnfVarCount = varCount; }
     uint32_t getCNFVarCount() const { return m_cnfVarCount; }
 
+    void start();
+
     private:
     std::shared_ptr<CNF> m_rootCNF;
     int64_t m_originatorID = 0;

@@ -106,6 +106,7 @@ Runner::worker(uint32_t workerId, Logger logger)
       m_currentlyRunningTasks[workerId] = nullptr;
       entry->task->finish(*result);
 
+      result->setTask(std::move(entry->task));
       entry->result.set_value(std::move(result));
     }
   }
