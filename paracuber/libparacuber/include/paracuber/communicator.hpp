@@ -40,11 +40,11 @@ using ClusterStatisticsPtr = std::shared_ptr<ClusterStatistics>;
  * This node owns the boost asio io_service that is responsible for all timing
  * operations on the local node and for communicating with other nodes.
  *
- * \section SendReceiveSolverInstances Sending and Receiving Solver Instances
+ * \section SendAndReceiveFormulas Sending and Receiving Formulas
  *
- * To send solver instances, a new TCP stream is opened. A solver gets
- * serialised into a buffer and directly transmitted over the stream. It then
- * gets reconstructed and the stream gets closed.
+ * A solver is not sent directly. Instead, only the changes to the formula state
+ * are transmitted. This means, that the root formula is sent once and cubes are
+ * sent as needed. More on synchronising cubes in @ref CNFTree.
  *
  * \dotfile solver-network-flow.dot
  */

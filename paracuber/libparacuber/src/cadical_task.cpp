@@ -65,43 +65,48 @@ CaDiCaLTask::readDIMACSFile(std::string_view sourcePath)
 void
 CaDiCaLTask::readCNF(std::shared_ptr<CNF> cnf)
 {
+  /// This applies the CNF tree to the current solver object. This means, that
+  /// the solver applies all missing rules from the CNF tree to the current
+  /// context. See @ref CNFTree for more.
   if(cnf->getPrevious() == 0) {
     // Root CNF - this must be parsed only. The root CNF never has to be solved
     // directly, as this is done by the client.
-    m_mode = ParseOnly;
+    m_mode = Parse;
     readDIMACSFile(cnf->getDimacsFile());
   } else {
-    // Apply the given cube. This requires, that the previous formula solved by
-    // this instance is the parent node on the CNF binary tree.
+    // Apply the CNF tree to the current solver.
   }
 }
 
 TaskResultPtr
 CaDiCaLTask::execute()
 {
-  if(!boost::filesystem::exists(m_sourcePath)) {
-    return std::move(std::make_unique<TaskResult>(TaskResult::MissingInputs));
+  TaskResult::Status status;
+  if(m_mode | Parse) {
+    if(!boost::filesystem::exists(m_sourcePath)) {
+      return std::move(std::make_unique<TaskResult>(TaskResult::MissingInputs));
+    }
+
+    PARACUBER_LOG((*m_logger), Trace)
+      << "Start parsing CNF formula in DIMACS format from \"" << m_sourcePath
+      << "\".";
+    int vars = 0;
+    const char* parse_status =
+      m_solver->read_dimacs(m_sourcePath.c_str(), vars, 1);
+    if(parse_status != 0) {
+      return std::move(std::make_unique<TaskResult>(TaskResult::ParsingError));
+    }
+
+    if(m_varCount != nullptr) {
+      *m_varCount = vars;
+    }
+
+    PARACUBER_LOG((*m_logger), Trace)
+      << "CNF formula parsed with " << vars << " variables.";
+    status = TaskResult::Parsed;
   }
 
-  PARACUBER_LOG((*m_logger), Trace)
-    << "Start parsing CNF formula in DIMACS format from \"" << m_sourcePath
-    << "\".";
-  int vars = 0;
-  const char* parse_status =
-    m_solver->read_dimacs(m_sourcePath.c_str(), vars, 1);
-  if(parse_status != 0) {
-    return std::move(std::make_unique<TaskResult>(TaskResult::ParsingError));
-  }
-
-  if(m_varCount != nullptr) {
-    *m_varCount = vars;
-  }
-
-  PARACUBER_LOG((*m_logger), Trace)
-    << "CNF formula parsed with " << vars << " variables.";
-
-  TaskResult::Status status = TaskResult::Parsed;
-  if(m_mode == Solve) {
+  if(m_mode | Mode::Solve) {
     PARACUBER_LOG((*m_logger), Trace)
       << "Start solving CNF formula using CaDiCaL CNF solver.";
     int solveResult = m_solver->solve();

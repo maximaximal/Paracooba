@@ -36,7 +36,7 @@ Daemon::Context::start()
   // CaDiCaL task.
 
   auto task =
-    std::make_unique<CaDiCaLTask>(&m_cnfVarCount, CaDiCaLTask::ParseOnly);
+    std::make_unique<CaDiCaLTask>(&m_cnfVarCount, CaDiCaLTask::Parse);
   task->readCNF(m_rootCNF);
 
   auto& finishedSignal = task->getFinishedSignal();
@@ -49,8 +49,10 @@ Daemon::Context::start()
            "continue on this node.";
       return;
     }
-    PARACUBER_LOG(m_logger, Info)
-      << "Successfully parsed received CNF and reached callback!";
+    // Once the CNF is parsed, this compute node sits idle until cubes arrive.
+    // These cubes can then be cubed further or just solved directly, depending
+    // on the heuristics of the current compute node.
+
   });
 
   m_daemon->m_communicator->getRunner()->push(std::move(task));

@@ -18,8 +18,9 @@ class CaDiCaLTask : public Task
   public:
   enum Mode
   {
-    Solve,
-    ParseOnly
+    Solve = 0b00000001,
+    Parse = 0b00000010,
+    ParseAndSolve = Solve | Parse,
   };
 
   /** @brief Construct this new CaDiCaL task as the copy of another CaDiCaL task
@@ -37,7 +38,7 @@ class CaDiCaLTask : public Task
   CaDiCaLTask(const TaskResult& result);
 
   /** @brief Create a new CaDiCaL solver task */
-  CaDiCaLTask(uint32_t* varCount = nullptr, Mode = Solve);
+  CaDiCaLTask(uint32_t* varCount = nullptr, Mode = ParseAndSolve);
 
   /** @brief Destructor */
   virtual ~CaDiCaLTask();
@@ -64,13 +65,26 @@ class CaDiCaLTask : public Task
   private:
   friend class Terminator;
   std::unique_ptr<Terminator> m_terminator;
-  Mode m_mode = Solve;
+  Mode m_mode = ParseAndSolve;
 
   std::unique_ptr<CaDiCaL::Solver> m_solver;
   std::string m_sourcePath;
   bool m_terminate = false;
   uint32_t* m_varCount = nullptr;
 };
+
+inline CaDiCaLTask::Mode
+operator|(CaDiCaLTask::Mode a, CaDiCaLTask::Mode b)
+{
+  return static_cast<CaDiCaLTask::Mode>(static_cast<int>(a) |
+                                        static_cast<int>(b));
+}
+inline CaDiCaLTask::Mode operator&(CaDiCaLTask::Mode a, CaDiCaLTask::Mode b)
+{
+  return static_cast<CaDiCaLTask::Mode>(static_cast<int>(a) &
+                                        static_cast<int>(b));
+}
+
 }
 
 #endif
