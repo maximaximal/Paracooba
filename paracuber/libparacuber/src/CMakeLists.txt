@@ -1,3 +1,5 @@
+add_subdirectory(cuber)
+
 set(PARACUBER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/orchestrator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/communicator.cpp
@@ -10,6 +12,8 @@ set(PARACUBER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/client.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/daemon.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cnf.cpp
+
+    ${CUBER_SRCS}
 
     ${CMAKE_CURRENT_SOURCE_DIR}/cadical_task.cpp
     PARENT_SCOPE)

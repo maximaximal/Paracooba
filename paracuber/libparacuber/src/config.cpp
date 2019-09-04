@@ -70,6 +70,7 @@ Config::Config()
     ("debug,d", po::bool_switch(&m_debugMode)->default_value(false), "debug mode (all debug output)")
     ("info,i", po::bool_switch(&m_infoMode)->default_value(false), "info mode (more information)")
     ("daemon", po::bool_switch(&m_daemonMode)->default_value(false), "daemon mode")
+    ("disable-client-cadical", po::bool_switch(&m_disableClientCaDiCaL)->default_value(false), "direct solving via CaDiCaL on client")
     ;
   // clang-format on
 }

@@ -32,14 +32,21 @@ Client::getDIMACSSourcePathFromConfig()
 void
 Client::solve()
 {
-  auto task = std::make_unique<CaDiCaLTask>(&m_cnfVarCount);
+  CaDiCaLTask::Mode mode = m_config->isClientCaDiCaLEnabled()
+                             ? CaDiCaLTask::ParseAndSolve
+                             : CaDiCaLTask::Parse;
+
+  auto task = std::make_unique<CaDiCaLTask>(&m_cnfVarCount, mode);
   auto& finishedSignal = task->getFinishedSignal();
   task->readDIMACSFile(getDIMACSSourcePathFromConfig());
   m_communicator->getRunner()->push(std::move(task));
   finishedSignal.connect([this](const TaskResult& result) {
     m_status = result.getStatus();
-    // Finished solving, the communicator can be stopped!
-    m_communicator->exit();
+
+    if(m_config->isClientCaDiCaLEnabled()) {
+      // Finished solving, the communicator can be stopped!
+      m_communicator->exit();
+    }
   });
 }
 

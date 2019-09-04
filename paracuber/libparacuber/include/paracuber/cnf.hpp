@@ -12,6 +12,7 @@
 
 namespace paracuber {
 class NetworkedNode;
+class CaDiCaLTask;
 
 /** @brief This class represents a CNF formula that can be transferred directly.
  *
@@ -42,6 +43,10 @@ class CNF
    * The variable count is reserved internally.
    */
   CNF(int64_t originId, uint64_t previous, size_t varCount);
+
+  /** @brief Copy another CNF formula.
+   */
+  CNF(const CNF& o);
   virtual ~CNF();
 
   uint64_t getPrevious() { return m_previous; }
@@ -64,6 +69,19 @@ class CNF
   inline CubeVector& getCube() { return m_cubeVector; }
 
   inline int64_t getOriginId() { return m_originId; }
+
+  inline void setPath(uint64_t p)
+  {
+    m_previous |=
+      (m_previous & 0b00111111) | (p & ~(0xFFFFFFFFFFFFFFFFu & 0b11000000u));
+  }
+
+  inline void setDepth(uint8_t d) { m_previous = getPath() | d; }
+
+  inline bool isRootCNF() { return m_previous == 0; }
+
+  void setRootTask(std::unique_ptr<CaDiCaLTask> root);
+  CaDiCaLTask* getRootTask();
 
   private:
   struct SendDataStruct
@@ -92,6 +110,7 @@ class CNF
 
   std::map<boost::asio::ip::tcp::socket*, SendDataStruct> m_sendData;
   CubeVector m_cubeVector;
+  std::unique_ptr<CaDiCaLTask> m_rootTask;
 };
 }
 

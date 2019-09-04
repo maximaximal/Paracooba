@@ -115,6 +115,9 @@ class Config
   /** @brief Set daemon mode active. */
   inline void setDaemonMode(bool v) { m_daemonMode = v; }
 
+  /** @brief Check if direct client-side solving via CaDiCaL is enabled. */
+  inline bool isClientCaDiCaLEnabled() { return !m_disableClientCaDiCaL; }
+
   int64_t generateId(int64_t uniqueNumber);
 
   Client* getClient() { return m_client; }
@@ -138,6 +141,7 @@ class Config
   bool m_debugMode = false;
   bool m_infoMode = false;
   bool m_daemonMode = false;
+  bool m_disableClientCaDiCaL = false;
   std::string m_generatedLocalName;
 
   Client* m_client = nullptr;

@@ -1,4 +1,5 @@
 #include "../include/paracuber/cnf.hpp"
+#include "../include/paracuber/cadical_task.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
@@ -34,6 +35,12 @@ CNF::CNF(int64_t originId, uint64_t previous, size_t varCount)
   , m_previous(previous)
   , m_cubeVector(varCount)
   , m_dimacsFile("")
+{}
+CNF::CNF(const CNF& o)
+  : m_originId(o.m_originId)
+  , m_previous(o.m_previous)
+  , m_cubeVector(o.m_cubeVector.size())
+  , m_dimacsFile(o.m_dimacsFile)
 {}
 
 CNF::~CNF() {}
@@ -159,4 +166,16 @@ CNF::receive(char* buf, std::size_t length)
     }
   }
 }
+
+void
+CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
+{
+  m_rootTask = std::move(root);
+}
+CaDiCaLTask*
+CNF::getRootTask()
+{
+  return m_rootTask.get();
+}
+
 }
