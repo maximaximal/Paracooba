@@ -1,5 +1,6 @@
 #include "../include/paracuber/cnf.hpp"
 
+#include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <iostream>
@@ -38,12 +39,21 @@ CNF::CNF(int64_t originId, uint64_t previous, size_t varCount)
 CNF::~CNF() {}
 
 void
-CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb)
+CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
 {
   SendDataStruct* data = &m_sendData[socket];
   data->cb = cb;
 
   if(m_previous == 0) {
+    if(first) {
+      // Send the filename, so that the used compression algorithm can be known.
+      // Also transfer the terminating \0.
+      boost::filesystem::path p(m_dimacsFile);
+      std::string dimacsBasename = p.filename().string();
+      socket->write_some(
+        boost::asio::buffer(dimacsBasename.c_str(), dimacsBasename.size() + 1));
+    }
+
     // This is the root CNF, send over the file directly using the sendfile()
     // syscall.
     int ret =
@@ -81,7 +91,7 @@ CNF::sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket)
     m_sendData.erase(socket);
   } else {
     // Repeated sends, as long as the file is transferred.
-    send(socket, data->cb);
+    send(socket, data->cb, false);
   }
 }
 
@@ -89,29 +99,57 @@ void
 CNF::receive(char* buf, std::size_t length)
 {
   if(m_previous == 0) {
-    // Receiving the root formula!
     using namespace boost::filesystem;
-    if(m_dimacsFile == "") {
-      path dir =
-        temp_directory_path() / ("paracuber-" + std::to_string(getpid()));
-      path p = dir / unique_path();
-      m_dimacsFile = p.string();
 
-      if(!exists(dir)) {
-        create_directory(dir);
+    // Receiving the root formula!
+    while(length > 0 || buf == nullptr) {
+      switch(m_receiveState) {
+        case ReceiveFileName: {
+          // First, receive the filename.
+          bool end = false;
+          while(length > 0 && !end) {
+            if(*buf == '\0') {
+              m_receiveState = ReceiveFile;
+
+              path dir = temp_directory_path() /
+                         ("paracuber-" + std::to_string(getpid()));
+              path p = dir / unique_path();
+              p += "-" + m_dimacsFile;
+
+              m_dimacsFile = p.string();
+
+              if(!exists(dir)) {
+                create_directory(dir);
+              }
+
+              m_ofstream.open(m_dimacsFile, std::ios::out);
+              end = true;
+            } else {
+              m_dimacsFile += *buf;
+            }
+            ++buf;
+            --length;
+          }
+          break;
+        }
+        case ReceiveFile:
+          if(length == 0) {
+            // This marks the end of the transmission, the file is finished.
+            m_ofstream.close();
+            return;
+          }
+
+          m_ofstream.write(buf, length);
+          length = 0;
+          break;
       }
-
-      m_ofstream.open(m_dimacsFile, std::ios::out);
     }
-    if(length == 0) {
-      // This marks the end of the transmission, the file is finished.
-      m_ofstream.close();
-      return;
-    }
-
-    m_ofstream.write(buf, length);
   } else {
-    // Receiving a cube!
+    // Receiving a cube! This always works, also with subsequent sends.
+
+    // If this condition breaks, this will not work anymore and needs fixing!
+    assert(length % sizeof(CubeVarType));
+
     for(std::size_t i = 0; i < length; i += sizeof(CubeVarType)) {
       m_cubeVector.push_back(*reinterpret_cast<CubeVarType*>(buf + i));
     }

@@ -50,7 +50,8 @@ class CNF
   using SendFinishedCB = std::function<void()>;
 
   void send(boost::asio::ip::tcp::socket* socket,
-            SendFinishedCB finishedCallback);
+            SendFinishedCB finishedCallback,
+            bool first = true);
   void receive(char* buf, std::size_t length);
 
   inline uint64_t getPath()
@@ -70,12 +71,18 @@ class CNF
     off_t offset = 0;
     SendFinishedCB cb;
   };
+  enum ReceiveState
+  {
+    ReceiveFileName,
+    ReceiveFile,
+  };
 
   void sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket);
 
   int64_t m_originId = 0;
   uint64_t m_previous = -1;
   std::string m_dimacsFile = "";
+  ReceiveState m_receiveState = ReceiveFileName;
 
   // Ofstream for outputting the original CNF file.
   std::ofstream m_ofstream;
