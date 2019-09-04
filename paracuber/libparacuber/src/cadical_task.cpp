@@ -82,7 +82,7 @@ TaskResultPtr
 CaDiCaLTask::execute()
 {
   TaskResult::Status status;
-  if(m_mode | Parse) {
+  if(m_mode & Parse) {
     if(!boost::filesystem::exists(m_sourcePath)) {
       return std::move(std::make_unique<TaskResult>(TaskResult::MissingInputs));
     }
@@ -106,7 +106,7 @@ CaDiCaLTask::execute()
     status = TaskResult::Parsed;
   }
 
-  if(m_mode | Mode::Solve) {
+  if(m_mode & Mode::Solve) {
     PARACUBER_LOG((*m_logger), Trace)
       << "Start solving CNF formula using CaDiCaL CNF solver.";
     int solveResult = m_solver->solve();
