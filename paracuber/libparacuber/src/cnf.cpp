@@ -42,7 +42,11 @@ void
 CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
 {
   SendDataStruct* data = &m_sendData[socket];
-  data->cb = cb;
+
+  if(first) {
+    data->cb = cb;
+    data->offset = 0;
+  }
 
   if(m_previous == 0) {
     if(first) {

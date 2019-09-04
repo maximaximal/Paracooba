@@ -556,10 +556,10 @@ class Communicator::TCPServer
       m_pos += sizeof(previous);
       uint32_t varCount = *reinterpret_cast<uint32_t*>(&m_recBuffer[m_pos]);
       m_pos += sizeof(varCount);
-      m_cnf = std::make_shared<CNF>(previous, varCount);
-
       int64_t originator = *reinterpret_cast<int64_t*>(&m_recBuffer[m_pos]);
       m_pos += sizeof(int64_t);
+
+      m_cnf = std::make_shared<CNF>(originator, previous, varCount);
 
       if(m_comm->m_config->isDaemonMode()) {
         auto [context, inserted] =
@@ -584,8 +584,8 @@ class Communicator::TCPServer
 
       // Handle remaining data of the stream.
       if(m_cnf->getPrevious() == 0) {
-        state_receivingFile(bytes - m_pos);
         m_state = ReceivingFile;
+        state_receivingFile(bytes - m_pos);
       } else {
         m_state = ReceivingCube;
       }

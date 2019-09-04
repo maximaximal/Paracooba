@@ -42,6 +42,13 @@ Daemon::Context::start()
   auto& finishedSignal = task->getFinishedSignal();
 
   finishedSignal.connect([this](const TaskResult& result) {
+    if(result.getStatus() != TaskResult::Parsed) {
+      PARACUBER_LOG(m_logger, LocalWarning)
+        << "Could not parse the given formula! This could stem from a "
+           "transmission error or from an invalid formula. Solving cannot "
+           "continue on this node.";
+      return;
+    }
     PARACUBER_LOG(m_logger, Info)
       << "Successfully parsed received CNF and reached callback!";
   });
