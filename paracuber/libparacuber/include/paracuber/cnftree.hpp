@@ -55,6 +55,18 @@ class CNFTree
    */
   bool setDecision(Path p, CubeVar decision);
 
+  /** @brief Traverse the decision tree and write the specified path to a given
+   * container.
+   */
+  template<class Container>
+  bool writePathToContainer(Container container, Path p)
+  {
+    return visit(p, [&container](CubeVar p, uint8_t depth) {
+      container.push_back(p);
+      return false;
+    });
+  }
+
   static inline uint64_t getPath(Path p)
   {
     return p & (0xFFFFFFFFFFFFFFF0u | 0b11000000u);

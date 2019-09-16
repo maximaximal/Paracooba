@@ -55,8 +55,8 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
       // Also transfer the terminating \0.
       boost::filesystem::path p(m_dimacsFile);
       std::string dimacsBasename = p.filename().string();
-      socket->write_some(
-        boost::asio::buffer(reinterpret_cast<const char*>(&path), sizeof(path)));
+      socket->write_some(boost::asio::buffer(
+        reinterpret_cast<const char*>(&path), sizeof(path)));
       socket->write_some(
         boost::asio::buffer(dimacsBasename.c_str(), dimacsBasename.size() + 1));
     }
@@ -73,7 +73,11 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
     socket->async_write_some(boost::asio::null_buffers(),
                              std::bind(&CNF::sendCB, this, data, path, socket));
   } else {
-    // Transmit all decisions leading up to this node.
+    // Transmit all decisions on the given path.
+    std::vector<CNFTree::Path> decisions(CNFTree::getDepth(path));
+    m_cnfTree.writePathToContainer(decisions, path);
+    socket->write_some(boost::asio::buffer(
+      reinterpret_cast<const char*>(decisions.data()), decisions.size()));
   }
 }
 
@@ -164,6 +168,12 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         length = 0;
         break;
       case ReceiveCube:
+        if(length == 0) {
+          // This marks the end of the transmission, the decision sequence is
+          // finished.
+          m_receiveData.erase(socket);
+          return;
+        }
         for(std::size_t i = 0; i < length; i += sizeof(CNFTree::CubeVar)) {
           CNFTree::CubeVar* var = nullptr;
           if(d.cubeVarReceivePos == 0 && length >= sizeof(CNFTree::CubeVar)) {
@@ -190,6 +200,8 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           }
           if(var) {
             // Valid literal received, insert into CNFTree.
+            m_cnfTree.setDecision(CNFTree::setDepth(d.path, d.currentDepth++),
+                                  *var);
           }
         }
         break;

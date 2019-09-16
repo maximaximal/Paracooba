@@ -69,6 +69,7 @@ class CNF
   {
     ReceiveState state = ReceivePath;
     CNFTree::Path path = 0;
+    uint8_t currentDepth = 1;
     size_t cubeVarReceivePos = 0;
     char cubeVarReceiveBuf[sizeof(CNFTree::CubeVar)];
   };
@@ -88,6 +89,7 @@ class CNF
   std::map<boost::asio::ip::tcp::socket*, ReceiveDataStruct> m_receiveData;
 
   std::unique_ptr<CaDiCaLTask> m_rootTask;
+  CNFTree m_cnfTree;
 };
 }
 

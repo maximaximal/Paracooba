@@ -51,11 +51,21 @@ CNFTree::setDecision(Path p, CubeVar decision)
 
   while(!end) {
     if(depth == getDepth(p)) {
-      // Create left and right branches as leaves. They have invalid decisions
-      // but are required to mark the current node to have a valid decision.
-      n->left = std::make_unique<Node>();
-      n->right = std::make_unique<Node>();
-      n->decision = decision;
+      if(!n->isLeaf() && n->decision != decision) {
+        /// The decision is invalid if a child node already exists, or if it
+        /// conflicts with the old assignment.
+        return false;
+      }
+      if(n->isLeaf()) {
+        // New value needs to be applied.
+
+        // Create left and right branches as leaves. They have invalid decisions
+        // but are required to mark the current node to have a valid decision.
+        n->left = std::make_unique<Node>();
+        n->right = std::make_unique<Node>();
+        n->decision = decision;
+      }
+
       break;
     }
 

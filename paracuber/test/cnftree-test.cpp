@@ -68,13 +68,18 @@ TEST_CASE("CNFTree Usage")
     }
 
     {
+      CNFTree::Path p = CNFTree::buildPath((uint8_t)0b10000000, 2);
+
       std::vector<CNFTree::CubeVar> vars;
-      REQUIRE(tree.visit(CNFTree::buildPath((uint8_t)0b10000000, 2),
-                         [&vars](CNFTree::CubeVar l, uint8_t d) {
-                           vars.push_back(l);
-                           return false;
-                         }));
+      REQUIRE(tree.visit(p, [&vars](CNFTree::CubeVar l, uint8_t d) {
+        vars.push_back(l);
+        return false;
+      }));
       REQUIRE(vars.size() == 2);
+      REQUIRE(vars[0] == 1);
+      REQUIRE(vars[1] == -3);
+
+      REQUIRE(tree.writePathToContainer(vars, p));
       REQUIRE(vars[0] == 1);
       REQUIRE(vars[1] == -3);
     }
