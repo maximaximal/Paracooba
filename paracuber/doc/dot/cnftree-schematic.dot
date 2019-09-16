@@ -8,17 +8,17 @@ digraph {
 
   "Original CNF" -> "CNFTree Root, d=1" [style = "dotted"];
 
-  "CNFTree Root, d=1" -> "p=00,d=2" [label = "⊤"];
-  "CNFTree Root, d=1" -> "p=10,d=2" [label = "⊥"];
+  "CNFTree Root, d=1" -> "p=00,d=2" [label = "⊥"];
+  "CNFTree Root, d=1" -> "p=10,d=2" [label = "⊤"];
 
   "p=00,d=3" [shape = "house"];
   "p=01,d=3" [shape = "house"];
   "p=10,d=3" [shape = "house"];
   "p=11,d=3" [shape = "house"];
 
-  "p=00,d=2" -> "p=00,d=3" [label = "⊤"];
-  "p=00,d=2" -> "p=01,d=3" [label = "⊥"];
+  "p=00,d=2" -> "p=00,d=3" [label = "⊥"];
+  "p=00,d=2" -> "p=01,d=3" [label = "⊤"];
 
-  "p=10,d=2" -> "p=10,d=3" [label = "⊤"];
-  "p=10,d=2" -> "p=11,d=3" [label = "⊥"];
+  "p=10,d=2" -> "p=10,d=3" [label = "⊥"];
+  "p=10,d=2" -> "p=11,d=3" [label = "⊤"];
 }
