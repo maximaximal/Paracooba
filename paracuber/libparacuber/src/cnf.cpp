@@ -56,6 +56,8 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
       boost::filesystem::path p(m_dimacsFile);
       std::string dimacsBasename = p.filename().string();
       socket->write_some(
+        boost::asio::buffer(reinterpret_cast<const char*>(&path), sizeof(path)));
+      socket->write_some(
         boost::asio::buffer(dimacsBasename.c_str(), dimacsBasename.size() + 1));
     }
 
@@ -100,13 +102,18 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
              std::size_t length)
 {
   using namespace boost::filesystem;
+  assert(socket);
 
   ReceiveDataStruct& d = m_receiveData[socket];
 
   while(length > 0 || buf == nullptr) {
     switch(d.state) {
       case ReceivePath:
-        assert(length >= sizeof(ReceiveDataStruct::path));
+        if(length < sizeof(ReceiveDataStruct::path)) {
+          // Remote has directly aborted the transmission.
+          m_receiveData.erase(socket);
+          return;
+        }
         d.path = *(reinterpret_cast<int64_t*>(buf));
         buf += sizeof(ReceiveDataStruct::path);
         length -= sizeof(ReceiveDataStruct::path);
@@ -149,6 +156,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         if(length == 0) {
           // This marks the end of the transmission, the file is finished.
           m_ofstream.close();
+          m_receiveData.erase(socket);
           return;
         }
 

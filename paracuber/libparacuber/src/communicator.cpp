@@ -546,6 +546,8 @@ class Communicator::TCPServer
         // using the main orchestrator.
       }
 
+      m_state = Receiving;
+
       state_receiving(bytes - m_pos);
     }
     void state_receiving(std::size_t bytes)
