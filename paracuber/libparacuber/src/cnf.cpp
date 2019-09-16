@@ -15,9 +15,11 @@ extern "C"
 }
 
 namespace paracuber {
-CNF::CNF(int64_t originId, std::string_view dimacsFile)
+CNF::CNF(LogPtr log, int64_t originId, std::string_view dimacsFile)
   : m_originId(originId)
   , m_dimacsFile(dimacsFile)
+  , m_log(log)
+  , m_logger(log->createLogger())
 {
   if(dimacsFile != "") {
     struct stat statbuf;
@@ -32,6 +34,8 @@ CNF::CNF(int64_t originId, std::string_view dimacsFile)
 CNF::CNF(const CNF& o)
   : m_originId(o.m_originId)
   , m_dimacsFile(o.m_dimacsFile)
+  , m_log(o.m_log)
+  , m_logger(o.m_log->createLogger())
 {}
 
 CNF::~CNF() {}
@@ -200,8 +204,12 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           }
           if(var) {
             // Valid literal received, insert into CNFTree.
-            m_cnfTree.setDecision(CNFTree::setDepth(d.path, d.currentDepth++),
-                                  *var);
+            if(!m_cnfTree.setDecision(
+                 CNFTree::setDepth(d.path, d.currentDepth++), *var)) {
+              PARACUBER_LOG(m_logger, LocalError)
+                << "Could not apply decision <" << *var
+                << "> into CNFTree of CNF " << m_originId;
+            }
           }
         }
         break;

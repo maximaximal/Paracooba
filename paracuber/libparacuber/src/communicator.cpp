@@ -533,7 +533,7 @@ class Communicator::TCPServer
       if(m_comm->m_config->isDaemonMode()) {
         m_context = m_comm->m_config->getDaemon()->getContext(originator);
         if(!m_context) {
-          m_cnf = std::make_shared<CNF>(originator);
+          m_cnf = std::make_shared<CNF>(m_comm->m_log, originator);
           auto [context, inserted] =
             m_comm->m_config->getDaemon()->getOrCreateContext(m_cnf,
                                                               originator);

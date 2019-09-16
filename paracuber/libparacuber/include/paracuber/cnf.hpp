@@ -10,6 +10,7 @@
 
 #include <boost/asio/ip/tcp.hpp>
 
+#include "log.hpp"
 #include "cnftree.hpp"
 
 namespace paracuber {
@@ -27,7 +28,7 @@ class CNF
   /** @brief Construct a CNF from existing literals based on DIMACS file or on
    * previous CNF.
    */
-  CNF(int64_t originId, std::string_view dimacsFile = "");
+  CNF(LogPtr log, int64_t originId, std::string_view dimacsFile = "");
 
   /** @brief Copy another CNF formula.
    */
@@ -90,6 +91,9 @@ class CNF
 
   std::unique_ptr<CaDiCaLTask> m_rootTask;
   CNFTree m_cnfTree;
+
+  LogPtr m_log;
+  Logger m_logger;
 };
 }
 
