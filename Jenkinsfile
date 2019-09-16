@@ -17,7 +17,7 @@ pipeline {
 	stage('Test') {
 	    steps {
 		dir('paracuber') {
-		    ctest 'InSearchPath', workingDir: 'build'
+                    ctest installation: 'InSearchPath', workingDir: 'build'
 		}
 	    }
 	}
