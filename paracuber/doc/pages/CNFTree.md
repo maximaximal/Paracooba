@@ -10,7 +10,9 @@ left, a `1` to the right. The following graphic visualises such a tree.
 @dotfile cnftree-schematic.dot
 
 The whole tree will never be completely materialised on all compute nodes, instead
-each compute node has its own version of the tree in the form of a disjoint sub-tree.
+each compute node has its own version of the tree in the form of a disjoint sub-tree. The tree is
+represented by the paracuber::CNFTree class, which also implements the visitor to walk over
+any given decision procedure defined by a paracuber::CNFTree::Path variable.
 
 Root Formula
 ------------

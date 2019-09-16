@@ -1,6 +1,7 @@
 set(TEST_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/paracuber-test-main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cnf-test.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cnftree-test.cpp
     )
 
 add_executable(parac-test ${TEST_SRCS})
