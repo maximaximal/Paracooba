@@ -10,7 +10,6 @@ std::shared_ptr<CNF>
 NaiveCutter::generateCube(std::shared_ptr<CNF> source)
 {
   std::shared_ptr<CNF> cube = std::make_shared<CNF>(*source);
-  cube->setDepth(source->getDepth() + 1);
   return std::move(cube);
 }
 }

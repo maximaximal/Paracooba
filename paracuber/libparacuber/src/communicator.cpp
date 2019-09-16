@@ -162,6 +162,7 @@ class Communicator::UDPServer
 
       m_communicator->sendCNFToNode(
         m_communicator->m_config->getClient()->getRootCNF(),
+        0,// Send root node only.
         statisticsNode.getNetworkedNode());
     }
 
@@ -197,6 +198,7 @@ class Communicator::UDPServer
       if(requester.getDaemonMode()) {
         m_communicator->sendCNFToNode(
           m_communicator->m_config->getClient()->getRootCNF(),
+          0,// Send the root node only, no path required yet at this stage.
           statisticsNode.getNetworkedNode());
       }
 
@@ -353,11 +355,13 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
             LogPtr log,
             boost::asio::io_service& ioService,
             boost::asio::ip::tcp::endpoint endpoint,
-            std::shared_ptr<CNF> cnf)
+            std::shared_ptr<CNF> cnf,
+            CNFTree::Path path)
     : m_comm(comm)
     , m_cnf(cnf)
     , m_endpoint(endpoint)
     , m_socket(ioService)
+    , m_path(path)
   {}
   virtual ~TCPClient()
   {
@@ -390,12 +394,6 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
                (char*)&option,
                sizeof(option));
 
-    PARACUBER_LOG(m_logger, Trace)
-      << "Sending the CNF with previous=" << m_cnf->getPrevious() << " to "
-      << m_endpoint << " started.";
-
-    auto prev = m_cnf->getPrevious();
-
     int64_t id = 0;
     if(m_comm->m_config->isDaemonMode()) {
       id = m_cnf->getOriginId();
@@ -403,33 +401,16 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
       id = m_comm->m_config->getInt64(Config::Id);
     };
 
-    uint32_t varCount = 0;
-    if(m_comm->m_config->isDaemonMode()) {
-      auto [context, inserted] =
-        m_comm->m_config->getDaemon()->getOrCreateContext(nullptr, id);
-      assert(!inserted);
-      varCount = context.getCNFVarCount();
-    } else {
-      varCount = m_comm->m_config->getClient()->getCNFVarCount();
-    }
-
-    char buf[sizeof(prev) + sizeof(id) + sizeof(varCount)];
-    *(reinterpret_cast<uint64_t*>(buf)) = prev;
-    *(reinterpret_cast<uint32_t*>(buf + sizeof(prev))) = varCount;
-    *(reinterpret_cast<int64_t*>(buf + sizeof(prev) + sizeof(varCount))) = id;
-
-    m_socket.write_some(boost::asio::buffer(buf, sizeof(buf)));
+    m_socket.write_some(
+      boost::asio::buffer(reinterpret_cast<int64_t*>(&id), sizeof(int64_t)));
 
     auto ptr = shared_from_this();
 
     m_socket.native_non_blocking(true);
 
     // Let the sending be handled by the CNF itself.
-    m_cnf->send(&m_socket, [this, ptr]() {
+    m_cnf->send(&m_socket, m_path, [this, ptr]() {
       // Finished sending CNF!
-      PARACUBER_LOG(m_logger, Trace)
-        << "Sending the CNF with previous=" << m_cnf->getPrevious() << " to "
-        << m_endpoint << " finished.";
     });
   }
 
@@ -437,6 +418,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   LoggerMT m_logger;
   Communicator* m_comm;
   std::shared_ptr<CNF> m_cnf;
+  CNFTree::Path m_path;
   boost::asio::ip::tcp::socket m_socket;
   boost::asio::ip::tcp::endpoint m_endpoint;
   boost::array<char, REC_BUF_SIZE> m_recBuffer;
@@ -483,8 +465,7 @@ class Communicator::TCPServer
     enum State
     {
       NewConnection,
-      ReceivingFile,
-      ReceivingCube,
+      Receiving,
     };
 
     boost::asio::ip::tcp::socket& socket() { return m_socket; }
@@ -508,13 +489,11 @@ class Communicator::TCPServer
         switch(m_state) {
           case NewConnection:
             break;
-          case ReceivingFile:
-            m_cnf->receive(nullptr, 0);
+          case Receiving:
+            m_cnf->receive(&m_socket, nullptr, 0);
             if(m_context) {
               m_context->start();
             }
-            break;
-          case ReceivingCube:
             break;
         }
         PARACUBER_LOG(m_logger, Trace)
@@ -533,12 +512,8 @@ class Communicator::TCPServer
           state_newConnection(bytes);
           break;
         }
-        case ReceivingFile: {
-          state_receivingFile(bytes);
-          break;
-        }
-        case ReceivingCube: {
-          state_receivingCube(bytes);
+        case Receiving: {
+          state_receiving(bytes);
           break;
         }
       }
@@ -552,45 +527,28 @@ class Communicator::TCPServer
       // If the connection is new, this client must be initialised first. A
       // connection has a header containing its type and assorted data. This
       // is extracted in this stage (first few bytes of the TCP stream).
-      uint64_t previous = *reinterpret_cast<uint64_t*>(&m_recBuffer[0]);
-      m_pos += sizeof(previous);
-      uint32_t varCount = *reinterpret_cast<uint32_t*>(&m_recBuffer[m_pos]);
-      m_pos += sizeof(varCount);
       int64_t originator = *reinterpret_cast<int64_t*>(&m_recBuffer[m_pos]);
       m_pos += sizeof(int64_t);
 
-      m_cnf = std::make_shared<CNF>(originator, previous, varCount);
-
       if(m_comm->m_config->isDaemonMode()) {
-        auto [context, inserted] =
-          m_comm->m_config->getDaemon()->getOrCreateContext(
-            m_cnf, originator, varCount);
-
-        m_context = &context;
-
-        if(previous == 0 && !inserted) {
-          PARACUBER_LOG(m_logger, GlobalWarning)
-            << "The same context should not have been sent twice! "
-               "Is a DIMACS file transmitted more than once?";
+        m_context = m_comm->m_config->getDaemon()->getContext(originator);
+        if(!m_context) {
+          m_cnf = std::make_shared<CNF>(originator);
+          auto [context, inserted] =
+            m_comm->m_config->getDaemon()->getOrCreateContext(m_cnf,
+                                                              originator);
+          m_context = &context;
+        } else {
+          m_cnf = m_context->getRootCNF();
         }
-        // The variable count may change if in the first transmission happens
-        // before the CNF has been parsed by the client.
-        context.setCNFVarCount(varCount);
-
       } else {
         // This is some other CNF that was sent back to the client. Handle it
         // using the main orchestrator.
       }
 
-      // Handle remaining data of the stream.
-      if(m_cnf->getPrevious() == 0) {
-        m_state = ReceivingFile;
-        state_receivingFile(bytes - m_pos);
-      } else {
-        m_state = ReceivingCube;
-      }
+      state_receiving(bytes - m_pos);
     }
-    void state_receivingFile(std::size_t bytes)
+    void state_receiving(std::size_t bytes)
     {
       // The receiving file state exists to shuffle data from the network
       // stream into the locally created file. After finishing, the created
@@ -601,11 +559,7 @@ class Communicator::TCPServer
         return;
       }
 
-      m_cnf->receive(&m_recBuffer[m_pos], bytes);
-    }
-    void state_receivingCube(std::size_t bytes)
-    {
-      // This state is active if this is a subsequent cube transfer.
+      m_cnf->receive(&m_socket, &m_recBuffer[m_pos], bytes);
     }
 
     std::shared_ptr<CNF> m_cnf;
@@ -774,12 +728,14 @@ Communicator::listenForIncomingTCP(uint16_t port)
 }
 
 void
-Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn)
+Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf,
+                            CNFTree::Path path,
+                            NetworkedNode* nn)
 {
   // This indirection is required to make this work from worker threads.
-  m_ioService->post([this, cnf, nn]() {
+  m_ioService->post([this, cnf, path, nn]() {
     auto client = std::make_shared<TCPClient>(
-      this, m_log, *m_ioService, nn->getRemoteTcpEndpoint(), cnf);
+      this, m_log, *m_ioService, nn->getRemoteTcpEndpoint(), cnf, path);
     client->connect();
   });
 }

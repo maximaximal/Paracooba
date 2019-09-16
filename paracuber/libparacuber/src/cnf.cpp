@@ -15,9 +15,8 @@ extern "C"
 }
 
 namespace paracuber {
-CNF::CNF(int64_t originId, uint64_t previous, std::string_view dimacsFile)
+CNF::CNF(int64_t originId, std::string_view dimacsFile)
   : m_originId(originId)
-  , m_previous(previous)
   , m_dimacsFile(dimacsFile)
 {
   if(dimacsFile != "") {
@@ -30,23 +29,18 @@ CNF::CNF(int64_t originId, uint64_t previous, std::string_view dimacsFile)
     assert(m_fd > 0);
   }
 }
-CNF::CNF(int64_t originId, uint64_t previous, size_t varCount)
-  : m_originId(originId)
-  , m_previous(previous)
-  , m_cubeVector(varCount)
-  , m_dimacsFile("")
-{}
 CNF::CNF(const CNF& o)
   : m_originId(o.m_originId)
-  , m_previous(o.m_previous)
-  , m_cubeVector(o.m_cubeVector.size())
   , m_dimacsFile(o.m_dimacsFile)
 {}
 
 CNF::~CNF() {}
 
 void
-CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
+CNF::send(boost::asio::ip::tcp::socket* socket,
+          CNFTree::Path path,
+          SendFinishedCB cb,
+          bool first)
 {
   SendDataStruct* data = &m_sendData[socket];
 
@@ -55,7 +49,7 @@ CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
     data->offset = 0;
   }
 
-  if(m_previous == 0) {
+  if(path == 0) {
     if(first) {
       // Send the filename, so that the used compression algorithm can be known.
       // Also transfer the terminating \0.
@@ -75,22 +69,16 @@ CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
     }
 
     socket->async_write_some(boost::asio::null_buffers(),
-                             std::bind(&CNF::sendCB, this, data, socket));
+                             std::bind(&CNF::sendCB, this, data, path, socket));
   } else {
-    // This is a cube, so only the cube must be transmitted. A cube always
-    // resides in memory, so this transfer can be done directly in one shot.
-    socket->async_write_some(
-      boost::asio::buffer(reinterpret_cast<char*>(m_cubeVector.data()),
-                          m_cubeVector.size() * sizeof(CubeVarType)),
-      std::bind([this, data, socket]() {
-        data->cb();
-        m_sendData.erase(socket);
-      }));
+    // Transmit all decisions leading up to this node.
   }
 }
 
 void
-CNF::sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket)
+CNF::sendCB(SendDataStruct* data,
+            CNFTree::Path path,
+            boost::asio::ip::tcp::socket* socket)
 {
   if(data->offset >= m_fileSize) {
     data->cb();
@@ -102,67 +90,101 @@ CNF::sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket)
     m_sendData.erase(socket);
   } else {
     // Repeated sends, as long as the file is transferred.
-    send(socket, data->cb, false);
+    send(socket, path, data->cb, false);
   }
 }
 
 void
-CNF::receive(char* buf, std::size_t length)
+CNF::receive(boost::asio::ip::tcp::socket* socket,
+             char* buf,
+             std::size_t length)
 {
-  if(m_previous == 0) {
-    using namespace boost::filesystem;
+  using namespace boost::filesystem;
 
-    // Receiving the root formula!
-    while(length > 0 || buf == nullptr) {
-      switch(m_receiveState) {
-        case ReceiveFileName: {
-          // First, receive the filename.
-          bool end = false;
-          while(length > 0 && !end) {
-            if(*buf == '\0') {
-              m_receiveState = ReceiveFile;
+  ReceiveDataStruct& d = m_receiveData[socket];
 
-              path dir = temp_directory_path() /
-                         ("paracuber-" + std::to_string(getpid()));
-              path p = dir / unique_path();
-              p += "-" + m_dimacsFile;
+  while(length > 0 || buf == nullptr) {
+    switch(d.state) {
+      case ReceivePath:
+        assert(length >= sizeof(ReceiveDataStruct::path));
+        d.path = *(reinterpret_cast<int64_t*>(buf));
+        buf += sizeof(ReceiveDataStruct::path);
+        length -= sizeof(ReceiveDataStruct::path);
 
-              m_dimacsFile = p.string();
-
-              if(!exists(dir)) {
-                create_directory(dir);
-              }
-
-              m_ofstream.open(m_dimacsFile, std::ios::out);
-              end = true;
-            } else {
-              m_dimacsFile += *buf;
-            }
-            ++buf;
-            --length;
-          }
-          break;
+        if(d.path == 0) {
+          d.state = ReceiveFileName;
+        } else {
+          d.state = ReceiveCube;
         }
-        case ReceiveFile:
-          if(length == 0) {
-            // This marks the end of the transmission, the file is finished.
-            m_ofstream.close();
-            return;
+        break;
+      case ReceiveFileName: {
+        // First, receive the filename.
+        bool end = false;
+        while(length > 0 && !end) {
+          if(*buf == '\0') {
+            d.state = ReceiveFile;
+
+            path dir =
+              temp_directory_path() / ("paracuber-" + std::to_string(getpid()));
+            path p = dir / unique_path();
+            p += "-" + m_dimacsFile;
+
+            m_dimacsFile = p.string();
+
+            if(!exists(dir)) {
+              create_directory(dir);
+            }
+
+            m_ofstream.open(m_dimacsFile, std::ios::out);
+            end = true;
+          } else {
+            m_dimacsFile += *buf;
           }
-
-          m_ofstream.write(buf, length);
-          length = 0;
-          break;
+          ++buf;
+          --length;
+        }
+        break;
       }
-    }
-  } else {
-    // Receiving a cube! This always works, also with subsequent sends.
+      case ReceiveFile:
+        if(length == 0) {
+          // This marks the end of the transmission, the file is finished.
+          m_ofstream.close();
+          return;
+        }
 
-    // If this condition breaks, this will not work anymore and needs fixing!
-    assert(length % sizeof(CubeVarType));
+        m_ofstream.write(buf, length);
+        length = 0;
+        break;
+      case ReceiveCube:
+        for(std::size_t i = 0; i < length; i += sizeof(CNFTree::CubeVar)) {
+          CNFTree::CubeVar* var = nullptr;
+          if(d.cubeVarReceivePos == 0 && length >= sizeof(CNFTree::CubeVar)) {
+            // Easy receive.
+            var = reinterpret_cast<CNFTree::CubeVar*>(buf);
+            buf += sizeof(CNFTree::CubeVar);
+            length -= sizeof(CNFTree::CubeVar);
+          } else {
+            // Cube var split into multiple buffers, reconstructing.
+            size_t l =
+              (length >= sizeof(CNFTree::CubeVar) ? sizeof(CNFTree::CubeVar)
+                                                  : length) -
+              d.cubeVarReceivePos;
 
-    for(std::size_t i = 0; i < length; i += sizeof(CubeVarType)) {
-      m_cubeVector.push_back(*reinterpret_cast<CubeVarType*>(buf + i));
+            std::copy(buf, buf + l, d.cubeVarReceiveBuf + d.cubeVarReceivePos);
+
+            buf += l;
+            length -= l;
+
+            if(d.cubeVarReceivePos == sizeof(CNFTree::CubeVar)) {
+              d.cubeVarReceivePos = 0;
+              var = reinterpret_cast<CNFTree::CubeVar*>(d.cubeVarReceiveBuf);
+            }
+          }
+          if(var) {
+            // Valid literal received, insert into CNFTree.
+          }
+        }
+        break;
     }
   }
 }
@@ -177,5 +199,4 @@ CNF::getRootTask()
 {
   return m_rootTask.get();
 }
-
 }

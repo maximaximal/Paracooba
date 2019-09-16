@@ -20,20 +20,16 @@ class Daemon
     public:
     explicit Context(std::shared_ptr<CNF> rootCNF,
                      int64_t originatorID,
-                     uint32_t cnfVarCount,
                      Daemon* daemon,
                      ClusterStatistics::Node& statisticsNode);
     ~Context();
 
-    void setCNFVarCount(uint32_t varCount) { m_cnfVarCount = varCount; }
-    uint32_t getCNFVarCount() const { return m_cnfVarCount; }
-
     void start();
+    std::shared_ptr<CNF> getRootCNF() { return m_rootCNF; }
 
     private:
     std::shared_ptr<CNF> m_rootCNF;
     int64_t m_originatorID = 0;
-    uint32_t m_cnfVarCount = 0;
     Daemon* m_daemon;
     Logger m_logger;
 
@@ -51,9 +47,10 @@ class Daemon
 
   using ContextMap = std::unordered_map<int64_t, std::unique_ptr<Context>>;
 
+  Context* getContext(int64_t id);
+
   std::pair<Context&, bool> getOrCreateContext(std::shared_ptr<CNF> rootCNF,
-                                               int64_t id,
-                                               uint32_t varCount = 0);
+                                               int64_t id);
 
   private:
   std::shared_ptr<Config> m_config;

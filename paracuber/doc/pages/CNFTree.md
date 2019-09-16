@@ -16,15 +16,14 @@ Root Formula
 ------------
 
 The root formula is the one with its `previous` field being equal to `0`. This
-means `depth=0` and `path=0`. This is the main formula (in DIMACS format) given to
-the application. Other cubes are attached to this formula afterwards.
+means `depth=0` and `path=0`. This is the only node in the tree that contains
+the complete original CNF formula. All descendants only reference this root.
 
 Cubes
 -----
 
-Cubes branch off of the root formula and go down into the tree. A cube is a conjunction of
-literals, which is represented internally by a `std::vector` of `int32_t` numbers inside of
-the @ref paracuber::CNF class.
+Cubes branch off of the root formula and go down into the tree. No single cube is manifested directly - instead,
+cubes are calculated while traversing the tree. They are then applied to the SAT solver by stepping through the tree.
 
 Applying Cubes to a solver inside a paracuber::CaDiCaLTask
 ----------------------------------------------------------

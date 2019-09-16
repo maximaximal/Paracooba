@@ -51,7 +51,6 @@ struct NodeStatus
 # An update about node statistics. Sent to all other
 # known online nodes approximately every second.
 
-
 struct Message
 {
   id @0 : Int16;

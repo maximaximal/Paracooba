@@ -2,6 +2,7 @@
 #define PARACUBER_COMMUNICATOR_HPP
 
 #include "cluster-statistics.hpp"
+#include "cnftree.hpp"
 #include "log.hpp"
 
 #include <any>
@@ -89,7 +90,9 @@ class Communicator : public std::enable_shared_from_this<Communicator>
     return m_currentMessageId++;
   }
 
-  void sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn);
+  void sendCNFToNode(std::shared_ptr<CNF> cnf,
+                     CNFTree::Path path,
+                     NetworkedNode* nn);
 
   private:
   ConfigPtr m_config;

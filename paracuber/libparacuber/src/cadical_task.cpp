@@ -63,12 +63,12 @@ CaDiCaLTask::readDIMACSFile(std::string_view sourcePath)
 }
 
 void
-CaDiCaLTask::readCNF(std::shared_ptr<CNF> cnf)
+CaDiCaLTask::readCNF(std::shared_ptr<CNF> cnf, CNFTree::Path path)
 {
   /// This applies the CNF tree to the current solver object. This means, that
   /// the solver applies all missing rules from the CNF tree to the current
   /// context. See @ref CNFTree for more.
-  if(cnf->getPrevious() == 0) {
+  if(path == 0) {
     // Root CNF - this must be parsed only. The root CNF never has to be solved
     // directly, as this is done by the client.
     m_mode = Parse;

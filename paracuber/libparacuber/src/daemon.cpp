@@ -8,19 +8,16 @@
 namespace paracuber {
 Daemon::Context::Context(std::shared_ptr<CNF> rootCNF,
                          int64_t originatorID,
-                         uint32_t cnfVarCount,
                          Daemon* daemon,
                          ClusterStatistics::Node& statsNode)
   : m_rootCNF(rootCNF)
   , m_originatorID(originatorID)
-  , m_cnfVarCount(cnfVarCount)
   , m_daemon(daemon)
   , m_logger(daemon->m_log->createLogger())
   , m_statisticsNode(statsNode)
 {
   PARACUBER_LOG(m_logger, Trace)
-    << "Create new context with origin " << m_originatorID
-    << " and a CNF variable count of " << m_cnfVarCount;
+    << "Create new context with origin " << m_originatorID << ".";
 }
 Daemon::Context::~Context()
 {
@@ -35,9 +32,8 @@ Daemon::Context::start()
   // file that created this context must be parsed. This is done in a new
   // CaDiCaL task.
 
-  auto task =
-    std::make_unique<CaDiCaLTask>(&m_cnfVarCount, CaDiCaLTask::Parse);
-  task->readCNF(m_rootCNF);
+  auto task = std::make_unique<CaDiCaLTask>(nullptr, CaDiCaLTask::Parse);
+  task->readCNF(m_rootCNF, 0);
 
   auto& finishedSignal = task->getFinishedSignal();
 
@@ -52,7 +48,6 @@ Daemon::Context::start()
     // Once the CNF is parsed, this compute node sits idle until cubes arrive.
     // These cubes can then be cubed further or just solved directly, depending
     // on the heuristics of the current compute node.
-
   });
 
   m_daemon->m_communicator->getRunner()->push(std::move(task));
@@ -68,10 +63,18 @@ Daemon::Daemon(ConfigPtr config,
   m_config->m_daemon = this;
 }
 
+Daemon::Context*
+Daemon::getContext(int64_t id)
+{
+  auto it = m_contextMap.find(id);
+  if(it != m_contextMap.end()) {
+    return it->second.get();
+  }
+  return nullptr;
+}
+
 std::pair<Daemon::Context&, bool>
-Daemon::getOrCreateContext(std::shared_ptr<CNF> rootCNF,
-                           int64_t id,
-                           uint32_t varCount)
+Daemon::getOrCreateContext(std::shared_ptr<CNF> rootCNF, int64_t id)
 {
   if(m_contextMap.count(id) > 0) {
     return { *m_contextMap.find(id)->second, false };
@@ -80,7 +83,7 @@ Daemon::getOrCreateContext(std::shared_ptr<CNF> rootCNF,
       m_communicator->getClusterStatistics()->getOrCreateNode(id);
 
     auto p = std::make_pair(
-      id, std::make_unique<Context>(rootCNF, id, varCount, this, statsNode));
+      id, std::make_unique<Context>(rootCNF, id, this, statsNode));
     Context& context = *p.second;
     m_contextMap.insert(std::move(p));
     return { context, true };

@@ -12,8 +12,8 @@ Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
   , m_communicator(communicator)
 {
   m_config->m_client = this;
-  m_rootCNF = std::make_shared<CNF>(
-    config->getInt64(Config::Id), 0, getDIMACSSourcePathFromConfig());
+  m_rootCNF = std::make_shared<CNF>(config->getInt64(Config::Id),
+                                    getDIMACSSourcePathFromConfig());
 }
 Client::~Client() {}
 

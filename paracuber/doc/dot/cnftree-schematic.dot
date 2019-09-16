@@ -1,15 +1,24 @@
 digraph {
   {
-    node [shape=box] "Root";
+    node [shape=box] "Original CNF";
+    node [shape=diamond, xlabel = "x₂"] "CNFTree Root, d=1";
+    node [xlabel = "x₈"] "p=00,d=2";
+    node [xlabel = "x5"] "p=10,d=2";
   }
 
-  "Root" -> "p=00,d=1";
-  "Root" -> "p=10,d=1";
+  "Original CNF" -> "CNFTree Root, d=1" [style = "dotted"];
 
+  "CNFTree Root, d=1" -> "p=00,d=2" [label = "⊤"];
+  "CNFTree Root, d=1" -> "p=10,d=2" [label = "⊥"];
 
-  "p=00,d=1" -> "p=00,d=2";
-  "p=00,d=1" -> "p=01,d=2";
+  "p=00,d=3" [shape = "house"];
+  "p=01,d=3" [shape = "house"];
+  "p=10,d=3" [shape = "house"];
+  "p=11,d=3" [shape = "house"];
 
-  "p=10,d=1" -> "p=10,d=2";
-  "p=10,d=1" -> "p=11,d=2";
+  "p=00,d=2" -> "p=00,d=3" [label = "⊤"];
+  "p=00,d=2" -> "p=01,d=3" [label = "⊥"];
+
+  "p=10,d=2" -> "p=10,d=3" [label = "⊤"];
+  "p=10,d=2" -> "p=11,d=3" [label = "⊥"];
 }

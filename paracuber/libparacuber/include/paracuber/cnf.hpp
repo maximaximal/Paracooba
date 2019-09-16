@@ -10,6 +10,8 @@
 
 #include <boost/asio/ip/tcp.hpp>
 
+#include "cnftree.hpp"
+
 namespace paracuber {
 class NetworkedNode;
 class CaDiCaLTask;
@@ -22,85 +24,59 @@ class CaDiCaLTask;
 class CNF
 {
   public:
-  /** @brief Maximum depth means 64, which is too high.
-   *
-   * This encodes a CNF which is not yet assigned.
-   */
-  static const uint64_t UNINITIALIZED_CNF_PREV = 0b00111111u;
-
-  using CubeVarType = int32_t;
-  using CubeVector = std::vector<CubeVarType>;
-
   /** @brief Construct a CNF from existing literals based on DIMACS file or on
    * previous CNF.
    */
-  CNF(int64_t originId,
-      uint64_t previous = UNINITIALIZED_CNF_PREV,
-      std::string_view dimacsFile = "");
-  /** @brief Constructs a CNF using a variable count for then applying a cube to
-   * it.
-   *
-   * The variable count is reserved internally.
-   */
-  CNF(int64_t originId, uint64_t previous, size_t varCount);
+  CNF(int64_t originId, std::string_view dimacsFile = "");
 
   /** @brief Copy another CNF formula.
    */
   CNF(const CNF& o);
   virtual ~CNF();
 
-  uint64_t getPrevious() { return m_previous; }
   std::string_view getDimacsFile() { return m_dimacsFile; }
 
   using SendFinishedCB = std::function<void()>;
 
   void send(boost::asio::ip::tcp::socket* socket,
+            CNFTree::Path path,
             SendFinishedCB finishedCallback,
             bool first = true);
-  void receive(char* buf, std::size_t length);
-
-  inline uint64_t getPath()
-  {
-    return m_previous & (0xFFFFFFFFFFFFFFFFu & 0b11000000u);
-  }
-  inline uint8_t getDepth() { return m_previous & 0b00111111u; }
-
-  /** @brief Get a writeable reference to the internal cube vector. */
-  inline CubeVector& getCube() { return m_cubeVector; }
+  void receive(boost::asio::ip::tcp::socket* socket,
+               char* buf,
+               std::size_t length);
 
   inline int64_t getOriginId() { return m_originId; }
-
-  inline void setPath(uint64_t p)
-  {
-    m_previous |=
-      (m_previous & 0b00111111) | (p & ~(0xFFFFFFFFFFFFFFFFu & 0b11000000u));
-  }
-
-  inline void setDepth(uint8_t d) { m_previous = getPath() | d; }
-
-  inline bool isRootCNF() { return m_previous == 0; }
 
   void setRootTask(std::unique_ptr<CaDiCaLTask> root);
   CaDiCaLTask* getRootTask();
 
   private:
+  enum ReceiveState
+  {
+    ReceivePath,
+    ReceiveFileName,
+    ReceiveFile,
+    ReceiveCube,
+  };
+
   struct SendDataStruct
   {
     off_t offset = 0;
     SendFinishedCB cb;
   };
-  enum ReceiveState
+  struct ReceiveDataStruct
   {
-    ReceiveFileName,
-    ReceiveFile,
+    ReceiveState state = ReceivePath;
+    CNFTree::Path path = 0;
+    size_t cubeVarReceivePos = 0;
+    char cubeVarReceiveBuf[sizeof(CNFTree::CubeVar)];
   };
 
-  void sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket);
+  void sendCB(SendDataStruct* data, CNFTree::Path path, boost::asio::ip::tcp::socket* socket);
 
   int64_t m_originId = 0;
-  uint64_t m_previous = -1;
   std::string m_dimacsFile = "";
-  ReceiveState m_receiveState = ReceiveFileName;
 
   // Ofstream for outputting the original CNF file.
   std::ofstream m_ofstream;
@@ -109,7 +85,8 @@ class CNF
   size_t m_fileSize = 0;
 
   std::map<boost::asio::ip::tcp::socket*, SendDataStruct> m_sendData;
-  CubeVector m_cubeVector;
+  std::map<boost::asio::ip::tcp::socket*, ReceiveDataStruct> m_receiveData;
+
   std::unique_ptr<CaDiCaLTask> m_rootTask;
 };
 }

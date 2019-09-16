@@ -2,6 +2,7 @@
 #define PARACUBER_CDCLTASK_HPP
 
 #include "task.hpp"
+#include "cnftree.hpp"
 
 namespace CaDiCaL {
 class Solver;
@@ -57,7 +58,7 @@ class CaDiCaLTask : public Task
    * The root CNF gets parsed directly, other CNFs (cubes) are applied to the
    * current state. This makes this function useful in conjunction with
    * initialising this task from an old task that already finished. */
-  void readCNF(std::shared_ptr<CNF> cnf);
+  void readCNF(std::shared_ptr<CNF> cnf, CNFTree::Path path);
 
   virtual TaskResultPtr execute();
   virtual void terminate();
