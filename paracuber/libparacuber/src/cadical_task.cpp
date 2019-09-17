@@ -22,15 +22,19 @@ class Terminator : public CaDiCaL::Terminator
 
   virtual bool terminate() { return m_task->m_terminate; }
 
+  void setCaDiCaLTask(CaDiCaLTask* task) { m_task = task; }
+
   private:
   CaDiCaLTask* m_task;
 };
 
 CaDiCaLTask::CaDiCaLTask(const CaDiCaLTask& other)
+  : CaDiCaLTask(nullptr, ParseAndSolve)
 {
   copyFromCaDiCaLTask(other);
 }
 CaDiCaLTask::CaDiCaLTask(const TaskResult& result)
+  : CaDiCaLTask(nullptr, ParseAndSolve)
 {
   Task& otherTask = result.getTask();
   if(CaDiCaLTask* otherCaDiCaLTask = dynamic_cast<CaDiCaLTask*>(&otherTask)) {
@@ -40,6 +44,12 @@ CaDiCaLTask::CaDiCaLTask(const TaskResult& result)
     // task result is given to this constructor.
     assert(false);
   }
+}
+CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
+  : m_terminator(std::move(other.m_terminator))
+  , m_solver(std::move(other.m_solver))
+{
+  m_terminator->setCaDiCaLTask(this);
 }
 
 CaDiCaLTask::CaDiCaLTask(uint32_t* varCount, Mode mode)
@@ -53,8 +63,20 @@ CaDiCaLTask::CaDiCaLTask(uint32_t* varCount, Mode mode)
 CaDiCaLTask::~CaDiCaLTask() {}
 
 void
+CaDiCaLTask::setMode(Mode mode)
+{
+  m_mode = mode;
+}
+
+void
 CaDiCaLTask::copyFromCaDiCaLTask(const CaDiCaLTask& other)
-{}
+{
+  assert(m_terminator);
+  assert(m_solver);
+
+  m_mode = other.m_mode;
+  m_solver->copy(*other.m_solver);
+}
 
 void
 CaDiCaLTask::readDIMACSFile(std::string_view sourcePath)

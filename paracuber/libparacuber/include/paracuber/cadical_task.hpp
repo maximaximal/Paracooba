@@ -1,8 +1,8 @@
 #ifndef PARACUBER_CDCLTASK_HPP
 #define PARACUBER_CDCLTASK_HPP
 
-#include "task.hpp"
 #include "cnftree.hpp"
+#include "task.hpp"
 
 namespace CaDiCaL {
 class Solver;
@@ -30,6 +30,11 @@ class CaDiCaLTask : public Task
    */
   CaDiCaLTask(const CaDiCaLTask& other);
 
+  /** @brief Move-Construct this new CaDiCaL task as a direct copy, without
+   * creating too much new memory.
+   */
+  CaDiCaLTask(CaDiCaLTask&& other);
+
   /** @brief Initiate this task from the result of another task, copying the old
    * solver.
    *
@@ -43,6 +48,8 @@ class CaDiCaLTask : public Task
 
   /** @brief Destructor */
   virtual ~CaDiCaLTask();
+
+  void setMode(Mode mode);
 
   void copyFromCaDiCaLTask(const CaDiCaLTask& other);
 

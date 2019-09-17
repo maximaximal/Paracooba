@@ -32,9 +32,7 @@ Client::getDIMACSSourcePathFromConfig()
 void
 Client::solve()
 {
-  CaDiCaLTask::Mode mode = m_config->isClientCaDiCaLEnabled()
-                             ? CaDiCaLTask::ParseAndSolve
-                             : CaDiCaLTask::Parse;
+  CaDiCaLTask::Mode mode = CaDiCaLTask::Parse;
 
   auto task = std::make_unique<CaDiCaLTask>(&m_cnfVarCount, mode);
   auto& finishedSignal = task->getFinishedSignal();
@@ -42,12 +40,28 @@ Client::solve()
   m_communicator->getRunner()->push(std::move(task));
   finishedSignal.connect([this](const TaskResult& result) {
     m_status = result.getStatus();
-
-    if(m_config->isClientCaDiCaLEnabled()) {
-      // Finished solving, the communicator can be stopped!
+    if(m_status != TaskResult::Parsed) {
+      PARACUBER_LOG(m_logger, Fatal)
+        << "Could not parse DIMACS source file! Status: " << result.getStatus()
+        << ". Exiting Client.";
       m_communicator->exit();
+    }
+
+    // If local solving is enabled, create a new task to solve the parsed
+    // formula.
+    if(m_config->isClientCaDiCaLEnabled()) {
+      auto task = std::make_unique<CaDiCaLTask>(
+        static_cast<CaDiCaLTask&&>(result.getTask()));
+      task->setMode(CaDiCaLTask::Solve);
+      auto& finishedSignal = task->getFinishedSignal();
+      task->readDIMACSFile(getDIMACSSourcePathFromConfig());
+      m_communicator->getRunner()->push(std::move(task));
+      finishedSignal.connect([this](const TaskResult& result) {
+        // Finished solving using client CaDiCaL!
+        m_status = result.getStatus();
+        m_communicator->exit();
+      });
     }
   });
 }
-
 }
