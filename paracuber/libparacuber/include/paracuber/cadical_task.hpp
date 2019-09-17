@@ -70,6 +70,9 @@ class CaDiCaLTask : public Task
   virtual TaskResultPtr execute();
   virtual void terminate();
 
+  CaDiCaL::Solver& getSolver() { return *m_solver; }
+  uint32_t getVarCount() { return m_internalVarCount; }
+
   private:
   friend class Terminator;
   std::unique_ptr<Terminator> m_terminator;
@@ -79,6 +82,7 @@ class CaDiCaLTask : public Task
   std::string m_sourcePath;
   bool m_terminate = false;
   uint32_t* m_varCount = nullptr;
+  uint32_t m_internalVarCount = 0;
 };
 
 inline CaDiCaLTask::Mode

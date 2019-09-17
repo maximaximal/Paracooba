@@ -2,18 +2,27 @@
 #define PARACUBER_CUBER_NAIVE_CUTTER_HPP
 
 #include "cuber.hpp"
+#include <vector>
 
 namespace paracuber {
 namespace cuber {
+/** @brief Splits by most to least commonly occurring literal.
+ *
+ * The naive cutter tries to find the most common literal and uses that
+ * for the next decision.
+ */
 class NaiveCutter : public Cuber
 {
   public:
-  NaiveCutter();
+  explicit NaiveCutter(ConfigPtr config, LogPtr log, CNF& rootCNF);
   virtual ~NaiveCutter();
 
-  virtual std::shared_ptr<CNF> generateCube(std::shared_ptr<CNF> source);
+  using ClauseMap = std::vector<size_t>;
+
+  virtual CNFTree::CubeVar generateCube(CNFTree::Path path);
 
   private:
+  ClauseMap m_clauseFrequency;
 };
 }
 }

@@ -75,7 +75,7 @@ CaDiCaLTask::copyFromCaDiCaLTask(const CaDiCaLTask& other)
   assert(m_solver);
 
   m_mode = other.m_mode;
-  m_solver->copy(*other.m_solver);
+  other.m_solver->copy(*m_solver);
 }
 
 void
@@ -122,6 +122,7 @@ CaDiCaLTask::execute()
     if(m_varCount != nullptr) {
       *m_varCount = vars;
     }
+    m_internalVarCount = vars;
 
     PARACUBER_LOG((*m_logger), Trace)
       << "CNF formula parsed with " << vars << " variables.";

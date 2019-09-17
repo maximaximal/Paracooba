@@ -13,9 +13,12 @@ Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
 {
   m_config->m_client = this;
   m_rootCNF = std::make_shared<CNF>(
-    log, config->getInt64(Config::Id), getDIMACSSourcePathFromConfig());
+    config, log, config->getInt64(Config::Id), getDIMACSSourcePathFromConfig());
 }
-Client::~Client() {}
+Client::~Client()
+{
+  m_config->m_client = nullptr;
+}
 
 std::string_view
 Client::getDIMACSSourcePathFromConfig()
@@ -27,6 +30,15 @@ Client::getDIMACSSourcePathFromConfig()
     return errorMsg;
   }
   return sourcePath;
+}
+
+// Approach to safely cast unique_ptr from
+// https://stackoverflow.com/a/36120483
+template<typename TO, typename FROM>
+std::unique_ptr<TO>
+static_unique_pointer_cast(std::unique_ptr<FROM>&& old)
+{
+  return std::unique_ptr<TO>{ static_cast<TO*>(old.release()) };
 }
 
 void
@@ -51,7 +63,7 @@ Client::solve()
     // formula.
     if(m_config->isClientCaDiCaLEnabled()) {
       auto task = std::make_unique<CaDiCaLTask>(
-        static_cast<CaDiCaLTask&&>(result.getTask()));
+        static_cast<CaDiCaLTask&>(result.getTask()));
       task->setMode(CaDiCaLTask::Solve);
       auto& finishedSignal = task->getFinishedSignal();
       task->readDIMACSFile(getDIMACSSourcePathFromConfig());
@@ -62,6 +74,16 @@ Client::solve()
         m_communicator->exit();
       });
     }
+
+    // Formula has been parsed successfully and local solver has been started.
+    // The internal CNF can therefore now be fully initialised with this root
+    // CNF solver task. The root CNF now has a valid unique_ptr to a completely
+    // parsed CaDiCaL task.
+    // This is (in theory) unsafe, but should only be required in this case. It
+    // should not be required to const cast the result anywhere else.
+    auto& resultMut = const_cast<TaskResult&>(result);
+    m_rootCNF->setRootTask(static_unique_pointer_cast<CaDiCaLTask>(
+      std::move(resultMut.getTaskPtr())));
   });
 }
 }

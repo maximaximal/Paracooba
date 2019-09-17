@@ -10,6 +10,7 @@
 namespace paracuber {
 class Client;
 class Daemon;
+class Communicator;
 
 /** @brief Store for communication options specific for each node.
  *
@@ -120,12 +121,26 @@ class Config
 
   int64_t generateId(int64_t uniqueNumber);
 
-  Client* getClient() { return m_client; }
-  Daemon* getDaemon() { return m_daemon; }
+  Client* getClient()
+  {
+    assert(m_client);
+    return m_client;
+  }
+  Daemon* getDaemon()
+  {
+    assert(m_daemon);
+    return m_daemon;
+  }
+  Communicator* getCommunicator()
+  {
+    assert(m_communicator);
+    return m_communicator;
+  }
 
   private:
   friend class Client;
   friend class Daemon;
+  friend class Communicator;
 
   bool processCommonParameters(
     const boost::program_options::variables_map& map);
@@ -144,6 +159,7 @@ class Config
   bool m_disableClientCaDiCaL = false;
   std::string m_generatedLocalName;
 
+  Communicator* m_communicator = nullptr;
   Client* m_client = nullptr;
   Daemon* m_daemon = nullptr;
 };

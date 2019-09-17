@@ -62,6 +62,10 @@ Daemon::Daemon(ConfigPtr config,
 {
   m_config->m_daemon = this;
 }
+Daemon::~Daemon()
+{
+  m_config->m_daemon = nullptr;
+}
 
 Daemon::Context*
 Daemon::getContext(int64_t id)
@@ -89,6 +93,4 @@ Daemon::getOrCreateContext(std::shared_ptr<CNF> rootCNF, int64_t id)
     return { context, true };
   }
 }
-
-Daemon::~Daemon() {}
 }

@@ -10,12 +10,16 @@
 
 #include <boost/asio/ip/tcp.hpp>
 
-#include "log.hpp"
 #include "cnftree.hpp"
+#include "log.hpp"
 
 namespace paracuber {
 class NetworkedNode;
 class CaDiCaLTask;
+
+namespace cuber {
+class Registry;
+}
 
 /** @brief This class represents a CNF formula that can be transferred directly.
  *
@@ -28,7 +32,7 @@ class CNF
   /** @brief Construct a CNF from existing literals based on DIMACS file or on
    * previous CNF.
    */
-  CNF(LogPtr log, int64_t originId, std::string_view dimacsFile = "");
+  CNF(ConfigPtr config, LogPtr log, int64_t originId, std::string_view dimacsFile = "");
 
   /** @brief Copy another CNF formula.
    */
@@ -75,7 +79,9 @@ class CNF
     char cubeVarReceiveBuf[sizeof(CNFTree::CubeVar)];
   };
 
-  void sendCB(SendDataStruct* data, CNFTree::Path path, boost::asio::ip::tcp::socket* socket);
+  void sendCB(SendDataStruct* data,
+              CNFTree::Path path,
+              boost::asio::ip::tcp::socket* socket);
 
   int64_t m_originId = 0;
   std::string m_dimacsFile = "";
@@ -90,8 +96,10 @@ class CNF
   std::map<boost::asio::ip::tcp::socket*, ReceiveDataStruct> m_receiveData;
 
   std::unique_ptr<CaDiCaLTask> m_rootTask;
+  std::unique_ptr<cuber::Registry> m_cuberRegistry;
   CNFTree m_cnfTree;
 
+  ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
 };

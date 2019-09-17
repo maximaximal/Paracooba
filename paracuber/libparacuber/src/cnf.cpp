@@ -1,5 +1,6 @@
 #include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/cadical_task.hpp"
+#include "../include/paracuber/cuber/registry.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
@@ -15,8 +16,12 @@ extern "C"
 }
 
 namespace paracuber {
-CNF::CNF(LogPtr log, int64_t originId, std::string_view dimacsFile)
-  : m_originId(originId)
+CNF::CNF(ConfigPtr config,
+         LogPtr log,
+         int64_t originId,
+         std::string_view dimacsFile)
+  : m_config(config)
+  , m_originId(originId)
   , m_dimacsFile(dimacsFile)
   , m_log(log)
   , m_logger(log->createLogger())
@@ -32,7 +37,8 @@ CNF::CNF(LogPtr log, int64_t originId, std::string_view dimacsFile)
   }
 }
 CNF::CNF(const CNF& o)
-  : m_originId(o.m_originId)
+  : m_config(o.m_config)
+  , m_originId(o.m_originId)
   , m_dimacsFile(o.m_dimacsFile)
   , m_log(o.m_log)
   , m_logger(o.m_log->createLogger())
@@ -220,7 +226,12 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
 void
 CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
 {
+  /// This shall only be called once, the internal root task must therefore
+  /// always be false. This is because this function also initialises the cubing
+  /// registry in m_cuberRegistry.
+  assert(!m_rootTask);
   m_rootTask = std::move(root);
+  m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
 }
 CaDiCaLTask*
 CNF::getRootTask()

@@ -1,6 +1,8 @@
 #ifndef PARACUBER_CUBER_CUBER_HPP
 #define PARACUBER_CUBER_CUBER_HPP
 
+#include "../cnftree.hpp"
+#include "../log.hpp"
 #include <memory>
 
 namespace paracuber {
@@ -16,14 +18,22 @@ namespace cuber {
 class Cuber
 {
   public:
-  Cuber() {}
-  virtual ~Cuber() {}
+  explicit Cuber(ConfigPtr config, LogPtr log, CNF &rootCNF);
+  virtual ~Cuber();
 
-  /** @brief Generates the next cube out of a given source.
+  /** @brief Generates the next cube on a given path.
    *
    * Required method for implementing cubing algorithms.
+   *
+   * @return The cube var.
    */
-  virtual std::shared_ptr<CNF> generateCube(std::shared_ptr<CNF> source) = 0;
+  virtual CNFTree::CubeVar generateCube(CNFTree::Path path) = 0;
+
+  protected:
+  ConfigPtr m_config;
+  LogPtr m_log;
+  Logger m_logger;
+  CNF &m_rootCNF;
 
   private:
 };

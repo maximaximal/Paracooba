@@ -5,9 +5,13 @@
 
 namespace paracuber {
 namespace cuber {
-Registry::Registry()
+Registry::Registry(ConfigPtr config, LogPtr log, CNF &rootCNF)
+  : m_config(config)
+  , m_log(log)
+  , m_logger(log->createLogger())
+  , m_rootCNF(rootCNF)
 {
-  m_cubers.push_back(std::make_unique<NaiveCutter>());
+  m_cubers.push_back(std::make_unique<NaiveCutter>(config, log, m_rootCNF));
 }
 Registry::~Registry() {}
 

@@ -33,7 +33,7 @@ class TaskResult
   /** @brief Create a task result with an assigned status. */
   TaskResult(Status status);
   /** @brief Destructor */
-      ~TaskResult();
+  ~TaskResult();
 
   /** @brief Get the status of this task. */
   Status getStatus() const { return m_status; }
@@ -42,6 +42,13 @@ class TaskResult
    * The task is deleted with this task result, because the result owns the task
    * after it has finished. */
   Task& getTask() const { return *m_task; }
+
+  /** @brief Return the internal unique pointer to the task that produced this
+   * result.
+   *
+   * Once this has been moved again, no other call can use the internal task!
+   */
+  std::unique_ptr<Task>& getTaskPtr() { return m_task; }
 
   void setTask(std::unique_ptr<Task> task);
 

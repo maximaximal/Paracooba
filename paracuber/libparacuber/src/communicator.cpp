@@ -533,7 +533,8 @@ class Communicator::TCPServer
       if(m_comm->m_config->isDaemonMode()) {
         m_context = m_comm->m_config->getDaemon()->getContext(originator);
         if(!m_context) {
-          m_cnf = std::make_shared<CNF>(m_comm->m_log, originator);
+          m_cnf =
+            std::make_shared<CNF>(m_comm->m_config, m_comm->m_log, originator);
           auto [context, inserted] =
             m_comm->m_config->getDaemon()->getOrCreateContext(m_cnf,
                                                               originator);
@@ -620,6 +621,7 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   , m_signalSet(std::make_unique<boost::asio::signal_set>(*m_ioService, SIGINT))
   , m_clusterStatistics(std::make_shared<ClusterStatistics>(config, log))
 {
+  m_config->m_communicator = this;
   // Initialize communicator
   boost::asio::io_service::work work(*m_ioService);
   m_ioServiceWork = work;
@@ -632,6 +634,7 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
 
 Communicator::~Communicator()
 {
+  m_config->m_communicator = nullptr;
   exit();
   PARACUBER_LOG(m_logger, Trace) << "Destruct Communicator.";
 }
