@@ -40,37 +40,37 @@ Config::Config()
   // clang-format off
   m_optionsCommon.add_options()
     (GetConfigNameFromEnum(Config::LocalName),
-         po::value<std::string>()->default_value(m_generatedLocalName), "local name of this solver node")
+         po::value<std::string>()->default_value(m_generatedLocalName)->value_name("string"), "local name of this solver node")
     (GetConfigNameFromEnum(Config::InputFile),
-         po::value<std::string>()->default_value(""), "input file (problem) to parse")
+         po::value<std::string>()->default_value("")->value_name("string"), "input file (problem) to parse")
     (GetConfigNameFromEnum(Config::ThreadCount),
-         po::value<uint32_t>()->default_value(std::thread::hardware_concurrency()),
+         po::value<uint32_t>()->default_value(std::thread::hardware_concurrency())->value_name("int"),
          "number of worker threads to execute tasks on")
     (GetConfigNameFromEnum(Config::UDPListenPort),
-         po::value<uint16_t>()->default_value(18001),
+         po::value<uint16_t>()->default_value(18001)->value_name("int"),
          "udp port for incoming control messages")
     (GetConfigNameFromEnum(Config::UDPTargetPort),
-         po::value<uint16_t>()->default_value(18001),
+         po::value<uint16_t>()->default_value(18001)->value_name("int"),
          "udp port for outgoing control messages")
     (GetConfigNameFromEnum(Config::TCPListenPort),
-         po::value<uint16_t>()->default_value(18001),
+         po::value<uint16_t>()->default_value(18001)->value_name("int"),
          "tcp port for incoming data messages")
     (GetConfigNameFromEnum(Config::TCPTargetPort),
-         po::value<uint16_t>()->default_value(18001),
+         po::value<uint16_t>()->default_value(18001)->value_name("int"),
          "tcp port for outgoing data messages")
     (GetConfigNameFromEnum(Config::Id),
-         po::value<int64_t>()->default_value(dist_mac(rng)),
+         po::value<int64_t>()->default_value(dist_mac(rng))->value_name("int"),
          "Unique Number (only 48 Bit) (can be MAC address)")
     (GetConfigNameFromEnum(Config::WorkQueueCapacity),
-         po::value<uint64_t>()->default_value(100),
+         po::value<uint64_t>()->default_value(100)->value_name("int"),
          "Capacity of the internal work queue. Should be high on daemons and low on clients.")
     (GetConfigNameFromEnum(Config::DaemonHost),
-     po::value<std::string>()->default_value("127.0.0.1"),
+     po::value<std::string>()->default_value("127.0.0.1")->value_name("string"),
          "Initial peer to connect to. Should should be a long-running daemon.")
-    ("debug,d", po::bool_switch(&m_debugMode)->default_value(false), "debug mode (all debug output)")
-    ("info,i", po::bool_switch(&m_infoMode)->default_value(false), "info mode (more information)")
-    ("daemon", po::bool_switch(&m_daemonMode)->default_value(false), "daemon mode")
-    ("disable-client-cadical", po::bool_switch(&m_disableClientCaDiCaL)->default_value(false), "direct solving via CaDiCaL on client")
+    ("debug,d", po::bool_switch(&m_debugMode)->default_value(false)->value_name("bool"), "debug mode (all debug output)")
+    ("info,i", po::bool_switch(&m_infoMode)->default_value(false)->value_name("bool"), "info mode (more information)")
+    ("daemon", po::bool_switch(&m_daemonMode)->default_value(false)->value_name("bool"), "daemon mode")
+    ("disable-client-cadical", po::bool_switch(&m_disableClientCaDiCaL)->default_value(false)->value_name("bool"), "direct solving via CaDiCaL on client")
     ;
   // clang-format on
 }
