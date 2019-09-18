@@ -11,18 +11,18 @@ namespace cuber {
  * The naive cutter tries to find the most common literal and uses that
  * for the next decision.
  */
-class NaiveCutter : public Cuber
+class LiteralFrequency : public Cuber
 {
   public:
-  explicit NaiveCutter(ConfigPtr config, LogPtr log, CNF& rootCNF);
-  virtual ~NaiveCutter();
+  explicit LiteralFrequency(ConfigPtr config, LogPtr log, CNF& rootCNF);
+  virtual ~LiteralFrequency();
 
-  using ClauseMap = std::vector<size_t>;
+  using LiteralMap = std::vector<size_t>;
 
   virtual CNFTree::CubeVar generateCube(CNFTree::Path path);
 
   private:
-  ClauseMap m_clauseFrequency;
+  LiteralMap m_literalFrequency;
 };
 }
 }

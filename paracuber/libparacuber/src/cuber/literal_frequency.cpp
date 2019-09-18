@@ -1,4 +1,4 @@
-#include "../../include/paracuber/cuber/naive_cutter.hpp"
+#include "../../include/paracuber/cuber/literal_frequency.hpp"
 #include "../../include/paracuber/cadical_task.hpp"
 #include "../../include/paracuber/cnf.hpp"
 #include <cadical/cadical.hpp>
@@ -18,7 +18,7 @@ namespace cuber {
 class ClauseIterator : public CaDiCaL::ClauseIterator
 {
   public:
-  explicit ClauseIterator(NaiveCutter::ClauseMap& m)
+  explicit ClauseIterator(LiteralFrequency::LiteralMap& m)
     : m_m(m)
   {}
   ~ClauseIterator() {}
@@ -33,32 +33,41 @@ class ClauseIterator : public CaDiCaL::ClauseIterator
   }
 
   private:
-  NaiveCutter::ClauseMap& m_m;
+  LiteralFrequency::LiteralMap& m_m;
 };
 
-NaiveCutter::NaiveCutter(ConfigPtr config, LogPtr log, CNF& rootCNF)
+LiteralFrequency::LiteralFrequency(ConfigPtr config, LogPtr log, CNF& rootCNF)
   : Cuber(config, log, rootCNF)
-  , m_clauseFrequency(rootCNF.getRootTask()->getVarCount() + 1)
+  , m_literalFrequency(rootCNF.getRootTask()->getVarCount() + 1, 0)
 {
-  // Traverse clauses to build up internal map.
-  ClauseMap m(m_clauseFrequency.size(), 0);
-
-  ClauseIterator it(m);
+  ClauseIterator it(m_literalFrequency);
   PARACUBER_LOG(m_logger, Trace) << "Begin traversing CNF clauses for naive "
                                     "cutter literal frequency map. Map Size: "
-                                 << m.size();
+                                 << m_literalFrequency.size();
   m_rootCNF.getRootTask()->getSolver().traverse_clauses(it);
   PARACUBER_LOG(m_logger, Trace)
     << "Finished traversing CNF clauses for naive "
        "cutter literal frequency map. Sorting by value now.";
 
+  auto litIt = m_literalFrequency.begin();
+  while(litIt != m_literalFrequency.end()) {
+    auto maxIt = std::max_element(litIt, m_literalFrequency.end());
+    *maxIt = *litIt;
+    *litIt = (maxIt - m_literalFrequency.begin());
+    ++litIt;
+    if((litIt - m_literalFrequency.begin()) % 10000 == 0) {
+      PARACUBER_LOG(m_logger, Trace)
+        << "  -> Currently at element " << litIt - m_literalFrequency.begin();
+    }
+  }
+
   PARACUBER_LOG(m_logger, Trace)
     << "Finished sorting by value for naive cutter literal frequency map.";
 }
-NaiveCutter::~NaiveCutter() {}
+LiteralFrequency::~LiteralFrequency() {}
 
 CNFTree::CubeVar
-NaiveCutter::generateCube(CNFTree::Path path)
+LiteralFrequency::generateCube(CNFTree::Path path)
 {
   return 0;
 }
