@@ -11,8 +11,14 @@ Registry::Registry(ConfigPtr config, LogPtr log, CNF& rootCNF)
   , m_logger(log->createLogger())
   , m_rootCNF(rootCNF)
 {
-  m_cubers.push_back(
-    std::make_unique<LiteralFrequency>(config, log, m_rootCNF));
+  auto litFreqPtr =
+    std::make_unique<LiteralFrequency>(config, log, m_rootCNF, &m_allowanceMap);
+  LiteralFrequency& litFreq = *litFreqPtr;
+  m_cubers.push_back(std::move(litFreqPtr));
+
+  for(auto& cuber : m_cubers) {
+    cuber->m_allowanceMap = litFreq.getLiteralFrequency();
+  }
 }
 Registry::~Registry() {}
 

@@ -2,6 +2,8 @@
 #include <cassert>
 
 namespace paracuber {
+const size_t CNFTree::maxPathDepth = sizeof(CNFTree::Path) * 8 - 6;
+
 CNFTree::CNFTree() {}
 CNFTree::~CNFTree() {}
 

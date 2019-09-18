@@ -18,22 +18,38 @@ namespace cuber {
 class Cuber
 {
   public:
-  explicit Cuber(ConfigPtr config, LogPtr log, CNF &rootCNF);
+  explicit Cuber(ConfigPtr config, LogPtr log, CNF& rootCNF);
   virtual ~Cuber();
+
+  using LiteralMap = std::vector<int>;
 
   /** @brief Generates the next cube on a given path.
    *
    * Required method for implementing cubing algorithms.
    *
-   * @return The cube var.
+   * @return True if cubing was successful, false if no other cube should be
+   * done.
    */
-  virtual CNFTree::CubeVar generateCube(CNFTree::Path path) = 0;
+  virtual bool generateCube(CNFTree::Path path, CNFTree::CubeVar& var) = 0;
+
+  static inline uint64_t getModuloComponent(CNFTree::Path p)
+  {
+    return (1 << (CNFTree::getDepth(p) - 1));
+  }
+  static inline uint64_t getAdditionComponent(CNFTree::Path p)
+  {
+    return CNFTree::getDepthShiftedPath(p);
+  }
 
   protected:
+  friend class Registry;
+
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
-  CNF &m_rootCNF;
+  CNF& m_rootCNF;
+
+  LiteralMap* m_allowanceMap = nullptr;
 
   private:
 };

@@ -33,6 +33,8 @@ class Config
     DaemonHost,
     WorkQueueCapacity,
 
+    FreqCuberCutoff,
+
     _KEY_COUNT
   };
 
@@ -87,6 +89,9 @@ class Config
   /** @brief Get an uint64 configuration variable.
    */
   inline uint64_t getUint64(Key key) { return get<uint64_t>(key); }
+  /** @brief Get a float configuration variable.
+   */
+  inline uint64_t getFloat(Key key) { return get<float>(key); }
   /** @brief Get a bool configuration variable.
    */
   inline bool getBool(Key key) { return get<bool>(key); }
@@ -188,6 +193,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "daemon-host";
     case Config::WorkQueueCapacity:
       return "work-queue-capacity";
+    case Config::FreqCuberCutoff:
+      return "frequency-cuber-cutoff";
     default:
       return "";
   }

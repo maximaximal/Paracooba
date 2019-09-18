@@ -67,11 +67,17 @@ class CNFTree
     });
   }
 
+  static const size_t maxPathDepth;
   static inline uint64_t getPath(Path p)
   {
     return p & (0xFFFFFFFFFFFFFFF0u | 0b11000000u);
   }
   static inline uint8_t getDepth(Path p) { return p & 0b00111111u; }
+  static inline uint64_t getShiftedPath(Path p) { return p >> 6u; }
+  static inline uint64_t getDepthShiftedPath(Path p)
+  {
+    return p >> ((sizeof(p) * 8) - getDepth(p));
+  }
 
   static inline Path setPath(Path p, Path path)
   {

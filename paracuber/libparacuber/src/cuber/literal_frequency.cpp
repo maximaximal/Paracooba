@@ -18,7 +18,7 @@ namespace cuber {
 class ClauseIterator : public CaDiCaL::ClauseIterator
 {
   public:
-  explicit ClauseIterator(LiteralFrequency::LiteralMap& m)
+  explicit ClauseIterator(Cuber::LiteralMap& m)
     : m_m(m)
   {}
   ~ClauseIterator() {}
@@ -33,31 +33,35 @@ class ClauseIterator : public CaDiCaL::ClauseIterator
   }
 
   private:
-  LiteralFrequency::LiteralMap& m_m;
+  Cuber::LiteralMap& m_m;
 };
 
-LiteralFrequency::LiteralFrequency(ConfigPtr config, LogPtr log, CNF& rootCNF)
+LiteralFrequency::LiteralFrequency(ConfigPtr config,
+                                   LogPtr log,
+                                   CNF& rootCNF,
+                                   Cuber::LiteralMap* allowanceMap)
   : Cuber(config, log, rootCNF)
-  , m_literalFrequency(rootCNF.getRootTask()->getVarCount() + 1, 0)
+  , m_literalFrequency(allowanceMap)
 {
-  ClauseIterator it(m_literalFrequency);
+  *m_literalFrequency = LiteralMap(rootCNF.getRootTask()->getVarCount() + 1, 0);
+  ClauseIterator it(*m_literalFrequency);
   PARACUBER_LOG(m_logger, Trace) << "Begin traversing CNF clauses for naive "
                                     "cutter literal frequency map. Map Size: "
-                                 << m_literalFrequency.size();
+                                 << m_literalFrequency->size();
   m_rootCNF.getRootTask()->getSolver().traverse_clauses(it);
   PARACUBER_LOG(m_logger, Trace)
     << "Finished traversing CNF clauses for"
        "literal frequency map. Sorting by value now.";
 
-  auto litIt = m_literalFrequency.begin();
-  while(litIt != m_literalFrequency.end()) {
-    auto maxIt = std::max_element(litIt, m_literalFrequency.end());
+  auto litIt = m_literalFrequency->begin();
+  while(litIt != m_literalFrequency->end()) {
+    auto maxIt = std::max_element(litIt, m_literalFrequency->end());
     *maxIt = *litIt;
-    *litIt = (maxIt - m_literalFrequency.begin());
+    *litIt = (maxIt - m_literalFrequency->begin());
     ++litIt;
-    if((litIt - m_literalFrequency.begin()) % 10000 == 0) {
+    if((litIt - m_literalFrequency->begin()) % 10000 == 0) {
       PARACUBER_LOG(m_logger, Trace)
-        << "  -> Currently at element " << litIt - m_literalFrequency.begin();
+        << "  -> Currently at element " << litIt - m_literalFrequency->begin();
     }
   }
 
@@ -66,10 +70,30 @@ LiteralFrequency::LiteralFrequency(ConfigPtr config, LogPtr log, CNF& rootCNF)
 }
 LiteralFrequency::~LiteralFrequency() {}
 
-CNFTree::CubeVar
-LiteralFrequency::generateCube(CNFTree::Path path)
+bool
+LiteralFrequency::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
 {
-  return 0;
+  assert(m_literalFrequency);
+
+  if(CNFTree::getDepth(path) > CNFTree::maxPathDepth) {
+    return false;
+  }
+  auto additionComponent = getAdditionComponent(path);
+  if((float)additionComponent / (float)m_literalFrequency->size() >=
+     m_config->getFloat(Config::FreqCuberCutoff)) {
+    return false;
+  }
+
+  // The next decision is always determined by the addition component, as no
+  // decision must be made. The next decision is therefore always the next most
+  // frequent literal.
+
+  if(additionComponent >= m_literalFrequency->size()) {
+    return false;
+  }
+
+  var = (*m_literalFrequency)[additionComponent];
+  return true;
 }
 }
 }

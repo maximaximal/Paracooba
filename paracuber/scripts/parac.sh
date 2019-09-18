@@ -109,7 +109,7 @@ _parac() {
           COMPREPLY=($(compgen -W "on off yes no true false 1 0" -- "${cur}"))
           return
           ;;
-        double|int)
+        float|double|int)
           # An argument is required.
           return
           ;;

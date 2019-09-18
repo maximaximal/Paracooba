@@ -26,6 +26,8 @@ class Registry
   Logger m_logger;
   CuberVector m_cubers;
   CNF &m_rootCNF;
+
+  std::vector<int> m_allowanceMap;
 };
 }
 }

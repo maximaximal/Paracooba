@@ -2,27 +2,31 @@
 #define PARACUBER_CUBER_NAIVE_CUTTER_HPP
 
 #include "cuber.hpp"
+#include "../config.hpp"
 #include <vector>
 
 namespace paracuber {
 namespace cuber {
-/** @brief Splits by most to least commonly occurring literal.
+/** @brief Generates a literal frequency map.
  *
- * The naive cutter tries to find the most common literal and uses that
- * for the next decision.
+ * If this is used as a cuber, the next most frequently used literal is used to
+ * cut the formula.
  */
 class LiteralFrequency : public Cuber
 {
   public:
-  explicit LiteralFrequency(ConfigPtr config, LogPtr log, CNF& rootCNF);
+  explicit LiteralFrequency(ConfigPtr config,
+                            LogPtr log,
+                            CNF& rootCNF,
+                            Cuber::LiteralMap* allowanceMap);
   virtual ~LiteralFrequency();
 
-  using LiteralMap = std::vector<size_t>;
+  virtual bool generateCube(CNFTree::Path path, CNFTree::CubeVar& var);
 
-  virtual CNFTree::CubeVar generateCube(CNFTree::Path path);
+  Cuber::LiteralMap* getLiteralFrequency() { return m_literalFrequency; }
 
   private:
-  LiteralMap m_literalFrequency;
+  Cuber::LiteralMap* m_literalFrequency;
 };
 }
 }
