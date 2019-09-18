@@ -2,6 +2,7 @@
 #include "../../include/paracuber/cadical_task.hpp"
 #include "../../include/paracuber/cnf.hpp"
 #include <cadical/cadical.hpp>
+#include <cmath>
 #include <vector>
 
 // This is inspired from https://stackoverflow.com/a/2074403
@@ -11,6 +12,16 @@
     VAL ^= temp;               /* toggle the bits if value is negative */ \
     VAL += temp & 1;           /* add one if value was negative */        \
   }
+
+std::string
+bytePrettyPrint(size_t bytes)
+{
+  auto base = (double)std::log(bytes) / (double)std::log(1024);
+  const char* suffixArr[] = { "", "kiB", "MiB", "GiB", "TiB", "PiB" };
+  return std::to_string(
+           (size_t)std::round(std::pow(1024, base - std::floor(base)))) +
+         suffixArr[(size_t)std::floor(base)];
+}
 
 namespace paracuber {
 namespace cuber {
@@ -47,11 +58,14 @@ LiteralFrequency::LiteralFrequency(ConfigPtr config,
   ClauseIterator it(*m_literalFrequency);
   PARACUBER_LOG(m_logger, Trace) << "Begin traversing CNF clauses for naive "
                                     "cutter literal frequency map. Map Size: "
-                                 << m_literalFrequency->size();
+                                 << m_literalFrequency->size() << " elements.";
   m_rootCNF.getRootTask()->getSolver().traverse_clauses(it);
   PARACUBER_LOG(m_logger, Trace)
     << "Finished traversing CNF clauses for"
-       "literal frequency map. Sorting by value now.";
+       "literal frequency map. The map size in RAM is "
+    << bytePrettyPrint(m_literalFrequency->size() *
+                       sizeof((*m_literalFrequency)[0]))
+    << ". Sorting by value now.";
 
   auto litIt = m_literalFrequency->begin();
   while(litIt != m_literalFrequency->end()) {
