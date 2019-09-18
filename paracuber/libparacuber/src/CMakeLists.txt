@@ -13,6 +13,7 @@ set(PARACUBER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/daemon.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cnf.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cnftree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/util.cpp
 
     ${CUBER_SRCS}
 

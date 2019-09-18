@@ -1,27 +1,9 @@
 #include "../../include/paracuber/cuber/literal_frequency.hpp"
 #include "../../include/paracuber/cadical_task.hpp"
 #include "../../include/paracuber/cnf.hpp"
+#include "../../include/paracuber/util.hpp"
 #include <cadical/cadical.hpp>
-#include <cmath>
 #include <vector>
-
-// This is inspired from https://stackoverflow.com/a/2074403
-#define FAST_ABS(VAL)                                                     \
-  {                                                                       \
-    uint32_t temp = VAL >> 31; /* make a mask of the sign bit */          \
-    VAL ^= temp;               /* toggle the bits if value is negative */ \
-    VAL += temp & 1;           /* add one if value was negative */        \
-  }
-
-std::string
-bytePrettyPrint(size_t bytes)
-{
-  auto base = (double)std::log(bytes) / (double)std::log(1024);
-  const char* suffixArr[] = { "", "kiB", "MiB", "GiB", "TiB", "PiB" };
-  return std::to_string(
-           (size_t)std::round(std::pow(1024, base - std::floor(base)))) +
-         suffixArr[(size_t)std::floor(base)];
-}
 
 namespace paracuber {
 namespace cuber {
@@ -37,8 +19,7 @@ class ClauseIterator : public CaDiCaL::ClauseIterator
   virtual bool clause(const std::vector<int>& clause)
   {
     for(int l : clause) {
-      FAST_ABS(l)
-      m_m[l] += 1;
+      m_m[FastAbsolute(l)] += 1;
     }
     return true;
   }
@@ -63,7 +44,7 @@ LiteralFrequency::LiteralFrequency(ConfigPtr config,
   PARACUBER_LOG(m_logger, Trace)
     << "Finished traversing CNF clauses for"
        "literal frequency map. The map size in RAM is "
-    << bytePrettyPrint(m_literalFrequency->size() *
+    << BytePrettyPrint(m_literalFrequency->size() *
                        sizeof((*m_literalFrequency)[0]))
     << ". Sorting by value now.";
 
