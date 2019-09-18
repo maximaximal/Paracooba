@@ -43,7 +43,7 @@ LiteralFrequency::LiteralFrequency(ConfigPtr config,
   m_rootCNF.getRootTask()->getSolver().traverse_clauses(it);
   PARACUBER_LOG(m_logger, Trace)
     << "Finished traversing CNF clauses for"
-       "literal frequency map. The map size in RAM is "
+       " literal frequency map. The map size in RAM is "
     << BytePrettyPrint(m_literalFrequency->size() *
                        sizeof((*m_literalFrequency)[0]))
     << ". Sorting by value now.";
