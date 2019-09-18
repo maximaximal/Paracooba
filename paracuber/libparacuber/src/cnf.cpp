@@ -61,12 +61,18 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
 
   if(path == 0) {
     if(first) {
+      TransmissionSubject subject = TransmitFormula;
+      socket->write_some(boost::asio::buffer(
+        reinterpret_cast<const char*>(subject), sizeof(subject)));
+
+      // Send the path to use.
+      socket->write_some(boost::asio::buffer(
+        reinterpret_cast<const char*>(&path), sizeof(path)));
+
       // Send the filename, so that the used compression algorithm can be known.
       // Also transfer the terminating \0.
       boost::filesystem::path p(m_dimacsFile);
       std::string dimacsBasename = p.filename().string();
-      socket->write_some(boost::asio::buffer(
-        reinterpret_cast<const char*>(&path), sizeof(path)));
       socket->write_some(
         boost::asio::buffer(dimacsBasename.c_str(), dimacsBasename.size() + 1));
     }
@@ -84,11 +90,50 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
                              std::bind(&CNF::sendCB, this, data, path, socket));
   } else {
     // Transmit all decisions on the given path.
-    std::vector<CNFTree::Path> decisions(CNFTree::getDepth(path));
-    m_cnfTree.writePathToContainer(decisions, path);
-    socket->write_some(boost::asio::buffer(
-      reinterpret_cast<const char*>(decisions.data()), decisions.size()));
+    data->decisions.resize(CNFTree::getDepth(path));
+    m_cnfTree.writePathToContainer(data->decisions, path);
+
+    // After this async write operation has finished, the local data can be
+    // erased again. This happens when the file offset reaches the file size, so
+    // the file offset is set to the filesize in this statement.
+    data->offset = m_fileSize;
+
+    socket->async_write_some(
+      boost::asio::buffer(reinterpret_cast<const char*>(data->decisions.data()),
+                          data->decisions.size()),
+      std::bind(&CNF::sendCB, this, data, path, socket));
   }
+}
+
+void
+CNF::sendAllowanceMap(boost::asio::ip::tcp::socket* socket,
+                      SendFinishedCB finishedCallback)
+{
+  m_rootTaskReady.callWhenReady(
+    [this, socket, finishedCallback](CaDiCaLTask& ptr) {
+      // Registry is only initialised after the root task arrived.
+      m_cuberRegistry->allowanceMapWaiter.callWhenReady(
+        [this, socket, finishedCallback](cuber::Registry::AllowanceMap& map) {
+          // The allowance map may take a while to generate.
+          assert(map.size() > 0);
+
+          // Write the subject (an AllowanceMap).
+          TransmissionSubject subject = TransmitAllowanceMap;
+          socket->write_some(boost::asio::buffer(
+            reinterpret_cast<const char*>(subject), sizeof(subject)));
+
+          // Write the map size.
+          uint32_t mapSize = map.size();
+          socket->write_some(boost::asio::buffer(
+            reinterpret_cast<const char*>(mapSize), sizeof(mapSize)));
+
+          // Write the map itself asynchronously.
+          socket->async_write_some(
+            boost::asio::buffer(reinterpret_cast<const char*>(map.data()),
+                                mapSize * sizeof(map[0])),
+            std::bind(finishedCallback));
+        });
+    });
 }
 
 void
@@ -232,6 +277,8 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
   assert(!m_rootTask);
   m_rootTask = std::move(root);
   m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
+
+  m_rootTaskReady.setReady(m_rootTask.get());
 }
 CaDiCaLTask*
 CNF::getRootTask()

@@ -1,9 +1,11 @@
 #ifndef PARACUBER_CUBER_REGISTRY_HPP
 #define PARACUBER_CUBER_REGISTRY_HPP
 
+#include "../log.hpp"
+#include "../readywaiter.hpp"
 #include <memory>
 #include <vector>
-#include "../log.hpp"
+#include <queue>
 
 namespace paracuber {
 class CNF;
@@ -13,21 +15,24 @@ class Cuber;
 class Registry
 {
   public:
-  explicit Registry(ConfigPtr config, LogPtr log, CNF &rootCNF);
+  explicit Registry(ConfigPtr config, LogPtr log, CNF& rootCNF);
   ~Registry();
 
   using CuberVector = std::vector<std::unique_ptr<Cuber>>;
+  using AllowanceMap = std::vector<int>;
 
   Cuber& getActiveCuber();
+
+  ReadyWaiter<AllowanceMap> allowanceMapWaiter;
 
   private:
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
   CuberVector m_cubers;
-  CNF &m_rootCNF;
+  CNF& m_rootCNF;
 
-  std::vector<int> m_allowanceMap;
+  AllowanceMap m_allowanceMap;
 };
 }
 }

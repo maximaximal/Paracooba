@@ -19,6 +19,9 @@ Registry::Registry(ConfigPtr config, LogPtr log, CNF& rootCNF)
   for(auto& cuber : m_cubers) {
     cuber->m_allowanceMap = litFreq.getLiteralFrequency();
   }
+
+  // Now, the allowance map is ready and all waiting callbacks can be called.
+  allowanceMapWaiter.setReady(&m_allowanceMap);
 }
 Registry::~Registry() {}
 
