@@ -46,8 +46,8 @@ LiteralFrequency::LiteralFrequency(ConfigPtr config, LogPtr log, CNF& rootCNF)
                                  << m_literalFrequency.size();
   m_rootCNF.getRootTask()->getSolver().traverse_clauses(it);
   PARACUBER_LOG(m_logger, Trace)
-    << "Finished traversing CNF clauses for naive "
-       "cutter literal frequency map. Sorting by value now.";
+    << "Finished traversing CNF clauses for"
+       "literal frequency map. Sorting by value now.";
 
   auto litIt = m_literalFrequency.begin();
   while(litIt != m_literalFrequency.end()) {
@@ -62,7 +62,7 @@ LiteralFrequency::LiteralFrequency(ConfigPtr config, LogPtr log, CNF& rootCNF)
   }
 
   PARACUBER_LOG(m_logger, Trace)
-    << "Finished sorting by value for naive cutter literal frequency map.";
+    << "Finished sorting by value for literal frequency map.";
 }
 LiteralFrequency::~LiteralFrequency() {}
 
