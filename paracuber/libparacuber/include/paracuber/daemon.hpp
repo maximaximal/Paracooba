@@ -3,6 +3,7 @@
 
 #include "cluster-statistics.hpp"
 #include "log.hpp"
+#include <map>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -37,6 +38,8 @@ class Daemon
 
     void start(State change);
     std::shared_ptr<CNF> getRootCNF() { return m_rootCNF; }
+    inline State getState() const { return m_state; }
+    inline int64_t getOriginatorId() const { return m_originatorID; }
 
     private:
     std::shared_ptr<CNF> m_rootCNF;
@@ -60,9 +63,12 @@ class Daemon
    */
   ~Daemon();
 
-  using ContextMap = std::unordered_map<int64_t, std::unique_ptr<Context>>;
+  using ContextMap = std::map<int64_t, std::unique_ptr<Context>>;
 
-  Context* getContext(int64_t id);
+  std::pair<const ContextMap&, std::shared_lock<std::shared_mutex>>
+  getContextMap();
+  std::pair<Context*, std::shared_lock<std::shared_mutex>> getContext(
+    int64_t id);
 
   std::pair<Context&, bool> getOrCreateContext(int64_t id);
 

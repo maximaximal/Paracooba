@@ -3,6 +3,18 @@
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("paracuber::message");
 
+struct DaemonContext
+{
+  originator @0 : Int64; # Id of originator node
+  state @1 : UInt8; # State of the context (taken directly from C++ enum)
+}
+# A structure describing the state of a daemon.
+
+struct Daemon
+{
+  contexts @0 : List(DaemonContext); # List of all contexts on this node
+}
+
 struct Node
 {
   name @0 : Text; # Name of the node
@@ -16,6 +28,7 @@ struct Node
   tcpListenPort @8 : UInt16; # listen port for tcp data messages
   daemonMode @9 : Bool; # determines if the node is in daemon or client mode
 }
+
 
 struct AnnouncementRequest
 {
@@ -47,6 +60,10 @@ struct OfflineAnnouncement
 struct NodeStatus
 {
   workQueueSize @0 : UInt64; # number of tasks in worker queue
+  union {
+    client @1 : Void;
+    daemon @2 : Daemon;
+  }
 }
 # An update about node statistics. Sent to all other
 # known online nodes approximately every second.

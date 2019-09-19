@@ -32,6 +32,7 @@ class Config
     Id,
     DaemonHost,
     WorkQueueCapacity,
+    TickMilliseconds,
 
     FreqCuberCutoff,
 
@@ -195,6 +196,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "work-queue-capacity";
     case Config::FreqCuberCutoff:
       return "frequency-cuber-cutoff";
+    case Config::TickMilliseconds:
+      return "tick-milliseconds";
     default:
       return "";
   }

@@ -192,18 +192,12 @@ class Communicator::UDPServer
     PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
 
     if(!m_communicator->m_config->isDaemonMode()) {
-      // A client does not need to send online announcements after the initial
-      // announcement request. Only the root CNF needs to be sent, so the
-      // context is initiated on the remote side, but this only if the remote is
-      // a daemon that is accepting work.
       if(requester.getDaemonMode()) {
         m_communicator->sendCNFToNode(
           m_communicator->m_config->getClient()->getRootCNF(),
           0,// Send the root node only, no path required yet at this stage.
           statisticsNode.getNetworkedNode());
       }
-
-      return;
     }
 
     auto nameMatch = reader.getNameMatch();
@@ -255,7 +249,7 @@ class Communicator::UDPServer
     if(!error || error == boost::asio::error::message_size) {
     } else {
       PARACUBER_LOG(m_logger, LocalError)
-        << "Error sending data from UDP socket. Error: " << error;
+        << "Error sending data from UDP socket. Error: " << error.message();
     }
   }
 
@@ -649,6 +643,9 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   , m_logger(log->createLogger())
   , m_signalSet(std::make_unique<boost::asio::signal_set>(*m_ioService, SIGINT))
   , m_clusterStatistics(std::make_shared<ClusterStatistics>(config, log))
+  , m_tickTimer((*m_ioService),
+                boost::asio::chrono::milliseconds(
+                  m_config->getUint64(Config::TickMilliseconds)))
 {
   m_config->m_communicator = this;
   // Initialize communicator
@@ -684,6 +681,13 @@ Communicator::run()
   listenForIncomingTCP(m_config->getUint16(Config::TCPListenPort));
   m_ioService->post(
     std::bind(&Communicator::task_requestAnnounce, this, 0, "", nullptr));
+
+  // The timer can only be enabled at this stage, after all other required data
+  // structures have been initialised. Also, use a warmup time of 5 seconds -
+  // the first 5 seconds do not need this, because other work has to be done.
+  m_tickTimer.expires_at(m_tickTimer.expiry() +
+                         boost::asio::chrono::seconds(5));
+  m_tickTimer.async_wait(std::bind(&Communicator::tick, this));
 
   PARACUBER_LOG(m_logger, Trace) << "Communicator io_service started.";
   m_ioService->run();
@@ -805,6 +809,53 @@ Communicator::sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
         });
       });
   });
+}
+
+void
+Communicator::tick()
+{
+  // Avoid time drifts by always using the exact time the timer should expire
+  // at.
+  m_tickTimer.expires_at(m_tickTimer.expiry() +
+                         boost::asio::chrono::milliseconds(
+                           m_config->getUint64(Config::TickMilliseconds)));
+  m_tickTimer.async_wait(std::bind(&Communicator::tick, this));
+
+  auto msg = m_udpServer->getMessageBuilder();
+  auto nodeStatus = msg.initNodeStatus();
+
+  if(m_config->isDaemonMode()) {
+    auto daemon = m_config->getDaemon();
+    assert(daemon);
+
+    auto daemonStruct = nodeStatus.initDaemon();
+
+    auto [contextMap, lock] = daemon->getContextMap();
+    auto contextList = daemonStruct.initContexts(contextMap.size());
+
+    auto contextStructIt = contextList.begin();
+
+    for(auto& it : contextMap) {
+      auto& context = *it.second;
+      contextStructIt->setOriginator(context.getOriginatorId());
+      contextStructIt->setState(static_cast<uint8_t>(context.getState()));
+      ++contextStructIt;
+    }
+  } else {
+    auto client = m_config->getClient();
+    assert(client);
+  }
+
+  // Send built message to all other known nodes.
+  for(auto& it : m_clusterStatistics->getNodeMap()) {
+    auto& node = it.second;
+    if(node.getId() != m_config->getInt64(Config::Id)) {
+      auto nn = node.getNetworkedNode();
+      if(node.getFullyKnown() && nn) {
+        m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false, true);
+      }
+    }
+  }
 }
 
 void

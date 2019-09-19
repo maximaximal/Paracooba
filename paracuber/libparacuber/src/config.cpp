@@ -64,6 +64,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::WorkQueueCapacity),
          po::value<uint64_t>()->default_value(100)->value_name("int"),
          "Capacity of the internal work queue. Should be high on daemons and low on clients.")
+    (GetConfigNameFromEnum(Config::TickMilliseconds),
+         po::value<uint64_t>()->default_value(500)->value_name("int"),
+         "Milliseconds between Communicator ticks.")
     (GetConfigNameFromEnum(Config::FreqCuberCutoff),
          po::value<float>()->default_value(0.1)->value_name("float"),
          "Cutoff point (ratio of assigned literals to unassigned ones)) at which the literal frequency cuber algorithm stops creating new cubes.")
@@ -149,6 +152,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::TCPTargetPort);
   conditionallySetConfigOptionToArray<uint64_t>(
     vm, m_config.data(), Config::WorkQueueCapacity);
+  conditionallySetConfigOptionToArray<uint64_t>(
+    vm, m_config.data(), Config::TickMilliseconds);
   conditionallySetConfigOptionToArray<float>(
     vm, m_config.data(), Config::FreqCuberCutoff);
   conditionallySetConfigOptionToArray<std::string>(

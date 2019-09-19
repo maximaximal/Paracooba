@@ -12,6 +12,7 @@
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/signal_set.hpp>
+#include <boost/asio/deadline_timer.hpp>
 #include <boost/version.hpp>
 
 namespace boost {
@@ -134,6 +135,14 @@ class Communicator : public std::enable_shared_from_this<Communicator>
                             std::string regex = "",
                             NetworkedNode* nn = nullptr);
   void task_offlineAnnouncement(NetworkedNode* nn = nullptr);
+
+  /** @brief Ticks are called every 100ms.
+   *
+   * The main task of ticks is to send out statistics updates to all other
+   * connected nodes.
+   */
+  void tick();
+  boost::asio::steady_timer m_tickTimer;
 };
 
 std::ostream&

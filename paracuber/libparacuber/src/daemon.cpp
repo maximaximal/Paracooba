@@ -85,15 +85,22 @@ Daemon::~Daemon()
   m_config->m_daemon = nullptr;
 }
 
-Daemon::Context*
+std::pair<const Daemon::ContextMap&, std::shared_lock<std::shared_mutex>>
+Daemon::getContextMap()
+{
+  std::shared_lock sharedLock(m_contextMapMutex);
+  return { m_contextMap, std::move(sharedLock) };
+}
+
+std::pair<Daemon::Context*, std::shared_lock<std::shared_mutex>>
 Daemon::getContext(int64_t id)
 {
   std::shared_lock sharedLock(m_contextMapMutex);
   auto it = m_contextMap.find(id);
   if(it != m_contextMap.end()) {
-    return it->second.get();
+    return { it->second.get(), std::move(sharedLock) };
   }
-  return nullptr;
+  return { nullptr, std::move(sharedLock) };
 }
 
 std::pair<Daemon::Context&, bool>
