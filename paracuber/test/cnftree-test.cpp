@@ -42,6 +42,10 @@ TEST_CASE("CNFTree::Path manipulation")
   p = CNFTree::buildPath((uint8_t)0b11110000u, 4);
   REQUIRE(CNFTree::getDepthShiftedPath(p) == 15u);
   REQUIRE(CNFTree::maxPathDepth == 58u);
+
+  p = CNFTree::setDepth(CNFTree::setAssignment(p, 5, true), 5);
+  REQUIRE(CNFTree::getPath(p) == ((uint64_t)0b11111000u) << (64 - 8));
+  REQUIRE(CNFTree::getDepthShiftedPath(p) == 31u);
 }
 
 TEST_CASE("CNFTree Usage")

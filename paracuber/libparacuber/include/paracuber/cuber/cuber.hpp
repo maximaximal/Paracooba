@@ -27,6 +27,10 @@ class Cuber
    *
    * Required method for implementing cubing algorithms.
    *
+   * @param path The path to the current position to be decided. This position
+   * must be a leaf node.
+   * @param var A reference to a decision variable that is going to be
+   * overwritten in this function.
    * @return True if cubing was successful, false if no other cube should be
    * done.
    */

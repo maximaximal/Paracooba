@@ -86,6 +86,7 @@ class CNFTree
 
   static inline Path setDepth(Path p, uint8_t d)
   {
+    assert(d <= maxPathDepth);
     return getPath(p) | (d & 0b00111111);
   }
 
@@ -100,9 +101,23 @@ class CNFTree
   {
     // The depth starts counting with 1 and the sizeof() is 1 too large.
     assert(depth >= 1);
+    assert(depth <= maxPathDepth);
     return p &
            (static_cast<Path>(1u) << ((sizeof(Path) * 8) - 1 - (depth - 1)));
   }
+
+  static inline Path setAssignment(Path p, uint8_t depth, bool val)
+  {
+    // The depth starts counting with 1 and the sizeof() is 1 too large.
+    assert(depth >= 1);
+    assert(depth <= maxPathDepth);
+    return (p & ~(static_cast<Path>(1u)
+                  << ((sizeof(Path) * 8) - 1 - (depth - 1)))) |
+           (static_cast<Path>(val) << ((sizeof(Path) * 8) - 1 - (depth - 1)));
+  }
+
+  static inline Path down(Path p) { return setDepth(p, getDepth(p) + 1); }
+  static inline Path up(Path p) { return setDepth(p, getDepth(p) - 1); }
 
   private:
   Node m_root;

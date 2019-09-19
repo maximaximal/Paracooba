@@ -84,6 +84,12 @@ Client::solve()
     auto& resultMut = const_cast<TaskResult&>(result);
     m_rootCNF->setRootTask(static_unique_pointer_cast<CaDiCaLTask>(
       std::move(resultMut.getTaskPtr())));
+
+    // After the root formula has been set, which completely builds up the CNF
+    // object including the cuber::Registry object, decisions can be made.
+    // Decisions must be propagated to daemons in order to solve them in
+    // parallel. Decisions are always guided by the CNFTree class, which
+    // knows how many decisions are left in any given path.
   });
 }
 }
