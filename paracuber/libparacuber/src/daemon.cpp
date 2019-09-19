@@ -58,16 +58,16 @@ Daemon::Context::start(State change)
       // depending on the heuristics of the current compute node.
     });
     m_daemon->m_communicator->getRunner()->push(std::move(task));
-  }
-  else if(change == FormulaParsed) {
+  } else if(change == FormulaParsed) {
     m_state = m_state | FormulaParsed;
-  }
-  else if(change == AllowanceMapReceived) {
+  } else if(change == AllowanceMapReceived) {
     m_state = m_state | AllowanceMapReceived;
   }
 
   if(m_state & FormulaParsed && m_state & AllowanceMapReceived) {
     // Ready to start receiving cubes!
+    m_state = m_state | WaitingForWork;
+    PARACUBER_LOG(m_logger, Trace) << "Ready for Work!";
   }
 }
 

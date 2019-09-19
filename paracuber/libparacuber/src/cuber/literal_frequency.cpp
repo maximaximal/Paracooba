@@ -92,7 +92,7 @@ LiteralFrequency::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
     return false;
   }
 
-  var = (*m_literalFrequency)[additionComponent];
+  var = (*m_literalFrequency)[additionComponent] + m_counter++;
   return true;
 }
 }

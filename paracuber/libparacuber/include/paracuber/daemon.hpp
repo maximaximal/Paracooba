@@ -32,6 +32,7 @@ class Daemon
       FormulaReceived = 0b00000001u,
       AllowanceMapReceived = 0b00000010u,
       FormulaParsed = 0b00000100u,
+      WaitingForWork = 0b00001000u
     };
 
     void start(State change);

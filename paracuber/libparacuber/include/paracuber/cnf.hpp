@@ -83,8 +83,8 @@ class CNF
                         SendFinishedCB finishedCallback);
 
   TransmissionSubject receive(boost::asio::ip::tcp::socket* socket,
-               char* buf,
-               std::size_t length);
+                              char* buf,
+                              std::size_t length);
 
   inline int64_t getOriginId() { return m_originId; }
 
@@ -96,6 +96,8 @@ class CNF
   ReadyWaiter<CaDiCaLTask> rootTaskReady;
 
   bool readyToBeStarted() const;
+
+  CNFTree& getCNFTree() { return m_cnfTree; }
 
   private:
   struct SendDataStruct

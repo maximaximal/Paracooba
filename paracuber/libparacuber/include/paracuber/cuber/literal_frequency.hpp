@@ -27,6 +27,7 @@ class LiteralFrequency : public Cuber
 
   private:
   Cuber::LiteralMap* m_literalFrequency;
+  size_t m_counter = 0;
 };
 }
 }
