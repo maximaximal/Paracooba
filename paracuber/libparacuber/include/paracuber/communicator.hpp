@@ -12,7 +12,7 @@
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/signal_set.hpp>
-#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/high_resolution_timer.hpp>
 #include <boost/version.hpp>
 
 namespace boost {
@@ -142,7 +142,7 @@ class Communicator : public std::enable_shared_from_this<Communicator>
    * connected nodes.
    */
   void tick();
-  boost::asio::steady_timer m_tickTimer;
+  boost::asio::high_resolution_timer m_tickTimer;
 };
 
 std::ostream&

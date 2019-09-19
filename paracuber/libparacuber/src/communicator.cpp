@@ -10,6 +10,7 @@
 #include <boost/asio/socket_base.hpp>
 #include <boost/bind.hpp>
 #include <cassert>
+#include <chrono>
 #include <mutex>
 #include <regex>
 
@@ -651,9 +652,9 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   , m_logger(log->createLogger())
   , m_signalSet(std::make_unique<boost::asio::signal_set>(*m_ioService, SIGINT))
   , m_clusterStatistics(std::make_shared<ClusterStatistics>(config, log))
-  , m_tickTimer((*m_ioService),
-                boost::asio::chrono::milliseconds(
-                  m_config->getUint64(Config::TickMilliseconds)))
+  , m_tickTimer(
+      (*m_ioService),
+      std::chrono::milliseconds(m_config->getUint64(Config::TickMilliseconds)))
 {
   m_config->m_communicator = this;
   // Initialize communicator
@@ -691,10 +692,9 @@ Communicator::run()
     std::bind(&Communicator::task_requestAnnounce, this, 0, "", nullptr));
 
   // The timer can only be enabled at this stage, after all other required data
-  // structures have been initialised. Also, use a warmup time of 5 seconds -
+  // structures have been initialised. Also, use a warmup time of 2 seconds -
   // the first 5 seconds do not need this, because other work has to be done.
-  m_tickTimer.expires_at(m_tickTimer.expiry() +
-                         boost::asio::chrono::seconds(5));
+  m_tickTimer.expires_from_now(std::chrono::seconds(2));
   m_tickTimer.async_wait(std::bind(&Communicator::tick, this));
 
   PARACUBER_LOG(m_logger, Trace) << "Communicator io_service started.";
@@ -822,13 +822,6 @@ Communicator::sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
 void
 Communicator::tick()
 {
-  // Avoid time drifts by always using the exact time the timer should expire
-  // at.
-  m_tickTimer.expires_at(m_tickTimer.expiry() +
-                         boost::asio::chrono::milliseconds(
-                           m_config->getUint64(Config::TickMilliseconds)));
-  m_tickTimer.async_wait(std::bind(&Communicator::tick, this));
-
   auto msg = m_udpServer->getMessageBuilder();
   auto nodeStatus = msg.initNodeStatus();
 
@@ -864,6 +857,10 @@ Communicator::tick()
       }
     }
   }
+
+  m_tickTimer.expires_from_now(
+    std::chrono::milliseconds(m_config->getUint64(Config::TickMilliseconds)));
+  m_tickTimer.async_wait(std::bind(&Communicator::tick, this));
 }
 
 void
