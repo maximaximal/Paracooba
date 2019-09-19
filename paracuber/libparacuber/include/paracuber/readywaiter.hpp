@@ -1,7 +1,10 @@
 #ifndef PARACUBER_READYWAITER_HPP
 #define PARACUBER_READYWAITER_HPP
 
+#include <atomic>
+#include <cassert>
 #include <functional>
+#include <mutex>
 #include <queue>
 
 namespace paracuber {
@@ -22,23 +25,27 @@ class ReadyWaiter
   inline void setReady(T* value)
   {
     m_ready = true;
+    m_value = value;
+    std::lock_guard<std::mutex> lock(m_queueMutex);
     while(!m_readyCBs.empty()) {
-      auto cb = m_readyCBs.front();
+      m_readyCBs.front()(*m_value);
       m_readyCBs.pop();
-      cb(*m_value);
     };
   }
   inline bool isReady() { return m_ready; }
   inline void callWhenReady(ReadyCB cb)
   {
-    if(isReady())
+    if(isReady()) {
       cb(*m_value);
-    else
+    } else {
+      std::unique_lock<std::mutex> lock(m_queueMutex);
       m_readyCBs.push(cb);
+    }
   }
 
   private:
-  volatile bool m_ready = false;
+  std::mutex m_queueMutex;
+  std::atomic<bool> m_ready = false;
   T* m_value = nullptr;
   std::queue<ReadyCB> m_readyCBs;
 };

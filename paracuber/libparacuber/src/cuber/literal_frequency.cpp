@@ -35,33 +35,38 @@ LiteralFrequency::LiteralFrequency(ConfigPtr config,
   : Cuber(config, log, rootCNF)
   , m_literalFrequency(allowanceMap)
 {
-  *m_literalFrequency = LiteralMap(rootCNF.getRootTask()->getVarCount() + 1, 0);
-  ClauseIterator it(*m_literalFrequency);
-  PARACUBER_LOG(m_logger, Trace) << "Begin traversing CNF clauses for naive "
-                                    "cutter literal frequency map. Map Size: "
-                                 << m_literalFrequency->size() << " elements.";
-  m_rootCNF.getRootTask()->getSolver().traverse_clauses(it);
-  PARACUBER_LOG(m_logger, Trace)
-    << "Finished traversing CNF clauses for"
-       " literal frequency map. The map size in RAM is "
-    << BytePrettyPrint(m_literalFrequency->size() *
-                       sizeof((*m_literalFrequency)[0]))
-    << ". Sorting by value now.";
+  // Frequency map only needs to be build on the client.
+  if(!config->isDaemonMode()) {
+    *m_literalFrequency =
+      LiteralMap(rootCNF.getRootTask()->getVarCount() + 1, 0);
+    ClauseIterator it(*m_literalFrequency);
+    PARACUBER_LOG(m_logger, Trace)
+      << "Begin traversing CNF clauses for naive "
+         "cutter literal frequency map. Map Size: "
+      << m_literalFrequency->size() << " elements.";
+    m_rootCNF.getRootTask()->getSolver().traverse_clauses(it);
+    PARACUBER_LOG(m_logger, Trace)
+      << "Finished traversing CNF clauses for"
+         " literal frequency map. The map size in RAM is "
+      << BytePrettyPrint(m_literalFrequency->size() *
+                         sizeof((*m_literalFrequency)[0]))
+      << ". Sorting by value now.";
 
-  auto litIt = m_literalFrequency->begin();
-  while(litIt != m_literalFrequency->end()) {
-    auto maxIt = std::max_element(litIt, m_literalFrequency->end());
-    *maxIt = *litIt;
-    *litIt = (maxIt - m_literalFrequency->begin());
-    ++litIt;
-    if((litIt - m_literalFrequency->begin()) % 10000 == 0) {
-      PARACUBER_LOG(m_logger, Trace)
-        << "  -> Currently at element " << litIt - m_literalFrequency->begin();
+    auto litIt = m_literalFrequency->begin();
+    while(litIt != m_literalFrequency->end()) {
+      auto maxIt = std::max_element(litIt, m_literalFrequency->end());
+      *maxIt = *litIt;
+      *litIt = (maxIt - m_literalFrequency->begin());
+      ++litIt;
+      if((litIt - m_literalFrequency->begin()) % 10000 == 0) {
+        PARACUBER_LOG(m_logger, Trace) << "  -> Currently at element "
+                                       << litIt - m_literalFrequency->begin();
+      }
     }
-  }
 
-  PARACUBER_LOG(m_logger, Trace)
-    << "Finished sorting by value for literal frequency map.";
+    PARACUBER_LOG(m_logger, Trace)
+      << "Finished sorting by value for literal frequency map.";
+  }
 }
 LiteralFrequency::~LiteralFrequency() {}
 

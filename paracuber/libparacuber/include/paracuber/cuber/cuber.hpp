@@ -21,7 +21,7 @@ class Cuber
   explicit Cuber(ConfigPtr config, LogPtr log, CNF& rootCNF);
   virtual ~Cuber();
 
-  using LiteralMap = std::vector<int>;
+  using LiteralMap = std::vector<CNFTree::CubeVar>;
 
   /** @brief Generates the next cube on a given path.
    *

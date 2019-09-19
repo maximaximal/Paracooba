@@ -43,6 +43,34 @@ class CNF
   CNF(const CNF& o);
   virtual ~CNF();
 
+  enum TransmissionSubject
+  {
+    TransmitFormula = 1,
+    TransmitAllowanceMap = 2,
+    TransmissionSubjectUnknown = 3,
+  };
+
+  enum ReceiveState
+  {
+    ReceiveTransmissionSubject,
+    ReceivePath,
+    ReceiveFileName,
+    ReceiveFile,
+    ReceiveCube,
+    ReceiveAllowanceMapSize,
+    ReceiveAllowanceMap,
+  };
+
+  struct ReceiveDataStruct
+  {
+    TransmissionSubject subject = TransmissionSubjectUnknown;
+    ReceiveState state = ReceiveTransmissionSubject;
+    CNFTree::Path path = 0;
+    uint8_t currentDepth = 1;
+    size_t receiveVarPos = 0;
+    char receiveVarBuf[8];
+  };
+
   std::string_view getDimacsFile() { return m_dimacsFile; }
 
   using SendFinishedCB = std::function<void()>;
@@ -54,7 +82,7 @@ class CNF
   void sendAllowanceMap(boost::asio::ip::tcp::socket* socket,
                         SendFinishedCB finishedCallback);
 
-  void receive(boost::asio::ip::tcp::socket* socket,
+  TransmissionSubject receive(boost::asio::ip::tcp::socket* socket,
                char* buf,
                std::size_t length);
 
@@ -63,35 +91,18 @@ class CNF
   void setRootTask(std::unique_ptr<CaDiCaLTask> root);
   CaDiCaLTask* getRootTask();
 
+  cuber::Registry& getCuberRegistry() { return *m_cuberRegistry; }
+
+  ReadyWaiter<CaDiCaLTask> rootTaskReady;
+
+  bool readyToBeStarted() const;
+
   private:
-  enum TransmissionSubject
-  {
-    TransmitFormula = 1,
-    TransmitAllowanceMap = 2
-  };
-
-  enum ReceiveState
-  {
-    ReceivePath,
-    ReceiveFileName,
-    ReceiveFile,
-    ReceiveCube,
-    ReceiveAllowanceMap,
-  };
-
   struct SendDataStruct
   {
     off_t offset = 0;
     SendFinishedCB cb;
     std::vector<CNFTree::Path> decisions;
-  };
-  struct ReceiveDataStruct
-  {
-    ReceiveState state = ReceivePath;
-    CNFTree::Path path = 0;
-    uint8_t currentDepth = 1;
-    size_t cubeVarReceivePos = 0;
-    char cubeVarReceiveBuf[sizeof(CNFTree::CubeVar)];
   };
 
   void sendCB(SendDataStruct* data,
@@ -119,8 +130,12 @@ class CNF
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
-  ReadyWaiter<CaDiCaLTask> m_rootTaskReady;
 };
+
+std::ostream&
+operator<<(std::ostream& m, CNF::TransmissionSubject s);
+std::ostream&
+operator<<(std::ostream& m, CNF::ReceiveState s);
 }
 
 #endif

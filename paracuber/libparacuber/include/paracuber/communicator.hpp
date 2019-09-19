@@ -4,10 +4,13 @@
 #include "cluster-statistics.hpp"
 #include "cnftree.hpp"
 #include "log.hpp"
+#include "readywaiter.hpp"
 
 #include <any>
+#include <functional>
 #include <memory>
 
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/version.hpp>
 
@@ -32,6 +35,7 @@ namespace paracuber {
 
 class Runner;
 class CNF;
+class NetworkedNode;
 
 using RunnerPtr = std::shared_ptr<Runner>;
 using ClusterStatisticsPtr = std::shared_ptr<ClusterStatistics>;
@@ -90,9 +94,18 @@ class Communicator : public std::enable_shared_from_this<Communicator>
     return m_currentMessageId++;
   }
 
+  enum class TCPClientMode
+  {
+    TransmitCNF,
+    TransmitAllowanceMap
+  };
+
   void sendCNFToNode(std::shared_ptr<CNF> cnf,
                      CNFTree::Path path,
                      NetworkedNode* nn);
+
+  void sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
+                                       NetworkedNode* nn);
 
   private:
   ConfigPtr m_config;
@@ -122,6 +135,9 @@ class Communicator : public std::enable_shared_from_this<Communicator>
                             NetworkedNode* nn = nullptr);
   void task_offlineAnnouncement(NetworkedNode* nn = nullptr);
 };
+
+std::ostream&
+operator<<(std::ostream& o, Communicator::TCPClientMode mode);
 
 using CommunicatorPtr = std::shared_ptr<Communicator>;
 }

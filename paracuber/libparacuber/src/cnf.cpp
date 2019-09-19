@@ -63,7 +63,7 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
     if(first) {
       TransmissionSubject subject = TransmitFormula;
       socket->write_some(boost::asio::buffer(
-        reinterpret_cast<const char*>(subject), sizeof(subject)));
+        reinterpret_cast<const char*>(&subject), sizeof(subject)));
 
       // Send the path to use.
       socket->write_some(boost::asio::buffer(
@@ -109,31 +109,29 @@ void
 CNF::sendAllowanceMap(boost::asio::ip::tcp::socket* socket,
                       SendFinishedCB finishedCallback)
 {
-  m_rootTaskReady.callWhenReady(
-    [this, socket, finishedCallback](CaDiCaLTask& ptr) {
-      // Registry is only initialised after the root task arrived.
-      m_cuberRegistry->allowanceMapWaiter.callWhenReady(
-        [this, socket, finishedCallback](cuber::Registry::AllowanceMap& map) {
-          // The allowance map may take a while to generate.
-          assert(map.size() > 0);
+  assert(rootTaskReady.isReady());
+  assert(m_cuberRegistry->allowanceMapWaiter.isReady());
 
-          // Write the subject (an AllowanceMap).
-          TransmissionSubject subject = TransmitAllowanceMap;
-          socket->write_some(boost::asio::buffer(
-            reinterpret_cast<const char*>(subject), sizeof(subject)));
+  auto& map = m_cuberRegistry->getAllowanceMap();
 
-          // Write the map size.
-          uint32_t mapSize = map.size();
-          socket->write_some(boost::asio::buffer(
-            reinterpret_cast<const char*>(mapSize), sizeof(mapSize)));
+  // The allowance map may take a while to generate.
+  assert(map.size() > 0);
 
-          // Write the map itself asynchronously.
-          socket->async_write_some(
-            boost::asio::buffer(reinterpret_cast<const char*>(map.data()),
-                                mapSize * sizeof(map[0])),
-            std::bind(finishedCallback));
-        });
-    });
+  // Write the subject (an AllowanceMap).
+  TransmissionSubject subject = TransmitAllowanceMap;
+  socket->write_some(boost::asio::buffer(
+    reinterpret_cast<const char*>(&subject), sizeof(subject)));
+
+  // Write the map size.
+  uint32_t mapSize = map.size();
+  socket->write_some(boost::asio::buffer(
+    reinterpret_cast<const char*>(&mapSize), sizeof(mapSize)));
+
+  // Write the map itself asynchronously.
+  socket->async_write_some(
+    boost::asio::buffer(reinterpret_cast<const char*>(map.data()),
+                        mapSize * sizeof(map[0])),
+    std::bind(finishedCallback));
 }
 
 void
@@ -154,8 +152,48 @@ CNF::sendCB(SendDataStruct* data,
     send(socket, path, data->cb, false);
   }
 }
+bool
+CNF::readyToBeStarted() const
+{
+  return m_rootTask && m_cuberRegistry &&
+         m_cuberRegistry->allowanceMapWaiter.isReady();
+}
 
-void
+template<typename T>
+T*
+receiveValueFromBuffer(CNF::ReceiveDataStruct& d, char** buf, std::size_t* len)
+{
+  T* returnVal = nullptr;
+  if(d.receiveVarPos == 0 && *len >= sizeof(T)) {
+    // Easy receive.
+    returnVal = reinterpret_cast<T*>(*buf);
+    *buf += sizeof(T);
+    *len -= sizeof(T);
+  } else {
+    // Cube var split into multiple buffers, reconstructing.
+    size_t l = (*len >= sizeof(T) ? sizeof(T) : *len) - d.receiveVarPos;
+
+    std::copy(*buf, *buf + l, d.receiveVarBuf + d.receiveVarPos);
+
+    *buf += l;
+    *len -= l;
+
+    if(d.receiveVarPos == sizeof(T)) {
+      d.receiveVarPos = 0;
+      returnVal = reinterpret_cast<T*>(d.receiveVarBuf);
+    }
+  }
+  return returnVal;
+}
+
+#define ERASE_AND_RETURN_SUBJECT()        \
+  {                                       \
+    TransmissionSubject subj = d.subject; \
+    m_receiveData.erase(socket);          \
+    return subj;                          \
+  }
+
+CNF::TransmissionSubject
 CNF::receive(boost::asio::ip::tcp::socket* socket,
              char* buf,
              std::size_t length)
@@ -167,11 +205,44 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
 
   while(length > 0 || buf == nullptr) {
     switch(d.state) {
+      case ReceiveTransmissionSubject:
+        if(length < sizeof(TransmissionSubject)) {
+          // Remote has directly aborted the transmission.
+          PARACUBER_LOG(m_logger, GlobalError)
+            << "Remote "
+            << ((socket != nullptr)
+                  ? socket->remote_endpoint().address().to_string()
+                  : "(Unknwon)")
+            << " aborted TCP transmission before transmitting subject.";
+          ERASE_AND_RETURN_SUBJECT()
+        }
+        d.subject = *reinterpret_cast<TransmissionSubject*>(buf);
+        buf += sizeof(TransmissionSubject);
+        length -= sizeof(TransmissionSubject);
+
+        switch(d.subject) {
+          case TransmitFormula:
+            d.state = ReceivePath;
+            break;
+          case TransmitAllowanceMap:
+            d.state = ReceiveAllowanceMapSize;
+            break;
+          default:
+            PARACUBER_LOG(m_logger, GlobalError)
+              << "Unknown subject received from " << socket->remote_endpoint()
+              << "!";
+            ERASE_AND_RETURN_SUBJECT()
+        }
+
+        PARACUBER_LOG(m_logger, Trace)
+          << "Receive TCP transmission (" << d.subject << ") from "
+          << socket->remote_endpoint() << ".";
+
+        break;
       case ReceivePath:
         if(length < sizeof(ReceiveDataStruct::path)) {
           // Remote has directly aborted the transmission.
-          m_receiveData.erase(socket);
-          return;
+          ERASE_AND_RETURN_SUBJECT()
         }
         d.path = *(reinterpret_cast<int64_t*>(buf));
         buf += sizeof(ReceiveDataStruct::path);
@@ -215,44 +286,21 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         if(length == 0) {
           // This marks the end of the transmission, the file is finished.
           m_ofstream.close();
-          m_receiveData.erase(socket);
-          return;
+          ERASE_AND_RETURN_SUBJECT()
         }
 
         m_ofstream.write(buf, length);
         length = 0;
         break;
       case ReceiveCube:
-        if(length == 0) {
+        if(length == 0 && buf == nullptr) {
           // This marks the end of the transmission, the decision sequence is
           // finished.
-          m_receiveData.erase(socket);
-          return;
+          ERASE_AND_RETURN_SUBJECT()
         }
         for(std::size_t i = 0; i < length; i += sizeof(CNFTree::CubeVar)) {
-          CNFTree::CubeVar* var = nullptr;
-          if(d.cubeVarReceivePos == 0 && length >= sizeof(CNFTree::CubeVar)) {
-            // Easy receive.
-            var = reinterpret_cast<CNFTree::CubeVar*>(buf);
-            buf += sizeof(CNFTree::CubeVar);
-            length -= sizeof(CNFTree::CubeVar);
-          } else {
-            // Cube var split into multiple buffers, reconstructing.
-            size_t l =
-              (length >= sizeof(CNFTree::CubeVar) ? sizeof(CNFTree::CubeVar)
-                                                  : length) -
-              d.cubeVarReceivePos;
-
-            std::copy(buf, buf + l, d.cubeVarReceiveBuf + d.cubeVarReceivePos);
-
-            buf += l;
-            length -= l;
-
-            if(d.cubeVarReceivePos == sizeof(CNFTree::CubeVar)) {
-              d.cubeVarReceivePos = 0;
-              var = reinterpret_cast<CNFTree::CubeVar*>(d.cubeVarReceiveBuf);
-            }
-          }
+          CNFTree::CubeVar* var =
+            receiveValueFromBuffer<CNFTree::CubeVar>(d, &buf, &length);
           if(var) {
             // Valid literal received, insert into CNFTree.
             if(!m_cnfTree.setDecision(
@@ -264,8 +312,43 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           }
         }
         break;
+      case ReceiveAllowanceMapSize: {
+        if(!m_cuberRegistry) {
+          m_cuberRegistry =
+            std::make_unique<cuber::Registry>(m_config, m_log, *this);
+        }
+        uint32_t* size = receiveValueFromBuffer<uint32_t>(d, &buf, &length);
+        if(size) {
+          PARACUBER_LOG(m_logger, Trace)
+            << "Receive allowance map from " << socket->remote_endpoint()
+            << " with size " << *size << ".";
+          m_cuberRegistry->getAllowanceMap().clear();
+          m_cuberRegistry->getAllowanceMap().resize(*size);
+        }
+        d.state = ReceiveAllowanceMap;
+        break;
+      }
+      case ReceiveAllowanceMap: {
+        if(length == 0 && buf == nullptr) {
+          // This marks the end of the transmission, the decision sequence is
+          // finished.
+          m_cuberRegistry->allowanceMapWaiter.setReady(
+            &m_cuberRegistry->getAllowanceMap());
+          ERASE_AND_RETURN_SUBJECT()
+        }
+
+        CNFTree::CubeVar* cubeVar =
+          receiveValueFromBuffer<CNFTree::CubeVar>(d, &buf, &length);
+        while(cubeVar != nullptr) {
+          m_cuberRegistry->getAllowanceMap().push_back(*cubeVar);
+          cubeVar = receiveValueFromBuffer<CNFTree::CubeVar>(d, &buf, &length);
+        }
+
+        break;
+      }
     }
   }
+  return d.subject;
 }
 
 void
@@ -276,13 +359,65 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
   /// registry in m_cuberRegistry.
   assert(!m_rootTask);
   m_rootTask = std::move(root);
-  m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
-
-  m_rootTaskReady.setReady(m_rootTask.get());
+  if(!m_cuberRegistry) {
+    // The cuber registry may already have been created if this is a daemon
+    // node. It can then just be re-used, as the daemon cuber registry did not
+    // need the root node to be created.
+    m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
+  }
+  rootTaskReady.setReady(m_rootTask.get());
 }
 CaDiCaLTask*
 CNF::getRootTask()
 {
   return m_rootTask.get();
+}
+
+std::ostream&
+operator<<(std::ostream& o, CNF::TransmissionSubject s)
+{
+  switch(s) {
+    case CNF::TransmissionSubject::TransmitFormula:
+      o << "Transmit Formula";
+      break;
+    case CNF::TransmissionSubject::TransmitAllowanceMap:
+      o << "Transmit Allowance Map";
+      break;
+    default:
+      o << "(! UNKNOWN TRANSMISSION SUBJECT !)";
+      break;
+  }
+  return o;
+}
+std::ostream&
+operator<<(std::ostream& o, CNF::ReceiveState s)
+{
+  switch(s) {
+    case CNF::ReceiveState::ReceiveCube:
+      o << "Receive Cube";
+      break;
+    case CNF::ReceiveState::ReceiveFile:
+      o << "Receive File";
+      break;
+    case CNF::ReceiveState::ReceivePath:
+      o << "Receive Path";
+      break;
+    case CNF::ReceiveState::ReceiveFileName:
+      o << "Receive File Name";
+      break;
+    case CNF::ReceiveState::ReceiveAllowanceMap:
+      o << "Receive Allowance Map";
+      break;
+    case CNF::ReceiveState::ReceiveAllowanceMapSize:
+      o << "Receive Allowance Map Size";
+      break;
+    case CNF::ReceiveState::ReceiveTransmissionSubject:
+      o << "Receive Transmission Subject";
+      break;
+    default:
+      o << "(! UNKNOWN RECEIVE STATE !)";
+      break;
+  }
+  return o;
 }
 }

@@ -2,6 +2,7 @@
 #include "../include/paracuber/client.hpp"
 #include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/config.hpp"
+#include "../include/paracuber/cuber/registry.hpp"
 #include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/networked_node.hpp"
 #include "../include/paracuber/runner.hpp"
@@ -355,14 +356,19 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
             LogPtr log,
             boost::asio::io_service& ioService,
             boost::asio::ip::tcp::endpoint endpoint,
+            TCPClientMode mode,
             std::shared_ptr<CNF> cnf,
-            CNFTree::Path path)
+            CNFTree::Path path = 0)
     : m_comm(comm)
     , m_cnf(cnf)
+    , m_mode(mode)
     , m_endpoint(endpoint)
     , m_socket(ioService)
     , m_path(path)
-  {}
+  {
+    PARACUBER_LOG(m_logger, Trace)
+      << "Start TCPClient to " << m_endpoint << " with mode " << mode;
+  }
   virtual ~TCPClient()
   {
     PARACUBER_LOG(m_logger, Trace) << "Destroy TCPClient to " << m_endpoint;
@@ -408,11 +414,27 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
 
     m_socket.native_non_blocking(true);
 
-    // Let the sending be handled by the CNF itself.
-    m_cnf->send(&m_socket, m_path, [this, ptr]() {
-      // Finished sending CNF!
-    });
+    // The transmission type handling is done inside the CNF sending functions,
+    // receiving is therefore completely handled inside the CNF class. Only the
+    // ID is handled outside to be able to match the connection to the CNF on
+    // the other side.
+    switch(m_mode) {
+      case TCPClientMode::TransmitCNF:
+        // Let the sending be handled by the CNF itself.
+        m_cnf->send(&m_socket, m_path, [this, ptr]() {
+          // Finished sending CNF!
+        });
+        break;
+      case TCPClientMode::TransmitAllowanceMap:
+        // Let the sending be handled by the CNF itself.
+        m_cnf->sendAllowanceMap(&m_socket, [this, ptr]() {
+          // Finished sending AllowanceMap!
+        });
+        break;
+    }
   }
+
+  ReadyWaiter<boost::asio::ip::tcp::socket> socketWaiter;
 
   private:
   LoggerMT m_logger;
@@ -422,6 +444,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   boost::asio::ip::tcp::socket m_socket;
   boost::asio::ip::tcp::endpoint m_endpoint;
   boost::array<char, REC_BUF_SIZE> m_recBuffer;
+  TCPClientMode m_mode;
 };
 
 class Communicator::TCPServer
@@ -490,9 +513,22 @@ class Communicator::TCPServer
           case NewConnection:
             break;
           case Receiving:
-            m_cnf->receive(&m_socket, nullptr, 0);
+            CNF::TransmissionSubject subject =
+              m_cnf->receive(&m_socket, nullptr, 0);
             if(m_context) {
-              m_context->start();
+              Daemon::Context::State change;
+              switch(subject) {
+                case CNF::TransmitFormula:
+                  change = Daemon::Context::FormulaReceived;
+                  break;
+                case CNF::TransmitAllowanceMap:
+                  change = Daemon::Context::AllowanceMapReceived;
+                  break;
+                default:
+                  change = Daemon::Context::JustCreated;
+                  break;
+              }
+              m_context->start(change);
             }
             break;
         }
@@ -531,17 +567,10 @@ class Communicator::TCPServer
       m_pos += sizeof(int64_t);
 
       if(m_comm->m_config->isDaemonMode()) {
-        m_context = m_comm->m_config->getDaemon()->getContext(originator);
-        if(!m_context) {
-          m_cnf =
-            std::make_shared<CNF>(m_comm->m_config, m_comm->m_log, originator);
-          auto [context, inserted] =
-            m_comm->m_config->getDaemon()->getOrCreateContext(m_cnf,
-                                                              originator);
-          m_context = &context;
-        } else {
-          m_cnf = m_context->getRootCNF();
-        }
+        auto [context, inserted] =
+          m_comm->m_config->getDaemon()->getOrCreateContext(originator);
+        m_context = &context;
+        m_cnf = m_context->getRootCNF();
       } else {
         // This is some other CNF that was sent back to the client. Handle it
         // using the main orchestrator.
@@ -739,9 +768,42 @@ Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf,
 {
   // This indirection is required to make this work from worker threads.
   m_ioService->post([this, cnf, path, nn]() {
-    auto client = std::make_shared<TCPClient>(
-      this, m_log, *m_ioService, nn->getRemoteTcpEndpoint(), cnf, path);
+    auto client = std::make_shared<TCPClient>(this,
+                                              m_log,
+                                              *m_ioService,
+                                              nn->getRemoteTcpEndpoint(),
+                                              TCPClientMode::TransmitCNF,
+                                              cnf,
+                                              path);
     client->connect();
+  });
+  if(path == 0) {
+    // Also send the allowance map to a CNF, if this transmits the root formula.
+    sendAllowanceMapToNodeWhenReady(cnf, nn);
+  }
+}
+
+void
+Communicator::sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
+                                              NetworkedNode* nn)
+{
+  // First, wait for the allowance map to be ready.
+  cnf->rootTaskReady.callWhenReady([this, cnf, nn](CaDiCaLTask& ptr) {
+    // Registry is only initialised after the root task arrived.
+    cnf->getCuberRegistry().allowanceMapWaiter.callWhenReady(
+      [this, cnf, nn](cuber::Registry::AllowanceMap& map) {
+        // This indirection is required to make this work from worker threads.
+        m_ioService->post([this, cnf, nn]() {
+          auto client =
+            std::make_shared<TCPClient>(this,
+                                        m_log,
+                                        *m_ioService,
+                                        nn->getRemoteTcpEndpoint(),
+                                        TCPClientMode::TransmitAllowanceMap,
+                                        cnf);
+          client->connect();
+        });
+      });
   });
 }
 
@@ -836,5 +898,19 @@ Communicator::task_offlineAnnouncement(NetworkedNode* nn)
                                   false,
                                   false);
   }
+}
+
+std::ostream&
+operator<<(std::ostream& o, Communicator::TCPClientMode mode)
+{
+  switch(mode) {
+    case Communicator::TCPClientMode::TransmitCNF:
+      o << "Transmit CNF";
+      break;
+    case Communicator::TCPClientMode::TransmitAllowanceMap:
+      o << "Transmit Allowance Map";
+      break;
+  }
+  return o;
 }
 }

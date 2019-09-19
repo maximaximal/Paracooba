@@ -26,7 +26,7 @@ Registry::Registry(ConfigPtr config, LogPtr log, CNF& rootCNF)
 Registry::~Registry() {}
 
 Cuber&
-Registry::getActiveCuber()
+Registry::getActiveCuber() const
 {
   return *m_cubers[0];
 }

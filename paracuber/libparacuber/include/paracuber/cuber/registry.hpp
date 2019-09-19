@@ -3,9 +3,10 @@
 
 #include "../log.hpp"
 #include "../readywaiter.hpp"
+#include "../cnftree.hpp"
 #include <memory>
-#include <vector>
 #include <queue>
+#include <vector>
 
 namespace paracuber {
 class CNF;
@@ -19,9 +20,10 @@ class Registry
   ~Registry();
 
   using CuberVector = std::vector<std::unique_ptr<Cuber>>;
-  using AllowanceMap = std::vector<int>;
+  using AllowanceMap = std::vector<CNFTree::CubeVar>;
 
-  Cuber& getActiveCuber();
+  Cuber& getActiveCuber() const;
+  inline AllowanceMap& getAllowanceMap() { return m_allowanceMap; }
 
   ReadyWaiter<AllowanceMap> allowanceMapWaiter;
 

@@ -4,6 +4,8 @@
 #include "cluster-statistics.hpp"
 #include "log.hpp"
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 
 namespace paracuber {
 class CNF;
@@ -24,7 +26,15 @@ class Daemon
                      ClusterStatistics::Node& statisticsNode);
     ~Context();
 
-    void start();
+    enum State
+    {
+      JustCreated = 0b00000000u,
+      FormulaReceived = 0b00000001u,
+      AllowanceMapReceived = 0b00000010u,
+      FormulaParsed = 0b00000100u,
+    };
+
+    void start(State change);
     std::shared_ptr<CNF> getRootCNF() { return m_rootCNF; }
 
     private:
@@ -32,6 +42,10 @@ class Daemon
     int64_t m_originatorID = 0;
     Daemon* m_daemon;
     Logger m_logger;
+
+    State m_state = JustCreated;
+
+    std::mutex m_contextMutex;
 
     ClusterStatistics::Node& m_statisticsNode;
   };
@@ -49,15 +63,28 @@ class Daemon
 
   Context* getContext(int64_t id);
 
-  std::pair<Context&, bool> getOrCreateContext(std::shared_ptr<CNF> rootCNF,
-                                               int64_t id);
+  std::pair<Context&, bool> getOrCreateContext(int64_t id);
 
   private:
   std::shared_ptr<Config> m_config;
   ContextMap m_contextMap;
+  std::shared_mutex m_contextMapMutex;
   LogPtr m_log;
   std::shared_ptr<Communicator> m_communicator;
 };
+
+inline Daemon::Context::State
+operator|(Daemon::Context::State a, Daemon::Context::State b)
+{
+  return static_cast<Daemon::Context::State>(static_cast<int>(a) |
+                                             static_cast<int>(b));
+}
+inline Daemon::Context::State operator&(Daemon::Context::State a,
+                                        Daemon::Context::State b)
+{
+  return static_cast<Daemon::Context::State>(static_cast<int>(a) &
+                                             static_cast<int>(b));
+}
 }
 
 #endif
