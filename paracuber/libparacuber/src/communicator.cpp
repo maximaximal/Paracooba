@@ -93,19 +93,27 @@ class Communicator::UDPServer
       Message::Reader msg = reader.getRoot<Message>();
       switch(msg.which()) {
         case Message::ONLINE_ANNOUNCEMENT:
-          PARACUBER_LOG(m_logger, Trace) << "  -> Online Announcement.";
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> Online Announcement from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
           handleOnlineAnnouncement(msg);
           break;
         case Message::OFFLINE_ANNOUNCEMENT:
-          PARACUBER_LOG(m_logger, Trace) << "  -> Offline Announcement.";
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> Offline Announcement from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
           handleOfflineAnnouncement(msg);
           break;
         case Message::ANNOUNCEMENT_REQUEST:
-          PARACUBER_LOG(m_logger, Trace) << "  -> Announcement Request.";
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> Announcement Request from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
           handleAnnouncementRequest(msg);
           break;
         case Message::NODE_STATUS:
-          PARACUBER_LOG(m_logger, Trace) << "  -> Node Status.";
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> Node Status from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
           handleNodeStatus(msg);
           break;
       }
