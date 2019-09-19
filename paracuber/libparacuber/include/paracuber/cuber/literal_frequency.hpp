@@ -1,8 +1,8 @@
 #ifndef PARACUBER_CUBER_NAIVE_CUTTER_HPP
 #define PARACUBER_CUBER_NAIVE_CUTTER_HPP
 
-#include "cuber.hpp"
 #include "../config.hpp"
+#include "cuber.hpp"
 #include <vector>
 
 namespace paracuber {

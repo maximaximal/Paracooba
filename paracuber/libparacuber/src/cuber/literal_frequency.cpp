@@ -1,6 +1,8 @@
 #include "../../include/paracuber/cuber/literal_frequency.hpp"
 #include "../../include/paracuber/cadical_task.hpp"
 #include "../../include/paracuber/cnf.hpp"
+#include "../../include/paracuber/communicator.hpp"
+#include "../../include/paracuber/runner.hpp"
 #include "../../include/paracuber/util.hpp"
 #include <cadical/cadical.hpp>
 #include <vector>
@@ -52,15 +54,28 @@ LiteralFrequency::LiteralFrequency(ConfigPtr config,
                          sizeof((*m_literalFrequency)[0]))
       << ". Sorting by value now.";
 
+    const size_t logCheck = 10000;
+    const size_t abortConditionCheck = 1000;
+
     auto litIt = m_literalFrequency->begin();
     while(litIt != m_literalFrequency->end()) {
       auto maxIt = std::max_element(litIt, m_literalFrequency->end());
       *maxIt = *litIt;
       *litIt = (maxIt - m_literalFrequency->begin());
       ++litIt;
-      if((litIt - m_literalFrequency->begin()) % 10000 == 0) {
+      if((litIt - m_literalFrequency->begin()) % logCheck == 0) {
         PARACUBER_LOG(m_logger, Trace) << "  -> Currently at element "
                                        << litIt - m_literalFrequency->begin();
+      }
+
+      if((litIt - m_literalFrequency->begin()) % abortConditionCheck == 0) {
+        if(!m_config->getCommunicator()->getRunner()->isRunning()) {
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> Aborted at element " << litIt - m_literalFrequency->begin()
+            << "! (Abort condition checked every " << abortConditionCheck
+            << " elements)";
+          break;
+        }
       }
     }
 

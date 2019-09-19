@@ -8,6 +8,7 @@
 #include <queue>
 #include <thread>
 #include <vector>
+#include <atomic>
 
 namespace paracuber {
 class Communicator;
@@ -57,7 +58,7 @@ class Runner
   LogPtr m_log;
   Logger m_logger;
   Communicator* m_communicator;
-  volatile bool m_running = true;
+  std::atomic<bool> m_running = true;
 
   std::vector<std::thread> m_pool;
 
