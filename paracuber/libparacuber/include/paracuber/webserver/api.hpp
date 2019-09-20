@@ -29,6 +29,9 @@ class API
 
   std::string generateResponse(Request request);
 
+  std::string generateResponseForLocalConfig();
+  std::string generateResponseForLocalInfo();
+
   static const std::regex matchAPIRequest;
   static const std::regex matchLocalConfigRequest;
   static const std::regex matchLocalInfoRequest;

@@ -36,12 +36,23 @@ API::generateResponse(Request request)
 {
   switch(request) {
     case LocalConfig:
-      return "{\"hello\":\"config\"}";
+      return generateResponseForLocalConfig();
     case LocalInfo:
-      return "{\"hello\":\"info\"}";
+      return generateResponseForLocalInfo();
     default:
       return "{\"success\":false}";
   }
+}
+
+std::string
+API::generateResponseForLocalConfig()
+{
+  return "{\"hello\":\"config\"}";
+}
+std::string
+API::generateResponseForLocalInfo()
+{
+  return "{\"hello\":\"info\"}";
 }
 }
 }

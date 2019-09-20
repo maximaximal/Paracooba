@@ -12,6 +12,10 @@ class Client;
 class Daemon;
 class Communicator;
 
+namespace webserver {
+class API;
+}
+
 /** @brief Store for communication options specific for each node.
  *
  */
@@ -151,6 +155,7 @@ class Config
   friend class Client;
   friend class Daemon;
   friend class Communicator;
+  friend class webserver::API;
 
   bool processCommonParameters(
     const boost::program_options::variables_map& map);
