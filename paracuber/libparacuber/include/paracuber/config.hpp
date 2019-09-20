@@ -33,6 +33,7 @@ class Config
     DaemonHost,
     WorkQueueCapacity,
     TickMilliseconds,
+    HTTPListenPort,
 
     FreqCuberCutoff,
 
@@ -124,6 +125,8 @@ class Config
 
   /** @brief Check if direct client-side solving via CaDiCaL is enabled. */
   inline bool isClientCaDiCaLEnabled() { return !m_disableClientCaDiCaL; }
+  /** @brief Check if internal webserver is enabled. */
+  inline bool isInternalWebserverEnabled() { return m_enableInternalWebserver; }
 
   int64_t generateId(int64_t uniqueNumber);
 
@@ -163,6 +166,12 @@ class Config
   bool m_infoMode = false;
   bool m_daemonMode = false;
   bool m_disableClientCaDiCaL = false;
+#ifdef ENABLE_INTERNAL_WEBSERVER
+  bool m_enableInternalWebserver = true;
+#else
+  bool m_enableInternalWebserver = false;
+#endif
+
   std::string m_generatedLocalName;
 
   Communicator* m_communicator = nullptr;
@@ -188,6 +197,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "tcp-listen-port";
     case Config::TCPTargetPort:
       return "tcp-target-port";
+    case Config::HTTPListenPort:
+      return "http-listen-port";
     case Config::Id:
       return "id";
     case Config::DaemonHost:

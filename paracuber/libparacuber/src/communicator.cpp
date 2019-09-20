@@ -140,7 +140,7 @@ class Communicator::UDPServer
 
     if(!node.getFullyKnown() &&
        node.getId() != m_communicator->m_config->getInt64(Config::Id)) {
-      m_communicator->m_ioService->post(
+      m_communicator->m_ioService.post(
         std::bind(&Communicator::task_requestAnnounce,
                   m_communicator,
                   node.getId(),
@@ -165,7 +165,7 @@ class Communicator::UDPServer
     if(inserted && !m_communicator->m_config->isDaemonMode()) {
       // Send announcement of this client to the other node before transferring
       // the root CNF.
-      m_communicator->m_ioService->post(
+      m_communicator->m_ioService.post(
         std::bind(&Communicator::task_announce,
                   m_communicator,
                   statisticsNode.getNetworkedNode()));
@@ -230,7 +230,7 @@ class Communicator::UDPServer
     }
 
     if(requester.getId() != m_communicator->m_config->getInt64(Config::Id)) {
-      m_communicator->m_ioService->post(
+      m_communicator->m_ioService.post(
         std::bind(&Communicator::task_announce,
                   m_communicator,
                   statisticsNode.getNetworkedNode()));
@@ -648,19 +648,16 @@ class Communicator::TCPServer
 Communicator::Communicator(ConfigPtr config, LogPtr log)
   : m_config(config)
   , m_log(log)
-  , m_ioService(std::make_shared<boost::asio::io_service>())
+  , m_ioServiceWork(m_ioService)
   , m_logger(log->createLogger())
-  , m_signalSet(std::make_unique<boost::asio::signal_set>(*m_ioService, SIGINT))
+  , m_signalSet(std::make_unique<boost::asio::signal_set>(m_ioService, SIGINT))
   , m_clusterStatistics(std::make_shared<ClusterStatistics>(config, log))
+  , m_webserverInitiator(config, log, m_ioService)
   , m_tickTimer(
-      (*m_ioService),
+      (m_ioService),
       std::chrono::milliseconds(m_config->getUint64(Config::TickMilliseconds)))
 {
   m_config->m_communicator = this;
-  // Initialize communicator
-  boost::asio::io_service::work work(*m_ioService);
-  m_ioServiceWork = work;
-
   m_signalSet->async_wait(std::bind(&Communicator::signalHandler,
                                     this,
                                     std::placeholders::_1,
@@ -688,7 +685,7 @@ Communicator::run()
 
   listenForIncomingUDP(m_config->getUint16(Config::UDPListenPort));
   listenForIncomingTCP(m_config->getUint16(Config::TCPListenPort));
-  m_ioService->post(
+  m_ioService.post(
     std::bind(&Communicator::task_requestAnnounce, this, 0, "", nullptr));
 
   // The timer can only be enabled at this stage, after all other required data
@@ -698,7 +695,7 @@ Communicator::run()
   m_tickTimer.async_wait(std::bind(&Communicator::tick, this));
 
   PARACUBER_LOG(m_logger, Trace) << "Communicator io_service started.";
-  m_ioService->run();
+  m_ioService.run();
   PARACUBER_LOG(m_logger, Trace) << "Communicator io_service ended.";
   m_runner->stop();
 }
@@ -717,14 +714,14 @@ Communicator::exit()
   // this is called from a runner thread.
   m_runner->m_running = false;
 
-  m_ioService->post([this]() {
+  m_ioService.post([this]() {
     m_runner->stop();
 
     // Destruct all servers before io Service is stopped.
     m_udpServer.reset();
     m_tcpServer.reset();
 
-    m_ioService->stop();
+    m_ioService.stop();
   });
 }
 
@@ -752,7 +749,7 @@ Communicator::listenForIncomingUDP(uint16_t port)
 {
   using namespace boost::asio;
   try {
-    m_udpServer = std::make_unique<UDPServer>(this, m_log, *m_ioService, port);
+    m_udpServer = std::make_unique<UDPServer>(this, m_log, m_ioService, port);
   } catch(std::exception& e) {
     PARACUBER_LOG(m_logger, LocalError)
       << "Could not initialize server for incoming UDP connections on port "
@@ -765,7 +762,7 @@ Communicator::listenForIncomingTCP(uint16_t port)
 {
   using namespace boost::asio;
   try {
-    m_tcpServer = std::make_unique<TCPServer>(this, m_log, *m_ioService, port);
+    m_tcpServer = std::make_unique<TCPServer>(this, m_log, m_ioService, port);
   } catch(std::exception& e) {
     PARACUBER_LOG(m_logger, LocalError)
       << "Could not initialize server for incoming TCP connections on port "
@@ -779,10 +776,10 @@ Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf,
                             NetworkedNode* nn)
 {
   // This indirection is required to make this work from worker threads.
-  m_ioService->post([this, cnf, path, nn]() {
+  m_ioService.post([this, cnf, path, nn]() {
     auto client = std::make_shared<TCPClient>(this,
                                               m_log,
-                                              *m_ioService,
+                                              m_ioService,
                                               nn->getRemoteTcpEndpoint(),
                                               TCPClientMode::TransmitCNF,
                                               cnf,
@@ -805,11 +802,11 @@ Communicator::sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
     cnf->getCuberRegistry().allowanceMapWaiter.callWhenReady(
       [this, cnf, nn](cuber::Registry::AllowanceMap& map) {
         // This indirection is required to make this work from worker threads.
-        m_ioService->post([this, cnf, nn]() {
+        m_ioService.post([this, cnf, nn]() {
           auto client =
             std::make_shared<TCPClient>(this,
                                         m_log,
-                                        *m_ioService,
+                                        m_ioService,
                                         nn->getRemoteTcpEndpoint(),
                                         TCPClientMode::TransmitAllowanceMap,
                                         cnf);

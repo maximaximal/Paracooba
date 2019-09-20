@@ -12,7 +12,19 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost COMPONENTS log program_options thread filesystem REQUIRED)
+find_package(Boost COMPONENTS log program_options thread filesystem system REQUIRED)
+
+option(BOOST_BEAST_INCLUDE_DIRS String "Include dirs for Boost Beast HTTP library. Should not be required and is normally included with your boost distribution.")
+
+# Try to include beast headers. They are required for the internal webserver.
+find_file(BOOST_BEAST_AVAILABLE "boost/beast/core.hpp" PATHS ${Boost_INCLUDE_DIRS} ${BOOST_BEAST_INCLUDE_DIRS})
+if(NOT ${BOOST_BEAST_AVAILABLE})
+    message(WARNING "Could not find Boost Beast HTTP Library. Internal webserver will not be available.")
+    set(BOOST_BEAST_AVAILABLE FALSE)
+else()
+    message(STATUS "Found Boost Beast HTTP library. Enabling internal webserver.")
+    set(BOOST_BEAST_AVAILABLE TRUE)
+endif()
 
 # Add Catch2 unit testing framework.
 include(CTest)

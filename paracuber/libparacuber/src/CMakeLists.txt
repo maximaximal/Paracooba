@@ -1,4 +1,5 @@
 add_subdirectory(cuber)
+add_subdirectory(webserver)
 
 set(PARACUBER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/orchestrator.cpp
@@ -16,6 +17,7 @@ set(PARACUBER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/util.cpp
 
     ${CUBER_SRCS}
+    ${WEBSERVER_SRCS}
 
     ${CMAKE_CURRENT_SOURCE_DIR}/cadical_task.cpp
     PARENT_SCOPE)

@@ -1,0 +1,10 @@
+if(BOOST_BEAST_AVAILABLE)
+    set(WEBSERVER_SRCS
+	${CMAKE_CURRENT_SOURCE_DIR}/initiator.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/webserver.cpp
+	PARENT_SCOPE)
+else()
+    set(WEBSERVER_SRCS
+	${CMAKE_CURRENT_SOURCE_DIR}/initiator.cpp
+	PARENT_SCOPE)
+endif()

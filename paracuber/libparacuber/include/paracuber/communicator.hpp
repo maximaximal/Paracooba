@@ -5,14 +5,16 @@
 #include "cnftree.hpp"
 #include "log.hpp"
 #include "readywaiter.hpp"
+#include "webserver/initiator.hpp"
 
 #include <any>
 #include <functional>
 #include <memory>
 
+#include <boost/asio/high_resolution_timer.hpp>
+#include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/signal_set.hpp>
-#include <boost/asio/high_resolution_timer.hpp>
 #include <boost/version.hpp>
 
 namespace boost {
@@ -29,8 +31,6 @@ namespace system {
 class error_code;
 }
 }
-
-using IOServicePtr = std::shared_ptr<boost::asio::io_service>;
 
 namespace paracuber {
 
@@ -84,7 +84,7 @@ class Communicator : public std::enable_shared_from_this<Communicator>
    * objects.
    */
   inline RunnerPtr getRunner() { return m_runner; }
-  inline IOServicePtr getIOService() { return m_ioService; }
+  inline boost::asio::io_service& getIOService() { return m_ioService; }
   inline ClusterStatisticsPtr getClusterStatistics()
   {
     return m_clusterStatistics;
@@ -111,12 +111,13 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   private:
   ConfigPtr m_config;
   LogPtr m_log;
-  IOServicePtr m_ioService;
-  std::any m_ioServiceWork;
+  boost::asio::io_service m_ioService;
+  boost::asio::io_service::work m_ioServiceWork;
   Logger m_logger;
   std::unique_ptr<boost::asio::signal_set> m_signalSet;
   RunnerPtr m_runner;
   ClusterStatisticsPtr m_clusterStatistics;
+  webserver::Initiator m_webserverInitiator;
 
   int64_t m_currentMessageId = INT64_MIN;
 

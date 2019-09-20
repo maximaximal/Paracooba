@@ -58,6 +58,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::TCPTargetPort),
          po::value<uint16_t>()->default_value(18001)->value_name("int"),
          "tcp port for outgoing data messages")
+    (GetConfigNameFromEnum(Config::HTTPListenPort),
+         po::value<uint16_t>()->default_value(18080)->value_name("int"),
+         "port for internal webserver")
     (GetConfigNameFromEnum(Config::Id),
          po::value<int64_t>()->default_value(dist_mac(rng))->value_name("int"),
          "Unique Number (only 48 Bit) (can be MAC address)")
@@ -77,6 +80,7 @@ Config::Config()
     ("info,i", po::bool_switch(&m_infoMode)->default_value(false)->value_name("bool"), "info mode (more information)")
     ("daemon", po::bool_switch(&m_daemonMode)->default_value(false)->value_name("bool"), "daemon mode")
     ("disable-client-cadical", po::bool_switch(&m_disableClientCaDiCaL)->default_value(false)->value_name("bool"), "direct solving via CaDiCaL on client")
+    ("enable-internal-webserver", po::bool_switch(&m_enableInternalWebserver)->default_value(m_enableInternalWebserver)->value_name("bool"), "enable internal webserver to see debugging, diagnostics and status information")
     ;
   // clang-format on
 }
@@ -150,6 +154,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::TCPListenPort);
   conditionallySetConfigOptionToArray<uint16_t>(
     vm, m_config.data(), Config::TCPTargetPort);
+  conditionallySetConfigOptionToArray<uint16_t>(
+    vm, m_config.data(), Config::HTTPListenPort);
   conditionallySetConfigOptionToArray<uint64_t>(
     vm, m_config.data(), Config::WorkQueueCapacity);
   conditionallySetConfigOptionToArray<uint64_t>(
