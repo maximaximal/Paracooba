@@ -91,7 +91,7 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
   } else {
     // Transmit all decisions on the given path.
     data->decisions.resize(CNFTree::getDepth(path));
-    m_cnfTree.writePathToContainer(data->decisions, path);
+    m_cnfTree.writePathToLiteralContainer(data->decisions, path);
 
     // After this async write operation has finished, the local data can be
     // erased again. This happens when the file offset reaches the file size, so

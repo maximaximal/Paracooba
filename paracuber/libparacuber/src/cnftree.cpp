@@ -10,7 +10,7 @@ CNFTree::~CNFTree() {}
 bool
 CNFTree::visit(Path p, Visitor visitor)
 {
-  assert(getDepth(p) < (sizeof(Path) * 8) - 6);
+  assert(getDepth(p) < maxPathDepth);
 
   Node* n = &m_root;
   uint8_t depth = 1;
@@ -29,7 +29,7 @@ CNFTree::visit(Path p, Visitor visitor)
     if(n->isLeaf()) {
       end = true;
     } else {
-      end = visitor(decision, depth);
+      end = visitor(decision, depth, n->state);
     }
 
     if(nextPtr && depth < getDepth(p) && !n->isLeaf()) {
@@ -45,7 +45,7 @@ CNFTree::visit(Path p, Visitor visitor)
 bool
 CNFTree::setDecision(Path p, CubeVar decision)
 {
-  assert(getDepth(p) < (sizeof(Path) * 8) - 6);
+  assert(getDepth(p) < maxPathDepth);
 
   Node* n = &m_root;
   uint8_t depth = 1;
@@ -85,6 +85,62 @@ CNFTree::setDecision(Path p, CubeVar decision)
   if(depth == getDepth(p)) {
     n->decision = decision;
     return true;
+  }
+  return false;
+}
+
+bool
+CNFTree::getState(Path p, State state) const
+{
+  assert(getDepth(p) < maxPathDepth);
+
+  const Node* n = &m_root;
+  uint8_t depth = 1;
+  bool end = false;
+
+  while(!end) {
+    if(!n) {
+      return false;
+    }
+
+    if(depth == getDepth(p)) {
+      state = n->state.load();
+      return true;
+    }
+
+    bool assignment = getAssignment(p, depth);
+    const std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+
+    n = nextPtr.get();
+    ++depth;
+  }
+  return false;
+}
+
+bool
+CNFTree::setState(Path p, State state)
+{
+  assert(getDepth(p) < maxPathDepth);
+
+  Node* n = &m_root;
+  uint8_t depth = 1;
+  bool end = false;
+
+  while(!end) {
+    if(!n) {
+      return false;
+    }
+
+    if(depth == getDepth(p)) {
+      n->state.store(state);
+      return true;
+    }
+
+    bool assignment = getAssignment(p, depth);
+    std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+
+    n = nextPtr.get();
+    ++depth;
   }
   return false;
 }

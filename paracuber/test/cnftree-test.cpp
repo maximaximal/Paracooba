@@ -57,7 +57,7 @@ TEST_CASE("CNFTree Usage")
     uint8_t depth = GENERATE(0, 1, 2, 3);
 
     tree.visit(CNFTree::buildPath((uint8_t)0b10000000, depth),
-               [](CNFTree::CubeVar l, uint8_t d) {
+               [](CNFTree::CubeVar l, uint8_t d, CNFTree::State& state) {
                  REQUIRE(false);
                  return false;
                });
@@ -73,11 +73,13 @@ TEST_CASE("CNFTree Usage")
   {
     {
       std::vector<CNFTree::CubeVar> vars;
-      REQUIRE(tree.visit(CNFTree::buildPath((uint8_t)0b10000000, 1),
-                         [&vars](CNFTree::CubeVar l, uint8_t d) {
-                           vars.push_back(l);
-                           return false;
-                         }));
+      REQUIRE(tree.visit(
+        CNFTree::buildPath((uint8_t)0b10000000, 1),
+        [&vars](CNFTree::CubeVar l, uint8_t d, CNFTree::State& state) {
+          REQUIRE(state == CNFTree::Unvisited);
+          vars.push_back(l);
+          return false;
+        }));
       REQUIRE(vars.size() == 1);
       REQUIRE(vars[0] == 1);
     }
@@ -86,26 +88,28 @@ TEST_CASE("CNFTree Usage")
       CNFTree::Path p = CNFTree::buildPath((uint8_t)0b10000000, 2);
 
       std::vector<CNFTree::CubeVar> vars;
-      REQUIRE(tree.visit(p, [&vars](CNFTree::CubeVar l, uint8_t d) {
-        vars.push_back(l);
-        return false;
-      }));
+      REQUIRE(tree.visit(
+        p, [&vars](CNFTree::CubeVar l, uint8_t d, CNFTree::State& state) {
+          vars.push_back(l);
+          return false;
+        }));
       REQUIRE(vars.size() == 2);
       REQUIRE(vars[0] == 1);
       REQUIRE(vars[1] == -3);
 
-      REQUIRE(tree.writePathToContainer(vars, p));
+      REQUIRE(tree.writePathToLiteralContainer(vars, p));
       REQUIRE(vars[0] == 1);
       REQUIRE(vars[1] == -3);
     }
 
     {
       std::vector<CNFTree::CubeVar> vars;
-      REQUIRE(!tree.visit(CNFTree::buildPath((uint8_t)0b10000000, 4),
-                          [&vars](CNFTree::CubeVar l, uint8_t d) {
-                            vars.push_back(l);
-                            return false;
-                          }));
+      REQUIRE(!tree.visit(
+        CNFTree::buildPath((uint8_t)0b10000000, 4),
+        [&vars](CNFTree::CubeVar l, uint8_t d, CNFTree::State& state) {
+          vars.push_back(l);
+          return false;
+        }));
       REQUIRE(vars.size() == 2);
     }
   }

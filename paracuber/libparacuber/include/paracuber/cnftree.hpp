@@ -1,6 +1,7 @@
 #ifndef PARACUBER_CNFTREE_HPP
 #define PARACUBER_CNFTREE_HPP
 
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <functional>
@@ -18,26 +19,43 @@ class CNFTree
   using Path = uint64_t;
   using CubeVar = int32_t;
 
+  enum StateEnum
+  {
+    Unvisited,
+    Working,
+    SAT,
+    UNSAT,
+    Unknown
+  };
+  using State = std::atomic<StateEnum>;
+
   /** @brief Visitor function for traversing a CNF tree.
    *
    * The CubeVar is the current decision, the uint8_t the depth.
    *
    * Return true to abort traversal, false to continue.
    */
-  using Visitor = std::function<bool(CubeVar, uint8_t)>;
+  using Visitor = std::function<bool(CubeVar, uint8_t, State& state)>;
 
   /** @brief A single node on the cubing binary tree.
    *
    * A leaf (as given by isLeaf()) has no valid decision literal. All other
-   * nodes have valid decision literals.
+   * nodes have valid decision literals, except for remote ones, where remote !=
+   * 0.
+   *
+   * Remote nodes are leaves where the decision is != 0. These nodes are
+   * materialised on other compute nodes.
    */
   struct Node
   {
-    CubeVar decision;
+    CubeVar decision = 0;
+    State state = Unvisited;
+    int64_t remote = 0;
     std::unique_ptr<Node> left;
     std::unique_ptr<Node> right;
 
     inline bool isLeaf() { return (!left) && (!right); }
+    inline bool isRemote() { return isLeaf() && remote != 0; }
   };
 
   /** @brief Visit the tree and call the provided visitor function.
@@ -55,16 +73,38 @@ class CNFTree
    */
   bool setDecision(Path p, CubeVar decision);
 
+  /** @brief Get the state for a given path.
+   *
+   * The node at the path must already exist.
+   */
+  bool getState(Path p, State state) const;
+
+  /** @brief Set the state for a given path.
+   *
+   * The node at the path must already exist.
+   */
+  bool setState(Path p, State state);
+
   /** @brief Traverse the decision tree and write the specified path to a given
    * container.
    */
   template<class Container>
-  bool writePathToContainer(Container container, Path p)
+  bool writePathToLiteralContainer(Container container, Path p)
   {
-    return visit(p, [&container](CubeVar p, uint8_t depth) {
-      container.push_back(p);
-      return false;
-    });
+    return visit(p,
+                 [&container](CubeVar p, uint8_t depth, CNFTree::State& state) {
+                   container.push_back(p);
+                   return false;
+                 });
+  }
+  template<class Container>
+  bool writePathToLiteralAndStateContainer(Container container, Path p)
+  {
+    return visit(p,
+                 [&container](CubeVar p, uint8_t depth, CNFTree::State& state) {
+                   container.push_back({ p, state });
+                   return false;
+                 });
   }
 
   static const size_t maxPathDepth;
