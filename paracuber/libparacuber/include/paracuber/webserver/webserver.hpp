@@ -6,6 +6,7 @@
 #endif
 
 #include "../log.hpp"
+#include "api.hpp"
 #include <boost/version.hpp>
 #include <memory>
 
@@ -37,11 +38,14 @@ class Webserver
 
   std::string buildLink();
 
+  API& getAPI() { return m_api; }
+
   private:
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
   boost::asio::io_service& m_ioService;
+  API m_api;
 
   std::shared_ptr<HTTPListener> m_httpListener;
 };

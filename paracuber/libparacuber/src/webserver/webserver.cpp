@@ -7,11 +7,14 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <regex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
 #include "../../include/paracuber/config.hpp"
+#include "../../include/paracuber/webserver/api.hpp"
 #include "../../include/paracuber/webserver/webserver.hpp"
 
 #ifndef ENABLE_INTERNAL_WEBSERVER
@@ -28,6 +31,12 @@ namespace asio = boost::asio;
 
 namespace paracuber {
 namespace webserver {
+
+inline std::string
+boostStringViewToStdString(boost::string_view view)
+{
+  return std::move(std::string(view.data(), view.size()));
+}
 
 // Return a reasonable mime type based on the extension of a file.
 boost::beast::string_view
@@ -112,7 +121,8 @@ pathCat(boost::beast::string_view base, boost::beast::string_view path)
 
 template<class Body, class Allocator, class Send>
 void
-handleRequest(boost::beast::string_view doc_root,
+handleRequest(Webserver* webserver,
+              boost::beast::string_view doc_root,
               http::request<Body, http::basic_fields<Allocator>>&& req,
               Send&& send)
 {
@@ -152,6 +162,17 @@ handleRequest(boost::beast::string_view doc_root,
     return res;
   };
 
+  // Returns a server error response
+  auto const api_response = [&req, webserver](API::Request request) {
+    http::response<http::string_body> res{ http::status::ok, req.version() };
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/json");
+    res.keep_alive(req.keep_alive());
+    res.body() = webserver->getAPI().generateResponse(request);
+    res.prepare_payload();
+    return res;
+  };
+
   // Make sure we can handle the method
   if(req.method() != http::verb::get && req.method() != http::verb::head)
     return send(bad_request("Unknown HTTP-method"));
@@ -165,6 +186,11 @@ handleRequest(boost::beast::string_view doc_root,
   std::string path = pathCat(doc_root, req.target());
   if(req.target().back() == '/')
     path.append("index.html");
+
+  auto targetPath = boostStringViewToStdString(req.target());
+  if(API::isAPIRequest(targetPath)) {
+    return send(api_response(API::matchTargetToRequest(targetPath)));
+  }
 
   // Attempt to open the file
   boost::beast::error_code ec;
@@ -250,7 +276,7 @@ class Webserver::HTTPSession
         << "Could not read HTTP! Error: " << ec.message();
     }
 
-    handleRequest(m_docRoot, std::move(m_req), m_lambda);
+    handleRequest(m_webserver, m_docRoot, std::move(m_req), m_lambda);
   }
 
   void onWrite(boost::system::error_code ec,
@@ -399,6 +425,10 @@ class Webserver::HTTPListener
     }
   }
 
+  void shutdown() {
+    m_acceptor.close();
+  }
+
   private:
   Webserver* m_webserver;
   Logger m_logger;
@@ -414,6 +444,7 @@ Webserver::Webserver(ConfigPtr config,
   , m_log(log)
   , m_logger(log->createLogger())
   , m_ioService(ioService)
+  , m_api(this, config, log)
 {
   PARACUBER_LOG(m_logger, Trace)
     << "Creating internal webserver. Reachable over port "
@@ -429,7 +460,10 @@ Webserver::Webserver(ConfigPtr config,
     config->getString(Config::HTTPDocRoot));
   m_httpListener->startAccept();
 }
-Webserver::~Webserver() {}
+Webserver::~Webserver() {
+  m_httpListener->shutdown();
+  m_httpListener.reset();
+}
 
 std::string
 Webserver::buildLink()
