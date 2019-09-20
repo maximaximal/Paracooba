@@ -34,6 +34,7 @@ class Config
     WorkQueueCapacity,
     TickMilliseconds,
     HTTPListenPort,
+    HTTPDocRoot,
 
     FreqCuberCutoff,
 
@@ -84,7 +85,7 @@ class Config
   inline int64_t getInt64(Key key) { return get<int64_t>(key); }
   /** @brief Get an uint16 configuration variable.
    */
-  inline uint32_t getUint16(Key key) { return get<uint16_t>(key); }
+  inline uint16_t getUint16(Key key) { return get<uint16_t>(key); }
   /** @brief Get an uint32 configuration variable.
    */
   inline uint32_t getUint32(Key key) { return get<uint32_t>(key); }
@@ -174,6 +175,8 @@ class Config
 
   std::string m_generatedLocalName;
 
+  std::string getInternalWebserverDefaultDocRoot();
+
   Communicator* m_communicator = nullptr;
   Client* m_client = nullptr;
   Daemon* m_daemon = nullptr;
@@ -199,6 +202,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "tcp-target-port";
     case Config::HTTPListenPort:
       return "http-listen-port";
+    case Config::HTTPDocRoot:
+      return "http-doc-root";
     case Config::Id:
       return "id";
     case Config::DaemonHost:

@@ -1,5 +1,6 @@
 #include "../include/paracuber/config.hpp"
 #include <boost/asio/ip/host_name.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <cstddef>
 #include <iostream>
@@ -7,6 +8,7 @@
 #include <thread>
 
 namespace po = boost::program_options;
+namespace fs = boost::filesystem;
 
 namespace paracuber {
 Config::Config()
@@ -61,6 +63,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::HTTPListenPort),
          po::value<uint16_t>()->default_value(18080)->value_name("int"),
          "port for internal webserver")
+    (GetConfigNameFromEnum(Config::HTTPDocRoot),
+         po::value<std::string>()->default_value(getInternalWebserverDefaultDocRoot())->value_name("string"),
+         "document root path of the internal http server")
     (GetConfigNameFromEnum(Config::Id),
          po::value<int64_t>()->default_value(dist_mac(rng))->value_name("int"),
          "Unique Number (only 48 Bit) (can be MAC address)")
@@ -156,6 +161,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::TCPTargetPort);
   conditionallySetConfigOptionToArray<uint16_t>(
     vm, m_config.data(), Config::HTTPListenPort);
+  conditionallySetConfigOptionToArray<std::string>(
+    vm, m_config.data(), Config::HTTPDocRoot);
   conditionallySetConfigOptionToArray<uint64_t>(
     vm, m_config.data(), Config::WorkQueueCapacity);
   conditionallySetConfigOptionToArray<uint64_t>(
@@ -171,5 +178,17 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
   }
 
   return true;
+}
+
+#define CHECK_PATH(PATH) \
+  if(fs::exists(PATH))   \
+    return fs::absolute(PATH).string();
+
+std::string
+Config::getInternalWebserverDefaultDocRoot()
+{
+  CHECK_PATH("../internalwebserver-docroot/")
+  CHECK_PATH("/usr/local/share/paracuber/internalwebserver/")
+  return "/usr/local/share/paracuber/internalwebserver/";
 }
 }

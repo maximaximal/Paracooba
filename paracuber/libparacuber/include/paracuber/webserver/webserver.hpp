@@ -29,14 +29,21 @@ namespace webserver {
 class Webserver
 {
   public:
+  class HTTPListener;
+  class HTTPSession;
+
   Webserver(ConfigPtr config, LogPtr log, boost::asio::io_service& ioService);
   ~Webserver();
+
+  std::string buildLink();
 
   private:
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
-  boost::asio::io_service &m_ioService;
+  boost::asio::io_service& m_ioService;
+
+  std::shared_ptr<HTTPListener> m_httpListener;
 };
 }
 }
