@@ -117,7 +117,6 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   std::unique_ptr<boost::asio::signal_set> m_signalSet;
   RunnerPtr m_runner;
   ClusterStatisticsPtr m_clusterStatistics;
-  webserver::Initiator m_webserverInitiator;
 
   int64_t m_currentMessageId = INT64_MIN;
 
@@ -144,6 +143,8 @@ class Communicator : public std::enable_shared_from_this<Communicator>
    */
   void tick();
   boost::asio::high_resolution_timer m_tickTimer;
+
+  std::unique_ptr<webserver::Initiator> m_webserverInitiator;
 };
 
 std::ostream&

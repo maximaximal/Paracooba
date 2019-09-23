@@ -10,18 +10,40 @@ namespace webserver {
 Initiator::Initiator(ConfigPtr config,
                      LogPtr log,
                      boost::asio::io_service& ioService)
-  : m_logger(log->createLogger())
+  : m_config(config)
+  , m_log(log)
+  , m_ioService(ioService)
+  , m_logger(log->createLogger())
+{}
+Initiator::~Initiator() {}
+
+void
+Initiator::run()
 {
-  if(!config->isInternalWebserverEnabled())
+  if(!m_config->isInternalWebserverEnabled())
     return;
 
 #ifdef ENABLE_INTERNAL_WEBSERVER
-  m_webserver = std::make_unique<Webserver>(config, log, ioService);
+  if(!m_webserver) {
+    m_webserver = std::make_unique<Webserver>(m_config, m_log, m_ioService);
+  }
+
+  m_webserver->run();
 #else
-  PARACUBER_LOG(m_logger, Info) << "Webserver disabled during compilation, "
-                                   "cannot start internal webserver.";
+  PARACUBER_LOG(m_logger, LocalError)
+    << "Webserver disabled during compilation, "
+       "cannot start internal webserver.";
 #endif
 }
-Initiator::~Initiator() {}
+void
+Initiator::stop()
+{
+#ifdef ENABLE_INTERNAL_WEBSERVER
+  if(m_webserver) {
+    m_webserver->stop();
+    m_webserver.reset();
+  }
+#endif
+}
 }
 }

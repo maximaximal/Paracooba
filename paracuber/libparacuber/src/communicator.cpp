@@ -652,7 +652,6 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   , m_logger(log->createLogger())
   , m_signalSet(std::make_unique<boost::asio::signal_set>(m_ioService, SIGINT))
   , m_clusterStatistics(std::make_shared<ClusterStatistics>(config, log))
-  , m_webserverInitiator(config, log, m_ioService)
   , m_tickTimer(
       (m_ioService),
       std::chrono::milliseconds(m_config->getUint64(Config::TickMilliseconds)))
@@ -662,6 +661,11 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
                                     this,
                                     std::placeholders::_1,
                                     std::placeholders::_2));
+
+  if(config->isInternalWebserverEnabled()) {
+    m_webserverInitiator =
+      std::make_unique<webserver::Initiator>(config, log, m_ioService);
+  }
 }
 
 Communicator::~Communicator()
@@ -687,6 +691,11 @@ Communicator::run()
   listenForIncomingTCP(m_config->getUint16(Config::TCPListenPort));
   m_ioService.post(
     std::bind(&Communicator::task_requestAnnounce, this, 0, "", nullptr));
+
+  if(m_webserverInitiator) {
+    m_ioService.post(
+      std::bind(&webserver::Initiator::run, m_webserverInitiator.get()));
+  }
 
   // The timer can only be enabled at this stage, after all other required data
   // structures have been initialised. Also, use a warmup time of 2 seconds -
@@ -715,6 +724,10 @@ Communicator::exit()
   m_runner->m_running = false;
 
   m_ioService.post([this]() {
+    if(m_webserverInitiator) {
+      m_webserverInitiator->stop();
+      m_webserverInitiator.reset();
+    }
     m_runner->stop();
 
     // Destruct all servers before io Service is stopped.

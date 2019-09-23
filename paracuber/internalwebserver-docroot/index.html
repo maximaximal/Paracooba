@@ -32,35 +32,42 @@
 	</style>
     </head>
     <body>
-	<!-- The general structure is originally inspired from
-	     https://getbootstrap.com/docs/4.3/examples/dashboard/ -->
-	<nav class="navbar navbar-dark fixed-top bg-dark flex-md-nowrap p-0 shadow">
-	    <a class="navbar-brand col-sm-3 col-md-2 mr-0" href="#">ParaCuber</a>
-	</nav>
-	<div class="container-fluid" id="app" >
-	    <div class="row">
-		<nav class="col-md-2 d-none d-md-block bg-light sidebar">
-		    <div class="sidebar-sticky">
-			<ul class="nav flex-column">
-			    <li class="nav-item">
-				<a class="nav-link active" href="#">
-				    <span data-feather="home"></span>
-				    Dashboard <span class="sr-only">(current)</span>
-				</a>
-			    </li>
-			</ul>
-		    </div>
-		</nav>
+	<div id="app">
+	    <!-- The general structure is originally inspired from
+		 https://getbootstrap.com/docs/4.3/examples/dashboard/ -->
+	    <nav class="navbar navbar-dark fixed-top bg-dark flex-md-nowrap p-0 shadow">
+		<a class="navbar-brand col-sm-3 col-md-2 mr-0" href="#">ParaCuber</a>
 
-		<main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
-		    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-			<h1 class="h2">Dashboard</h1>
-		    </div>
-		</main>
+		<span class="navbar-text">Connection State: {{ ws_state }} </span>
+	    </nav>
+	    <div class="container-fluid">
+		<div class="row">
+		    <nav class="col-md-2 d-none d-md-block bg-light sidebar">
+			<div class="sidebar-sticky">
+			    <ul class="nav flex-column">
+				<li class="nav-item">
+				    <a class="nav-link active" href="#">
+					<span data-feather="home"></span>
+					Dashboard <span class="sr-only">(current)</span>
+				    </a>
+				</li>
+			    </ul>
+			</div>
+		    </nav>
 
-		<footer role="footer" class="col-md-9 ml-sm-auto col-lg-10 px-4">
-		    <p style="font-size: 0.9rem;font-style: italic;">Favicon based on <a href="https://www.flickr.com/photos/37804160@N00/1229335440">"go west"</a><span>by <a href="https://www.flickr.com/photos/37804160@N00">SqueakyMarmot</a></span> is licensed under <a href="https://creativecommons.org/licenses/by-sa/2.0/?ref=ccsearch&atype=html" style="margin-right: 5px;">CC BY-SA 2.0</a><a href="https://creativecommons.org/licenses/by-sa/2.0/?ref=ccsearch&atype=html" target="_blank" rel="noopener noreferrer" style="display: inline-block;white-space: none;opacity: .7;margin-top: 2px;margin-left: 3px;height: 22px !important;"><img style="height: inherit;margin-right: 3px;display: inline-block;" src="https://search.creativecommons.org/static/img/cc_icon.svg" /><img style="height: inherit;margin-right: 3px;display: inline-block;" src="https://search.creativecommons.org/static/img/cc-by_icon.svg" /><img style="height: inherit;margin-right: 3px;display: inline-block;" src="https://search.creativecommons.org/static/img/cc-sa_icon.svg" /></a></p>
-		</footer>
+		    <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
+			<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+			    <h1 class="h2">Dashboard</h1>
+			</div>
+			<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+			    <div id="cytoscape_main" class="my-4 w-100"></div>
+			</div>
+		    </main>
+
+		    <footer role="footer" class="col-md-9 ml-sm-auto col-lg-10 px-4">
+			<p style="font-size: 0.9rem;font-style: italic;">Favicon based on <a href="https://www.flickr.com/photos/37804160@N00/1229335440">"go west"</a><span>by <a href="https://www.flickr.com/photos/37804160@N00">SqueakyMarmot</a></span> is licensed under <a href="https://creativecommons.org/licenses/by-sa/2.0/?ref=ccsearch&atype=html" style="margin-right: 5px;">CC BY-SA 2.0</a><a href="https://creativecommons.org/licenses/by-sa/2.0/?ref=ccsearch&atype=html" target="_blank" rel="noopener noreferrer" style="display: inline-block;white-space: none;opacity: .7;margin-top: 2px;margin-left: 3px;height: 22px !important;"><img style="height: inherit;margin-right: 3px;display: inline-block;" src="https://search.creativecommons.org/static/img/cc_icon.svg" /><img style="height: inherit;margin-right: 3px;display: inline-block;" src="https://search.creativecommons.org/static/img/cc-by_icon.svg" /><img style="height: inherit;margin-right: 3px;display: inline-block;" src="https://search.creativecommons.org/static/img/cc-sa_icon.svg" /></a></p>
+		    </footer>
+		</div>
 	    </div>
 	</div>
     </body>
@@ -72,6 +79,7 @@
     <script src="js/deps/vue.js"></script>
     <script src="js/deps/axios.min.js"></script>
 
+    <script src="js/deps/dagre.min.js"></script>
     <script src="js/deps/cytoscape.min.js"></script>
     <script src="js/deps/cytoscape-dagre.js"></script>
 

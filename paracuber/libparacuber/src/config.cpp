@@ -85,7 +85,7 @@ Config::Config()
     ("info,i", po::bool_switch(&m_infoMode)->default_value(false)->value_name("bool"), "info mode (more information)")
     ("daemon", po::bool_switch(&m_daemonMode)->default_value(false)->value_name("bool"), "daemon mode")
     ("disable-client-cadical", po::bool_switch(&m_disableClientCaDiCaL)->default_value(false)->value_name("bool"), "direct solving via CaDiCaL on client")
-    ("enable-internal-webserver", po::bool_switch(&m_enableInternalWebserver)->default_value(m_enableInternalWebserver)->value_name("bool"), "enable internal webserver to see debugging, diagnostics and status information")
+    ("enable-internal-webserver", po::bool_switch(&m_enableInternalWebserver)->default_value(false)->value_name("bool"), "enable internal webserver to see debugging, diagnostics and status information")
     ;
   // clang-format on
 }

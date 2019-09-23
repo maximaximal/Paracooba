@@ -2,23 +2,8 @@
 #define PARACUBER_WEBSERVER_INITIATOR_HPP
 
 #include "../log.hpp"
-#include <boost/version.hpp>
+#include <boost/asio/io_service.hpp>
 #include <memory>
-
-namespace boost {
-namespace asio {
-#if(BOOST_VERSION / 100 % 1000) >= 69
-class io_context;
-using io_service = io_context;
-class signal_set;
-#else
-class io_service;
-#endif
-}
-namespace system {
-class error_code;
-}
-}
 
 namespace paracuber {
 namespace webserver {
@@ -30,8 +15,14 @@ class Initiator
   Initiator(ConfigPtr config, LogPtr log, boost::asio::io_service& ioService);
   ~Initiator();
 
+  void run();
+  void stop();
+
   private:
+  LogPtr m_log;
+  ConfigPtr m_config;
   Logger m_logger;
+  boost::asio::io_service& m_ioService;
 
 #ifdef ENABLE_INTERNAL_WEBSERVER
   std::unique_ptr<Webserver> m_webserver;

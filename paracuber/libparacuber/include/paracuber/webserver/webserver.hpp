@@ -36,11 +36,18 @@ class Webserver
   Webserver(ConfigPtr config, LogPtr log, boost::asio::io_service& ioService);
   ~Webserver();
 
+  void run();
+  void stop();
+
   std::string buildLink();
 
   API& getAPI() { return m_api; }
+  boost::asio::io_service& getIOService() { return m_ioService; }
+  HTTPListener* getHTTPListener() { return m_httpListener.get(); }
 
   private:
+  void httpSessionClosed(HTTPSession* session);
+
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;

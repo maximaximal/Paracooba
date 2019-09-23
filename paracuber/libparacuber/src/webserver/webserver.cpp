@@ -2,12 +2,14 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
+#include <boost/beast/websocket.hpp>
 #include <boost/config.hpp>
 #include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <regex>
+#include <set>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -21,7 +23,10 @@
 #error "Internal Webserver must be enabled if this source is compiled!"
 #endif
 
+using namespace std::placeholders;
 using tcp = boost::asio::ip::tcp;
+namespace beast = boost::beast;
+namespace websocket = beast::websocket;
 namespace http = boost::beast::http;
 namespace asio = boost::asio;
 
@@ -118,6 +123,9 @@ pathCat(boost::beast::string_view base, boost::beast::string_view path)
 #endif
   return result;
 }
+
+using Websocket =
+  boost::beast::websocket::stream<boost::asio::ip::tcp::socket&>;
 
 template<class Body, class Allocator, class Send>
 void
@@ -241,13 +249,99 @@ class Webserver::HTTPSession
     , m_docRoot(docRoot)
     , m_lambda(*this)
   {}
-  ~HTTPSession() {}
+  ~HTTPSession()
+  {
+    PARACUBER_LOG(m_logger, Trace) << "HTTP TCP Session ended.";
+    if(m_webserver) {
+      m_webserver->httpSessionClosed(this);
+    }
+  }
 
   void run()
   {
     PARACUBER_LOG(m_logger, Trace) << "New HTTP TCP Session established from "
                                    << m_socket.remote_endpoint() << ".";
     doRead();
+  }
+
+  void wsRun()
+  {
+    m_websocket->async_accept(
+      m_req,
+      boost::asio::bind_executor(m_strand,
+                                 std::bind(&HTTPSession::wsOnAccept,
+                                           shared_from_this(),
+                                           std::placeholders::_1)));
+  }
+  void wsOnAccept(beast::error_code ec)
+  {
+    if(ec != boost::system::errc::success) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not accept Websocket! Error: " << ec.message();
+      return;
+    }
+
+    PARACUBER_LOG(m_logger, Trace)
+      << "Accept websocket from " << m_socket.remote_endpoint();
+
+    // Read a message
+    wsDoRead();
+  }
+  void wsDoRead()
+  {
+    m_websocket->async_read(
+      m_buffer,
+      boost::asio::bind_executor(m_strand,
+                                 std::bind(&HTTPSession::wsOnRead,
+                                           shared_from_this(),
+                                           std::placeholders::_1,
+                                           std::placeholders::_2)));
+  }
+
+  void wsOnRead(beast::error_code ec, std::size_t bytes_transferred)
+  {
+    boost::ignore_unused(bytes_transferred);
+
+    // This indicates that the session was closed
+    if(ec == websocket::error::closed)
+      return;
+
+    if(ec != boost::system::errc::success) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not read Websocket! Error: " << ec.message();
+      return;
+    }
+
+    // Echo the message
+    m_websocket->text(m_websocket->got_text());
+    m_websocket->async_write(
+      m_buffer.data(),
+      boost::asio::bind_executor(m_strand,
+                                 std::bind(&HTTPSession::wsOnWrite,
+                                           shared_from_this(),
+                                           std::placeholders::_1,
+                                           std::placeholders::_2)));
+  }
+
+  void wsOnWrite(boost::system::error_code ec, std::size_t bytes_transferred)
+  {
+    boost::ignore_unused(bytes_transferred);
+
+    // Happens when the timer closes the socket
+    if(ec == boost::asio::error::operation_aborted)
+      return;
+
+    if(ec != boost::system::errc::success) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not write to Websocket! Error: " << ec.message();
+      return;
+    }
+
+    // Clear the buffer
+    m_buffer.consume(m_buffer.size());
+
+    // Do another read
+    wsDoRead();
   }
 
   void doRead()
@@ -276,8 +370,19 @@ class Webserver::HTTPSession
         << "Could not read HTTP! Error: " << ec.message();
     }
 
+    if(boost::beast::websocket::is_upgrade(m_req)) {
+      // This is a websocket request and should be treated as such.
+      m_websocket = std::make_unique<Websocket>(m_socket);
+      wsRun();
+      return;
+    }
+
     handleRequest(m_webserver, m_docRoot, std::move(m_req), m_lambda);
+
+    doRead();
   }
+
+  boost::asio::ip::tcp::socket& getTCPSocket() { return m_socket; }
 
   void onWrite(boost::system::error_code ec,
                std::size_t bytes_transferred,
@@ -305,15 +410,23 @@ class Webserver::HTTPSession
 
   void doClose()
   {
-    PARACUBER_LOG(m_logger, Trace)
-      << "HTTP TCP Session from " << m_socket.remote_endpoint() << " ended.";
+    if(m_socket.is_open())
+      return;
 
     // Send a TCP shutdown
     boost::system::error_code ec;
     m_socket.shutdown(tcp::socket::shutdown_send, ec);
 
+    if(ec != boost::system::errc::success) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not close HTTP TCP socket! Error: " << ec.message();
+    }
+
     // At this point the connection is closed gracefully
+    m_socket.close();
   }
+
+  void setWebserver(Webserver* server) { m_webserver = server; }
 
   private:
   struct send_lambda
@@ -351,6 +464,7 @@ class Webserver::HTTPSession
   };
 
   Webserver* m_webserver;
+  std::unique_ptr<Websocket> m_websocket;
   Logger m_logger;
   tcp::socket m_socket;
   boost::asio::strand<boost::asio::io_context::executor_type> m_strand;
@@ -383,6 +497,9 @@ class Webserver::HTTPListener
       return;
     }
 
+    // Reuse, so connections can directly stay.
+    m_acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
+
     // Bind to the server address
     m_acceptor.bind(endpoint, ec);
     if(ec) {
@@ -399,7 +516,11 @@ class Webserver::HTTPListener
       return;
     }
   }
-  ~HTTPListener() {}
+  ~HTTPListener()
+  {
+    shutdown();
+    PARACUBER_LOG(m_logger, Trace) << "Destruct HTTP Listener.";
+  }
 
   void startAccept()
   {
@@ -417,16 +538,58 @@ class Webserver::HTTPListener
         << ec.message();
     } else {
       // Create the session and run it
-      std::make_shared<HTTPSession>(m_webserver, std::move(m_socket), m_docRoot)
-        ->run();
+      auto session = std::make_shared<HTTPSession>(
+        m_webserver, std::move(m_socket), m_docRoot);
+      m_sessions.push_back(session);
+      session->run();
 
       // Accept another connection
       startAccept();
     }
   }
 
-  void shutdown() {
+  void sessionClosed(HTTPSession* session)
+  {
+    std::remove_if(m_sessions.begin(),
+                   m_sessions.end(),
+                   std::bind(&removeIfCB, _1, session));
+  }
+
+  void closeAllSessions()
+  {
+    for(auto& session : m_sessions) {
+      if(!session.expired()) {
+        auto ptr = session.lock();
+        ptr->doClose();
+      }
+    }
+    m_sessions.clear();
+  }
+
+  void shutdown()
+  {
+    closeAllSessions();
     m_acceptor.close();
+  }
+
+  void setWebserver(Webserver* server)
+  {
+    m_webserver = server;
+    std::remove_if(m_sessions.begin(),
+                   m_sessions.end(),
+                   std::bind(&removeIfCB, _1, nullptr));
+    for(auto& session : m_sessions) {
+      auto ptr = session.lock();
+      ptr->setWebserver(server);
+    }
+  }
+
+  static bool removeIfCB(const std::weak_ptr<HTTPSession> s, HTTPSession* match)
+  {
+    if(s.expired())
+      return true;
+    auto ptr = s.lock();
+    return ptr.get() == match;
   }
 
   private:
@@ -435,6 +598,7 @@ class Webserver::HTTPListener
   tcp::acceptor m_acceptor;
   tcp::socket m_socket;
   std::string m_docRoot;
+  std::vector<std::weak_ptr<HTTPSession>> m_sessions;
 };
 
 Webserver::Webserver(ConfigPtr config,
@@ -451,18 +615,35 @@ Webserver::Webserver(ConfigPtr config,
     << std::to_string(config->getUint16(Config::HTTPListenPort))
     << " with doc-root \"" << config->getString(Config::HTTPDocRoot)
     << "\". Link: " << buildLink();
-
-  m_httpListener = std::make_shared<HTTPListener>(
-    this,
-    m_ioService,
-    tcp::endpoint{ boost::asio::ip::tcp::v4(),
-                   config->getUint16(Config::HTTPListenPort) },
-    config->getString(Config::HTTPDocRoot));
-  m_httpListener->startAccept();
 }
-Webserver::~Webserver() {
-  m_httpListener->shutdown();
-  m_httpListener.reset();
+Webserver::~Webserver()
+{
+  if(m_httpListener) {
+    m_httpListener->setWebserver(nullptr);
+  }
+  PARACUBER_LOG(m_logger, Trace) << "Destruct Webserver.";
+}
+
+void
+Webserver::run()
+{
+  if(!m_httpListener) {
+    m_httpListener = std::make_shared<HTTPListener>(
+      this,
+      m_ioService,
+      tcp::endpoint{ boost::asio::ip::tcp::v4(),
+                     m_config->getUint16(Config::HTTPListenPort) },
+      m_config->getString(Config::HTTPDocRoot));
+    m_httpListener->startAccept();
+  }
+}
+void
+Webserver::stop()
+{
+  if(m_httpListener) {
+    m_httpListener->shutdown();
+    m_httpListener.reset();
+  }
 }
 
 std::string
@@ -470,6 +651,14 @@ Webserver::buildLink()
 {
   return "http://127.0.0.1:" +
          std::to_string(m_config->getUint16(Config::HTTPListenPort)) + "/";
+}
+
+void
+Webserver::httpSessionClosed(HTTPSession* session)
+{
+  if(m_httpListener) {
+    m_httpListener->sessionClosed(session);
+  }
 }
 }
 }
