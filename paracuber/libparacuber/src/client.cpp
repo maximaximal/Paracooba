@@ -57,6 +57,7 @@ Client::solve()
         << "Could not parse DIMACS source file! Status: " << result.getStatus()
         << ". Exiting Client.";
       m_communicator->exit();
+      return;
     }
 
     // If local solving is enabled, create a new task to solve the parsed
