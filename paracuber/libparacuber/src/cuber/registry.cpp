@@ -10,9 +10,19 @@ Registry::Registry(ConfigPtr config, LogPtr log, CNF& rootCNF)
   , m_log(log)
   , m_logger(log->createLogger())
   , m_rootCNF(rootCNF)
+{}
+Registry::~Registry() {}
+
+bool
+Registry::init()
 {
-  auto litFreqPtr =
-    std::make_unique<LiteralFrequency>(config, log, m_rootCNF, &m_allowanceMap);
+  m_cubers.clear();
+
+  auto litFreqPtr = std::make_unique<LiteralFrequency>(
+    m_config, m_log, m_rootCNF, &m_allowanceMap);
+  if(!litFreqPtr->init()) {
+    return false;
+  }
   LiteralFrequency& litFreq = *litFreqPtr;
   m_cubers.push_back(std::move(litFreqPtr));
 
@@ -22,8 +32,8 @@ Registry::Registry(ConfigPtr config, LogPtr log, CNF& rootCNF)
 
   // Now, the allowance map is ready and all waiting callbacks can be called.
   allowanceMapWaiter.setReady(&m_allowanceMap);
+  return true;
 }
-Registry::~Registry() {}
 
 Cuber&
 Registry::getActiveCuber() const

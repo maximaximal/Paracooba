@@ -19,6 +19,8 @@ class Registry
   explicit Registry(ConfigPtr config, LogPtr log, CNF& rootCNF);
   ~Registry();
 
+  bool init();
+
   using CuberVector = std::vector<std::unique_ptr<Cuber>>;
   using AllowanceMap = std::vector<CNFTree::CubeVar>;
 

@@ -316,6 +316,12 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         if(!m_cuberRegistry) {
           m_cuberRegistry =
             std::make_unique<cuber::Registry>(m_config, m_log, *this);
+          if(!m_cuberRegistry->init()) {
+            PARACUBER_LOG(m_logger, Fatal)
+              << "Could not initialise cuber registry!";
+            m_cuberRegistry.reset();
+            return d.subject;
+          }
         }
         uint32_t* size = receiveValueFromBuffer<uint32_t>(d, &buf, &length);
         if(size) {
@@ -364,6 +370,11 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     // node. It can then just be re-used, as the daemon cuber registry did not
     // need the root node to be created.
     m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
+    if(!m_cuberRegistry->init()) {
+      PARACUBER_LOG(m_logger, Fatal) << "Could not initialise cuber registry!";
+      m_cuberRegistry.reset();
+      return;
+    }
   }
   rootTaskReady.setReady(m_rootTask.get());
 }

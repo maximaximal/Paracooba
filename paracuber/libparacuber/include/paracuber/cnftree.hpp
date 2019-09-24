@@ -34,8 +34,9 @@ class CNFTree
    * The CubeVar is the current decision, the uint8_t the depth.
    *
    * Return true to abort traversal, false to continue.
+   *
+   * using VisitorFunc = std::function<bool(CubeVar, uint8_t, State& state)>;
    */
-  using Visitor = std::function<bool(CubeVar, uint8_t, State& state)>;
 
   /** @brief A single node on the cubing binary tree.
    *
@@ -62,7 +63,40 @@ class CNFTree
    *
    * @return False if the path is not known, true otherwise.
    */
-  bool visit(Path p, Visitor visitor);
+  template<class Visitor>
+  bool visit(Path p, Visitor visitor)
+  {
+    assert(getDepth(p) < maxPathDepth);
+
+    Node* n = &m_root;
+    uint8_t depth = 1;
+    bool end = false;
+
+    while(!end) {
+      bool assignment = getAssignment(p, depth);
+      CubeVar decision = n->decision;
+      std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+
+      if(!assignment) {
+        // A left path is an inversed literal, this is a bottom assignment.
+        decision = -decision;
+      }
+
+      if(n->isLeaf()) {
+        end = true;
+      } else {
+        end = visitor(decision, depth, n->state);
+      }
+
+      if(nextPtr && depth < getDepth(p) && !n->isLeaf()) {
+        n = nextPtr.get();
+        ++depth;
+      } else {
+        end = true;
+      }
+    }
+    return depth == getDepth(p);
+  }
 
   /** @brief Assigns a literal to the internal tree.
    *

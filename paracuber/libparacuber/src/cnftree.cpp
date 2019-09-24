@@ -8,41 +8,6 @@ CNFTree::CNFTree() {}
 CNFTree::~CNFTree() {}
 
 bool
-CNFTree::visit(Path p, Visitor visitor)
-{
-  assert(getDepth(p) < maxPathDepth);
-
-  Node* n = &m_root;
-  uint8_t depth = 1;
-  bool end = false;
-
-  while(!end) {
-    bool assignment = getAssignment(p, depth);
-    CubeVar decision = n->decision;
-    std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
-
-    if(!assignment) {
-      // A left path is an inversed literal, this is a bottom assignment.
-      decision = -decision;
-    }
-
-    if(n->isLeaf()) {
-      end = true;
-    } else {
-      end = visitor(decision, depth, n->state);
-    }
-
-    if(nextPtr && depth < getDepth(p) && !n->isLeaf()) {
-      n = nextPtr.get();
-      ++depth;
-    } else {
-      end = true;
-    }
-  }
-  return depth == getDepth(p);
-}
-
-bool
 CNFTree::setDecision(Path p, CubeVar decision)
 {
   assert(getDepth(p) < maxPathDepth);

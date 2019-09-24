@@ -21,6 +21,8 @@ class LiteralFrequency : public Cuber
                             Cuber::LiteralMap* allowanceMap);
   virtual ~LiteralFrequency();
 
+  bool init();
+
   virtual bool generateCube(CNFTree::Path path, CNFTree::CubeVar& var);
 
   Cuber::LiteralMap* getLiteralFrequency() { return m_literalFrequency; }

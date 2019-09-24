@@ -130,11 +130,33 @@ Config::parseConfigFile(std::string_view filePath)
   return true;
 }
 
+std::string
+Config::getKeyAsString(Key key)
+{
+  ConfigVariant& v = get(key);
+  switch(v.index()) {
+    case 0:
+      return std::to_string(std::get<uint16_t>(v));
+    case 1:
+      return std::to_string(std::get<uint32_t>(v));
+    case 2:
+      return std::to_string(std::get<uint64_t>(v));
+    case 3:
+      return std::to_string(std::get<int64_t>(v));
+    case 4:
+      return std::to_string(std::get<float>(v));
+    case 5:
+      return std::get<std::string>(v);
+    default:
+      return "Unknown Type!";
+  }
+}
+
 template<typename T>
 inline void
 conditionallySetConfigOptionToArray(
   const boost::program_options::variables_map& vm,
-  std::any* arr,
+  Config::ConfigVariant* arr,
   Config::Key key)
 {
   if(vm.count(GetConfigNameFromEnum(key))) {
@@ -173,8 +195,7 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::DaemonHost);
 
   if(vm.count(GetConfigNameFromEnum(Id))) {
-    m_config.data()[Id] =
-      generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());
+    m_config[Id] = generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());
   }
 
   return true;

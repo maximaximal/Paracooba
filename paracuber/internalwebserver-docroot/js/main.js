@@ -1,8 +1,8 @@
 var app = new Vue({
     el: '#app',
     data: {
-	local_info: null,
-	local_config: null,
+	local_info: {},
+	local_config: {},
 	ws_state: "Initialising",
     },
     filters: {
@@ -91,19 +91,55 @@ class CNFTree {
     }
 
     connect(url) {
+	let self = this;
+
 	app.ws_state = "Connecting...";
 	console.log("Using URL for websocket: " + this.url);
 	this.socket = new WebSocket(url);
-	this.socket.onopen = this.onWSOpen;
-	this.socket.onmessage = this.onWSMessage;
+	this.socket.onopen = function(e) { self.onWSOpen(e); };
+	this.socket.onmessage = function(e) { self.onWSMessage(e); };
     }
 
     onWSOpen() {
 	app.ws_state = "Connected!";
     }
 
-    onWSMessage() {
-	app.ws_state = "Message!";
+    onWSMessage(event) {
+	let msg = null;
+	try {
+	    msg = JSON.parse(event.data);
+	} catch(e) {
+	    console.log("Could not parse message from WS! Message:" + e);
+	    console.log(event.data);
+	}
+
+	if(msg === null) return;
+
+	try {
+	    this.handleWSMessage(msg);
+	} catch(e) {
+	    console.log("Could not process message from WS! Message: " + e);
+	    console.log(msg);
+	}
+    }
+
+    handleWSMessage(msg) {
+	switch(msg.type) {
+	case "cnftree-update": {
+	    break;
+	}
+	case "error": {
+	    alert("Error: " + msg.message);
+	    break;
+	}
+	case "pong": {
+	    console.log("pong");
+	    break;
+	}
+	case undefined:
+	    throw "REQUIRE .type field!";
+	    break;
+	}
     }
 }
 

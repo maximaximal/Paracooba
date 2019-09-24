@@ -4,12 +4,14 @@
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/config.hpp>
+#include <boost/property_tree/json_parser.hpp>
 #include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <regex>
 #include <set>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -172,11 +174,12 @@ handleRequest(Webserver* webserver,
 
   // Returns a server error response
   auto const api_response = [&req, webserver](API::Request request) {
+    assert(webserver);
     http::response<http::string_body> res{ http::status::ok, req.version() };
     res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set(http::field::content_type, "text/json");
+    res.set(http::field::content_type, "application/json");
     res.keep_alive(req.keep_alive());
-    res.body() = webserver->getAPI().generateResponse(request);
+    res.body() = webserver->getAPI()->generateResponse(request);
     res.prepare_payload();
     return res;
   };
@@ -248,12 +251,21 @@ class Webserver::HTTPSession
     , m_strand(m_socket.get_executor())
     , m_docRoot(docRoot)
     , m_lambda(*this)
-  {}
+  {
+    assert(m_webserver);
+  }
   ~HTTPSession()
   {
     PARACUBER_LOG(m_logger, Trace) << "HTTP TCP Session ended.";
     if(m_webserver) {
       m_webserver->httpSessionClosed(this);
+      if(m_webserver->getAPI()) {
+        m_webserver->getAPI()->handleWebSocketRequest(
+          &m_socket,
+          std::bind(
+            &HTTPSession::wsSendPropertyTree, this, std::placeholders::_1),
+          nullptr);
+      }
     }
   }
 
@@ -262,6 +274,14 @@ class Webserver::HTTPSession
     PARACUBER_LOG(m_logger, Trace) << "New HTTP TCP Session established from "
                                    << m_socket.remote_endpoint() << ".";
     doRead();
+  }
+
+  boost::property_tree::ptree makeErrorPTree(const std::string& message)
+  {
+    boost::property_tree::ptree ptree;
+    ptree.put("type", "error");
+    ptree.put("message", message);
+    return std::move(ptree);
   }
 
   void wsRun()
@@ -312,20 +332,38 @@ class Webserver::HTTPSession
       return;
     }
 
-    // Echo the message
-    m_websocket->text(m_websocket->got_text());
-    m_websocket->async_write(
-      m_buffer.data(),
-      boost::asio::bind_executor(m_strand,
-                                 std::bind(&HTTPSession::wsOnWrite,
-                                           shared_from_this(),
-                                           std::placeholders::_1,
-                                           std::placeholders::_2)));
+    if(m_websocket->got_text()) {
+      assert(m_webserver);
+      boost::property_tree::ptree ptree;
+      std::string msg = beast::buffers_to_string(m_buffer.data());
+      m_buffer.consume(m_buffer.size());
+      std::istringstream iss(msg);
+      try {
+        boost::property_tree::json_parser::read_json(iss, ptree);
+
+        m_webserver->getAPI()->handleWebSocketRequest(
+          &m_socket,
+          std::bind(
+            &HTTPSession::wsSendPropertyTree, this, std::placeholders::_1),
+          &ptree);
+      } catch(boost::property_tree::ptree_error& e) {
+        PARACUBER_LOG(m_logger, LocalWarning)
+          << "Could not parse received JSON from WebSocket! Data: \"" << msg
+          << "\" Error: " << e.what();
+
+        auto ptree = makeErrorPTree(
+          std::string("Could not parse request! Error: ") + e.what());
+        wsSendPropertyTree(ptree);
+      }
+    }
+
+    wsDoRead();
   }
 
   void wsOnWrite(boost::system::error_code ec, std::size_t bytes_transferred)
   {
     boost::ignore_unused(bytes_transferred);
+    m_buffer.consume(m_buffer.size());
 
     // Happens when the timer closes the socket
     if(ec == boost::asio::error::operation_aborted)
@@ -336,12 +374,23 @@ class Webserver::HTTPSession
         << "Could not write to Websocket! Error: " << ec.message();
       return;
     }
+  }
+  void wsSendPropertyTree(boost::property_tree::ptree& tree)
+  {
+    assert(m_webserver);
+    m_webserver->getIOService().post([this, tree]() {
+      auto os = boost::beast::ostream(m_buffer);
+      boost::property_tree::json_parser::write_json(os, tree);
+      m_websocket->text(true);
 
-    // Clear the buffer
-    m_buffer.consume(m_buffer.size());
-
-    // Do another read
-    wsDoRead();
+      m_websocket->async_write(
+        m_buffer.data(),
+        boost::asio::bind_executor(m_strand,
+                                   std::bind(&HTTPSession::wsOnWrite,
+                                             shared_from_this(),
+                                             std::placeholders::_1,
+                                             std::placeholders::_2)));
+    });
   }
 
   void doRead()
@@ -552,7 +601,7 @@ class Webserver::HTTPListener
   {
     std::remove_if(m_sessions.begin(),
                    m_sessions.end(),
-                   std::bind(&removeIfCB, _1, session));
+                   std::bind(&removeIfCB, std::placeholders::_1, session));
   }
 
   void closeAllSessions()
@@ -577,7 +626,7 @@ class Webserver::HTTPListener
     m_webserver = server;
     std::remove_if(m_sessions.begin(),
                    m_sessions.end(),
-                   std::bind(&removeIfCB, _1, nullptr));
+                   std::bind(&removeIfCB, std::placeholders::_1, nullptr));
     for(auto& session : m_sessions) {
       auto ptr = session.lock();
       ptr->setWebserver(server);
@@ -608,7 +657,7 @@ Webserver::Webserver(ConfigPtr config,
   , m_log(log)
   , m_logger(log->createLogger())
   , m_ioService(ioService)
-  , m_api(this, config, log)
+  , m_api(std::make_unique<API>(this, m_config, m_log))
 {
   PARACUBER_LOG(m_logger, Trace)
     << "Creating internal webserver. Reachable over port "

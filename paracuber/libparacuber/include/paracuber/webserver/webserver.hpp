@@ -41,7 +41,7 @@ class Webserver
 
   std::string buildLink();
 
-  API& getAPI() { return m_api; }
+  API* getAPI() { return m_api.get(); }
   boost::asio::io_service& getIOService() { return m_ioService; }
   HTTPListener* getHTTPListener() { return m_httpListener.get(); }
 
@@ -52,7 +52,7 @@ class Webserver
   LogPtr m_log;
   Logger m_logger;
   boost::asio::io_service& m_ioService;
-  API m_api;
+  std::unique_ptr<API> m_api;
 
   std::shared_ptr<HTTPListener> m_httpListener;
 };

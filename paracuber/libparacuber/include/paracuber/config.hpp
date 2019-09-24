@@ -1,11 +1,11 @@
 #ifndef PARACUBER_CONFIG_HPP
 
-#include <any>
 #include <array>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include <cstddef>
 #include <string_view>
+#include <variant>
 
 namespace paracuber {
 class Client;
@@ -44,6 +44,8 @@ class Config
 
     _KEY_COUNT
   };
+  using ConfigVariant =
+    std::variant<uint16_t, uint32_t, uint64_t, int64_t, float, std::string>;
 
   /** @brief Constructor
    */
@@ -67,12 +69,14 @@ class Config
    */
   bool parseConfigFile(std::string_view filePath);
 
+  std::string getKeyAsString(Key key);
+
   /** @brief Get a configuration variable with type and key.
    */
   template<typename T>
   inline T& get(Key key)
   {
-    return std::any_cast<T&>(m_config[key]);
+    return std::get<T>(m_config[key]);
   }
   /** @brief Get a std::string configuration variable.
    */
@@ -81,12 +85,6 @@ class Config
     std::string& str = get<std::string>(key);
     return std::string_view{ str.c_str(), str.size() };
   }
-  /** @brief Get an int32 configuration variable.
-   */
-  inline int32_t getInt32(Key key) { return get<int32_t>(key); }
-  /** @brief Get an int64 configuration variable.
-   */
-  inline int64_t getInt64(Key key) { return get<int64_t>(key); }
   /** @brief Get an uint16 configuration variable.
    */
   inline uint16_t getUint16(Key key) { return get<uint16_t>(key); }
@@ -96,23 +94,23 @@ class Config
   /** @brief Get an uint64 configuration variable.
    */
   inline uint64_t getUint64(Key key) { return get<uint64_t>(key); }
+  /** @brief Get an int64 configuration variable.
+   */
+  inline uint64_t getInt64(Key key) { return get<int64_t>(key); }
   /** @brief Get a float configuration variable.
    */
   inline uint64_t getFloat(Key key) { return get<float>(key); }
-  /** @brief Get a bool configuration variable.
-   */
-  inline bool getBool(Key key) { return get<bool>(key); }
 
   /** @brief Get a configuration variable which can be cast in any way.
    */
-  inline std::any get(Key key) { return m_config[key]; }
+  inline ConfigVariant& get(Key key) { return m_config[key]; }
   /** @brief Set a configuration variable.
    */
-  inline void set(Key key, std::any val) { m_config[key] = val; }
+  inline void set(Key key, ConfigVariant&& val) { m_config[key] = val; }
 
   /** @brief Get a configuration variable which can be cast in any way.
    */
-  std::any operator[](Key key) { return get(key); }
+  ConfigVariant& operator[](Key key) { return get(key); }
 
   /** @brief Check if debug mode is active. */
   inline bool isDebugMode() { return m_debugMode; }
@@ -155,13 +153,12 @@ class Config
   friend class Client;
   friend class Daemon;
   friend class Communicator;
-  friend class webserver::API;
 
   bool processCommonParameters(
     const boost::program_options::variables_map& map);
 
   using ConfigArray =
-    std::array<std::any, static_cast<std::size_t>(_KEY_COUNT)>;
+    std::array<ConfigVariant, static_cast<std::size_t>(_KEY_COUNT)>;
   ConfigArray m_config;
 
   boost::program_options::options_description m_optionsCLI;
