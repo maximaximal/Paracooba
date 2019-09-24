@@ -77,14 +77,10 @@ _parac_parse_help() {
 ########################################
 _parac() {
   local cur prev type
-  if ! type _init_completion >/dev/null; then
-    _init_completion -n = || return
-  else
-    # manual initialization for older bash completion versions
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-  fi
+  # manual initialization for older bash completion versions
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
 
   program="parac";
   if [[ -f "$PWD/parac" ]]; then
