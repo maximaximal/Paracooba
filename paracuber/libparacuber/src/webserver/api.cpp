@@ -1,6 +1,7 @@
 #include "../../include/paracuber/webserver/api.hpp"
-#include "../../include/paracuber/config.hpp"
 #include "../../include/paracuber/client.hpp"
+#include "../../include/paracuber/communicator.hpp"
+#include "../../include/paracuber/config.hpp"
 #include "../../include/paracuber/webserver/webserver.hpp"
 #include <cassert>
 #include <regex>
@@ -17,6 +18,22 @@ API::API(Webserver* webserver, ConfigPtr config, LogPtr log)
   , m_config(config)
 {}
 API::~API() {}
+
+void
+API::injectCNFTreeNode(int64_t handle,
+                       CNFTree::Path p,
+                       CNFTree::CubeVar var,
+                       CNFTree::StateEnum state)
+{
+  auto it = m_wsData.find(
+    reinterpret_cast<const boost::asio::ip::tcp::socket*>(handle));
+  if(it == m_wsData.end()) {
+    PARACUBER_LOG(m_logger, LocalWarning)
+      << "Invalid socket handle supplied to API in CNFTreeNode injection!";
+    return;
+  }
+  WSData& data = it->second;
+}
 
 bool
 API::isAPIRequest(const std::string& target)
@@ -69,7 +86,8 @@ API::generateResponseForLocalInfo()
 {
   std::string str = "{\n";
   if(!m_config->isDaemonMode()) {
-    str += "  \"CNFVarCount\":" + std::to_string(m_config->getClient()->getCNFVarCount()) + "\n";
+    str += "  \"CNFVarCount\":" +
+           std::to_string(m_config->getClient()->getCNFVarCount()) + "\n";
   }
   str += "}";
   return str;
@@ -84,22 +102,57 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
     m_wsData.erase(socket);
     return;
   }
-  WSData& data = m_wsData[socket];
+  auto it = m_wsData.find(socket);
+  if(it == m_wsData.end()) {
+    it = m_wsData.insert({ socket, { cb } }).first;
+  }
+  WSData& data = it->second;
   data.answer.clear();
 
   std::string type = ptree->get<std::string>("type");
 
   if(type == "cnftree-request-path") {
     // Request path.
+    std::string strPath = ptree->get<std::string>("path");
+    if(strPath.length() > CNFTree::maxPathDepth) {
+      return sendError(data, "CNFTree path too long!");
+    }
+    CNFTree::Path p = CNFTree::strToPath(strPath.data(), strPath.length());
+    m_config->getCommunicator()->requestCNFPathInfo(
+      p, reinterpret_cast<int64_t>(socket));
   } else if(type == "ping") {
     // Ping
     data.answer.put("type", "pong");
+    cb(data.answer);
   } else {
-    data.answer.put("type", "error");
-    data.answer.put("message", "Unknown message type: \"" + type + "\"!");
+    return sendError(data, "Unknown message type \"" + type + "\"!");
   }
+}
 
-  cb(data.answer);
+void
+API::sendError(WSData& d, const std::string& str)
+{
+  d.answer.clear();
+  d.answer.put("type", "error");
+  d.answer.put("message", str);
+  d.cb(d.answer);
+}
+
+void
+API::handleInjectedCNFTreeNode(WSData& d,
+                               CNFTree::Path p,
+                               CNFTree::CubeVar var,
+                               CNFTree::StateEnum state)
+{
+  char strPath[CNFTree::maxPathDepth + 1];
+  CNFTree::pathToStr(p, strPath);
+  auto& a = d.answer;
+  a.clear();
+  a.put("type", "cnftree-update");
+  a.put("path", std::string(strPath, CNFTree::getDepth(p)));
+  a.put("literal", var);
+  a.put("state", CNFTreeStateToStr(state));
+  d.cb(a);
 }
 }
 }

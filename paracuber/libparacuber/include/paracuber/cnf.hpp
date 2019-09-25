@@ -99,6 +99,8 @@ class CNF
 
   CNFTree& getCNFTree() { return m_cnfTree; }
 
+  void requestInfoGlobally(CNFTree::Path p, int64_t handle = 0);
+
   private:
   struct SendDataStruct
   {

@@ -14,6 +14,10 @@
 #include <mutex>
 #include <regex>
 
+#ifdef ENABLE_INTERNAL_WEBSERVER
+#include "../include/paracuber/webserver/api.hpp"
+#endif
+
 #include <capnp-schemas/message.capnp.h>
 #include <capnp/serialize.h>
 
@@ -116,6 +120,18 @@ class Communicator::UDPServer
             << "  -> Node Status from " << m_remoteEndpoint
             << " (ID: " << msg.getOrigin() << ")";
           handleNodeStatus(msg);
+          break;
+        case Message::CNF_TREE_NODE_STATUS_REQUEST:
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> CNFTree Node Status Request from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
+          handleCNFTreeNodeStatusRequest(msg);
+          break;
+        case Message::CNF_TREE_NODE_STATUS_REPLY:
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> CNFTree Node Status Reply from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
+          handleCNFTreeNodeStatusReply(msg);
           break;
       }
 
@@ -247,6 +263,86 @@ class Communicator::UDPServer
     applyMessageNodeStatusToStatsNode(reader, statisticsNode);
 
     networkStatisticsNode(statisticsNode);
+  }
+
+  void handleCNFTreeNodeStatusRequest(Message::Reader& msg)
+  {
+    const CNFTreeNodeStatusRequest::Reader& reader =
+      msg.getCnfTreeNodeStatusRequest();
+    int64_t originId = msg.getOrigin();
+    int64_t cnfId = reader.getCnfId();
+
+    CNF* cnf = nullptr;
+    auto [statisticsNode, inserted] =
+      m_clusterStatistics->getOrCreateNode(originId);
+    networkStatisticsNode(statisticsNode);
+
+    if(m_communicator->m_config->isDaemonMode()) {
+      auto [context, lock] =
+        m_communicator->m_config->getDaemon()->getContext(cnfId);
+      if(!context) {
+        PARACUBER_LOG(m_logger, GlobalWarning)
+          << "CNFTreeNodeStatusRequest received before Context for ID " << cnfId
+          << " existed!";
+        return;
+      }
+      cnf = context->getRootCNF().get();
+    }
+
+    if(!cnf) {
+      PARACUBER_LOG(m_logger, LocalWarning)
+        << "CNFTreeNodeStatusRequest received, but no CNF found for ID "
+        << cnfId << "!";
+      return;
+    }
+
+    // Build answer message.
+    auto msgBuilder = getMessageBuilder();
+    auto reply = msgBuilder.initCnfTreeNodeStatusReply();
+    auto nodes = reply.initNodes(CNFTree::getDepth(reader.getPath()));
+    auto it = nodes.begin();
+    reply.setCnfId(cnfId);
+    reply.setHandle(reader.getHandle());
+    reply.setPath(reader.getPath());
+
+    cnf->getCNFTree().visit(
+      reader.getPath(),
+      [&it](
+        CNFTree::CubeVar var, uint8_t, CNFTree::State& state, int64_t remote) {
+        it->setState(state);
+        it->setLiteral(var);
+        ++it;
+        return false;
+      });
+
+    sendBuiltMessage(m_socket.remote_endpoint());
+  }
+  void handleCNFTreeNodeStatusReply(Message::Reader& msg)
+  {
+    const CNFTreeNodeStatusReply::Reader& reader =
+      msg.getCnfTreeNodeStatusReply();
+    int64_t originId = msg.getOrigin();
+    int64_t cnfId = reader.getCnfId();
+    int64_t handle = reader.getHandle();
+    uint64_t path = reader.getPath();
+
+    // Depending on the handle, this is sent to the internal CNFTree handling
+    // mechanism (handle == 0) or to the webserver for viewing (handle != 0).
+
+    auto nodes = reader.getNodes();
+    if(handle == 0) {
+
+    } else {
+      size_t depth = 1;
+      for(auto node : nodes) {
+        m_communicator->injectCNFTreeNodeInfo(
+          cnfId,
+          handle,
+          CNFTree::setDepth(path, depth++),
+          node.getLiteral(),
+          static_cast<CNFTree::StateEnum>(node.getState()));
+      }
+    }
   }
 
   void handleSend(const boost::system::error_code& error,
@@ -827,6 +923,70 @@ Communicator::sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
         });
       });
   });
+}
+
+void
+Communicator::requestCNFPathInfo(CNFTree::Path p, int64_t handle, int64_t cnfId)
+{
+  PARACUBER_LOG(m_logger, Trace)
+    << "Requesting path info for path " << CNFTree::pathToStdString(p);
+
+  std::shared_ptr<CNF> rootCNF;
+
+  if(m_config->isDaemonMode()) {
+    if(cnfId == 0) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Cannot request status on daemon node without ID!";
+      return;
+    }
+
+    // TODO
+    assert(false);
+  } else {
+    rootCNF = m_config->getClient()->getRootCNF();
+  }
+
+  if(!rootCNF) {
+    PARACUBER_LOG(m_logger, LocalError)
+      << "Cannot answer CNFTree path request without CNF instance!";
+    return;
+  }
+
+  rootCNF->requestInfoGlobally(p, handle);
+}
+
+void
+Communicator::injectCNFTreeNodeInfo(int64_t cnfId,
+                                    int64_t handle,
+                                    CNFTree::Path p,
+                                    CNFTree::CubeVar v,
+                                    CNFTree::StateEnum state)
+{
+#ifdef ENABLE_INTERNAL_WEBSERVER
+  webserver::API* api = m_webserverInitiator->getAPI();
+  if(!api) {
+    PARACUBER_LOG(m_logger, LocalWarning)
+      << "Cannot inject CNFTreeNodeInfo into uninitialised webserver::API!";
+    return;
+  }
+  api->injectCNFTreeNode(handle, p, v, state);
+#endif
+}
+
+void
+Communicator::sendCNFTreeNodeStatusRequest(int64_t targetId,
+                                           int64_t cnfId,
+                                           CNFTree::Path p,
+                                           int64_t handle)
+{
+  auto& statNode = m_clusterStatistics->getNode(targetId);
+  auto* nn = statNode.getNetworkedNode();
+  auto msgBuilder = m_udpServer->getMessageBuilder();
+  auto req = msgBuilder.initCnfTreeNodeStatusRequest();
+  req.setCnfId(cnfId);
+  req.setPath(p);
+  req.setHandle(handle);
+  m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint());
 }
 
 void

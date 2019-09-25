@@ -1,3 +1,4 @@
+var cnfTree = null;
 var app = new Vue({
     el: '#app',
     data: {
@@ -9,20 +10,21 @@ var app = new Vue({
     },
     mounted () {
 	axios
-	    .get('/api/local.json')
+	    .get('/api/local-info.json')
 	    .then(response => {
-		this.local_info = response.data
+		this.local_info = response.data;
 	    })
 	    .catch(error => {
-		console.log(error)
+		console.log(error);
 	    });
 	axios
 	    .get('/api/local-config.json')
 	    .then(response => {
-		this.local_config = response.data
+		this.local_config = response.data;
+		cnfTree.connect();
 	    })
 	    .catch(error => {
-		console.log(error)
+		console.log(error);
 	    });
     }
 });
@@ -85,16 +87,14 @@ class CNFTree {
     constructor(cy) {
 	this.cy = cy;
 	this.socket = null;
-	this.url = "ws://" + window.location.href.substring(7);
-
-	this.connect(this.url);
     }
 
-    connect(url) {
+    connect() {
 	let self = this;
+	let url = "ws://127.0.0.1:" + app.local_config["http-listen-port"];
 
 	app.ws_state = "Connecting...";
-	console.log("Using URL for websocket: " + this.url);
+	console.log("Using URL for websocket: " + url);
 	this.socket = new WebSocket(url);
 	this.socket.onopen = function(e) { self.onWSOpen(e); };
 	this.socket.onmessage = function(e) { self.onWSMessage(e); };
@@ -126,6 +126,7 @@ class CNFTree {
     handleWSMessage(msg) {
 	switch(msg.type) {
 	case "cnftree-update": {
+	    this.handleCNFTreeUpdate(msg);
 	    break;
 	}
 	case "error": {
@@ -141,9 +142,13 @@ class CNFTree {
 	    break;
 	}
     }
+
+    handleCNFTreeUpdate(msg) {
+	this.cy.add({ group: "nodes", id: msg.id });
+    }
 }
 
-var cnfTree = new CNFTree(cytoscape_main);
+cnfTree = new CNFTree(cytoscape_main);
 
 cytoscape_main.layout({ name: 'dagre', options: dagre_options }).run();
 

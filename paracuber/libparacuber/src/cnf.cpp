@@ -1,5 +1,7 @@
 #include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/cadical_task.hpp"
+#include "../include/paracuber/communicator.hpp"
+#include "../include/paracuber/config.hpp"
 #include "../include/paracuber/cuber/registry.hpp"
 
 #include <boost/asio.hpp>
@@ -157,6 +159,26 @@ CNF::readyToBeStarted() const
 {
   return m_rootTask && m_cuberRegistry &&
          m_cuberRegistry->allowanceMapWaiter.isReady();
+}
+
+void
+CNF::requestInfoGlobally(CNFTree::Path p, int64_t handle)
+{
+  Communicator* comm = m_config->getCommunicator();
+  m_cnfTree.visit(
+    p,
+    [this, handle, comm, p](CNFTree::CubeVar var,
+                            uint8_t depth,
+                            CNFTree::State& state,
+                            int64_t remote) {
+      if(remote == 0) {
+        comm->injectCNFTreeNodeInfo(
+          m_originId, handle, CNFTree::setDepth(p, depth), var, state);
+      } else {
+        comm->sendCNFTreeNodeStatusRequest(remote, m_originId, p, handle);
+      }
+      return false;
+    });
 }
 
 template<typename T>

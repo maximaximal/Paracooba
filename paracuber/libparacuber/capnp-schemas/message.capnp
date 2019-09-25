@@ -68,6 +68,27 @@ struct NodeStatus
 # An update about node statistics. Sent to all other
 # known online nodes approximately every second.
 
+struct CNFTreeNodeStatusRequest
+{
+  handle @0 : Int64;
+  path @1 : UInt64;
+  cnfId @2 : Int64;
+}
+
+struct CNFTreeNodeStatusReplyEntry
+{
+  literal @0 : Int32;
+  state @1 : UInt8;
+}
+
+struct CNFTreeNodeStatusReply
+{
+  handle @0 : Int64;
+  path @1 : UInt64;
+  cnfId @2 : Int64;
+  nodes @3 : List(CNFTreeNodeStatusReplyEntry);
+}
+
 struct Message
 {
   id @0 : Int16;
@@ -81,6 +102,8 @@ struct Message
     onlineAnnouncement @3 : OnlineAnnouncement;
     offlineAnnouncement @4 : OfflineAnnouncement;
     nodeStatus @5 : NodeStatus;
+    cnfTreeNodeStatusRequest @6 : CNFTreeNodeStatusRequest;
+    cnfTreeNodeStatusReply @7 : CNFTreeNodeStatusReply;
   }
   # acual message body
 }

@@ -115,6 +115,8 @@ class ClusterStatistics
    */
   ~ClusterStatistics();
 
+  ClusterStatistics::Node& getNode(int64_t id);
+
   std::pair<ClusterStatistics::Node&, bool> getOrCreateNode(int64_t id);
 
   friend std::ostream& operator<<(std::ostream& o, const ClusterStatistics& c)

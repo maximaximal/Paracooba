@@ -8,6 +8,7 @@
 namespace paracuber {
 namespace webserver {
 class Webserver;
+class API;
 
 class Initiator
 {
@@ -17,6 +18,8 @@ class Initiator
 
   void run();
   void stop();
+
+  API* getAPI();
 
   private:
   LogPtr m_log;

@@ -47,6 +47,14 @@ ClusterStatistics::ClusterStatistics(ConfigPtr config, LogPtr log)
 
 ClusterStatistics::~ClusterStatistics() {}
 
+ClusterStatistics::Node&
+ClusterStatistics::getNode(int64_t id)
+{
+  auto it = m_nodeMap.find(id);
+  assert(it != m_nodeMap.end());
+  return it->second;
+}
+
 std::pair<ClusterStatistics::Node&, bool>
 ClusterStatistics::getOrCreateNode(int64_t id)
 {

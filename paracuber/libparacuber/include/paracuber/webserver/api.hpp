@@ -1,6 +1,7 @@
 #ifndef PARACUBER_WEBSERVER_API_HPP
 #define PARACUBER_WEBSERVER_API_HPP
 
+#include "../cnftree.hpp"
 #include "../log.hpp"
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -28,6 +29,11 @@ class API
   explicit API(Webserver* webserver, ConfigPtr config, LogPtr log);
   ~API();
 
+  void injectCNFTreeNode(int64_t handle,
+                         CNFTree::Path p,
+                         CNFTree::CubeVar var,
+                         CNFTree::StateEnum state);
+
   static bool isAPIRequest(const std::string& target);
   static Request matchTargetToRequest(const std::string& target);
 
@@ -42,9 +48,17 @@ class API
 
   struct WSData
   {
+    WebSocketCB &cb;
     boost::property_tree::ptree answer;
   };
   std::map<const boost::asio::ip::tcp::socket*, WSData> m_wsData;
+
+  void handleInjectedCNFTreeNode(WSData& d,
+                                 CNFTree::Path p,
+                                 CNFTree::CubeVar var,
+                                 CNFTree::StateEnum state);
+
+  void sendError(WSData &d, const std::string &str);
 
   static const std::regex matchAPIRequest;
   static const std::regex matchLocalConfigRequest;

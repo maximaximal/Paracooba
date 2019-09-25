@@ -109,4 +109,55 @@ CNFTree::setState(Path p, State state)
   }
   return false;
 }
+void
+CNFTree::pathToStr(Path p, char* str)
+{
+  // TODO: Make this more efficient if it is required.
+  for(size_t i = 0; i < maxPathDepth; ++i) {
+    if(getAssignment(p, i + 1)) {
+      str[i] = '1';
+    } else {
+      str[i] = '0';
+    }
+  }
+}
+
+std::string
+CNFTree::pathToStdString(Path p)
+{
+  char str[maxPathDepth + 1];
+  pathToStr(p, str);
+  return (std::string(str, getDepth(p)) + " (" + std::to_string(getDepth(p)) +
+          ")");
+}
+
+bool
+CNFTree::isLocal(Path p)
+{
+  bool isLocal = true;
+  visit(p,
+        [&isLocal](
+          CubeVar p, uint8_t depth, CNFTree::State& state, int64_t remote) {
+          if(remote != 0) {
+            isLocal = false;
+            return true;
+          }
+          return false;
+        });
+  return isLocal;
+}
+
+CNFTree::Path
+CNFTree::strToPath(const char* str, size_t len)
+{
+  Path p = CNFTree::setDepth(0, len);
+  for(size_t i = 0; i < len; ++i) {
+    if(str[i] == '0') {
+      p = setAssignment(p, i + 1, false);
+    } else {
+      p = setAssignment(p, i + 1, true);
+    }
+  }
+  return p;
+}
 }

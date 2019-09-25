@@ -108,6 +108,19 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   void sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
                                        NetworkedNode* nn);
 
+  void requestCNFPathInfo(CNFTree::Path p, int64_t handle, int64_t cnfId = 0);
+
+  void injectCNFTreeNodeInfo(int64_t cnfId,
+                             int64_t handle,
+                             CNFTree::Path p,
+                             CNFTree::CubeVar v,
+                             CNFTree::StateEnum state);
+
+  void sendCNFTreeNodeStatusRequest(int64_t targetId,
+                                    int64_t cnfId,
+                                    CNFTree::Path p,
+                                    int64_t handle);
+
   private:
   ConfigPtr m_config;
   LogPtr m_log;

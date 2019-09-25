@@ -45,5 +45,15 @@ Initiator::stop()
   }
 #endif
 }
+API*
+Initiator::getAPI()
+{
+#ifdef ENABLE_INTERNAL_WEBSERVER
+  if(m_webserver) {
+    return m_webserver->getAPI();
+  }
+#endif
+  return nullptr;
+}
 }
 }

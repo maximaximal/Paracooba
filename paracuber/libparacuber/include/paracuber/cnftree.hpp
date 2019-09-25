@@ -25,7 +25,8 @@ class CNFTree
     Working,
     SAT,
     UNSAT,
-    Unknown
+    Unknown,
+    _STATE_COUNT
   };
   using State = std::atomic<StateEnum>;
 
@@ -35,7 +36,8 @@ class CNFTree
    *
    * Return true to abort traversal, false to continue.
    *
-   * using VisitorFunc = std::function<bool(CubeVar, uint8_t, State& state)>;
+   * using VisitorFunc = std::function<bool(CubeVar, uint8_t, State& state,
+   * int64_t remote)>;
    */
 
   /** @brief A single node on the cubing binary tree.
@@ -85,7 +87,7 @@ class CNFTree
       if(n->isLeaf()) {
         end = true;
       } else {
-        end = visitor(decision, depth, n->state);
+        end = visitor(decision, depth, n->state, n->remote);
       }
 
       if(nextPtr && depth < getDepth(p) && !n->isLeaf()) {
@@ -97,6 +99,8 @@ class CNFTree
     }
     return depth == getDepth(p);
   }
+
+  bool isLocal(Path p);
 
   /** @brief Assigns a literal to the internal tree.
    *
@@ -125,20 +129,24 @@ class CNFTree
   template<class Container>
   bool writePathToLiteralContainer(Container container, Path p)
   {
-    return visit(p,
-                 [&container](CubeVar p, uint8_t depth, CNFTree::State& state) {
-                   container.push_back(p);
-                   return false;
-                 });
+    return visit(
+      p,
+      [&container](
+        CubeVar p, uint8_t depth, CNFTree::State& state, int64_t remote) {
+        container.push_back(p);
+        return false;
+      });
   }
   template<class Container>
   bool writePathToLiteralAndStateContainer(Container container, Path p)
   {
-    return visit(p,
-                 [&container](CubeVar p, uint8_t depth, CNFTree::State& state) {
-                   container.push_back({ p, state });
-                   return false;
-                 });
+    return visit(
+      p,
+      [&container](
+        CubeVar p, uint8_t depth, CNFTree::State& state, int64_t remote) {
+        container.push_back({ p, state });
+        return false;
+      });
   }
 
   static const size_t maxPathDepth;
@@ -163,6 +171,10 @@ class CNFTree
     assert(d <= maxPathDepth);
     return getPath(p) | (d & 0b00111111);
   }
+
+  static void pathToStr(Path p, char* str);
+  static std::string pathToStdString(Path p);
+  static Path strToPath(const char* str, size_t len);
 
   template<typename T>
   static inline Path buildPath(T p, uint8_t d)
@@ -196,6 +208,25 @@ class CNFTree
   private:
   Node m_root;
 };
+
+constexpr const char*
+CNFTreeStateToStr(CNFTree::StateEnum s)
+{
+  switch(s) {
+    case CNFTree::StateEnum::Unvisited:
+      return "Unvisited";
+    case CNFTree::StateEnum::Working:
+      return "Working";
+    case CNFTree::StateEnum::SAT:
+      return "SAT";
+    case CNFTree::StateEnum::UNSAT:
+      return "UNSAT";
+    case CNFTree::StateEnum::Unknown:
+      return "Unknown";
+    default:
+      return "Unknown State";
+  }
+}
 
 template<>
 inline CNFTree::Path
