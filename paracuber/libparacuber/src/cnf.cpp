@@ -27,6 +27,7 @@ CNF::CNF(ConfigPtr config,
   , m_dimacsFile(dimacsFile)
   , m_log(log)
   , m_logger(log->createLogger())
+  , m_cnfTree(std::make_unique<CNFTree>())
 {
   if(dimacsFile != "") {
     struct stat statbuf;
@@ -44,6 +45,7 @@ CNF::CNF(const CNF& o)
   , m_dimacsFile(o.m_dimacsFile)
   , m_log(o.m_log)
   , m_logger(o.m_log->createLogger())
+  , m_cnfTree(std::make_unique<CNFTree>())
 {}
 
 CNF::~CNF() {}
@@ -93,7 +95,7 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
   } else {
     // Transmit all decisions on the given path.
     data->decisions.resize(CNFTree::getDepth(path));
-    m_cnfTree.writePathToLiteralContainer(data->decisions, path);
+    m_cnfTree->writePathToLiteralContainer(data->decisions, path);
 
     // After this async write operation has finished, the local data can be
     // erased again. This happens when the file offset reaches the file size, so
@@ -165,7 +167,7 @@ void
 CNF::requestInfoGlobally(CNFTree::Path p, int64_t handle)
 {
   Communicator* comm = m_config->getCommunicator();
-  m_cnfTree.visit(
+  m_cnfTree->visit(
     p,
     [this, handle, comm, p](CNFTree::CubeVar var,
                             uint8_t depth,
@@ -325,7 +327,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
             receiveValueFromBuffer<CNFTree::CubeVar>(d, &buf, &length);
           if(var) {
             // Valid literal received, insert into CNFTree.
-            if(!m_cnfTree.setDecision(
+            if(!m_cnfTree->setDecision(
                  CNFTree::setDepth(d.path, d.currentDepth++), *var)) {
               PARACUBER_LOG(m_logger, LocalError)
                 << "Could not apply decision <" << *var

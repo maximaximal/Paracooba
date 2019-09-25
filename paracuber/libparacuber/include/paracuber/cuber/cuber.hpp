@@ -38,7 +38,7 @@ class Cuber
 
   static inline uint64_t getModuloComponent(CNFTree::Path p)
   {
-    return (1 << (CNFTree::getDepth(p) - 1));
+    return (1 << (CNFTree::getDepth(p)));
   }
   static inline uint64_t getAdditionComponent(CNFTree::Path p)
   {

@@ -28,7 +28,7 @@ class CNFTree
     Unknown,
     _STATE_COUNT
   };
-  using State = std::atomic<StateEnum>;
+  using State = StateEnum;
 
   /** @brief Visitor function for traversing a CNF tree.
    *

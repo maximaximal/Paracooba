@@ -70,11 +70,11 @@ CNFTree::getState(Path p, State state) const
     }
 
     if(depth == getDepth(p)) {
-      state = n->state.load();
+      state = n->state;
       return true;
     }
 
-    bool assignment = getAssignment(p, depth);
+    bool assignment = getAssignment(p, depth + 1);
     const std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
 
     n = nextPtr.get();
@@ -98,11 +98,11 @@ CNFTree::setState(Path p, State state)
     }
 
     if(depth == getDepth(p)) {
-      n->state.store(state);
+      n->state = state;
       return true;
     }
 
-    bool assignment = getAssignment(p, depth);
+    bool assignment = getAssignment(p, depth + 1);
     std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
 
     n = nextPtr.get();

@@ -97,7 +97,7 @@ class CNF
 
   bool readyToBeStarted() const;
 
-  CNFTree& getCNFTree() { return m_cnfTree; }
+  CNFTree& getCNFTree() { return *m_cnfTree; }
 
   void requestInfoGlobally(CNFTree::Path p, int64_t handle = 0);
 
@@ -129,7 +129,7 @@ class CNF
   CaDiCaLTaskPtr m_rootTask;
 
   std::unique_ptr<cuber::Registry> m_cuberRegistry;
-  CNFTree m_cnfTree;
+  std::unique_ptr<CNFTree> m_cnfTree;
 
   ConfigPtr m_config;
   LogPtr m_log;

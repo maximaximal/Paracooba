@@ -93,11 +93,11 @@ Client::solve()
     // parallel. Decisions are always guided by the CNFTree class, which
     // knows how many decisions are left in any given path.
     CNFTree::CubeVar var;
-    CNFTree::Path p = CNFTree::buildPath(0, 1);
+    CNFTree::Path p = CNFTree::buildPath(0, 0);
     bool succ = m_rootCNF->getCuberRegistry().generateCube(p, var);
     PARACUBER_LOG(m_logger, Trace)
       << "First Decision: " << var << " with " << succ << " and cutoff " << m_config->getFloat(Config::FreqCuberCutoff);
-    m_rootCNF->getCNFTree().setDecision(p, var);
+    assert(m_rootCNF->getCNFTree().setDecision(p, var));
   });
 }
 }

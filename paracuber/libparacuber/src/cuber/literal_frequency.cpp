@@ -102,7 +102,7 @@ LiteralFrequency::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
   auto additionComponent = getAdditionComponent(path);
   auto moduloComponent = getModuloComponent(path);
 
-  auto dec = additionComponent + moduloComponent;
+  auto dec = additionComponent + (moduloComponent - 1);
 
   if(((float)dec / (float)m_literalFrequency->size()) >=
      m_config->getFloat(Config::FreqCuberCutoff)) {
