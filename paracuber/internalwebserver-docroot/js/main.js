@@ -32,12 +32,6 @@ var app = new Vue({
 var cytoscape_main = cytoscape({
     container: document.getElementById('cytoscape_main'),
     elements: [
-	{ // node n1
-	    data: { // element data (put json serialisable dev data here)
-		id: 'root' // mandatory (string) id for each element, assigned automatically on undefined
-		// (`parent` can be effectively changed by `eles.move()`)
-	    },
-	},
     ],
 
     layout: {
@@ -50,9 +44,17 @@ var cytoscape_main = cytoscape({
 	{
 	    selector: 'node',
 	    style: {
-		'label': 'data(id)',
+		'label': 'data(literal)',
 		'text-valign': 'top',
 		'text-halign': 'left'
+	    }
+	},
+	{
+	    selector: 'edge',
+	    style: {
+		'label': 'data(assignment)',
+		'text-valign': 'top',
+		'text-halign': 'center'
 	    }
 	}
     ]
@@ -87,6 +89,12 @@ class CNFTree {
     constructor(cy) {
 	this.cy = cy;
 	this.socket = null;
+	let self = this;
+
+	this.cy.on('tap', 'node', function (evt) {
+	    let data = evt.target.data();
+	    self.requestNodeData(data.path);
+	});
     }
 
     connect() {
@@ -143,22 +151,56 @@ class CNFTree {
 	}
     }
 
+    requestNodeData(path) {
+	if(app.ws_state != "Connected!") {
+	    return;
+	}
+	let path1 = path + '0';
+	let path2 = path + '1';
+	this.socket.send(JSON.stringify({type: "cnftree-request-path", path: path1}));
+	this.socket.send(JSON.stringify({type: "cnftree-request-path", path: path2}));
+    }
+
     handleCNFTreeUpdate(msg) {
 	console.log(msg);
-	this.cy.add({ group: "nodes", id: msg.path, literal: msg.literal });
+
+	// Find root.
+	let rootQuery = this.cy.$('node[id="root"]');
+	let root = null;
+
+	if(rootQuery.length == 0) {
+	    // Add root node, it does not exist yet.
+	    this.cy.add({ group: "nodes", data: { id: "root", literal: Math.abs(msg.literal), path: '' }});
+	    rootQuery = this.cy.$('node[id="root"]');
+	}
+	root = rootQuery[0];
+
+	console.log(root);
+
+	if(msg.path == "") {
+	    // This is the root node! Apply it to there.
+	    root.data.literal = msg.literal;
+	} else {
+	    let source = msg.path.substr(0, msg.path.length - 1);
+	    if(source == '')
+		source = 'root';
+
+	    let right = msg.path.substr(-1) == '1';
+	    let assignment = right ? '⊤' : '⊥';
+	    let pos = {x: assignment ? 1000 : -1000, y: 0};
+
+	    let node = this.cy.$("node[path=\"" + msg.path + "\"]");
+	    if(node.length == 0) {
+		this.cy.add({ group: "nodes", position: pos, data: {
+		    id: msg.path, literal: Math.abs(msg.literal), path: msg.path }});
+		this.cy.add({ group: "edges", data: {
+		    id: msg.path + "e", source: source, target: msg.path, assignment: assignment }});
+	    }
+	}
+	this.cy.layout({ name: 'dagre', options: dagre_options }).run();
     }
 }
 
 cnfTree = new CNFTree(cytoscape_main);
 
 cytoscape_main.layout({ name: 'dagre', options: dagre_options }).run();
-
-cytoscape_main.add({
-    data: {id: "n1"}
-});
-
-cytoscape_main.add({
-    data: {source: "root", target: "n1"}
-});
-
-cytoscape_main.layout({ name: 'dagre', options: dagre_options }).run()

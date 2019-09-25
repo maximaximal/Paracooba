@@ -343,8 +343,9 @@ class Webserver::HTTPSession
 
         m_webserver->getAPI()->handleWebSocketRequest(
           &m_socket,
-          std::bind(
-            &HTTPSession::wsSendPropertyTree, this, std::placeholders::_1),
+          std::bind(&HTTPSession::wsSendPropertyTree,
+                    shared_from_this(),
+                    std::placeholders::_1),
           &ptree);
       } catch(boost::property_tree::ptree_error& e) {
         PARACUBER_LOG(m_logger, LocalWarning)
@@ -378,19 +379,12 @@ class Webserver::HTTPSession
   void wsSendPropertyTree(boost::property_tree::ptree& tree)
   {
     assert(m_webserver);
-    m_webserver->getIOService().post([this, tree]() {
-      auto os = boost::beast::ostream(m_buffer);
-      boost::property_tree::json_parser::write_json(os, tree);
-      m_websocket->text(true);
+    auto os = boost::beast::ostream(m_buffer);
+    boost::property_tree::json_parser::write_json(os, tree);
+    m_websocket->text(true);
 
-      m_websocket->async_write(
-        m_buffer.data(),
-        boost::asio::bind_executor(m_strand,
-                                   std::bind(&HTTPSession::wsOnWrite,
-                                             shared_from_this(),
-                                             std::placeholders::_1,
-                                             std::placeholders::_2)));
-    });
+    m_websocket->write(m_buffer.data());
+    m_buffer.consume(m_buffer.size());
   }
 
   void doRead()

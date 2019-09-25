@@ -48,7 +48,7 @@ class API
 
   struct WSData
   {
-    WebSocketCB &cb;
+    WebSocketCB& cb;
     boost::property_tree::ptree answer;
   };
   std::map<const boost::asio::ip::tcp::socket*, WSData> m_wsData;
@@ -58,7 +58,7 @@ class API
                                  CNFTree::CubeVar var,
                                  CNFTree::StateEnum state);
 
-  void sendError(WSData &d, const std::string &str);
+  void sendError(WSData& d, const std::string& str);
 
   static const std::regex matchAPIRequest;
   static const std::regex matchLocalConfigRequest;
