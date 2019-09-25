@@ -64,9 +64,9 @@ TEST_CASE("CNFTree Usage")
   }
 
   // Setup the tree.
-  REQUIRE(tree.setDecision(CNFTree::buildPath((uint8_t)0b00000000, 1), 1));
-  REQUIRE(tree.setDecision(CNFTree::buildPath((uint8_t)0b00000000, 2), 2));
-  REQUIRE(tree.setDecision(CNFTree::buildPath((uint8_t)0b10000000, 2), 3));
+  REQUIRE(tree.setDecision(CNFTree::buildPath((uint8_t)0b00000000, 0), 1));
+  REQUIRE(tree.setDecision(CNFTree::buildPath((uint8_t)0b00000000, 1), 2));
+  REQUIRE(tree.setDecision(CNFTree::buildPath((uint8_t)0b10000000, 1), 3));
 
   SECTION(
     "Visitor should be called for a traversed node with the correct arguments.")
@@ -80,7 +80,7 @@ TEST_CASE("CNFTree Usage")
           vars.push_back(l);
           return false;
         }));
-      REQUIRE(vars.size() == 1);
+      REQUIRE(vars.size() == 2);
       REQUIRE(vars[0] == 1);
     }
 

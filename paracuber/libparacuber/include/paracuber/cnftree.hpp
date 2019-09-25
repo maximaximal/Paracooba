@@ -71,11 +71,11 @@ class CNFTree
     assert(getDepth(p) < maxPathDepth);
 
     Node* n = &m_root;
-    uint8_t depth = 1;
+    uint8_t depth = 0;
     bool end = false;
 
     while(!end) {
-      bool assignment = getAssignment(p, depth);
+      bool assignment = getAssignment(p, depth + 1);
       CubeVar decision = n->decision;
       std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
 
@@ -186,7 +186,6 @@ class CNFTree
   static inline bool getAssignment(Path p, uint8_t depth)
   {
     // The depth starts counting with 1 and the sizeof() is 1 too large.
-    assert(depth >= 1);
     assert(depth <= maxPathDepth);
     return p &
            (static_cast<Path>(1u) << ((sizeof(Path) * 8) - 1 - (depth - 1)));

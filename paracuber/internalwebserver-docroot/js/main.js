@@ -144,7 +144,8 @@ class CNFTree {
     }
 
     handleCNFTreeUpdate(msg) {
-	this.cy.add({ group: "nodes", id: msg.id });
+	console.log(msg);
+	this.cy.add({ group: "nodes", id: msg.path, literal: msg.literal });
     }
 }
 

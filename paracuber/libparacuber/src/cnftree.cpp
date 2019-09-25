@@ -13,7 +13,7 @@ CNFTree::setDecision(Path p, CubeVar decision)
   assert(getDepth(p) < maxPathDepth);
 
   Node* n = &m_root;
-  uint8_t depth = 1;
+  uint8_t depth = 0;
   bool end = false;
 
   while(!end) {
@@ -31,12 +31,13 @@ CNFTree::setDecision(Path p, CubeVar decision)
         n->left = std::make_unique<Node>();
         n->right = std::make_unique<Node>();
         n->decision = decision;
+        return true;
       }
 
       break;
     }
 
-    bool assignment = getAssignment(p, depth);
+    bool assignment = getAssignment(p, depth + 1);
     std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
 
     if(!nextPtr) {
@@ -60,7 +61,7 @@ CNFTree::getState(Path p, State state) const
   assert(getDepth(p) < maxPathDepth);
 
   const Node* n = &m_root;
-  uint8_t depth = 1;
+  uint8_t depth = 0;
   bool end = false;
 
   while(!end) {
@@ -88,7 +89,7 @@ CNFTree::setState(Path p, State state)
   assert(getDepth(p) < maxPathDepth);
 
   Node* n = &m_root;
-  uint8_t depth = 1;
+  uint8_t depth = 0;
   bool end = false;
 
   while(!end) {

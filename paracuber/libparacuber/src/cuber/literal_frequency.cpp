@@ -100,7 +100,11 @@ LiteralFrequency::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
     return false;
   }
   auto additionComponent = getAdditionComponent(path);
-  if((float)additionComponent / (float)m_literalFrequency->size() >=
+  auto moduloComponent = getModuloComponent(path);
+
+  auto dec = additionComponent + moduloComponent;
+
+  if(((float)dec / (float)m_literalFrequency->size()) >=
      m_config->getFloat(Config::FreqCuberCutoff)) {
     return false;
   }
@@ -109,11 +113,11 @@ LiteralFrequency::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
   // decision must be made. The next decision is therefore always the next most
   // frequent literal.
 
-  if(additionComponent >= m_literalFrequency->size()) {
+  if(dec >= m_literalFrequency->size()) {
     return false;
   }
 
-  var = (*m_literalFrequency)[additionComponent] + m_counter++;
+  var = (*m_literalFrequency)[dec];
   return true;
 }
 }

@@ -33,6 +33,12 @@ API::injectCNFTreeNode(int64_t handle,
     return;
   }
   WSData& data = it->second;
+
+  PARACUBER_LOG(m_logger, Trace)
+    << "INJECT NODE INFO FOR PATH " << CNFTree::pathToStdString(p)
+    << " with var " << std::to_string(var);
+
+  handleInjectedCNFTreeNode(data, p, var, state);
 }
 
 bool

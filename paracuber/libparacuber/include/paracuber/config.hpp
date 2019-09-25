@@ -99,7 +99,7 @@ class Config
   inline uint64_t getInt64(Key key) { return get<int64_t>(key); }
   /** @brief Get a float configuration variable.
    */
-  inline uint64_t getFloat(Key key) { return get<float>(key); }
+  inline float getFloat(Key key) { return get<float>(key); }
 
   /** @brief Get a configuration variable which can be cast in any way.
    */

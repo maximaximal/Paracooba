@@ -40,5 +40,11 @@ Registry::getActiveCuber() const
 {
   return *m_cubers[0];
 }
+
+bool
+Registry::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
+{
+  return getActiveCuber().generateCube(path, var);
+}
 }
 }

@@ -3,6 +3,7 @@
 #include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
+#include "../include/paracuber/cuber/registry.hpp"
 #include "../include/paracuber/runner.hpp"
 
 namespace paracuber {
@@ -91,6 +92,12 @@ Client::solve()
     // Decisions must be propagated to daemons in order to solve them in
     // parallel. Decisions are always guided by the CNFTree class, which
     // knows how many decisions are left in any given path.
+    CNFTree::CubeVar var;
+    CNFTree::Path p = CNFTree::buildPath(0, 1);
+    bool succ = m_rootCNF->getCuberRegistry().generateCube(p, var);
+    PARACUBER_LOG(m_logger, Trace)
+      << "First Decision: " << var << " with " << succ << " and cutoff " << m_config->getFloat(Config::FreqCuberCutoff);
+    m_rootCNF->getCNFTree().setDecision(p, var);
   });
 }
 }

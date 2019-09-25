@@ -1,9 +1,9 @@
 #ifndef PARACUBER_CUBER_REGISTRY_HPP
 #define PARACUBER_CUBER_REGISTRY_HPP
 
+#include "../cnftree.hpp"
 #include "../log.hpp"
 #include "../readywaiter.hpp"
-#include "../cnftree.hpp"
 #include <memory>
 #include <queue>
 #include <vector>
@@ -25,6 +25,7 @@ class Registry
   using AllowanceMap = std::vector<CNFTree::CubeVar>;
 
   Cuber& getActiveCuber() const;
+  bool generateCube(CNFTree::Path path, CNFTree::CubeVar& var);
   inline AllowanceMap& getAllowanceMap() { return m_allowanceMap; }
 
   ReadyWaiter<AllowanceMap> allowanceMapWaiter;
