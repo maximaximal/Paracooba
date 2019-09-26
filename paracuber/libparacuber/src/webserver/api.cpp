@@ -132,8 +132,6 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
   WSData& data = it->second;
   data.answer.clear();
 
-  PARACUBER_LOG(m_logger, Trace) << "Receive WS Request";
-
   std::string type = ptree->get<std::string>("type");
 
   if(type == "cnftree-request-path") {
@@ -194,9 +192,7 @@ API::handleInjectedCNFTreeNode(WSData& d,
   a.put("path", std::string(strPath, CNFTree::getDepth(p)));
   a.put("literal", var);
   a.put("state", CNFTreeStateToStr(state));
-  PARACUBER_LOG(m_logger, Trace) << "Write WS Answer";
   d.cb(a);
-  PARACUBER_LOG(m_logger, Trace) << "After Write WS Answer";
 }
 }
 }

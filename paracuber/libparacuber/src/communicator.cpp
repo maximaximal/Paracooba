@@ -928,9 +928,6 @@ Communicator::sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
 void
 Communicator::requestCNFPathInfo(CNFTree::Path p, int64_t handle, int64_t cnfId)
 {
-  PARACUBER_LOG(m_logger, Trace)
-    << "Requesting path info for path " << CNFTree::pathToStdString(p);
-
   std::shared_ptr<CNF> rootCNF;
 
   if(m_config->isDaemonMode()) {
