@@ -105,12 +105,18 @@ class CNFTree {
 	console.log("Using URL for websocket: " + url);
 	this.socket = new WebSocket(url);
 	this.socket.onopen = function(e) { self.onWSOpen(e); };
+	this.socket.onclose = function(e) { self.onWSClose(e); };
 	this.socket.onmessage = function(e) { self.onWSMessage(e); };
     }
 
     onWSOpen() {
 	app.ws_state = "Connected!";
 	this.socket.send(JSON.stringify({type: "ping"}));
+    }
+
+    onWSClose(event) {
+	app.ws_state = "Disconnected!";
+	alert("Websocket closed, no more requests possible.");
     }
 
     onWSMessage(event) {
@@ -143,7 +149,6 @@ class CNFTree {
 	    break;
 	}
 	case "pong": {
-	    console.log("pong");
 	    break;
 	}
 	case undefined:
