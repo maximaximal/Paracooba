@@ -1,7 +1,9 @@
 #include "../../include/paracuber/webserver/api.hpp"
 #include "../../include/paracuber/client.hpp"
+#include "../../include/paracuber/cnf.hpp"
 #include "../../include/paracuber/communicator.hpp"
 #include "../../include/paracuber/config.hpp"
+#include "../../include/paracuber/cuber/registry.hpp"
 #include "../../include/paracuber/webserver/webserver.hpp"
 #include <cassert>
 #include <regex>
@@ -107,6 +109,25 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
   auto it = m_wsData.find(socket);
   if(it == m_wsData.end()) {
     it = m_wsData.insert({ socket, { cb } }).first;
+
+    std::shared_ptr<CNF> cnf;
+
+    if(m_config->isDaemonMode()) {
+      // TODO: Implement Daemon specific handling for web-debugging.
+      assert(false);
+    }
+
+    cnf = m_config->getClient()->getRootCNF();
+
+    // First, wait for the allowance map to be ready.
+    cnf->rootTaskReady.callWhenReady([this, cnf, socket](CaDiCaLTask& ptr) {
+      // Registry is only initialised after the root task arrived.
+      cnf->getCuberRegistry().allowanceMapWaiter.callWhenReady(
+        [this, cnf, socket](cuber::Registry::AllowanceMap& map) {
+          m_config->getCommunicator()->requestCNFPathInfo(
+            CNFTree::buildPath(0, 0), reinterpret_cast<int64_t>(socket));
+        });
+    });
   }
   WSData& data = it->second;
   data.answer.clear();
@@ -118,12 +139,29 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
   if(type == "cnftree-request-path") {
     // Request path.
     std::string strPath = ptree->get<std::string>("path");
+    bool next = ptree->get<bool>("next");
+
     if(strPath.length() > CNFTree::maxPathDepth) {
       return sendError(data, "CNFTree path too long!");
     }
-    CNFTree::Path p = CNFTree::strToPath(strPath.data(), strPath.length());
-    m_config->getCommunicator()->requestCNFPathInfo(
-      p, reinterpret_cast<int64_t>(socket));
+
+    if(next) {
+      std::string next1 = strPath + '0';
+      std::string next2 = strPath + '1';
+
+      CNFTree::Path p = CNFTree::strToPath(next1.data(), next1.length());
+      m_config->getCommunicator()->requestCNFPathInfo(
+        p, reinterpret_cast<int64_t>(socket));
+
+      p = CNFTree::strToPath(next2.data(), next2.length());
+      m_config->getCommunicator()->requestCNFPathInfo(
+        p, reinterpret_cast<int64_t>(socket));
+    } else {
+      CNFTree::Path p = CNFTree::strToPath(strPath.data(), strPath.length());
+      m_config->getCommunicator()->requestCNFPathInfo(
+        p, reinterpret_cast<int64_t>(socket));
+    }
+
   } else if(type == "ping") {
     // Ping
     data.answer.put("type", "pong");

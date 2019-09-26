@@ -110,6 +110,7 @@ class CNFTree {
 
     onWSOpen() {
 	app.ws_state = "Connected!";
+	this.socket.send(JSON.stringify({type: "ping"}));
     }
 
     onWSMessage(event) {
@@ -155,15 +156,10 @@ class CNFTree {
 	if(app.ws_state != "Connected!") {
 	    return;
 	}
-	let path1 = path + '0';
-	let path2 = path + '1';
-	this.socket.send(JSON.stringify({type: "cnftree-request-path", path: path1}));
-	this.socket.send(JSON.stringify({type: "cnftree-request-path", path: path2}));
+	this.socket.send(JSON.stringify({type: "cnftree-request-path", path: path, next: true}));
     }
 
     handleCNFTreeUpdate(msg) {
-	console.log(msg);
-
 	// Find root.
 	let rootQuery = this.cy.$('node[id="root"]');
 	let root = null;
@@ -174,8 +170,6 @@ class CNFTree {
 	    rootQuery = this.cy.$('node[id="root"]');
 	}
 	root = rootQuery[0];
-
-	console.log(root);
 
 	if(msg.path == "") {
 	    // This is the root node! Apply it to there.
