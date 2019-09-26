@@ -106,6 +106,10 @@ Client::solve()
     p = CNFTree::buildPath((uint8_t)0b10000000, 1);
     m_rootCNF->getCuberRegistry().generateCube(p, var);
     assert(m_rootCNF->getCNFTree().setDecision(p, var));
+
+    p = CNFTree::buildPath((uint8_t)0b10000000, 2);
+    m_rootCNF->getCuberRegistry().generateCube(p, var);
+    assert(m_rootCNF->getCNFTree().setDecision(p, var));
   });
 }
 }

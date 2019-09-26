@@ -2,6 +2,7 @@
 #define PARACUBER_CLUSTERSTATISTICS_HPP
 
 #include "log.hpp"
+#include "util.hpp"
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -13,6 +14,12 @@
 #include <boost/accumulators/statistics/stats.hpp>
 
 namespace paracuber {
+
+#define CLUSTERSTATISTICS_NODE_CHANGED(MEMBER, VAR) \
+  if(MEMBER != VAR) {                               \
+    MEMBER = VAR;                                   \
+    m_changed = true;                               \
+  }
 
 class NetworkedNode;
 
@@ -29,45 +36,74 @@ class ClusterStatistics
   class Node
   {
     public:
-    Node(int64_t id = 0);
+    explicit Node(bool& changed, int64_t id = 0);
     ~Node();
 
     Node(Node&& o) noexcept;
 
-    void setName(const std::string& name) { m_name = name; }
-    void setHost(const std::string& host) { m_host = host; }
+    void setName(const std::string& name)
+    {
+      CLUSTERSTATISTICS_NODE_CHANGED(m_name, name)
+    }
+    void setHost(const std::string& host)
+    {
+      CLUSTERSTATISTICS_NODE_CHANGED(m_host, host)
+    }
     void setNetworkedNode(std::unique_ptr<NetworkedNode> networkedNode);
     void setMaximumCPUFrequency(uint16_t maximumCPUFrequency)
     {
-      m_maximumCPUFrequency = maximumCPUFrequency;
+      CLUSTERSTATISTICS_NODE_CHANGED(m_maximumCPUFrequency, maximumCPUFrequency)
     }
     void setAvailableWorkers(uint16_t availableWorkers)
     {
-      m_availableWorkers = availableWorkers;
+      CLUSTERSTATISTICS_NODE_CHANGED(m_availableWorkers, availableWorkers);
     }
-    void setUptime(uint16_t uptime) { m_uptime = uptime; }
+    void setUptime(uint16_t uptime)
+    {
+      CLUSTERSTATISTICS_NODE_CHANGED(m_uptime, uptime)
+    }
     void setWorkQueueCapacity(uint64_t workQueueCapacity)
     {
-      m_workQueueCapacity = workQueueCapacity;
+      CLUSTERSTATISTICS_NODE_CHANGED(m_workQueueCapacity, workQueueCapacity)
     }
     void setWorkQueueSize(uint64_t workQueueSize);
-    void setId(int64_t id) { m_id = id; }
-    void setFullyKnown(bool fullyKnown) { m_fullyKnown = fullyKnown; }
+    void setId(int64_t id) { CLUSTERSTATISTICS_NODE_CHANGED(m_id, id) }
+    void setFullyKnown(bool fullyKnown)
+    {
+      CLUSTERSTATISTICS_NODE_CHANGED(m_fullyKnown, fullyKnown)
+    }
     void setUdpListenPort(uint16_t udpListenPort)
     {
-      m_udpListenPort = udpListenPort;
+      CLUSTERSTATISTICS_NODE_CHANGED(m_udpListenPort, udpListenPort)
     }
     void setTcpListenPort(uint16_t tcpListenPort)
     {
-      m_tcpListenPort = tcpListenPort;
+      CLUSTERSTATISTICS_NODE_CHANGED(m_tcpListenPort, tcpListenPort)
     }
+    void setReadyForWork(bool ready)
+    {
+      CLUSTERSTATISTICS_NODE_CHANGED(m_readyForWork, ready)
+    }
+    void setDaemon(bool daemon){ CLUSTERSTATISTICS_NODE_CHANGED(m_daemon,
+                                                                daemon) }
 
-    NetworkedNode* getNetworkedNode() const { return m_networkedNode.get(); }
+    NetworkedNode* getNetworkedNode() const
+    {
+      return m_networkedNode.get();
+    }
 
     int64_t getId() const { return m_id; }
     bool getFullyKnown() const { return m_fullyKnown; }
+    bool getReadyForWork() const { return m_readyForWork; }
+    bool getDaemon() const { return m_daemon; }
     uint16_t getUdpListenPort() const { return m_udpListenPort; }
     uint16_t getTcpListenPort() const { return m_tcpListenPort; }
+    uint64_t getWorkQueueSize() const { return m_workQueueSize; }
+    float getUtilization() const
+    {
+      return static_cast<float>(m_workQueueSize) /
+             static_cast<float>(m_workQueueCapacity);
+    }
 
     private:
     friend class ClusterStatistics;
@@ -85,6 +121,10 @@ class ClusterStatistics
     uint64_t m_workQueueSize = 0;
     int64_t m_id = 0;
     bool m_fullyKnown = false;
+    bool m_readyForWork = false;
+    bool m_daemon = false;
+
+    bool& m_changed;
 
     // Aggregating
     ::boost::accumulators::accumulator_set<
@@ -103,6 +143,9 @@ class ClusterStatistics
         << "\"udpListenPort\": " << n.m_udpListenPort << ","
         << "\"uptime\": " << n.m_uptime << ","
         << "\"workQueueCapacity\": " << n.m_workQueueCapacity << ","
+        << "\"readyForWork\": " << n.m_readyForWork << ","
+        << "\"fullyKnown\": " << n.m_fullyKnown << ","
+        << "\"daemon\": " << n.m_daemon << ","
         << "\"workQueueSize\": " << n.m_workQueueSize;
       return o;
     }
@@ -122,7 +165,7 @@ class ClusterStatistics
   friend std::ostream& operator<<(std::ostream& o, const ClusterStatistics& c)
   {
     bool first = true;
-    o << "{ \"ClusterStatistics\": [";
+    o << "{ \"type\": \"clusterstatistics\", \"ClusterStatistics\": [";
     for(auto& it : c.m_nodeMap) {
       auto& node = it.second;
       o << "{" << node << "}";
@@ -135,9 +178,18 @@ class ClusterStatistics
     return o;
   }
 
-  using NodeMap = std::unordered_map<int64_t, Node>;
+  using NodeMap = std::map<int64_t, Node>;
 
-  const NodeMap& getNodeMap() { return m_nodeMap; }
+  ConstSharedLockView<NodeMap> getNodeMap();
+
+  /** @brief Determine if the next decision should be offloaded to another
+   * compute node.
+   *
+   * @returns nullptr if the decision is better done locally, remote node
+   * otherwise.
+   */
+  const Node* offloadDecisionToRemote(int64_t originator);
+  bool clearChanged();
 
   protected:
   friend class Communicator;
@@ -146,9 +198,11 @@ class ClusterStatistics
 
   private:
   NodeMap m_nodeMap;
+  bool m_changed = false;
 
   ConfigPtr m_config;
   Logger m_logger;
+  std::shared_mutex m_nodeMapMutex;
 };
 }
 

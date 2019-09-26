@@ -41,12 +41,18 @@ applyMessageNodeToStatsNode(const message::Node::Reader& src,
   tgt.setUdpListenPort(src.getUdpListenPort());
   tgt.setTcpListenPort(src.getTcpListenPort());
   tgt.setFullyKnown(true);
+  tgt.setDaemon(src.getDaemonMode());
 }
 void
 applyMessageNodeStatusToStatsNode(const message::NodeStatus::Reader& src,
                                   ClusterStatistics::Node& tgt)
 {
   tgt.setWorkQueueSize(src.getWorkQueueSize());
+
+  if(src.isDaemon()) {
+    auto daemon = src.getDaemon();
+    tgt.setReadyForWork(daemon.getReadyForWork());
+  }
 }
 
 class Communicator::UDPServer
@@ -193,6 +199,7 @@ class Communicator::UDPServer
     }
 
     PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
+    m_communicator->checkAndTransmitClusterStatisticsChanges();
   }
   void handleOfflineAnnouncement(Message::Reader& msg)
   {
@@ -201,6 +208,7 @@ class Communicator::UDPServer
     m_clusterStatistics->removeNode(msg.getOrigin());
 
     PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
+    m_communicator->checkAndTransmitClusterStatisticsChanges();
   }
   void handleAnnouncementRequest(Message::Reader& msg)
   {
@@ -263,6 +271,8 @@ class Communicator::UDPServer
     applyMessageNodeStatusToStatsNode(reader, statisticsNode);
 
     networkStatisticsNode(statisticsNode);
+
+    m_communicator->checkAndTransmitClusterStatisticsChanges();
   }
 
   void handleCNFTreeNodeStatusRequest(Message::Reader& msg)
@@ -809,7 +819,8 @@ void
 Communicator::exit()
 {
   if(m_runner->m_running) {
-    for(auto& it : m_clusterStatistics->getNodeMap()) {
+    auto [nodeMap, lock] = m_clusterStatistics->getNodeMap();
+    for(auto& it : nodeMap) {
       auto& node = it.second;
       task_offlineAnnouncement(node.getNetworkedNode());
     }
@@ -850,6 +861,23 @@ Communicator::signalHandler(const boost::system::error_code& error,
   if(signalNumber == SIGINT) {
     PARACUBER_LOG(m_logger, Trace) << "SIGINT detected.";
     exit();
+  }
+}
+
+void
+Communicator::checkAndTransmitClusterStatisticsChanges(bool force)
+{
+  if(m_clusterStatistics->clearChanged() || force) {
+#ifdef ENABLE_INTERNAL_WEBSERVER
+    // Transmit changes to API, so all web-clients can see the new cluster
+    // statistics.
+    if(m_webserverInitiator) {
+      auto api = m_webserverInitiator->getAPI();
+      if(api) {
+        api->injectClusterStatisticsUpdate(*m_clusterStatistics);
+      }
+    }
+#endif
   }
 }
 
@@ -1015,7 +1043,8 @@ Communicator::tick()
   }
 
   // Send built message to all other known nodes.
-  for(auto& it : m_clusterStatistics->getNodeMap()) {
+  auto [nodeMap, lock] = m_clusterStatistics->getNodeMap();
+  for(auto& it : nodeMap) {
     auto& node = it.second;
     if(node.getId() != m_config->getInt64(Config::Id)) {
       auto nn = node.getNetworkedNode();

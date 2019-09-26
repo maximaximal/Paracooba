@@ -3,6 +3,7 @@
 
 #include "cluster-statistics.hpp"
 #include "log.hpp"
+#include "util.hpp"
 #include <map>
 #include <memory>
 #include <mutex>
@@ -65,10 +66,8 @@ class Daemon
 
   using ContextMap = std::map<int64_t, std::unique_ptr<Context>>;
 
-  std::pair<const ContextMap&, std::shared_lock<std::shared_mutex>>
-  getContextMap();
-  std::pair<Context*, std::shared_lock<std::shared_mutex>> getContext(
-    int64_t id);
+  ConstSharedLockView<ContextMap> getContextMap();
+  SharedLockView<Context*> getContext(int64_t id);
 
   std::pair<Context&, bool> getOrCreateContext(int64_t id);
 

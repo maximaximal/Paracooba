@@ -1,8 +1,10 @@
 #ifndef PARACUBER_WEBSERVER_API_HPP
 #define PARACUBER_WEBSERVER_API_HPP
 
+#define BOOST_SPIRIT_THREADSAFE
 #include "../cnftree.hpp"
 #include "../log.hpp"
+#include "webserver.hpp"
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/version.hpp>
@@ -10,8 +12,8 @@
 #include <regex>
 
 namespace paracuber {
+class ClusterStatistics;
 namespace webserver {
-class Webserver;
 
 class API
 {
@@ -24,7 +26,12 @@ class API
     Unknown,
   };
 
-  using WebSocketCB = std::function<void(boost::property_tree::ptree&)>;
+  using WebSocketCB =
+    std::add_pointer<bool(std::weak_ptr<Webserver::HTTPSession>&,
+                          boost::property_tree::ptree&)>::type;
+  using WebSocketCBData =
+    std::add_pointer<bool(std::weak_ptr<Webserver::HTTPSession>&,
+                          const std::string&)>::type;
 
   explicit API(Webserver* webserver, ConfigPtr config, LogPtr log);
   ~API();
@@ -33,6 +40,8 @@ class API
                          CNFTree::Path p,
                          CNFTree::CubeVar var,
                          CNFTree::StateEnum state);
+
+  void injectClusterStatisticsUpdate(ClusterStatistics& stats);
 
   static bool isAPIRequest(const std::string& target);
   static Request matchTargetToRequest(const std::string& target);
@@ -43,22 +52,40 @@ class API
   std::string generateResponseForLocalInfo();
 
   void handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
+                              std::weak_ptr<Webserver::HTTPSession> session,
                               WebSocketCB cb,
+                              WebSocketCBData,
                               boost::property_tree::ptree* ptree);
+
+  void handleWebSocketClosed(const boost::asio::ip::tcp::socket* socket);
 
   struct WSData
   {
-    WebSocketCB& cb;
+    explicit WSData(std::weak_ptr<Webserver::HTTPSession> session,
+                    WebSocketCB cb,
+                    WebSocketCBData dataCB)
+      : session(session)
+      , cb(cb)
+      , dataCB(dataCB)
+      , answer()
+    {}
+    std::weak_ptr<Webserver::HTTPSession> session;
+    WebSocketCB cb;
+    WebSocketCBData dataCB;
     boost::property_tree::ptree answer;
   };
-  std::map<const boost::asio::ip::tcp::socket*, WSData> m_wsData;
+  using WSPair =
+    std::pair<const boost::asio::ip::tcp::socket*, std::unique_ptr<WSData>>;
+  using WSMap =
+    std::map<const boost::asio::ip::tcp::socket*, std::unique_ptr<WSData>>;
+  WSMap m_wsData;
 
-  void handleInjectedCNFTreeNode(WSData& d,
+  bool handleInjectedCNFTreeNode(WSData& d,
                                  CNFTree::Path p,
                                  CNFTree::CubeVar var,
                                  CNFTree::StateEnum state);
 
-  void sendError(WSData& d, const std::string& str);
+  bool sendError(WSData& d, const std::string& str);
 
   static const std::regex matchAPIRequest;
   static const std::regex matchLocalConfigRequest;
@@ -68,6 +95,9 @@ class API
   Webserver* m_webserver;
   ConfigPtr m_config;
   Logger m_logger;
+
+  void conditionalEraseConn(const boost::asio::ip::tcp::socket* socket,
+                            bool erase);
 };
 }
 }

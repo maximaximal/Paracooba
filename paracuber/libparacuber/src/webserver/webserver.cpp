@@ -1,3 +1,4 @@
+#define BOOST_SPIRIT_THREADSAFE
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
@@ -260,11 +261,7 @@ class Webserver::HTTPSession
     if(m_webserver) {
       m_webserver->httpSessionClosed(this);
       if(m_webserver->getAPI()) {
-        m_webserver->getAPI()->handleWebSocketRequest(
-          &m_socket,
-          std::bind(
-            &HTTPSession::wsSendPropertyTree, this, std::placeholders::_1),
-          nullptr);
+        m_webserver->getAPI()->handleWebSocketClosed(&m_socket);
       }
     }
   }
@@ -343,9 +340,9 @@ class Webserver::HTTPSession
 
         m_webserver->getAPI()->handleWebSocketRequest(
           &m_socket,
-          std::bind(&HTTPSession::wsSendPropertyTree,
-                    shared_from_this(),
-                    std::placeholders::_1),
+          weak_from_this(),
+          &HTTPSession::wsSendPropertyTree,
+          &HTTPSession::wsSendString,
           &ptree);
       } catch(boost::property_tree::ptree_error& e) {
         PARACUBER_LOG(m_logger, LocalWarning)
@@ -354,7 +351,8 @@ class Webserver::HTTPSession
 
         auto ptree = makeErrorPTree(
           std::string("Could not parse request! Error: ") + e.what());
-        wsSendPropertyTree(ptree);
+        auto weakPtr = weak_from_this();
+        wsSendPropertyTree(weakPtr, ptree);
       }
     }
 
@@ -376,17 +374,37 @@ class Webserver::HTTPSession
       return;
     }
   }
-  void wsSendPropertyTree(boost::property_tree::ptree& tree)
+  static bool wsSendPropertyTree(std::weak_ptr<HTTPSession>& weakPtr,
+                                 boost::property_tree::ptree& tree)
   {
-    assert(m_webserver);
-    auto os = boost::beast::ostream(m_buffer);
+    if(weakPtr.expired())
+      return false;
+    auto ptr = weakPtr.lock();
+    assert(ptr->m_webserver);
+    assert(ptr->m_websocket);
+    auto os = boost::beast::ostream(ptr->m_buffer);
     boost::property_tree::json_parser::write_json(os, tree);
-    m_websocket->text(true);
+    ptr->m_websocket->text(true);
 
-    m_websocket->write(m_buffer.data());
-    m_buffer.consume(m_buffer.size());
+    ptr->m_websocket->write(ptr->m_buffer.data());
+    ptr->m_buffer.consume(ptr->m_buffer.size());
+    tree.clear();
+    return true;
   }
-
+  static bool wsSendString(std::weak_ptr<HTTPSession>& weakPtr,
+                           const std::string& data)
+  {
+    if(weakPtr.expired())
+      return false;
+    auto ptr = weakPtr.lock();
+    assert(ptr->m_webserver);
+    assert(ptr->m_websocket);
+    ptr->m_websocket->text(true);
+    boost::beast::ostream(ptr->m_buffer) << data;
+    ptr->m_websocket->write(ptr->m_buffer.data());
+    ptr->m_buffer.consume(ptr->m_buffer.size());
+    return true;
+  }
   void doRead()
   {
     // Read a request

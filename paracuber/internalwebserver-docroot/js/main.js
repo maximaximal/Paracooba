@@ -5,6 +5,7 @@ var app = new Vue({
 	local_info: {},
 	local_config: {},
 	ws_state: "Initialising",
+	clusterstatistics: []
     },
     filters: {
     },
@@ -151,9 +152,19 @@ class CNFTree {
 	case "pong": {
 	    break;
 	}
-	case undefined:
+	case "clusterstatistics": {
+	    app.clusterstatistics = msg["ClusterStatistics"];
+	    break;
+	}
+	case undefined: {
 	    throw "REQUIRE .type field!";
 	    break;
+	}
+	default: {
+	    console.log("Unknown message received!");
+	    console.log(msg);
+	    break;
+	}
 	}
     }
 

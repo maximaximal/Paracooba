@@ -2,6 +2,7 @@
 #define PARACUBER_UTIL_HPP
 
 #include <cstdint>
+#include <shared_mutex>
 #include <string>
 
 namespace paracuber {
@@ -19,6 +20,16 @@ FastAbsolute(T v)
 std::string
 BytePrettyPrint(size_t bytes);
 
+template<typename T>
+using SharedLockView = std::pair<T, std::shared_lock<std::shared_mutex>>;
+template<typename T>
+using ConstSharedLockView =
+  std::pair<const T&, std::shared_lock<std::shared_mutex>>;
+
+extern int64_t StackStart;
+
+size_t
+GetStackSize();
 }
 
 #endif

@@ -6,7 +6,6 @@
 #endif
 
 #include "../log.hpp"
-#include "api.hpp"
 #include <boost/version.hpp>
 #include <memory>
 
@@ -27,6 +26,7 @@ class error_code;
 
 namespace paracuber {
 namespace webserver {
+class API;
 class Webserver
 {
   public:

@@ -122,6 +122,8 @@ class Communicator : public std::enable_shared_from_this<Communicator>
                                     int64_t handle);
 
   private:
+  friend class webserver::API;
+
   ConfigPtr m_config;
   LogPtr m_log;
   boost::asio::io_service m_ioService;
@@ -134,6 +136,8 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   int64_t m_currentMessageId = INT64_MIN;
 
   void signalHandler(const boost::system::error_code& error, int signalNumber);
+
+  void checkAndTransmitClusterStatisticsChanges(bool force = false);
 
   // Listeners
   void listenForIncomingUDP(uint16_t port);

@@ -3,6 +3,7 @@
 
 #include "cnftree.hpp"
 #include "task.hpp"
+#include <memory>
 
 namespace CaDiCaL {
 class Solver;

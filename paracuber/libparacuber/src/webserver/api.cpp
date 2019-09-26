@@ -1,5 +1,6 @@
 #include "../../include/paracuber/webserver/api.hpp"
 #include "../../include/paracuber/client.hpp"
+#include "../../include/paracuber/cluster-statistics.hpp"
 #include "../../include/paracuber/cnf.hpp"
 #include "../../include/paracuber/communicator.hpp"
 #include "../../include/paracuber/config.hpp"
@@ -7,6 +8,9 @@
 #include "../../include/paracuber/webserver/webserver.hpp"
 #include <cassert>
 #include <regex>
+#include <sstream>
+
+#include <sys/resource.h>
 
 namespace paracuber {
 namespace webserver {
@@ -27,16 +31,32 @@ API::injectCNFTreeNode(int64_t handle,
                        CNFTree::CubeVar var,
                        CNFTree::StateEnum state)
 {
-  auto it = m_wsData.find(
-    reinterpret_cast<const boost::asio::ip::tcp::socket*>(handle));
+  auto socket = reinterpret_cast<const boost::asio::ip::tcp::socket*>(handle);
+  auto it = m_wsData.find(socket);
   if(it == m_wsData.end()) {
     PARACUBER_LOG(m_logger, LocalWarning)
       << "Invalid socket handle supplied to API in CNFTreeNode injection!";
     return;
   }
-  WSData& data = it->second;
+  WSData& data = *it->second;
 
-  handleInjectedCNFTreeNode(data, p, var, state);
+  conditionalEraseConn(socket, handleInjectedCNFTreeNode(data, p, var, state));
+}
+void
+API::injectClusterStatisticsUpdate(ClusterStatistics& stats)
+{
+  // Cluster Statistics can be directly converted into a JSON data stream, so it
+  // can be sent directly.
+  std::stringstream sstream;
+  sstream << stats;
+  std::string data = sstream.str();
+
+  PARACUBER_LOG(m_logger, Trace) << "NEW CLUSTER STATS: Internal clients: " << m_wsData.size();
+
+  for(auto& it : m_wsData) {
+    auto& conn = *it.second;
+    conditionalEraseConn(it.first, conn.dataCB(conn.session, data));
+  }
 }
 
 bool
@@ -99,7 +119,9 @@ API::generateResponseForLocalInfo()
 
 void
 API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
+                            std::weak_ptr<Webserver::HTTPSession> session,
                             WebSocketCB cb,
+                            WebSocketCBData dataCB,
                             boost::property_tree::ptree* ptree)
 {
   if(!ptree) {
@@ -108,7 +130,10 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
   }
   auto it = m_wsData.find(socket);
   if(it == m_wsData.end()) {
-    it = m_wsData.insert({ socket, { cb } }).first;
+    it =
+      m_wsData
+        .insert(WSPair(socket, std::make_unique<WSData>(session, cb, dataCB)))
+        .first;
 
     std::shared_ptr<CNF> cnf;
 
@@ -126,11 +151,13 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
         [this, cnf, socket](cuber::Registry::AllowanceMap& map) {
           m_config->getCommunicator()->requestCNFPathInfo(
             CNFTree::buildPath(0, 0), reinterpret_cast<int64_t>(socket));
+          m_config->getCommunicator()->checkAndTransmitClusterStatisticsChanges(
+            true);
         });
     });
   }
-  WSData& data = it->second;
-  data.answer.clear();
+  assert(it->second);
+  WSData& data = *it->second;
 
   std::string type = ptree->get<std::string>("type");
 
@@ -140,7 +167,8 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
     bool next = ptree->get<bool>("next");
 
     if(strPath.length() > CNFTree::maxPathDepth) {
-      return sendError(data, "CNFTree path too long!");
+      return conditionalEraseConn(socket,
+                                  sendError(data, "CNFTree path too long!"));
     }
 
     if(next) {
@@ -163,22 +191,29 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
   } else if(type == "ping") {
     // Ping
     data.answer.put("type", "pong");
-    cb(data.answer);
+    conditionalEraseConn(socket, cb(data.session, data.answer));
   } else {
-    return sendError(data, "Unknown message type \"" + type + "\"!");
+    return conditionalEraseConn(
+      socket, sendError(data, "Unknown message type \"" + type + "\"!"));
   }
 }
 
 void
+API::handleWebSocketClosed(const boost::asio::ip::tcp::socket* socket)
+{
+  m_wsData.erase(socket);
+}
+
+bool
 API::sendError(WSData& d, const std::string& str)
 {
   d.answer.clear();
   d.answer.put("type", "error");
   d.answer.put("message", str);
-  d.cb(d.answer);
+  return d.cb(d.session, d.answer);
 }
 
-void
+bool
 API::handleInjectedCNFTreeNode(WSData& d,
                                CNFTree::Path p,
                                CNFTree::CubeVar var,
@@ -192,7 +227,16 @@ API::handleInjectedCNFTreeNode(WSData& d,
   a.put("path", std::string(strPath, CNFTree::getDepth(p)));
   a.put("literal", var);
   a.put("state", CNFTreeStateToStr(state));
-  d.cb(a);
+  return d.cb(d.session, a);
+}
+
+void
+API::conditionalEraseConn(const boost::asio::ip::tcp::socket* socket,
+                          bool erase)
+{
+  if(!erase) {
+    m_wsData.erase(socket);
+  }
 }
 }
 }

@@ -36,6 +36,7 @@ class Config
     Id,
     DaemonHost,
     WorkQueueCapacity,
+    MaxNodeUtilization,
     TickMilliseconds,
     HTTPListenPort,
     HTTPDocRoot,
@@ -216,6 +217,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "frequency-cuber-cutoff";
     case Config::TickMilliseconds:
       return "tick-milliseconds";
+    case Config::MaxNodeUtilization:
+      return "max-node-utilization";
     default:
       return "";
   }

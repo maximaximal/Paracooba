@@ -7,6 +7,7 @@
 #include <paracuber/config.hpp>
 #include <paracuber/daemon.hpp>
 #include <paracuber/log.hpp>
+#include <paracuber/util.hpp>
 
 namespace po = boost::program_options;
 using namespace paracuber;
@@ -14,6 +15,11 @@ using namespace paracuber;
 int
 main(int argc, char* argv[])
 {
+  // Stack size tracking code.
+  char c = 'S';
+  StackStart = reinterpret_cast<int64_t>(&c);
+
+  // Start of main.
   std::shared_ptr<Config> config = std::make_shared<Config>();
   bool continueRunning = config->parseParameters(argc, argv);
   if(!continueRunning) {

@@ -78,6 +78,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::FreqCuberCutoff),
          po::value<float>()->default_value(0.1)->value_name("float"),
          "Cutoff point (ratio of assigned literals to unassigned ones)) at which the literal frequency cuber algorithm stops creating new cubes.")
+    (GetConfigNameFromEnum(Config::MaxNodeUtilization),
+         po::value<float>()->default_value(2)->value_name("float"),
+         "Maximum node utilization to still offload a decision to there.")
     (GetConfigNameFromEnum(Config::DaemonHost),
      po::value<std::string>()->default_value("127.0.0.1")->value_name("string"),
          "Initial peer to connect to. Should should be a long-running daemon.")
@@ -191,6 +194,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::TickMilliseconds);
   conditionallySetConfigOptionToArray<float>(
     vm, m_config.data(), Config::FreqCuberCutoff);
+  conditionallySetConfigOptionToArray<float>(
+    vm, m_config.data(), Config::MaxNodeUtilization);
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::DaemonHost);
 

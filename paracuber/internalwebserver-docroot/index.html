@@ -62,6 +62,62 @@
 			<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
 			    <div id="cytoscape_main" class="my-4 w-100"></div>
 			</div>
+			<div class="pt-3 pb-2 mb-3 border-bottom">
+			    <h2 class="h3">Cluster Statistics</h2>
+			    <div class="card-columns" >
+				<div class="card" v-for="stat in clusterstatistics">
+				    <div class="card-body">
+					<h4 class="card-title">{{ stat.name }}</h4>
+					<table>
+					    <thead>
+						<tr>
+						    <th>Property</th>
+						    <th>Value</th>
+						</tr>
+					    </thead>
+					    <tbody>
+						<tr>
+						    <td>Name</td>
+						    <td>{{ stat.name }}</td>
+						</tr>
+						<tr>
+						    <td>Id</td>
+						    <td>{{ stat.id }}</td>
+						</tr>
+						<tr>
+						    <td>Workers</td>
+						    <td>{{ stat.availableWorkers }}</td>
+						</tr>
+						<tr>
+						    <td>UDP Listen Port</td>
+						    <td>{{ stat.udpListenPort }}</td>
+						</tr>
+						<tr>
+						    <td>Work Queue Capacity</td>
+						    <td>{{ stat.workQueueCapacity }}</td>
+						</tr>
+						<tr>
+						    <td>Work Queue Size</td>
+						    <td>{{ stat.workQueueSize }}</td>
+						</tr>
+						<tr>
+						    <td>Ready For Work</td>
+						    <td>{{ stat.readyForWork }}</td>
+						</tr>
+						<tr>
+						    <td>Fully Known</td>
+						    <td>{{ stat.fullyKnown }}</td>
+						</tr>
+						<tr>
+						    <td>Daemon</td>
+						    <td>{{ stat.daemon }}</td>
+						</tr>
+					    </tbody>
+					</table>
+				    </div>
+				</div>
+			    </div>
+			</div>
 		    </main>
 
 		    <footer role="footer" class="col-md-9 ml-sm-auto col-lg-10 px-4">

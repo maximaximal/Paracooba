@@ -92,7 +92,7 @@ Daemon::getContextMap()
   return { m_contextMap, std::move(sharedLock) };
 }
 
-std::pair<Daemon::Context*, std::shared_lock<std::shared_mutex>>
+SharedLockView<Daemon::Context*>
 Daemon::getContext(int64_t id)
 {
   std::shared_lock sharedLock(m_contextMapMutex);
