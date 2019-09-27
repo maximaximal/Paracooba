@@ -171,7 +171,7 @@ CNF::requestInfoGlobally(CNFTree::Path p, int64_t handle)
     p,
     [this, handle, comm, p](CNFTree::CubeVar var,
                             uint8_t depth,
-                            CNFTree::State& state,
+                            CNFTree::State state,
                             int64_t remote) {
       if(remote == 0) {
         comm->injectCNFTreeNodeInfo(

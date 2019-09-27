@@ -29,9 +29,10 @@ class Terminator : public CaDiCaL::Terminator
 };
 
 CaDiCaLTask::CaDiCaLTask(const CaDiCaLTask& other)
-  : CaDiCaLTask(nullptr, ParseAndSolve)
+  : CaDiCaLTask(nullptr, Solve)
 {
   copyFromCaDiCaLTask(other);
+  m_name = "CaDiCaL Task (copied)";
 }
 CaDiCaLTask::CaDiCaLTask(const TaskResult& result)
   : CaDiCaLTask(nullptr, ParseAndSolve)
@@ -50,6 +51,7 @@ CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
   , m_solver(std::move(other.m_solver))
 {
   m_terminator->setCaDiCaLTask(this);
+  m_name = "CaDiCaL Task (moved)";
 }
 
 CaDiCaLTask::CaDiCaLTask(uint32_t* varCount, Mode mode)
@@ -59,6 +61,7 @@ CaDiCaLTask::CaDiCaLTask(uint32_t* varCount, Mode mode)
   , m_mode(mode)
 {
   m_solver->connect_terminator(m_terminator.get());
+  m_name = "CaDiCaL Task (completely new)";
 }
 CaDiCaLTask::~CaDiCaLTask() {}
 
@@ -76,6 +79,19 @@ CaDiCaLTask::copyFromCaDiCaLTask(const CaDiCaLTask& other)
 
   m_mode = other.m_mode;
   other.m_solver->copy(*m_solver);
+}
+
+void
+CaDiCaLTask::applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree)
+{
+  m_name = "Solver Task for Path " + CNFTree::pathToStdString(p);
+  tree.visit(
+    p,
+    [this](
+      CNFTree::CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
+      m_solver->assume(p);
+      return false;
+    });
 }
 
 void

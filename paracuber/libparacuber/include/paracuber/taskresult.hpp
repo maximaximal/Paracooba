@@ -21,6 +21,8 @@ class TaskResult
   enum Status
   {
     Success,
+    DecisionMade,
+    CreatedCaDiCaLTask,
     MissingInputs,
     ParsingError,
 
@@ -50,11 +52,13 @@ class TaskResult
    */
   std::unique_ptr<Task>& getTaskPtr() { return m_task; }
 
-  void setTask(std::unique_ptr<Task> task);
-
   private:
+  friend class Runner;
+
   Status m_status;
   std::unique_ptr<Task> m_task;
+
+  void setTask(std::unique_ptr<Task> task);
 };
 
 using TaskResultPtr = std::unique_ptr<TaskResult>;

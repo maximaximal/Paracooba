@@ -9,6 +9,7 @@ namespace paracuber {
 class Runner;
 class Communicator;
 class Config;
+class TaskFactory;
 
 /** @brief Environment for tasks anywhere in the distributed system.
  *
@@ -33,6 +34,8 @@ class Task
 
   virtual void terminate() = 0;
 
+  virtual const std::string& name() { return m_name; };
+
   /** @brief Returns the signal marking finished task.
    *
    * A given slot must not directly save the given reference, as it is only a
@@ -43,6 +46,8 @@ class Task
 
   protected:
   friend class Runner;
+
+  std::string m_name;
 
   FinishedSignal m_finishedSignal;
   void finish(const TaskResult& result);
@@ -59,10 +64,17 @@ class Task
   /// Pointer to a valid Config instance. Guaranteed to be available in
   /// execute().
   Config* m_config = nullptr;
-  // Pointer to a valid logger instance given to the task inside a worker
-  // thread. Guaranteed to be available in execute(). Logs in the same context
-  // as the worker thread running the task.
+  /// Pointer to a valid logger instance given to the task inside a worker
+  /// thread. Guaranteed to be available in execute(). Logs in the same context
+  /// as the worker thread running the task.
   Logger* m_logger = nullptr;
+  /// Pointer to a TaskFactory that created this task or was assigned to it. May
+  /// be a nullptr.
+  TaskFactory* m_factory = nullptr;
+  /// Always-valid ID of the original compute node that started this request. Is
+  /// not the source of the whole query (not the same as rootCNF ID), but the
+  /// compute node before this one.
+  int64_t m_originator = 0;
 };
 }
 

@@ -12,6 +12,7 @@
 namespace paracuber {
 class CNF;
 class Communicator;
+class TaskFactory;
 
 /** @brief Daemonised solver mode that waits for tasks and sends and receives
  * statistics to/from other solvers.
@@ -44,6 +45,7 @@ class Daemon
 
     private:
     std::shared_ptr<CNF> m_rootCNF;
+    std::unique_ptr<TaskFactory> m_taskFactory;
     int64_t m_originatorID = 0;
     Daemon* m_daemon;
     Logger m_logger;

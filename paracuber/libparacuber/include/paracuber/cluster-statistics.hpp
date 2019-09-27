@@ -1,6 +1,7 @@
 #ifndef PARACUBER_CLUSTERSTATISTICS_HPP
 #define PARACUBER_CLUSTERSTATISTICS_HPP
 
+#include "cnftree.hpp"
 #include "log.hpp"
 #include "util.hpp"
 #include <cstdint>
@@ -45,6 +46,10 @@ class ClusterStatistics
     {
       CLUSTERSTATISTICS_NODE_CHANGED(m_name, name)
     }
+    void setName(std::string_view name)
+    {
+      CLUSTERSTATISTICS_NODE_CHANGED(m_name, name)
+    }
     void setHost(const std::string& host)
     {
       CLUSTERSTATISTICS_NODE_CHANGED(m_host, host)
@@ -84,14 +89,20 @@ class ClusterStatistics
     {
       CLUSTERSTATISTICS_NODE_CHANGED(m_readyForWork, ready)
     }
-    void setDaemon(bool daemon){ CLUSTERSTATISTICS_NODE_CHANGED(m_daemon,
-                                                                daemon) }
+    void setDaemon(bool daemon)
+    {
+      CLUSTERSTATISTICS_NODE_CHANGED(m_daemon, daemon)
+    }
+    void setDistance(uint8_t distance){
+      CLUSTERSTATISTICS_NODE_CHANGED(m_distance, distance)
+    }
 
     NetworkedNode* getNetworkedNode() const
     {
       return m_networkedNode.get();
     }
 
+    std::string_view getName() const { return m_name; }
     int64_t getId() const { return m_id; }
     bool getFullyKnown() const { return m_fullyKnown; }
     bool getReadyForWork() const { return m_readyForWork; }
@@ -103,6 +114,12 @@ class ClusterStatistics
     {
       return static_cast<float>(m_workQueueSize) /
              static_cast<float>(m_workQueueCapacity);
+    }
+    float getFitnessForNewAssignment() const
+    {
+      // This addition determines the weight local decisions have. A greater
+      // value makes local decisions more unlikely.
+      return getUtilization() * (m_distance + 0.8);
     }
 
     private:
@@ -123,6 +140,7 @@ class ClusterStatistics
     bool m_fullyKnown = false;
     bool m_readyForWork = false;
     bool m_daemon = false;
+    uint8_t m_distance = 0;
 
     bool& m_changed;
 
@@ -158,6 +176,8 @@ class ClusterStatistics
    */
   ~ClusterStatistics();
 
+  void initLocalNode();
+
   ClusterStatistics::Node& getNode(int64_t id);
 
   std::pair<ClusterStatistics::Node&, bool> getOrCreateNode(int64_t id);
@@ -188,8 +208,14 @@ class ClusterStatistics
    * @returns nullptr if the decision is better done locally, remote node
    * otherwise.
    */
-  const Node* offloadDecisionToRemote(int64_t originator);
+  const Node* getTargetComputeNodeForNewDecision(int64_t originator);
   bool clearChanged();
+
+  const Node& getThisNode() const { return *m_thisNode; }
+
+  void handlePathOnNode(const Node* node,
+                        std::shared_ptr<CNF> rootCNF,
+                        CNFTree::Path p);
 
   protected:
   friend class Communicator;
@@ -198,6 +224,7 @@ class ClusterStatistics
 
   private:
   NodeMap m_nodeMap;
+  Node* m_thisNode;
   bool m_changed = false;
 
   ConfigPtr m_config;

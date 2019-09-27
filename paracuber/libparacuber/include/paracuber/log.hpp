@@ -12,6 +12,8 @@
 #include <memory>
 #include <string>
 
+#include "util.hpp"
+
 #ifndef FILE_BASENAME
 #define FILE_BASENAME "Basename not supported."
 #endif
@@ -22,10 +24,12 @@ using MutableConstant = boost::log::attributes::mutable_constant<T>;
 extern thread_local MutableConstant<int> lineAttr;
 extern thread_local MutableConstant<const char*> fileAttr;
 extern thread_local MutableConstant<const char*> functionAttr;
+extern thread_local MutableConstant<size_t> stackSizeAttr;
 
-#define PARACUBER_LOG_LOCATION(lg) \
-  lineAttr.set(__LINE__);          \
-  fileAttr.set(FILE_BASENAME);     \
+#define PARACUBER_LOG_LOCATION(lg)              \
+  lineAttr.set(__LINE__);                       \
+  fileAttr.set(FILE_BASENAME);                  \
+  stackSizeAttr.set(paracuber::GetStackSize()); \
   functionAttr.set(__PRETTY_FUNCTION__);
 
 #define PARACUBER_LOG(LOGGER, SEVERITY) \

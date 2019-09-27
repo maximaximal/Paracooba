@@ -2,19 +2,20 @@
 #define PARACUBER_RUNNER_HPP
 
 #include "log.hpp"
+#include <atomic>
 #include <condition_variable>
 #include <future>
 #include <mutex>
 #include <queue>
+#include <shared_mutex>
 #include <thread>
 #include <vector>
-#include <atomic>
 
 namespace paracuber {
 class Communicator;
 class Task;
 class TaskResult;
-class Log;
+class TaskFactory;
 
 /** @brief Environment for running a \ref Task in.
  *
@@ -48,8 +49,19 @@ class Runner
   /** @brief Push a new task to the internal task queue.
    *
    * The task will be run as soon as priorities, dependencies, ..., are sorted
-   * out. */
-  std::future<std::unique_ptr<TaskResult>> push(std::unique_ptr<Task> task);
+   * out.
+   *
+   * @param task The task to schedule.
+   * @param originator The compute node ID that pushed this task.
+   * @param factory May contain the factory assigned to this task, if
+   * applicable.
+   */
+  std::future<std::unique_ptr<TaskResult>> push(std::unique_ptr<Task> task,
+                                                int64_t originator,
+                                                TaskFactory* factory = nullptr);
+
+  void registerTaskFactory(TaskFactory* f);
+  void deregisterTaskFactory(TaskFactory* f);
 
   private:
   friend class Communicator;
@@ -68,11 +80,16 @@ class Runner
   {
     /** @brief Quick Constructor for a QueueEntry object.
      */
-    QueueEntry(std::unique_ptr<Task> task, int priority);
+    QueueEntry(std::unique_ptr<Task> task,
+               int priority,
+               int64_t originator,
+               TaskFactory* factory = nullptr);
     ~QueueEntry();
     std::unique_ptr<Task> task;
     std::promise<std::unique_ptr<TaskResult>> result;
+    TaskFactory* factory = nullptr;
     int priority = 0;
+    int64_t originator = 0;
 
     inline bool operator<(QueueEntry const& b) const
     {
@@ -94,6 +111,11 @@ class Runner
   std::vector<Task*> m_currentlyRunningTasks;
   std::atomic<uint32_t> m_numberOfRunningTasks;
   std::atomic<uint64_t> m_taskCount;
+
+  std::shared_mutex m_taskFactoriesMutex;
+  std::vector<TaskFactory*> m_taskFactories;
+
+  void checkTaskFactories();
 };
 }
 

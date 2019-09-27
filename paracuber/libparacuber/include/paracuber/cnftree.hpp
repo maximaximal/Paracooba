@@ -23,6 +23,7 @@ class CNFTree
   {
     Unvisited,
     Working,
+    Split,
     SAT,
     UNSAT,
     Unknown,
@@ -36,8 +37,8 @@ class CNFTree
    *
    * Return true to abort traversal, false to continue.
    *
-   * using VisitorFunc = std::function<bool(CubeVar, uint8_t, State& state,
-   * int64_t remote)>;
+   * using VisitorFunc = std::function<bool(CNFTree::CubeVar, uint8_t, State
+   * state, int64_t remote)>;
    */
 
   /** @brief A single node on the cubing binary tree.
@@ -57,8 +58,8 @@ class CNFTree
     std::unique_ptr<Node> left;
     std::unique_ptr<Node> right;
 
-    inline bool isLeaf() { return (!left) && (!right); }
-    inline bool isRemote() { return isLeaf() && remote != 0; }
+    inline bool isLeaf() const { return (!left) && (!right); }
+    inline bool isRemote() const { return isLeaf() && remote != 0; }
   };
 
   /** @brief Visit the tree and call the provided visitor function.
@@ -66,18 +67,18 @@ class CNFTree
    * @return False if the path is not known, true otherwise.
    */
   template<class Visitor>
-  bool visit(Path p, Visitor visitor)
+  bool visit(Path p, Visitor visitor) const
   {
     assert(getDepth(p) < maxPathDepth);
 
-    Node* n = &m_root;
+    const Node* n = &m_root;
     uint8_t depth = 0;
     bool end = false;
 
     while(!end) {
       bool assignment = getAssignment(p, depth + 1);
       CubeVar decision = n->decision;
-      std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+      const std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
 
       if(!assignment) {
         // A left path is an inversed literal, this is a bottom assignment.
@@ -114,14 +115,27 @@ class CNFTree
   /** @brief Get the state for a given path.
    *
    * The node at the path must already exist.
+   *
+   * @return False if the path does not exist yet, true if assignment was
+   * successful.
    */
-  bool getState(Path p, State state) const;
+  bool getState(Path p, State &state) const;
 
   /** @brief Set the state for a given path.
    *
    * The node at the path must already exist.
+   *
+   * @return False if the path does not exist yet, true if assignment was
+   * successful.
    */
   bool setState(Path p, State state);
+
+  /** @brief Bulk-set a node.
+   *
+   * @return False if the path does not exist yet, true if assignment was
+   * successful.
+   */
+  bool setDecisionAndState(Path p, CubeVar decision, State state);
 
   /** @brief Traverse the decision tree and write the specified path to a given
    * container.
@@ -132,7 +146,7 @@ class CNFTree
     return visit(
       p,
       [&container](
-        CubeVar p, uint8_t depth, CNFTree::State& state, int64_t remote) {
+        CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
         container.push_back(p);
         return false;
       });
@@ -143,7 +157,7 @@ class CNFTree
     return visit(
       p,
       [&container](
-        CubeVar p, uint8_t depth, CNFTree::State& state, int64_t remote) {
+        CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
         container.push_back({ p, state });
         return false;
       });
@@ -199,6 +213,17 @@ class CNFTree
     return (p & ~(static_cast<Path>(1u)
                   << ((sizeof(Path) * 8) - 1 - (depth - 1)))) |
            (static_cast<Path>(val) << ((sizeof(Path) * 8) - 1 - (depth - 1)));
+  }
+
+  static inline Path getNextLeftPath(Path p)
+  {
+    uint8_t depth = getDepth(p) + 1;
+    return setDepth(setAssignment(p, depth, false), depth);
+  }
+  static inline Path getNextRightPath(Path p)
+  {
+    uint8_t depth = getDepth(p) + 1;
+    return setDepth(setAssignment(p, depth, true), depth);
   }
 
   static inline Path down(Path p) { return setDepth(p, getDepth(p) + 1); }

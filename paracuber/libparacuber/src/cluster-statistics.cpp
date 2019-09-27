@@ -1,4 +1,5 @@
 #include "../include/paracuber/cluster-statistics.hpp"
+#include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/networked_node.hpp"
 #include <algorithm>
@@ -28,6 +29,7 @@ ClusterStatistics::Node::Node(Node&& o) noexcept
   , m_fullyKnown(o.m_fullyKnown)
   , m_daemon(o.m_daemon)
   , m_readyForWork(o.m_readyForWork)
+  , m_distance(o.m_distance)
   , m_acc_workQueueSize(boost::accumulators::tag::rolling_window::window_size =
                           20)
 {}
@@ -53,6 +55,24 @@ ClusterStatistics::ClusterStatistics(ConfigPtr config, LogPtr log)
 {}
 
 ClusterStatistics::~ClusterStatistics() {}
+
+void
+ClusterStatistics::initLocalNode()
+{
+  Node thisNode(m_changed, m_config->getInt64(Config::Id));
+  thisNode.setDaemon(m_config->isDaemonMode());
+  thisNode.setDistance(0);
+  thisNode.setReadyForWork(false);
+  thisNode.setFullyKnown(true);
+  thisNode.setUptime(0);
+  thisNode.setWorkQueueCapacity(m_config->getUint64(Config::WorkQueueCapacity));
+  thisNode.setWorkQueueSize(0);
+  thisNode.setTcpListenPort(m_config->getUint16(Config::TCPListenPort));
+  thisNode.setUdpListenPort(m_config->getUint16(Config::UDPListenPort));
+  thisNode.setName(m_config->getString(Config::LocalName));
+  m_thisNode = &thisNode;
+  addNode(std::move(thisNode));
+}
 
 ClusterStatistics::Node&
 ClusterStatistics::getNode(int64_t id)
@@ -88,28 +108,60 @@ ClusterStatistics::getNodeMap()
 }
 
 const ClusterStatistics::Node*
-ClusterStatistics::offloadDecisionToRemote(int64_t originator)
+ClusterStatistics::getTargetComputeNodeForNewDecision(int64_t originator)
 {
+
   auto [map, lock] = getNodeMap();
 
   int64_t localId = m_config->getInt64(Config::Id);
   auto filterFunc = [originator, localId](auto& e) {
     auto& n = e.second;
-    return n.getFullyKnown() && n.getReadyForWork() && n.getId() != localId &&
+    return n.getFullyKnown() && n.getReadyForWork() &&
            n.getId() != originator && n.getDaemon();
   };
 
   // Filter to only contain nodes that can be worked with.
   auto filteredMap =
     boost::make_filter_iterator(filterFunc, map.begin(), map.end());
+  auto filteredMapEnd =
+    boost::make_filter_iterator(filterFunc, map.end(), map.end());
 
-  auto& min = std::min(map.begin(), map.end(), [](auto& l, auto& r) {
-    return l->second.getUtilization() < r->second.getUtilization();
+  if(filteredMap == filteredMapEnd) {
+    return nullptr;
+  }
+
+  auto& min = std::min(filteredMap, filteredMapEnd, [](auto& l, auto& r) {
+    return l->second.getFitnessForNewAssignment() <
+           r->second.getFitnessForNewAssignment();
   });
-  if(min->second.getUtilization() <
-     m_config->getFloat(Config::MaxNodeUtilization))
-    return &min->second;
-  return nullptr;
+
+  auto target = &min->second;
+
+  // No limit for max node utilisation! Just send the node to the best fitting
+  // place.
+  if(target == m_thisNode) {
+    return nullptr;
+  }
+
+  return target;
+}
+
+void
+ClusterStatistics::handlePathOnNode(const Node* node,
+                                    std::shared_ptr<CNF> rootCNF,
+                                    CNFTree::Path p)
+{
+  assert(node);
+
+  Communicator* comm = m_config->getCommunicator();
+
+  // Local node should be handled externally, without using this function.
+  assert(node != m_thisNode);
+
+  // This path should be handled on another compute node. This means, the
+  // other compute node requires a Cube-Beam from the Communicator class.
+  m_config->getCommunicator()->sendCNFToNode(
+    rootCNF, p, node->getNetworkedNode());
 }
 
 bool

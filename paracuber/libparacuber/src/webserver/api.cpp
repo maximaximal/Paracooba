@@ -51,7 +51,8 @@ API::injectClusterStatisticsUpdate(ClusterStatistics& stats)
   sstream << stats;
   std::string data = sstream.str();
 
-  PARACUBER_LOG(m_logger, Trace) << "NEW CLUSTER STATS: Internal clients: " << m_wsData.size();
+  PARACUBER_LOG(m_logger, Trace)
+    << "NEW CLUSTER STATS: Internal clients: " << m_wsData.size();
 
   for(auto& it : m_wsData) {
     auto& conn = *it.second;
@@ -171,19 +172,14 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
                                   sendError(data, "CNFTree path too long!"));
     }
 
+    CNFTree::Path p = CNFTree::strToPath(strPath.data(), strPath.length());
     if(next) {
-      std::string next1 = strPath + '0';
-      std::string next2 = strPath + '1';
-
-      CNFTree::Path p = CNFTree::strToPath(next1.data(), next1.length());
       m_config->getCommunicator()->requestCNFPathInfo(
-        p, reinterpret_cast<int64_t>(socket));
+        CNFTree::getNextLeftPath(p), reinterpret_cast<int64_t>(socket));
 
-      p = CNFTree::strToPath(next2.data(), next2.length());
       m_config->getCommunicator()->requestCNFPathInfo(
-        p, reinterpret_cast<int64_t>(socket));
+        CNFTree::getNextRightPath(p), reinterpret_cast<int64_t>(socket));
     } else {
-      CNFTree::Path p = CNFTree::strToPath(strPath.data(), strPath.length());
       m_config->getCommunicator()->requestCNFPathInfo(
         p, reinterpret_cast<int64_t>(socket));
     }

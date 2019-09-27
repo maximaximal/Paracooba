@@ -56,7 +56,7 @@ CNFTree::setDecision(Path p, CubeVar decision)
 }
 
 bool
-CNFTree::getState(Path p, State state) const
+CNFTree::getState(Path p, State& state) const
 {
   assert(getDepth(p) < maxPathDepth);
 
@@ -110,6 +110,54 @@ CNFTree::setState(Path p, State state)
   }
   return false;
 }
+bool
+CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
+{
+  assert(getDepth(p) < maxPathDepth);
+
+  Node* n = &m_root;
+  uint8_t depth = 0;
+  bool end = false;
+
+  while(!end) {
+    if(depth == getDepth(p)) {
+      if(!n->isLeaf() && n->decision != decision) {
+        /// The decision is invalid if a child node already exists, or if it
+        /// conflicts with the old assignment.
+        return false;
+      }
+      if(n->isLeaf()) {
+        // New value needs to be applied.
+
+        // Create left and right branches as leaves. They have invalid decisions
+        // but are required to mark the current node to have a valid decision.
+        n->left = std::make_unique<Node>();
+        n->right = std::make_unique<Node>();
+        n->decision = decision;
+        n->state = state;
+        return true;
+      }
+
+      break;
+    }
+
+    bool assignment = getAssignment(p, depth + 1);
+    std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+
+    if(!nextPtr) {
+      nextPtr = std::make_unique<Node>();
+    }
+
+    n = nextPtr.get();
+    ++depth;
+  }
+
+  if(depth == getDepth(p)) {
+    n->decision = decision;
+    return true;
+  }
+  return false;
+}
 void
 CNFTree::pathToStr(Path p, char* str)
 {
@@ -136,15 +184,15 @@ bool
 CNFTree::isLocal(Path p)
 {
   bool isLocal = true;
-  visit(p,
-        [&isLocal](
-          CubeVar p, uint8_t depth, CNFTree::State& state, int64_t remote) {
-          if(remote != 0) {
-            isLocal = false;
-            return true;
-          }
-          return false;
-        });
+  visit(
+    p,
+    [&isLocal](CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
+      if(remote != 0) {
+        isLocal = false;
+        return true;
+      }
+      return false;
+    });
   return isLocal;
 }
 

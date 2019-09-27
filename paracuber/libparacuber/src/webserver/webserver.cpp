@@ -377,9 +377,9 @@ class Webserver::HTTPSession
   static bool wsSendPropertyTree(std::weak_ptr<HTTPSession>& weakPtr,
                                  boost::property_tree::ptree& tree)
   {
-    if(weakPtr.expired())
-      return false;
     auto ptr = weakPtr.lock();
+    if(!ptr)
+      return false;
     assert(ptr->m_webserver);
     assert(ptr->m_websocket);
     auto os = boost::beast::ostream(ptr->m_buffer);
@@ -394,9 +394,9 @@ class Webserver::HTTPSession
   static bool wsSendString(std::weak_ptr<HTTPSession>& weakPtr,
                            const std::string& data)
   {
-    if(weakPtr.expired())
-      return false;
     auto ptr = weakPtr.lock();
+    if(!ptr)
+      return false;
     assert(ptr->m_webserver);
     assert(ptr->m_websocket);
     ptr->m_websocket->text(true);
@@ -619,10 +619,10 @@ class Webserver::HTTPListener
   void closeAllSessions()
   {
     for(auto& session : m_sessions) {
-      if(!session.expired()) {
-        auto ptr = session.lock();
-        ptr->doClose();
-      }
+      auto ptr = session.lock();
+      if(!ptr)
+        continue;
+      ptr->doClose();
     }
     m_sessions.clear();
   }
@@ -647,9 +647,9 @@ class Webserver::HTTPListener
 
   static bool removeIfCB(const std::weak_ptr<HTTPSession> s, HTTPSession* match)
   {
-    if(s.expired())
-      return true;
     auto ptr = s.lock();
+    if(!ptr)
+      return true;
     return ptr.get() == match;
   }
 

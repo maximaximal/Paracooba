@@ -1,6 +1,7 @@
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/task.hpp"
+#include "../include/paracuber/task_factory.hpp"
 #include <boost/log/attributes/constant.hpp>
 
 #include <algorithm>
@@ -51,7 +52,9 @@ Runner::stop()
 }
 
 std::future<std::unique_ptr<TaskResult>>
-Runner::push(std::unique_ptr<Task> task)
+Runner::push(std::unique_ptr<Task> task,
+             int64_t originator,
+             TaskFactory* factory)
 {
   task->m_runner = this;
   task->m_log = m_log.get();
@@ -59,13 +62,27 @@ Runner::push(std::unique_ptr<Task> task)
   task->m_communicator = m_communicator;
 
   std::unique_ptr<QueueEntry> entry =
-    std::make_unique<QueueEntry>(std::move(task), 0);
+    std::make_unique<QueueEntry>(std::move(task), 0, originator, factory);
   std::promise<std::unique_ptr<TaskResult>>& promise = entry->result;
   push_(std::move(entry));
   std::unique_lock<std::mutex> lock(m_taskQueueMutex);
   m_newTasksVerifier = true;
   m_newTasks.notify_one();
   return promise.get_future();
+}
+
+void
+Runner::registerTaskFactory(TaskFactory* f)
+{
+  std::unique_lock lock(m_taskFactoriesMutex);
+  m_taskFactories.push_back(f);
+}
+void
+Runner::deregisterTaskFactory(TaskFactory* f)
+{
+  std::unique_lock lock(m_taskFactoriesMutex);
+  m_taskFactories.erase(
+    std::find(m_taskFactories.begin(), m_taskFactories.end(), f));
 }
 
 void
@@ -94,10 +111,13 @@ Runner::worker(uint32_t workerId, Logger logger)
 
     if(entry) {
       PARACUBER_LOG(logger, Trace)
-        << "Worker " << workerId << " has received a new task.";
+        << "Worker " << workerId
+        << " has received a new task: " << entry->task->name();
 
       // Insert the logger from this worker thread.
       entry->task->m_logger = &logger;
+      entry->task->m_factory = entry->factory;
+      entry->task->m_originator = entry->originator;
 
       m_currentlyRunningTasks[workerId] = entry->task.get();
       ++m_numberOfRunningTasks;
@@ -107,14 +127,24 @@ Runner::worker(uint32_t workerId, Logger logger)
       result->setTask(std::move(entry->task));
       result->getTask().finish(*result);
       entry->result.set_value(std::move(result));
+
+      // Now that the old task has ended, check the factories for possible new
+      // tasks that can be created from task skeletons. This saves memory
+      // compared to just dumping everything on the task queue.
+      checkTaskFactories();
     }
   }
   PARACUBER_LOG(logger, Trace) << "Worker " << workerId << " ended.";
 }
 
-Runner::QueueEntry::QueueEntry(std::unique_ptr<Task> task, int priority)
+Runner::QueueEntry::QueueEntry(std::unique_ptr<Task> task,
+                               int priority,
+                               int64_t originator,
+                               TaskFactory* factory)
   : task(std::move(task))
   , priority(priority)
+  , originator(originator)
+  , factory(factory)
 {}
 Runner::QueueEntry::~QueueEntry() {}
 
@@ -136,5 +166,23 @@ Runner::pop_()
     return result;
   }
   return nullptr;
+}
+
+void
+Runner::checkTaskFactories()
+{
+  std::shared_lock lock(m_taskFactoriesMutex);
+  for(auto factory : m_taskFactories) {
+    // Check if more tasks should be requested for every factory and if new
+    // tasks should be requested, request multiple of them.
+    while(m_taskCount < m_currentlyRunningTasks.size() * 3 &&
+          factory->canProduceTask()) {
+      // Receive and submit the task.
+      auto [task, originator] = factory->produceTask();
+      if(task) {
+        push(std::move(task), originator, factory);
+      }
+    }
+  }
 }
 }

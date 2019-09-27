@@ -11,6 +11,7 @@ namespace paracuber {
 class Config;
 class Communicator;
 class CNF;
+class TaskFactory;
 
 /** @brief Main interaction point with the solver as a user.
  */
@@ -46,12 +47,14 @@ class Client
 
   private:
   ConfigPtr m_config;
+  LogPtr m_log;
+  Logger m_logger;
   std::shared_ptr<Communicator> m_communicator;
   TaskResult::Status m_status;
   std::shared_ptr<CNF> m_rootCNF;
   uint32_t m_cnfVarCount = 0;
+  std::unique_ptr<TaskFactory> m_taskFactory;
 
-  Logger m_logger;
 };
 }
 

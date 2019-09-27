@@ -37,6 +37,14 @@ TEST_CASE("CNFTree::Path manipulation")
   REQUIRE(CNFTree::getDepthShiftedPath(p) == (uint64_t)0b00001000uL);
   REQUIRE(CNFTree::getDepthShiftedPath(p) == 8u);
 
+  REQUIRE(CNFTree::getDepth(CNFTree::getNextLeftPath(p)) == 5);
+  REQUIRE(!CNFTree::getAssignment(CNFTree::getNextLeftPath(p), 5));
+  REQUIRE(CNFTree::getAssignment(CNFTree::getNextRightPath(p), 5));
+  REQUIRE(CNFTree::getDepthShiftedPath(CNFTree::getNextLeftPath(p)) ==
+          (uint64_t)0b00010000uL);
+  REQUIRE(CNFTree::getDepthShiftedPath(CNFTree::getNextRightPath(p)) ==
+          (uint64_t)0b00010001uL);
+
   // This is also a test for cuber::Cuber::getAdditionComponent. The behaviour
   // stays the same.
   p = CNFTree::buildPath((uint8_t)0b11110000u, 4);
@@ -56,11 +64,12 @@ TEST_CASE("CNFTree Usage")
   {
     uint8_t depth = GENERATE(0, 1, 2, 3);
 
-    tree.visit(CNFTree::buildPath((uint8_t)0b10000000, depth),
-               [](CNFTree::CubeVar l, uint8_t d, CNFTree::State& state, int64_t remote) {
-                 REQUIRE(false);
-                 return false;
-               });
+    tree.visit(
+      CNFTree::buildPath((uint8_t)0b10000000, depth),
+      [](CNFTree::CubeVar l, uint8_t d, CNFTree::State state, int64_t remote) {
+        REQUIRE(false);
+        return false;
+      });
   }
 
   // Setup the tree.
@@ -75,7 +84,8 @@ TEST_CASE("CNFTree Usage")
       std::vector<CNFTree::CubeVar> vars;
       REQUIRE(tree.visit(
         CNFTree::buildPath((uint8_t)0b10000000, 1),
-        [&vars](CNFTree::CubeVar l, uint8_t d, CNFTree::State& state, int64_t remote) {
+        [&vars](
+          CNFTree::CubeVar l, uint8_t d, CNFTree::State state, int64_t remote) {
           REQUIRE(state == CNFTree::Unvisited);
           vars.push_back(l);
           return false;
@@ -89,7 +99,9 @@ TEST_CASE("CNFTree Usage")
 
       std::vector<CNFTree::CubeVar> vars;
       REQUIRE(tree.visit(
-        p, [&vars](CNFTree::CubeVar l, uint8_t d, CNFTree::State& state, int64_t remote) {
+        p,
+        [&vars](
+          CNFTree::CubeVar l, uint8_t d, CNFTree::State state, int64_t remote) {
           vars.push_back(l);
           return false;
         }));
@@ -106,7 +118,8 @@ TEST_CASE("CNFTree Usage")
       std::vector<CNFTree::CubeVar> vars;
       REQUIRE(!tree.visit(
         CNFTree::buildPath((uint8_t)0b10000000, 4),
-        [&vars](CNFTree::CubeVar l, uint8_t d, CNFTree::State& state, int64_t remote) {
+        [&vars](
+          CNFTree::CubeVar l, uint8_t d, CNFTree::State state, int64_t remote) {
           vars.push_back(l);
           return false;
         }));

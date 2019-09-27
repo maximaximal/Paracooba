@@ -5,6 +5,7 @@
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/log.hpp"
 #include "../include/paracuber/runner.hpp"
+#include "../include/paracuber/task_factory.hpp"
 #include <shared_mutex>
 
 namespace paracuber {
@@ -17,6 +18,8 @@ Daemon::Context::Context(std::shared_ptr<CNF> rootCNF,
   , m_daemon(daemon)
   , m_logger(daemon->m_log->createLogger())
   , m_statisticsNode(statsNode)
+  , m_taskFactory(
+      std::make_unique<TaskFactory>(daemon->m_config, daemon->m_log, rootCNF))
 {
   PARACUBER_LOG(m_logger, Trace)
     << "Create new context with origin " << m_originatorID << ".";
@@ -57,7 +60,8 @@ Daemon::Context::start(State change)
       // These cubes can then be cubed further or just solved directly,
       // depending on the heuristics of the current compute node.
     });
-    m_daemon->m_communicator->getRunner()->push(std::move(task));
+    m_daemon->m_communicator->getRunner()->push(
+      std::move(task), m_originatorID, m_taskFactory.get());
   } else if(change == FormulaParsed) {
     m_state = m_state | FormulaParsed;
   } else if(change == AllowanceMapReceived) {

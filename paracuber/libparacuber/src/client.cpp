@@ -5,10 +5,12 @@
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/cuber/registry.hpp"
 #include "../include/paracuber/runner.hpp"
+#include "../include/paracuber/task_factory.hpp"
 
 namespace paracuber {
 Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
   : m_config(config)
+  , m_log(log)
   , m_logger(log->createLogger())
   , m_communicator(communicator)
 {
@@ -33,15 +35,6 @@ Client::getDIMACSSourcePathFromConfig()
   return sourcePath;
 }
 
-// Approach to safely cast unique_ptr from
-// https://stackoverflow.com/a/36120483
-template<typename TO, typename FROM>
-std::unique_ptr<TO>
-static_unique_pointer_cast(std::unique_ptr<FROM>&& old)
-{
-  return std::unique_ptr<TO>{ static_cast<TO*>(old.release()) };
-}
-
 void
 Client::solve()
 {
@@ -50,7 +43,8 @@ Client::solve()
   auto task = std::make_unique<CaDiCaLTask>(&m_cnfVarCount, mode);
   auto& finishedSignal = task->getFinishedSignal();
   task->readDIMACSFile(getDIMACSSourcePathFromConfig());
-  m_communicator->getRunner()->push(std::move(task));
+  m_communicator->getRunner()->push(std::move(task),
+                                    m_config->getInt64(Config::Id));
   finishedSignal.connect([this](const TaskResult& result) {
     m_status = result.getStatus();
     if(m_status != TaskResult::Parsed) {
@@ -69,7 +63,8 @@ Client::solve()
       task->setMode(CaDiCaLTask::Solve);
       auto& finishedSignal = task->getFinishedSignal();
       task->readDIMACSFile(getDIMACSSourcePathFromConfig());
-      m_communicator->getRunner()->push(std::move(task));
+      m_communicator->getRunner()->push(std::move(task),
+                                        m_config->getInt64(Config::Id));
       finishedSignal.connect([this](const TaskResult& result) {
         // Finished solving using client CaDiCaL!
         m_status = result.getStatus();
@@ -92,24 +87,10 @@ Client::solve()
     // Decisions must be propagated to daemons in order to solve them in
     // parallel. Decisions are always guided by the CNFTree class, which
     // knows how many decisions are left in any given path.
-    CNFTree::CubeVar var;
-    CNFTree::Path p = CNFTree::buildPath(0, 0);
-    bool succ = m_rootCNF->getCuberRegistry().generateCube(p, var);
-    PARACUBER_LOG(m_logger, Trace)
-      << "First Decision: " << var << " with " << succ << " and cutoff " << m_config->getFloat(Config::FreqCuberCutoff);
-    assert(m_rootCNF->getCNFTree().setDecision(p, var));
+    m_taskFactory = std::make_unique<TaskFactory>(m_config, m_log, m_rootCNF);
 
-    p = CNFTree::buildPath((uint8_t)0b00000000, 1);
-    m_rootCNF->getCuberRegistry().generateCube(p, var);
-    assert(m_rootCNF->getCNFTree().setDecision(p, var));
-
-    p = CNFTree::buildPath((uint8_t)0b10000000, 1);
-    m_rootCNF->getCuberRegistry().generateCube(p, var);
-    assert(m_rootCNF->getCNFTree().setDecision(p, var));
-
-    p = CNFTree::buildPath((uint8_t)0b10000000, 2);
-    m_rootCNF->getCuberRegistry().generateCube(p, var);
-    assert(m_rootCNF->getCNFTree().setDecision(p, var));
+    m_taskFactory->addPath(
+      0, TaskFactory::CubeOrSolve, m_config->getInt64(Config::Id));
   });
 }
 }

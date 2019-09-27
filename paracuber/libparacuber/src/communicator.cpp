@@ -318,7 +318,7 @@ class Communicator::UDPServer
     cnf->getCNFTree().visit(
       reader.getPath(),
       [&it](
-        CNFTree::CubeVar var, uint8_t, CNFTree::State& state, int64_t remote) {
+        CNFTree::CubeVar var, uint8_t, CNFTree::State state, int64_t remote) {
         it->setState(state);
         it->setLiteral(var);
         ++it;
@@ -786,6 +786,9 @@ Communicator::run()
 {
   using namespace boost::asio;
 
+  // First, init the local node in cluster statistics with all set variables.
+  m_clusterStatistics->initLocalNode();
+
   if(!m_runner) {
     m_runner = std::make_shared<Runner>(this, m_config, m_log);
   }
@@ -912,6 +915,7 @@ Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf,
                             CNFTree::Path path,
                             NetworkedNode* nn)
 {
+  assert(nn);
   // This indirection is required to make this work from worker threads.
   m_ioService.post([this, cnf, path, nn]() {
     auto client = std::make_shared<TCPClient>(this,

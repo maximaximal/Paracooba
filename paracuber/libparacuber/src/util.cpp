@@ -1,4 +1,7 @@
 #include "../include/paracuber/util.hpp"
+#include "../include/paracuber/client.hpp"
+#include "../include/paracuber/config.hpp"
+#include "../include/paracuber/daemon.hpp"
 #include <cmath>
 
 namespace paracuber {
@@ -18,5 +21,23 @@ GetStackSize()
 {
   char c = 'T';
   return StackStart - reinterpret_cast<int64_t>(&c);
+}
+
+std::shared_ptr<CNF>
+GetRootCNF(Config* config, int64_t cnfID)
+{
+  assert(config);
+  if(config->isDaemonMode()) {
+    Daemon* daemon = config->getDaemon();
+    auto [context, lock] = daemon->getContext(cnfID);
+    if(context) {
+      return context->getRootCNF();
+    } else {
+      return nullptr;
+    }
+  } else {
+    Client* client = config->getClient();
+    return client->getRootCNF();
+  }
 }
 }

@@ -50,9 +50,18 @@ class CaDiCaLTask : public Task
   /** @brief Destructor */
   virtual ~CaDiCaLTask();
 
+  /** @brief Set the solving mode, so parsing or solving can be done
+   * independently.
+   */
   void setMode(Mode mode);
 
+  /** @brief Copy the internal solver from another CaDiCaLTask.
+   */
   void copyFromCaDiCaLTask(const CaDiCaLTask& other);
+
+  /** @brief Apply the given path to the internal solver as assumptions.
+   */
+  void applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree);
 
   /** @brief Queue parsing a DIMACS file into the internal solver instance.
    *

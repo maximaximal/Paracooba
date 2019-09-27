@@ -8,6 +8,7 @@ set(PARACUBER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/runner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/config.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/task_factory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/task.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/taskresult.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/client.cpp
@@ -20,4 +21,5 @@ set(PARACUBER_SRCS
     ${WEBSERVER_SRCS}
 
     ${CMAKE_CURRENT_SOURCE_DIR}/cadical_task.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/decision_task.cpp
     PARENT_SCOPE)
