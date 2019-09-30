@@ -30,6 +30,8 @@ std::string
 BytePrettyPrint(size_t bytes);
 
 template<typename T>
+using UniqueLockView = std::pair<T, std::unique_lock<std::shared_mutex>>;
+template<typename T>
 using SharedLockView = std::pair<T, std::shared_lock<std::shared_mutex>>;
 template<typename T>
 using ConstSharedLockView =

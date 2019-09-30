@@ -45,13 +45,17 @@ applyMessageNodeToStatsNode(const message::Node::Reader& src,
 }
 void
 applyMessageNodeStatusToStatsNode(const message::NodeStatus::Reader& src,
-                                  ClusterStatistics::Node& tgt)
+                                  ClusterStatistics::Node& tgt,
+                                  Config& config)
 {
   tgt.setWorkQueueSize(src.getWorkQueueSize());
 
   if(src.isDaemon()) {
     auto daemon = src.getDaemon();
-    tgt.setReadyForWork(daemon.getReadyForWork());
+
+    for(auto context : daemon.getContexts()) {
+      tgt.setContextState(context.getOriginator(), context.getState());
+    }
   }
 }
 
@@ -268,7 +272,8 @@ class Communicator::UDPServer
 
     auto [statisticsNode, inserted] = m_clusterStatistics->getOrCreateNode(id);
 
-    applyMessageNodeStatusToStatsNode(reader, statisticsNode);
+    applyMessageNodeStatusToStatsNode(
+      reader, statisticsNode, *m_communicator->m_config);
 
     networkStatisticsNode(statisticsNode);
 

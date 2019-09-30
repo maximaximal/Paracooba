@@ -17,6 +17,7 @@
 namespace paracuber {
 class NetworkedNode;
 class CaDiCaLTask;
+class TaskFactory;
 
 namespace cuber {
 class Registry;
@@ -69,6 +70,7 @@ class CNF
     uint8_t currentDepth = 1;
     size_t receiveVarPos = 0;
     char receiveVarBuf[8];
+    int64_t originator = 0;
   };
 
   std::string_view getDimacsFile() { return m_dimacsFile; }
@@ -100,6 +102,8 @@ class CNF
   CNFTree& getCNFTree() { return *m_cnfTree; }
 
   void requestInfoGlobally(CNFTree::Path p, int64_t handle = 0);
+
+  void setTaskFactory(TaskFactory* f) { m_taskFactory = f; }
 
   private:
   struct SendDataStruct
@@ -134,6 +138,7 @@ class CNF
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
+  TaskFactory* m_taskFactory = nullptr;
 };
 
 std::ostream&

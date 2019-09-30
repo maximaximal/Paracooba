@@ -3,6 +3,7 @@
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/cuber/registry.hpp"
+#include "../include/paracuber/task_factory.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
@@ -61,24 +62,32 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
   if(first) {
     data->cb = cb;
     data->offset = 0;
+
+    // Write the subject.
+    TransmissionSubject subject = TransmitFormula;
+    socket->write_some(boost::asio::buffer(
+      reinterpret_cast<const char*>(&subject), sizeof(subject)));
+
+    // Write the originator ID.
+    int64_t id = m_config->getInt64(Config::Id);
+    socket->write_some(
+      boost::asio::buffer(reinterpret_cast<const char*>(&id), sizeof(id)));
+
+    // Send the path to use.
+    socket->write_some(
+      boost::asio::buffer(reinterpret_cast<const char*>(&path), sizeof(path)));
   }
 
   if(path == 0) {
     if(first) {
-      TransmissionSubject subject = TransmitFormula;
-      socket->write_some(boost::asio::buffer(
-        reinterpret_cast<const char*>(&subject), sizeof(subject)));
-
-      // Send the path to use.
-      socket->write_some(boost::asio::buffer(
-        reinterpret_cast<const char*>(&path), sizeof(path)));
-
       // Send the filename, so that the used compression algorithm can be known.
       // Also transfer the terminating \0.
       boost::filesystem::path p(m_dimacsFile);
       std::string dimacsBasename = p.filename().string();
       socket->write_some(
         boost::asio::buffer(dimacsBasename.c_str(), dimacsBasename.size() + 1));
+
+      first = false;
     }
 
     // This is the root CNF, send over the file directly using the sendfile()
@@ -93,6 +102,8 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
     socket->async_write_some(boost::asio::null_buffers(),
                              std::bind(&CNF::sendCB, this, data, path, socket));
   } else {
+    first = false;
+
     // Transmit all decisions on the given path.
     data->decisions.resize(CNFTree::getDepth(path));
     m_cnfTree->writePathToLiteralContainer(data->decisions, path);
@@ -125,6 +136,11 @@ CNF::sendAllowanceMap(boost::asio::ip::tcp::socket* socket,
   TransmissionSubject subject = TransmitAllowanceMap;
   socket->write_some(boost::asio::buffer(
     reinterpret_cast<const char*>(&subject), sizeof(subject)));
+
+  // Write the originator ID.
+  int64_t id = m_config->getInt64(Config::Id);
+  socket->write_some(
+    boost::asio::buffer(reinterpret_cast<const char*>(&id), sizeof(id)));
 
   // Write the map size.
   uint32_t mapSize = map.size();
@@ -230,7 +246,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
   while(length > 0 || buf == nullptr) {
     switch(d.state) {
       case ReceiveTransmissionSubject:
-        if(length < sizeof(TransmissionSubject)) {
+        if(length < (sizeof(TransmissionSubject) + sizeof(int64_t))) {
           // Remote has directly aborted the transmission.
           PARACUBER_LOG(m_logger, GlobalError)
             << "Remote "
@@ -243,6 +259,10 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         d.subject = *reinterpret_cast<TransmissionSubject*>(buf);
         buf += sizeof(TransmissionSubject);
         length -= sizeof(TransmissionSubject);
+
+        d.originator = *reinterpret_cast<int64_t*>(buf);
+        buf += sizeof(int64_t);
+        length -= sizeof(int64_t);
 
         switch(d.subject) {
           case TransmitFormula:
@@ -260,7 +280,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
 
         PARACUBER_LOG(m_logger, Trace)
           << "Receive TCP transmission (" << d.subject << ") from "
-          << socket->remote_endpoint() << ".";
+          << socket->remote_endpoint() << " (ID: " << d.originator << ")";
 
         break;
       case ReceivePath:
@@ -320,6 +340,12 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         if(length == 0 && buf == nullptr) {
           // This marks the end of the transmission, the decision sequence is
           // finished.
+
+          // This also means, the task factory needs to get this newly received
+          // path.
+          assert(m_taskFactory);
+          m_taskFactory->addPath(
+            d.path, TaskFactory::CubeOrSolve, d.originator);
           ERASE_AND_RETURN_SUBJECT()
         }
         for(std::size_t i = 0; i < length; i += sizeof(CNFTree::CubeVar)) {

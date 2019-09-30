@@ -149,18 +149,17 @@ CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
 
   while(!end) {
     if(depth == getDepth(p)) {
-      if(!n->isLeaf() && n->decision != decision) {
-        /// The decision is invalid if a child node already exists, or if it
-        /// conflicts with the old assignment.
-        return false;
-      }
       if(n->isLeaf()) {
         // New value needs to be applied.
 
         // Create left and right branches as leaves. They have invalid decisions
         // but are required to mark the current node to have a valid decision.
-        n->left = std::make_unique<Node>();
-        n->right = std::make_unique<Node>();
+        if(!n->left) {
+          n->left = std::make_unique<Node>();
+        }
+        if(!n->right) {
+          n->right = std::make_unique<Node>();
+        }
         n->decision = decision;
         n->state = state;
         return true;

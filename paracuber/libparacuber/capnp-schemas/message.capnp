@@ -13,7 +13,6 @@ struct DaemonContext
 struct Daemon
 {
   contexts @0 : List(DaemonContext); # List of all contexts on this node
-  readyForWork @1 : Bool;
 }
 
 struct Node

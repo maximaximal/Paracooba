@@ -1,6 +1,7 @@
 #include "../include/paracuber/cluster-statistics.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
+#include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/networked_node.hpp"
 #include <algorithm>
 #include <boost/iterator/filter_iterator.hpp>
@@ -8,10 +9,11 @@
 
 namespace paracuber {
 
-ClusterStatistics::Node::Node(bool& changed, int64_t id)
+ClusterStatistics::Node::Node(bool& changed, int64_t thisId, int64_t id)
   : m_changed(changed)
   , m_acc_workQueueSize(boost::accumulators::tag::rolling_window::window_size =
                           20)
+  , m_thisId(thisId)
   , m_id(id)
 {}
 
@@ -28,8 +30,9 @@ ClusterStatistics::Node::Node(Node&& o) noexcept
   , m_id(o.m_id)
   , m_fullyKnown(o.m_fullyKnown)
   , m_daemon(o.m_daemon)
-  , m_readyForWork(o.m_readyForWork)
   , m_distance(o.m_distance)
+  , m_contextStates(std::move(o.m_contextStates))
+  , m_thisId(o.m_thisId)
   , m_acc_workQueueSize(boost::accumulators::tag::rolling_window::window_size =
                           20)
 {}
@@ -48,6 +51,15 @@ ClusterStatistics::Node::setWorkQueueSize(uint64_t workQueueSize)
   CLUSTERSTATISTICS_NODE_CHANGED(m_workQueueSize, workQueueSize)
   m_acc_workQueueSize(workQueueSize);
 }
+bool
+ClusterStatistics::Node::getReadyForWork(int64_t id) const
+{
+  if(id == 0)
+    id = m_thisId;
+  Daemon::Context::State state =
+    static_cast<Daemon::Context::State>(getContextState(id));
+  return state & Daemon::Context::WaitingForWork;
+}
 
 ClusterStatistics::ClusterStatistics(ConfigPtr config, LogPtr log)
   : m_config(config)
@@ -59,10 +71,10 @@ ClusterStatistics::~ClusterStatistics() {}
 void
 ClusterStatistics::initLocalNode()
 {
-  Node thisNode(m_changed, m_config->getInt64(Config::Id));
+  Node thisNode(
+    m_changed, m_config->getInt64(Config::Id), m_config->getInt64(Config::Id));
   thisNode.setDaemon(m_config->isDaemonMode());
   thisNode.setDistance(0);
-  thisNode.setReadyForWork(false);
   thisNode.setFullyKnown(true);
   thisNode.setUptime(0);
   thisNode.setWorkQueueCapacity(m_config->getUint64(Config::WorkQueueCapacity));
@@ -70,8 +82,8 @@ ClusterStatistics::initLocalNode()
   thisNode.setTcpListenPort(m_config->getUint16(Config::TCPListenPort));
   thisNode.setUdpListenPort(m_config->getUint16(Config::UDPListenPort));
   thisNode.setName(m_config->getString(Config::LocalName));
-  m_thisNode = &thisNode;
   addNode(std::move(thisNode));
+  m_thisNode = &getNode(m_config->getInt64(Config::Id));
 }
 
 ClusterStatistics::Node&
@@ -85,7 +97,8 @@ ClusterStatistics::getNode(int64_t id)
 std::pair<ClusterStatistics::Node&, bool>
 ClusterStatistics::getOrCreateNode(int64_t id)
 {
-  auto [it, inserted] = m_nodeMap.emplace(std::pair{ id, Node(m_changed, id) });
+  auto [it, inserted] = m_nodeMap.emplace(
+    std::pair{ id, Node(m_changed, m_thisNode->getId(), id) });
   return { it->second, inserted };
 }
 

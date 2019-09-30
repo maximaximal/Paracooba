@@ -45,7 +45,7 @@ DecisionTask::execute()
   if(m_rootCNF->getCuberRegistry().generateCube(m_path, var)) {
     // New cube generated! This means, the TRUE and FALSE branches are now
     // available and the generated decision must be set into the path.
-    m_rootCNF->getCNFTree().setDecisionAndState(m_path, var, CNFTree::Split);
+    assert(m_rootCNF->getCNFTree().setDecisionAndState(m_path, var, CNFTree::Split));
 
     {
       // LEFT

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 
@@ -37,10 +38,12 @@ class ClusterStatistics
   class Node
   {
     public:
-    explicit Node(bool& changed, int64_t id = 0);
+    explicit Node(bool& changed, int64_t thisId, int64_t id);
     ~Node();
 
     Node(Node&& o) noexcept;
+
+    using ContextStatesMap = std::map<int64_t, uint8_t>;
 
     void setName(const std::string& name)
     {
@@ -85,10 +88,6 @@ class ClusterStatistics
     {
       CLUSTERSTATISTICS_NODE_CHANGED(m_tcpListenPort, tcpListenPort)
     }
-    void setReadyForWork(bool ready)
-    {
-      CLUSTERSTATISTICS_NODE_CHANGED(m_readyForWork, ready)
-    }
     void setDaemon(bool daemon)
     {
       CLUSTERSTATISTICS_NODE_CHANGED(m_daemon, daemon)
@@ -105,7 +104,12 @@ class ClusterStatistics
     std::string_view getName() const { return m_name; }
     int64_t getId() const { return m_id; }
     bool getFullyKnown() const { return m_fullyKnown; }
-    bool getReadyForWork() const { return m_readyForWork; }
+    /** @brief Get ready for work state.
+     *
+     * Depends on client or daemon mode. In client mode, this returns the
+     * readyness for the client ID. In daemon mode, returns the state for the
+     * specified ID.*/
+    bool getReadyForWork(int64_t id = 0) const;
     bool getDaemon() const { return m_daemon; }
     uint16_t getUdpListenPort() const { return m_udpListenPort; }
     uint16_t getTcpListenPort() const { return m_tcpListenPort; }
@@ -120,6 +124,29 @@ class ClusterStatistics
       // This addition determines the weight local decisions have. A greater
       // value makes local decisions more unlikely.
       return getUtilization() * (m_distance + 0.8);
+    }
+    UniqueLockView<ContextStatesMap&> getContextStatesMap()
+    {
+      return { m_contextStates,
+               std::move(std::unique_lock(m_contextStatesMutex)) };
+    }
+    ConstSharedLockView<ContextStatesMap> getContextStatesMapShared() const
+    {
+      return { m_contextStates,
+               std::move(std::shared_lock(m_contextStatesMutex)) };
+    }
+    uint8_t getContextState(int64_t id) const
+    {
+      auto [map, lock] = getContextStatesMapShared();
+      auto it = map.find(id);
+      if(it == map.end())
+        return 0;
+      return it->second;
+    }
+    void setContextState(int64_t id, uint8_t state)
+    {
+      auto [map, lock] = getContextStatesMap();
+      CLUSTERSTATISTICS_NODE_CHANGED(map[id], state)
     }
 
     private:
@@ -137,10 +164,13 @@ class ClusterStatistics
     uint64_t m_workQueueCapacity = 0;
     uint64_t m_workQueueSize = 0;
     int64_t m_id = 0;
+    int64_t m_thisId = 0;
     bool m_fullyKnown = false;
-    bool m_readyForWork = false;
     bool m_daemon = false;
     uint8_t m_distance = 0;
+
+    mutable std::shared_mutex m_contextStatesMutex;
+    std::map<int64_t, uint8_t> m_contextStates;
 
     bool& m_changed;
 
@@ -161,7 +191,7 @@ class ClusterStatistics
         << "\"udpListenPort\": " << n.m_udpListenPort << ","
         << "\"uptime\": " << n.m_uptime << ","
         << "\"workQueueCapacity\": " << n.m_workQueueCapacity << ","
-        << "\"readyForWork\": " << n.m_readyForWork << ","
+        << "\"readyForWork\": " << n.getReadyForWork() << ","
         << "\"fullyKnown\": " << n.m_fullyKnown << ","
         << "\"daemon\": " << n.m_daemon << ","
         << "\"workQueueSize\": " << n.m_workQueueSize;
@@ -211,7 +241,7 @@ class ClusterStatistics
   const Node* getTargetComputeNodeForNewDecision(int64_t originator);
   bool clearChanged();
 
-  const Node& getThisNode() const { return *m_thisNode; }
+  Node& getThisNode() { return *m_thisNode; }
 
   void handlePathOnNode(const Node* node,
                         std::shared_ptr<CNF> rootCNF,

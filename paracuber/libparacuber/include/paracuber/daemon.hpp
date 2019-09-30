@@ -42,6 +42,7 @@ class Daemon
     std::shared_ptr<CNF> getRootCNF() { return m_rootCNF; }
     inline State getState() const { return m_state; }
     inline int64_t getOriginatorId() const { return m_originatorID; }
+    inline bool getReadyForWork() const { return m_readyForWork; }
 
     private:
     std::shared_ptr<CNF> m_rootCNF;
@@ -51,6 +52,7 @@ class Daemon
     Logger m_logger;
 
     State m_state = JustCreated;
+    bool m_readyForWork = false;
 
     std::mutex m_contextMutex;
 

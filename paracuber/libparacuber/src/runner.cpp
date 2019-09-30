@@ -104,7 +104,7 @@ Runner::worker(uint32_t workerId, Logger logger)
       }
       entry = pop_();
 
-      if(entry) {
+      if(entry && m_taskCount == 0) {
         // Only reset the verifier if this really was the thread to receive the
         // notification and this thread was not just started.
         m_newTasksVerifier = false;

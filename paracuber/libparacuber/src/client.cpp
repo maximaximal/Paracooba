@@ -4,6 +4,7 @@
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/cuber/registry.hpp"
+#include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task_factory.hpp"
 
@@ -77,10 +78,17 @@ Client::solve()
     // CNF solver task. The root CNF now has a valid unique_ptr to a completely
     // parsed CaDiCaL task.
     // This is (in theory) unsafe, but should only be required in this case. It
-    // should not be required to const cast the result anywhere else.
+    // should not be required to const cast the result anywhere else, except in
+    // daemon.
     auto& resultMut = const_cast<TaskResult&>(result);
     m_rootCNF->setRootTask(static_unique_pointer_cast<CaDiCaLTask>(
       std::move(resultMut.getTaskPtr())));
+
+    // Client is now ready for work.
+    m_config->m_communicator->getClusterStatistics()
+      ->getThisNode()
+      .setContextState(m_config->getInt64(Config::Id),
+                       Daemon::Context::WaitingForWork);
 
     // After the root formula has been set, which completely builds up the CNF
     // object including the cuber::Registry object, decisions can be made.
