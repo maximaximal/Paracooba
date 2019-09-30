@@ -64,11 +64,12 @@ Runner::push(std::unique_ptr<Task> task,
   std::unique_ptr<QueueEntry> entry =
     std::make_unique<QueueEntry>(std::move(task), 0, originator, factory);
   std::promise<std::unique_ptr<TaskResult>>& promise = entry->result;
-  push_(std::move(entry));
+  auto future = promise.get_future();
   std::unique_lock<std::mutex> lock(m_taskQueueMutex);
+  push_(std::move(entry));
   m_newTasksVerifier = true;
   m_newTasks.notify_one();
-  return promise.get_future();
+  return std::move(future);
 }
 
 void
@@ -94,13 +95,14 @@ Runner::worker(uint32_t workerId, Logger logger)
   while(m_running) {
     std::unique_ptr<QueueEntry> entry;
     {
+      checkTaskFactories();
       std::unique_lock<std::mutex> lock(m_taskQueueMutex);
       while(m_running && !m_newTasksVerifier) {
         PARACUBER_LOG(logger, Trace)
           << "Worker " << workerId << " waiting for tasks.";
         m_newTasks.wait(lock);
-        entry = pop_();
       }
+      entry = pop_();
 
       if(entry) {
         // Only reset the verifier if this really was the thread to receive the
@@ -110,28 +112,29 @@ Runner::worker(uint32_t workerId, Logger logger)
     }
 
     if(entry) {
-      PARACUBER_LOG(logger, Trace)
-        << "Worker " << workerId
-        << " has received a new task: " << entry->task->name();
+      if(entry->task) {
+        PARACUBER_LOG(logger, Trace)
+          << "Worker " << workerId
+          << " has received a new task: " << entry->task->name();
 
-      // Insert the logger from this worker thread.
-      entry->task->m_logger = &logger;
-      entry->task->m_factory = entry->factory;
-      entry->task->m_originator = entry->originator;
+        // Insert the logger from this worker thread.
+        entry->task->m_logger = &logger;
+        entry->task->m_factory = entry->factory;
+        entry->task->m_originator = entry->originator;
 
-      m_currentlyRunningTasks[workerId] = entry->task.get();
-      ++m_numberOfRunningTasks;
-      auto result = std::move(entry->task->execute());
-      --m_numberOfRunningTasks;
-      m_currentlyRunningTasks[workerId] = nullptr;
-      result->setTask(std::move(entry->task));
-      result->getTask().finish(*result);
-      entry->result.set_value(std::move(result));
-
-      // Now that the old task has ended, check the factories for possible new
-      // tasks that can be created from task skeletons. This saves memory
-      // compared to just dumping everything on the task queue.
-      checkTaskFactories();
+        m_currentlyRunningTasks[workerId] = entry->task.get();
+        ++m_numberOfRunningTasks;
+        auto result = std::move(entry->task->execute());
+        --m_numberOfRunningTasks;
+        m_currentlyRunningTasks[workerId] = nullptr;
+        result->setTask(std::move(entry->task));
+        result->getTask().finish(*result);
+        entry->result.set_value(std::move(result));
+      } else {
+        PARACUBER_LOG(logger, LocalError)
+          << "Worker " << workerId
+          << " received a task queue item without a valid task!";
+      }
     }
   }
   PARACUBER_LOG(logger, Trace) << "Worker " << workerId << " ended.";

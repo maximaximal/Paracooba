@@ -35,6 +35,8 @@ DecisionTask::execute()
 
   CNFTree::State state;
   assert(cnfTree.getState(m_path, state));
+  PARACUBER_LOG(*m_logger, Trace)
+    << "State for path " << CNFTree::pathToStrNoAlloc(m_path) << ":" << state;
   assert(state == CNFTree::Unvisited);
 
   m_rootCNF->getCNFTree().setState(m_path, CNFTree::Working);
@@ -75,19 +77,14 @@ DecisionTask::execute()
 
     return std::make_unique<TaskResult>(TaskResult::DecisionMade);
   } else {
-    PARACUBER_LOG(*m_logger, Trace) << name() << "Decided not to cube.";
-
-    // No cube was generated! Directly generate solver task from this state and
-    // submit it to the runner.
-    CaDiCaLTask* rootTask = m_rootCNF->getRootTask();
-    assert(rootTask);
-    std::unique_ptr<CaDiCaLTask> task =
-      std::make_unique<CaDiCaLTask>(*rootTask);
-    m_runner->push(std::move(task), m_originator, m_factory);
-
-    return std::make_unique<TaskResult>(TaskResult::CreatedCaDiCaLTask);
+    // This is an invalid leaf without a decision! Only one level above can a
+    // solver be created.
+    PARACUBER_LOG(*m_logger, Trace) << "No decision made!";
+    cnfTree.setState(m_path, CNFTree::Dropped);
+    return std::make_unique<TaskResult>(TaskResult::NoDecisionMade);
   }
 }
+
 void
 DecisionTask::terminate()
 {}

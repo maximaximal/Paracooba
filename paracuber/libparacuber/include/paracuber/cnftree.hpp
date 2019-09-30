@@ -26,6 +26,7 @@ class CNFTree
     Split,
     SAT,
     UNSAT,
+    Dropped,
     Unknown,
     _STATE_COUNT
   };
@@ -119,7 +120,16 @@ class CNFTree
    * @return False if the path does not exist yet, true if assignment was
    * successful.
    */
-  bool getState(Path p, State &state) const;
+  bool getState(Path p, State& state) const;
+
+  /** @brief Get the decision for a given path.
+   *
+   * The node at the path must already exist.
+   *
+   * @return False if the path does not exist yet, true if assignment was
+   * successful.
+   */
+  bool getDecision(Path p, CubeVar& var) const;
 
   /** @brief Set the state for a given path.
    *
@@ -187,6 +197,7 @@ class CNFTree
   }
 
   static void pathToStr(Path p, char* str);
+  static const char* pathToStrNoAlloc(Path p);
   static std::string pathToStdString(Path p);
   static Path strToPath(const char* str, size_t len);
 
@@ -245,12 +256,17 @@ CNFTreeStateToStr(CNFTree::StateEnum s)
       return "SAT";
     case CNFTree::StateEnum::UNSAT:
       return "UNSAT";
+    case CNFTree::StateEnum::Dropped:
+      return "Dropped";
     case CNFTree::StateEnum::Unknown:
       return "Unknown";
     default:
       return "Unknown State";
   }
 }
+
+std::ostream&
+operator<<(std::ostream& o, CNFTree::StateEnum s);
 
 template<>
 inline CNFTree::Path

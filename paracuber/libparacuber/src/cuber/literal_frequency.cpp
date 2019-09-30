@@ -94,6 +94,9 @@ LiteralFrequency::init()
 bool
 LiteralFrequency::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
 {
+
+  sleep(1);
+
   assert(m_literalFrequency);
 
   if(CNFTree::getDepth(path) > CNFTree::maxPathDepth) {

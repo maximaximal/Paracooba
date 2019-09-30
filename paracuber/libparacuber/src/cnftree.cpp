@@ -1,5 +1,6 @@
 #include "../include/paracuber/cnftree.hpp"
 #include <cassert>
+#include <iostream>
 
 namespace paracuber {
 const size_t CNFTree::maxPathDepth = sizeof(CNFTree::Path) * 8 - 6;
@@ -71,6 +72,33 @@ CNFTree::getState(Path p, State& state) const
 
     if(depth == getDepth(p)) {
       state = n->state;
+      return true;
+    }
+
+    bool assignment = getAssignment(p, depth + 1);
+    const std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+
+    n = nextPtr.get();
+    ++depth;
+  }
+  return false;
+}
+bool
+CNFTree::getDecision(Path p, CubeVar& var) const
+{
+  assert(getDepth(p) < maxPathDepth);
+
+  const Node* n = &m_root;
+  uint8_t depth = 0;
+  bool end = false;
+
+  while(!end) {
+    if(!n) {
+      return false;
+    }
+
+    if(depth == getDepth(p)) {
+      var = n->decision;
       return true;
     }
 
@@ -163,12 +191,16 @@ CNFTree::pathToStr(Path p, char* str)
 {
   // TODO: Make this more efficient if it is required.
   for(size_t i = 0; i < maxPathDepth; ++i) {
-    if(getAssignment(p, i + 1)) {
-      str[i] = '1';
-    } else {
-      str[i] = '0';
-    }
+    str[i] = getAssignment(p, i + 1) + '0';
   }
+  str[getDepth(p)] = '\0';
+}
+const char*
+CNFTree::pathToStrNoAlloc(Path p)
+{
+  static thread_local char arr[maxPathDepth];
+  pathToStr(p, arr);
+  return arr;
 }
 
 std::string
@@ -208,5 +240,11 @@ CNFTree::strToPath(const char* str, size_t len)
     }
   }
   return p;
+}
+std::ostream&
+operator<<(std::ostream& o, CNFTree::StateEnum s)
+{
+  o << CNFTreeStateToStr(s);
+  return o;
 }
 }

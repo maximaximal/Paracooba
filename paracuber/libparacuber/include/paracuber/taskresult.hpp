@@ -22,6 +22,7 @@ class TaskResult
   {
     Success,
     DecisionMade,
+    NoDecisionMade,
     CreatedCaDiCaLTask,
     MissingInputs,
     ParsingError,
