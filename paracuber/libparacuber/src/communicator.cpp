@@ -157,7 +157,7 @@ class Communicator::UDPServer
     NetworkedNode* nn = node.getNetworkedNode();
     if(!nn) {
       std::unique_ptr<NetworkedNode> networkedNode =
-        std::make_unique<NetworkedNode>(m_remoteEndpoint);
+        std::make_unique<NetworkedNode>(m_remoteEndpoint, node.getId());
       networkedNode->setUdpPort(node.getUdpListenPort());
       networkedNode->setTcpPort(node.getTcpListenPort());
       node.setNetworkedNode(std::move(networkedNode));
@@ -286,6 +286,7 @@ class Communicator::UDPServer
       msg.getCnfTreeNodeStatusRequest();
     int64_t originId = msg.getOrigin();
     int64_t cnfId = reader.getCnfId();
+    CNFTree::Path path = reader.getPath();
 
     CNF* cnf = nullptr;
     auto [statisticsNode, inserted] =
@@ -314,23 +315,38 @@ class Communicator::UDPServer
     // Build answer message.
     auto msgBuilder = getMessageBuilder();
     auto reply = msgBuilder.initCnfTreeNodeStatusReply();
-    auto nodes = reply.initNodes(CNFTree::getDepth(reader.getPath()));
-    auto it = nodes.begin();
     reply.setCnfId(cnfId);
     reply.setHandle(reader.getHandle());
     reply.setPath(reader.getPath());
 
-    cnf->getCNFTree().visit(
-      reader.getPath(),
-      [&it](
-        CNFTree::CubeVar var, uint8_t, CNFTree::State state, int64_t remote) {
-        it->setState(state);
-        it->setLiteral(var);
-        ++it;
-        return false;
-      });
+    std::vector<std::pair<CNFTree::State, CNFTree::CubeVar>> entries;
 
-    sendBuiltMessage(m_socket.remote_endpoint());
+    cnf->getCNFTree().visit(reader.getPath(),
+                            [this, path, &entries, &msg](CNFTree::CubeVar var,
+                                                         uint8_t depth,
+                                                         CNFTree::State state,
+                                                         int64_t remote) {
+                              var = FastAbsolute(var);
+                              entries.push_back({ state, var });
+                              return false;
+                            });
+
+    if(entries.size() != CNFTree::getDepth(path) + 1) {
+      // Not enough local information for a reply.
+      PARACUBER_LOG(m_logger, LocalError)
+        << "No reply to request for path " << CNFTree::pathToStrNoAlloc(path);
+      return;
+    }
+
+    auto nodes = reply.initNodes(entries.size());
+    auto it = nodes.begin();
+    for(auto& entry : entries) {
+      it->setState(entry.first);
+      it->setLiteral(entry.second);
+      ++it;
+    }
+
+    sendBuiltMessage(m_remoteEndpoint, false);
   }
   void handleCNFTreeNodeStatusReply(Message::Reader& msg)
   {
@@ -345,18 +361,33 @@ class Communicator::UDPServer
     // mechanism (handle == 0) or to the webserver for viewing (handle != 0).
 
     auto nodes = reader.getNodes();
+
+    if(nodes.size() == 0) {
+      PARACUBER_LOG(m_logger, GlobalWarning)
+        << "Cannot parse CNFTreeNodeStatusReply message for path \""
+        << CNFTree::pathToStrNoAlloc(path)
+        << "\"! Does not contain any "
+           "nodes.";
+      return;
+    }
+
+    PARACUBER_LOG(m_logger, Trace)
+      << "Receive CNFTree info for path " << CNFTree::pathToStrNoAlloc(path);
+
     if(handle == 0) {
 
     } else {
-      size_t depth = 1;
-      for(auto node : nodes) {
-        m_communicator->injectCNFTreeNodeInfo(
-          cnfId,
-          handle,
-          CNFTree::setDepth(path, depth++),
-          node.getLiteral(),
-          static_cast<CNFTree::StateEnum>(node.getState()));
-      }
+      // Only the very last entry is required for viewing. The rest can be used
+      // for load balancing purposes.
+
+      auto lastEntry = nodes.begin() + (nodes.size() - 1);
+      m_communicator->injectCNFTreeNodeInfo(
+        cnfId,
+        handle,
+        path,
+        lastEntry->getLiteral(),
+        static_cast<CNFTree::StateEnum>(lastEntry->getState()),
+        originId);
     }
   }
 
@@ -389,7 +420,7 @@ class Communicator::UDPServer
     msg.setId(m_communicator->getAndIncrementCurrentMessageId());
     return std::move(msg);
   }
-  void sendBuiltMessage(boost::asio::ip::udp::endpoint&& endpoint,
+  void sendBuiltMessage(boost::asio::ip::udp::endpoint endpoint,
                         bool fromRunner = true,
                         bool async = true)
   {
@@ -481,7 +512,8 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
     , m_path(path)
   {
     PARACUBER_LOG(m_logger, Trace)
-      << "Start TCPClient to " << m_endpoint << " with mode " << mode;
+      << "Start TCPClient to " << m_endpoint << " for path "
+      << CNFTree::pathToStrNoAlloc(path) << " with mode " << mode;
   }
   virtual ~TCPClient()
   {
@@ -920,6 +952,11 @@ Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf,
                             CNFTree::Path path,
                             NetworkedNode* nn)
 {
+  if(path != 0) {
+    // The root formula (path == 0) is always sent, other formulas on demand.
+    cnf->getCNFTree().setRemote(path, nn->getId());
+  }
+
   assert(nn);
   // This indirection is required to make this work from worker threads.
   m_ioService.post([this, cnf, path, nn]() {
@@ -994,7 +1031,8 @@ Communicator::injectCNFTreeNodeInfo(int64_t cnfId,
                                     int64_t handle,
                                     CNFTree::Path p,
                                     CNFTree::CubeVar v,
-                                    CNFTree::StateEnum state)
+                                    CNFTree::StateEnum state,
+                                    int64_t remote)
 {
 #ifdef ENABLE_INTERNAL_WEBSERVER
   webserver::API* api = m_webserverInitiator->getAPI();
@@ -1003,7 +1041,7 @@ Communicator::injectCNFTreeNodeInfo(int64_t cnfId,
       << "Cannot inject CNFTreeNodeInfo into uninitialised webserver::API!";
     return;
   }
-  api->injectCNFTreeNode(handle, p, v, state);
+  api->injectCNFTreeNode(handle, p, v, state, remote);
 #endif
 }
 
@@ -1020,12 +1058,14 @@ Communicator::sendCNFTreeNodeStatusRequest(int64_t targetId,
   req.setCnfId(cnfId);
   req.setPath(p);
   req.setHandle(handle);
-  m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint());
+  m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false);
 }
 
 void
 Communicator::tick()
 {
+  m_runner->checkTaskFactories();
+
   auto msg = m_udpServer->getMessageBuilder();
   auto nodeStatus = msg.initNodeStatus();
 

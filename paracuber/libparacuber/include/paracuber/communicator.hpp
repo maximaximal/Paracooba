@@ -114,7 +114,8 @@ class Communicator : public std::enable_shared_from_this<Communicator>
                              int64_t handle,
                              CNFTree::Path p,
                              CNFTree::CubeVar v,
-                             CNFTree::StateEnum state);
+                             CNFTree::StateEnum state,
+                             int64_t remote);
 
   void sendCNFTreeNodeStatusRequest(int64_t targetId,
                                     int64_t cnfId,

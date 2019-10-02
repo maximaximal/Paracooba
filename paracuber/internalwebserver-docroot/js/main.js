@@ -205,6 +205,8 @@ class CNFTree {
 		    id: msg.path, literal: Math.abs(msg.literal), path: msg.path }});
 		this.cy.add({ group: "edges", data: {
 		    id: msg.path + "e", source: source, target: msg.path, assignment: assignment }});
+	    } else {
+		node[0].data("literal", Math.abs(msg.literal));
 	    }
 	}
 	this.cy.layout({ name: 'dagre', options: dagre_options }).run();

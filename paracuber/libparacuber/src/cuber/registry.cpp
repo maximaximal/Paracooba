@@ -44,7 +44,9 @@ Registry::getActiveCuber() const
 bool
 Registry::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
 {
-  return getActiveCuber().generateCube(path, var);
+  bool success = getActiveCuber().generateCube(path, var);
+  assert(var != 0 || !success);
+  return success;
 }
 }
 }

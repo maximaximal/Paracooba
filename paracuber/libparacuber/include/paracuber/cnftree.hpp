@@ -111,7 +111,7 @@ class CNFTree
    * @return False if the path does not exist yet, true if assignment was
    * successful.
    */
-  bool setDecision(Path p, CubeVar decision);
+  bool setDecision(Path p, CubeVar decision, int64_t originator = 0);
 
   /** @brief Get the state for a given path.
    *
@@ -140,6 +140,15 @@ class CNFTree
    */
   bool setState(Path p, State state);
 
+  /** @brief Set the remote for a given path.
+   *
+   * The node at the path must already exist.
+   *
+   * @return False if the path does not exist yet, true if assignment was
+   * successful.
+   */
+  bool setRemote(Path p, int64_t remote);
+
   /** @brief Bulk-set a node.
    *
    * @return False if the path does not exist yet, true if assignment was
@@ -151,18 +160,18 @@ class CNFTree
    * container.
    */
   template<class Container>
-  bool writePathToLiteralContainer(Container container, Path p)
+  bool writePathToLiteralContainer(Container& container, Path p)
   {
     return visit(
       p,
       [&container](
-        CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
-        container.push_back(p);
+        CubeVar decision, uint8_t depth, CNFTree::State state, int64_t remote) {
+        container.push_back(decision);
         return false;
       });
   }
   template<class Container>
-  bool writePathToLiteralAndStateContainer(Container container, Path p)
+  bool writePathToLiteralAndStateContainer(Container& container, Path p)
   {
     return visit(
       p,

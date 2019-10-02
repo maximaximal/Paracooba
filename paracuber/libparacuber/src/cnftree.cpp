@@ -9,7 +9,7 @@ CNFTree::CNFTree() {}
 CNFTree::~CNFTree() {}
 
 bool
-CNFTree::setDecision(Path p, CubeVar decision)
+CNFTree::setDecision(Path p, CubeVar decision, int64_t originator)
 {
   assert(getDepth(p) < maxPathDepth);
 
@@ -19,19 +19,14 @@ CNFTree::setDecision(Path p, CubeVar decision)
 
   while(!end) {
     if(depth == getDepth(p)) {
-      if(!n->isLeaf() && n->decision != decision) {
-        /// The decision is invalid if a child node already exists, or if it
-        /// conflicts with the old assignment.
-        return false;
-      }
+      // New value needs to be applied.
+      n->decision = decision;
+      n->remote = originator;
       if(n->isLeaf()) {
-        // New value needs to be applied.
-
         // Create left and right branches as leaves. They have invalid decisions
         // but are required to mark the current node to have a valid decision.
         n->left = std::make_unique<Node>();
         n->right = std::make_unique<Node>();
-        n->decision = decision;
         return true;
       }
 
@@ -50,7 +45,6 @@ CNFTree::setDecision(Path p, CubeVar decision)
   }
 
   if(depth == getDepth(p)) {
-    n->decision = decision;
     return true;
   }
   return false;
@@ -138,6 +132,35 @@ CNFTree::setState(Path p, State state)
   }
   return false;
 }
+
+bool
+CNFTree::setRemote(Path p, int64_t remote)
+{
+  assert(getDepth(p) < maxPathDepth);
+
+  Node* n = &m_root;
+  uint8_t depth = 0;
+  bool end = false;
+
+  while(!end) {
+    if(!n) {
+      return false;
+    }
+
+    if(depth == getDepth(p)) {
+      n->remote = remote;
+      return true;
+    }
+
+    bool assignment = getAssignment(p, depth + 1);
+    std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+
+    n = nextPtr.get();
+    ++depth;
+  }
+  return false;
+}
+
 bool
 CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
 {
@@ -149,6 +172,8 @@ CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
 
   while(!end) {
     if(depth == getDepth(p)) {
+      n->decision = decision;
+      n->state = state;
       if(n->isLeaf()) {
         // New value needs to be applied.
 
@@ -160,8 +185,6 @@ CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
         if(!n->right) {
           n->right = std::make_unique<Node>();
         }
-        n->decision = decision;
-        n->state = state;
         return true;
       }
 

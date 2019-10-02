@@ -28,9 +28,6 @@ TaskFactory::addPath(CNFTree::Path p, Mode mode, int64_t originator)
   std::unique_lock lock(m_skeletonsMutex);
   m_skeletons.push(TaskSkeleton{ mode, originator, p });
   ++m_availableTasks;
-
-  PARACUBER_LOG(m_logger, Trace)
-    << "Added path to factory: " << CNFTree::pathToStrNoAlloc(p);
 }
 std::pair<std::unique_ptr<Task>, int64_t>
 TaskFactory::produceTask()
@@ -47,8 +44,6 @@ TaskFactory::produceTask()
     skel = std::move(m_skeletons.front());
     m_skeletons.pop();
   }
-  PARACUBER_LOG(m_logger, Trace)
-    << "Producing path in factory: " << CNFTree::pathToStrNoAlloc(skel.p);
 
   switch(skel.mode) {
     case CubeOrSolve:

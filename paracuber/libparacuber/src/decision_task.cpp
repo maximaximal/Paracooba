@@ -45,21 +45,16 @@ DecisionTask::execute()
   if(m_rootCNF->getCuberRegistry().generateCube(m_path, var)) {
     // New cube generated! This means, the TRUE and FALSE branches are now
     // available and the generated decision must be set into the path.
-    assert(m_rootCNF->getCNFTree().setDecisionAndState(m_path, var, CNFTree::Split));
+    m_rootCNF->getCNFTree().setDecisionAndState(m_path, var, CNFTree::Split);
 
     {
       // LEFT
       CNFTree::Path p = CNFTree::getNextLeftPath(m_path);
       cnfTree.setDecisionAndState(p, 0, CNFTree::Unvisited);
 
-      const ClusterStatistics::Node* target =
-        clusterStatistics->getTargetComputeNodeForNewDecision(m_originator);
-
-      if(!target) {
-        m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
-      } else {
-        clusterStatistics->handlePathOnNode(target, m_rootCNF, p);
-      }
+      // One branch is always done locally, as there must already be a working
+      // execution thread.
+      m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
     }
     {
       // RIGHT
@@ -67,7 +62,7 @@ DecisionTask::execute()
       cnfTree.setDecisionAndState(p, 0, CNFTree::Unvisited);
 
       const ClusterStatistics::Node* target =
-        clusterStatistics->getTargetComputeNodeForNewDecision(m_originator);
+        clusterStatistics->getTargetComputeNodeForNewDecision(p, m_originator);
       if(!target) {
         m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
       } else {

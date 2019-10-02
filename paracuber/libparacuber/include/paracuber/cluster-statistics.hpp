@@ -238,7 +238,7 @@ class ClusterStatistics
    * @returns nullptr if the decision is better done locally, remote node
    * otherwise.
    */
-  const Node* getTargetComputeNodeForNewDecision(int64_t originator);
+  const Node* getTargetComputeNodeForNewDecision(CNFTree::Path p, int64_t originator);
   bool clearChanged();
 
   Node& getThisNode() { return *m_thisNode; }

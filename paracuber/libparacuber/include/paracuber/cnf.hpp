@@ -67,7 +67,7 @@ class CNF
     TransmissionSubject subject = TransmissionSubjectUnknown;
     ReceiveState state = ReceiveTransmissionSubject;
     CNFTree::Path path = 0;
-    uint8_t currentDepth = 1;
+    uint8_t currentDepth = 0;
     size_t receiveVarPos = 0;
     char receiveVarBuf[8];
     int64_t originator = 0;
@@ -110,7 +110,7 @@ class CNF
   {
     off_t offset = 0;
     SendFinishedCB cb;
-    std::vector<CNFTree::Path> decisions;
+    std::vector<CNFTree::CubeVar> decisions;
   };
 
   void sendCB(SendDataStruct* data,

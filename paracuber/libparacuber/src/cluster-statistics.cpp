@@ -121,8 +121,12 @@ ClusterStatistics::getNodeMap()
 }
 
 const ClusterStatistics::Node*
-ClusterStatistics::getTargetComputeNodeForNewDecision(int64_t originator)
+ClusterStatistics::getTargetComputeNodeForNewDecision(CNFTree::Path p,
+                                                      int64_t originator)
 {
+  if(CNFTree::getDepth(p) < 1) {
+    return nullptr;
+  }
 
   auto [map, lock] = getNodeMap();
 

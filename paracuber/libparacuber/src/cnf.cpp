@@ -3,6 +3,7 @@
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/cuber/registry.hpp"
+#include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task_factory.hpp"
 
 #include <boost/asio.hpp>
@@ -105,8 +106,9 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
     first = false;
 
     // Transmit all decisions on the given path.
-    data->decisions.resize(CNFTree::getDepth(path));
-    m_cnfTree->writePathToLiteralContainer(data->decisions, path);
+    data->decisions.reserve(CNFTree::getDepth(path) - 1);
+    m_cnfTree->writePathToLiteralContainer(
+      data->decisions, CNFTree::setDepth(path, CNFTree::getDepth(path) - 1));
 
     // After this async write operation has finished, the local data can be
     // erased again. This happens when the file offset reaches the file size, so
@@ -115,7 +117,7 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
 
     socket->async_write_some(
       boost::asio::buffer(reinterpret_cast<const char*>(data->decisions.data()),
-                          data->decisions.size()),
+                          data->decisions.size() * sizeof(CNFTree::CubeVar)),
       std::bind(&CNF::sendCB, this, data, path, socket));
   }
 }
@@ -190,10 +192,18 @@ CNF::requestInfoGlobally(CNFTree::Path p, int64_t handle)
                             CNFTree::State state,
                             int64_t remote) {
       if(remote == 0) {
-        comm->injectCNFTreeNodeInfo(
-          m_originId, handle, CNFTree::setDepth(p, depth), var, state);
+        if(depth == CNFTree::getDepth(p)) {
+          comm->injectCNFTreeNodeInfo(m_originId,
+                                      handle,
+                                      CNFTree::setDepth(p, depth),
+                                      var,
+                                      state,
+                                      remote);
+          return true;
+        }
       } else {
         comm->sendCNFTreeNodeStatusRequest(remote, m_originId, p, handle);
+        return true;
       }
       return false;
     });
@@ -344,17 +354,22 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           // This also means, the task factory needs to get this newly received
           // path.
           assert(m_taskFactory);
+          m_cnfTree->setDecisionAndState(d.path, 0, CNFTree::Unvisited);
           m_taskFactory->addPath(
             d.path, TaskFactory::CubeOrSolve, d.originator);
+
           ERASE_AND_RETURN_SUBJECT()
         }
         for(std::size_t i = 0; i < length; i += sizeof(CNFTree::CubeVar)) {
           CNFTree::CubeVar* var =
             receiveValueFromBuffer<CNFTree::CubeVar>(d, &buf, &length);
           if(var) {
+            *var = FastAbsolute(*var);
             // Valid literal received, insert into CNFTree.
             if(!m_cnfTree->setDecision(
-                 CNFTree::setDepth(d.path, d.currentDepth++), *var)) {
+                 CNFTree::setDepth(d.path, d.currentDepth++),
+                 *var,
+                 d.originator)) {
               PARACUBER_LOG(m_logger, LocalError)
                 << "Could not apply decision <" << *var
                 << "> into CNFTree of CNF " << m_originId;
@@ -379,7 +394,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
             << "Receive allowance map from " << socket->remote_endpoint()
             << " with size " << *size << ".";
           m_cuberRegistry->getAllowanceMap().clear();
-          m_cuberRegistry->getAllowanceMap().resize(*size);
+          m_cuberRegistry->getAllowanceMap().reserve(*size);
         }
         d.state = ReceiveAllowanceMap;
         break;

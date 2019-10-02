@@ -8,11 +8,12 @@ namespace paracuber {
 class NetworkedNode
 {
   public:
-  explicit NetworkedNode(boost::asio::ip::udp::endpoint remoteUdpEndpoint)
-    : m_remoteUdpEndoint(remoteUdpEndpoint),
-      m_remoteTcpEndoint(m_remoteUdpEndoint.address(), remoteUdpEndpoint.port())
-  {
-  }
+  explicit NetworkedNode(boost::asio::ip::udp::endpoint remoteUdpEndpoint,
+                         int64_t id)
+    : m_remoteUdpEndoint(remoteUdpEndpoint)
+    , m_remoteTcpEndoint(m_remoteUdpEndoint.address(), remoteUdpEndpoint.port())
+    , m_id(id)
+  {}
   ~NetworkedNode() {}
 
   boost::asio::ip::udp::endpoint getRemoteUdpEndpoint()
@@ -35,10 +36,12 @@ class NetworkedNode
 
   void setUdpPort(uint16_t p) { m_remoteUdpEndoint.port(p); }
   void setTcpPort(uint16_t p) { m_remoteTcpEndoint.port(p); }
+  int64_t getId() const { return m_id; }
 
   private:
   boost::asio::ip::udp::endpoint m_remoteUdpEndoint;
   boost::asio::ip::tcp::endpoint m_remoteTcpEndoint;
+  int64_t m_id;
 };
 }
 
