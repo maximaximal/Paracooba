@@ -9,6 +9,13 @@ var app = new Vue({
     },
     filters: {
     },
+    methods: {
+	highlightClusterNode(id) {
+	    for(node of this.clusterstatistics) {
+		node.highlighted = node.id == id;
+	    }
+	}
+    },
     mounted () {
 	axios
 	    .get('/api/local-info.json')
@@ -96,6 +103,15 @@ class CNFTree {
 	    let data = evt.target.data();
 	    self.requestNodeData(data.path);
 	});
+	this.cy.on('mouseover', 'node', function (evt) {
+	    let data = evt.target.data();
+	    let id = data.remote;
+	    if(id == "0") {
+		id = app.local_config['id'];
+	    }
+	    app.highlightClusterNode(id);
+	    console.log(id);
+	});
     }
 
     connect() {
@@ -182,7 +198,7 @@ class CNFTree {
 
 	if(rootQuery.length == 0) {
 	    // Add root node, it does not exist yet.
-	    this.cy.add({ group: "nodes", data: { id: "root", literal: Math.abs(msg.literal), path: '' }});
+	    this.cy.add({ group: "nodes", data: { id: "root", literal: Math.abs(msg.literal), path: '', remote: msg.remote }});
 	    rootQuery = this.cy.$('node[id="root"]');
 	}
 	root = rootQuery[0];
@@ -202,7 +218,7 @@ class CNFTree {
 	    let node = this.cy.$("node[path=\"" + msg.path + "\"]");
 	    if(node.length == 0) {
 		this.cy.add({ group: "nodes", position: pos, data: {
-		    id: msg.path, literal: Math.abs(msg.literal), path: msg.path }});
+		    id: msg.path, literal: Math.abs(msg.literal), path: msg.path, remote: msg.remote }});
 		this.cy.add({ group: "edges", data: {
 		    id: msg.path + "e", source: source, target: msg.path, assignment: assignment }});
 	    } else {

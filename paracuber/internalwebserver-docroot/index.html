@@ -65,7 +65,7 @@
 			<div class="pt-3 pb-2 mb-3 border-bottom">
 			    <h2 class="h3">Cluster Statistics</h2>
 			    <div class="card-columns" >
-				<div class="card" v-for="stat in clusterstatistics">
+				<div class="card" v-bind:class="{'text-white bg-info': stat.highlighted}" v-for="stat in clusterstatistics">
 				    <div class="card-body">
 					<h4 class="card-title">{{ stat.name }}</h4>
 					<table>

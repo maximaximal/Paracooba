@@ -194,6 +194,7 @@ class ClusterStatistics
         << "\"readyForWork\": " << n.getReadyForWork() << ","
         << "\"fullyKnown\": " << n.m_fullyKnown << ","
         << "\"daemon\": " << n.m_daemon << ","
+        << "\"highlighted\": false" << ","
         << "\"workQueueSize\": " << n.m_workQueueSize;
       return o;
     }
