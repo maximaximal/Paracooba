@@ -54,7 +54,8 @@ applyMessageNodeStatusToStatsNode(const message::NodeStatus::Reader& src,
     auto daemon = src.getDaemon();
 
     for(auto context : daemon.getContexts()) {
-      tgt.setContextState(context.getOriginator(), context.getState());
+      tgt.setContextStateAndSize(
+        context.getOriginator(), context.getState(), context.getFactorySize());
     }
   }
 }
@@ -1066,8 +1067,18 @@ Communicator::tick()
 {
   m_runner->checkTaskFactories();
 
+  // Update workQueueSize
+  auto& thisNode = m_clusterStatistics->getThisNode();
+  thisNode.setWorkQueueSize(m_runner->getWorkQueueSize());
+  {
+    auto [v, lock] = m_runner->getTaskFactories();
+    thisNode.applyTaskFactoryVector(v);
+  }
+  checkAndTransmitClusterStatisticsChanges();
+
   auto msg = m_udpServer->getMessageBuilder();
   auto nodeStatus = msg.initNodeStatus();
+  nodeStatus.setWorkQueueSize(m_runner->getWorkQueueSize());
 
   if(m_config->isDaemonMode()) {
     auto daemon = m_config->getDaemon();
@@ -1084,6 +1095,7 @@ Communicator::tick()
       auto& context = *it.second;
       contextStructIt->setOriginator(context.getOriginatorId());
       contextStructIt->setState(static_cast<uint8_t>(context.getState()));
+      contextStructIt->setFactorySize(context.getFactoryQueueSize());
       ++contextStructIt;
     }
   } else {

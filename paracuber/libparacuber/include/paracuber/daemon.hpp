@@ -43,6 +43,7 @@ class Daemon
     inline State getState() const { return m_state; }
     inline int64_t getOriginatorId() const { return m_originatorID; }
     inline bool getReadyForWork() const { return m_readyForWork; }
+    uint64_t getFactoryQueueSize() const;
 
     private:
     std::shared_ptr<CNF> m_rootCNF;

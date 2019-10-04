@@ -63,6 +63,13 @@ class Runner
   void registerTaskFactory(TaskFactory* f);
   void deregisterTaskFactory(TaskFactory* f);
 
+  using TaskFactoryVector = std::vector<TaskFactory*>;
+  ConstSharedLockView<TaskFactoryVector> getTaskFactories()
+  {
+    return { m_taskFactories,
+             std::move(std::shared_lock(m_taskFactoriesMutex)) };
+  }
+
   private:
   friend class Communicator;
 
@@ -113,7 +120,7 @@ class Runner
   std::atomic<uint64_t> m_taskCount;
 
   std::shared_mutex m_taskFactoriesMutex;
-  std::vector<TaskFactory*> m_taskFactories;
+  TaskFactoryVector m_taskFactories;
 
   void checkTaskFactories();
 };

@@ -7,6 +7,7 @@ struct DaemonContext
 {
   originator @0 : Int64; # Id of originator node
   state @1 : UInt8; # State of the context (taken directly from C++ enum)
+  factorySize @2 : UInt64; # Size of the factory queue in this context
 }
 # A structure describing the state of a daemon.
 

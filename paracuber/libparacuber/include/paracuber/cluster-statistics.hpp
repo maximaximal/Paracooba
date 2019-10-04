@@ -24,6 +24,7 @@ namespace paracuber {
   }
 
 class NetworkedNode;
+class TaskFactory;
 
 /** @brief Statistics about the whole cluster, based on which decisions may be
  * made.
@@ -43,7 +44,13 @@ class ClusterStatistics
 
     Node(Node&& o) noexcept;
 
-    using ContextStatesMap = std::map<int64_t, uint8_t>;
+    struct Context
+    {
+      uint8_t state = 0;
+      uint64_t queueSize = 0;
+    };
+
+    using ContextMap = std::map<int64_t, Context>;
 
     void setName(const std::string& name)
     {
@@ -117,37 +124,58 @@ class ClusterStatistics
     float getUtilization() const
     {
       return static_cast<float>(m_workQueueSize) /
-             static_cast<float>(m_workQueueCapacity);
+             static_cast<float>(m_availableWorkers);
     }
     float getFitnessForNewAssignment() const
     {
       // This addition determines the weight local decisions have. A greater
       // value makes local decisions more unlikely.
-      return getUtilization() * (m_distance + 0.8);
+      return getUtilization() + m_distance;
     }
-    UniqueLockView<ContextStatesMap&> getContextStatesMap()
+    UniqueLockView<ContextMap&> getContextMap()
     {
-      return { m_contextStates,
-               std::move(std::unique_lock(m_contextStatesMutex)) };
+      return { m_contexts, std::move(std::unique_lock(m_contextsMutex)) };
     }
-    ConstSharedLockView<ContextStatesMap> getContextStatesMapShared() const
+    ConstSharedLockView<ContextMap> getContextMapShared() const
     {
-      return { m_contextStates,
-               std::move(std::shared_lock(m_contextStatesMutex)) };
+      return { m_contexts, std::move(std::shared_lock(m_contextsMutex)) };
     }
     uint8_t getContextState(int64_t id) const
     {
-      auto [map, lock] = getContextStatesMapShared();
+      auto [map, lock] = getContextMapShared();
       auto it = map.find(id);
       if(it == map.end())
         return 0;
-      return it->second;
+      return it->second.state;
     }
     void setContextState(int64_t id, uint8_t state)
     {
-      auto [map, lock] = getContextStatesMap();
-      CLUSTERSTATISTICS_NODE_CHANGED(map[id], state)
+      auto [map, lock] = getContextMap();
+      CLUSTERSTATISTICS_NODE_CHANGED(map[id].state, state)
     }
+    void setContextSize(int64_t id, uint64_t size)
+    {
+      auto [map, lock] = getContextMap();
+      CLUSTERSTATISTICS_NODE_CHANGED(map[id].queueSize, size)
+    }
+    void setContextStateAndSize(int64_t id, uint8_t state, uint64_t size)
+    {
+      auto [map, lock] = getContextMap();
+      CLUSTERSTATISTICS_NODE_CHANGED(map[id].state, state)
+      CLUSTERSTATISTICS_NODE_CHANGED(map[id].queueSize, size)
+    }
+    uint64_t getAggregatedContextSize() const
+    {
+      uint64_t size = 0;
+      auto [map, lock] = getContextMapShared();
+      for(auto& e : map) {
+        size += e.second.queueSize;
+      }
+      return size;
+    }
+
+    using TaskFactoryVector = std::vector<TaskFactory*>;
+    void applyTaskFactoryVector(const TaskFactoryVector& v);
 
     private:
     friend class ClusterStatistics;
@@ -167,10 +195,10 @@ class ClusterStatistics
     int64_t m_thisId = 0;
     bool m_fullyKnown = false;
     bool m_daemon = false;
-    uint8_t m_distance = 0;
+    uint8_t m_distance = 2;
 
-    mutable std::shared_mutex m_contextStatesMutex;
-    std::map<int64_t, uint8_t> m_contextStates;
+    mutable std::shared_mutex m_contextsMutex;
+    ContextMap m_contexts;
 
     bool& m_changed;
 
@@ -194,7 +222,9 @@ class ClusterStatistics
         << "\"readyForWork\": " << n.getReadyForWork() << ","
         << "\"fullyKnown\": " << n.m_fullyKnown << ","
         << "\"daemon\": " << n.m_daemon << ","
-        << "\"highlighted\": false" << ","
+        << "\"highlighted\": false"
+        << ","
+        << "\"aggregatedContextSize\": " << n.getAggregatedContextSize() << ","
         << "\"workQueueSize\": " << n.m_workQueueSize;
       return o;
     }
@@ -239,7 +269,8 @@ class ClusterStatistics
    * @returns nullptr if the decision is better done locally, remote node
    * otherwise.
    */
-  const Node* getTargetComputeNodeForNewDecision(CNFTree::Path p, int64_t originator);
+  const Node* getTargetComputeNodeForNewDecision(CNFTree::Path p,
+                                                 int64_t originator);
   bool clearChanged();
 
   Node& getThisNode() { return *m_thisNode; }

@@ -3,6 +3,7 @@
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/networked_node.hpp"
+#include "../include/paracuber/task_factory.hpp"
 #include <algorithm>
 #include <boost/iterator/filter_iterator.hpp>
 #include <capnp-schemas/message.capnp.h>
@@ -31,7 +32,7 @@ ClusterStatistics::Node::Node(Node&& o) noexcept
   , m_fullyKnown(o.m_fullyKnown)
   , m_daemon(o.m_daemon)
   , m_distance(o.m_distance)
-  , m_contextStates(std::move(o.m_contextStates))
+  , m_contexts(std::move(o.m_contexts))
   , m_thisId(o.m_thisId)
   , m_acc_workQueueSize(boost::accumulators::tag::rolling_window::window_size =
                           20)
@@ -60,6 +61,13 @@ ClusterStatistics::Node::getReadyForWork(int64_t id) const
     static_cast<Daemon::Context::State>(getContextState(id));
   return state & Daemon::Context::WaitingForWork;
 }
+void
+ClusterStatistics::Node::applyTaskFactoryVector(const TaskFactoryVector& v)
+{
+  for(auto& e : v) {
+    setContextSize(e->getOriginId(), e->getSize());
+  }
+}
 
 ClusterStatistics::ClusterStatistics(ConfigPtr config, LogPtr log)
   : m_config(config)
@@ -74,7 +82,7 @@ ClusterStatistics::initLocalNode()
   Node thisNode(
     m_changed, m_config->getInt64(Config::Id), m_config->getInt64(Config::Id));
   thisNode.setDaemon(m_config->isDaemonMode());
-  thisNode.setDistance(0);
+  thisNode.setDistance(1);
   thisNode.setFullyKnown(true);
   thisNode.setUptime(0);
   thisNode.setWorkQueueCapacity(m_config->getUint64(Config::WorkQueueCapacity));
@@ -133,8 +141,7 @@ ClusterStatistics::getTargetComputeNodeForNewDecision(CNFTree::Path p,
   int64_t localId = m_config->getInt64(Config::Id);
   auto filterFunc = [originator, localId](auto& e) {
     auto& n = e.second;
-    return n.getFullyKnown() && n.getReadyForWork() &&
-           n.getId() != originator && n.getDaemon();
+    return n.getFullyKnown() && n.getReadyForWork() && n.getId() != originator;
   };
 
   // Filter to only contain nodes that can be worked with.

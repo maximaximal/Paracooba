@@ -94,6 +94,11 @@ Daemon::Context::start(State change)
 
   m_statisticsNode.setContextState(m_originatorID, m_state);
 }
+uint64_t
+Daemon::Context::getFactoryQueueSize() const
+{
+  return m_taskFactory->getSize();
+}
 
 Daemon::Daemon(ConfigPtr config,
                LogPtr log,

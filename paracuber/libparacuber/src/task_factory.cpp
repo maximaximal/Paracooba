@@ -59,6 +59,12 @@ TaskFactory::produceTask()
   return { nullptr, skel.originator };
 }
 
+int64_t
+TaskFactory::getOriginId() const
+{
+  return m_rootCNF->getOriginId();
+}
+
 std::pair<std::unique_ptr<Task>, int64_t>
 TaskFactory::produceCubeOrSolveTask(TaskSkeleton skel)
 {
