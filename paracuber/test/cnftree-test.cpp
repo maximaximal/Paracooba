@@ -58,7 +58,7 @@ TEST_CASE("CNFTree::Path manipulation")
 
 TEST_CASE("CNFTree Usage")
 {
-  CNFTree tree;
+  CNFTree tree(nullptr, 0);
 
   SECTION("Traversing an empty tree should not call the visitor.")
   {

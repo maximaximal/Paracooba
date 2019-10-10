@@ -8,12 +8,15 @@
 #include <memory>
 
 namespace paracuber {
+class Config;
+class CNF;
+
 /** @brief Implements the CNFTree concept from @ref CNFTree.
  */
 class CNFTree
 {
   public:
-  CNFTree();
+  explicit CNFTree(std::shared_ptr<Config> config, int64_t originCNFId);
   ~CNFTree();
 
   using Path = uint64_t;
@@ -23,6 +26,7 @@ class CNFTree
   {
     Unvisited,
     Working,
+    Solving,
     Split,
     SAT,
     UNSAT,
@@ -251,6 +255,8 @@ class CNFTree
 
   private:
   Node m_root;
+  std::shared_ptr<Config> m_config;
+  int64_t m_originCNFId;
 };
 
 constexpr const char*

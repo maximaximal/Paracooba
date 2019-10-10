@@ -249,7 +249,7 @@ class Webserver::HTTPSession
     : m_webserver(webserver)
     , m_logger(m_webserver->m_log->createLogger())
     , m_socket(std::move(socket))
-    , m_strand(m_socket.get_executor())
+    , m_strand(webserver->getIOService().get_executor())
     , m_docRoot(docRoot)
     , m_lambda(*this)
   {

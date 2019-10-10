@@ -34,6 +34,7 @@ class Daemon
       JustCreated = 0b00000000u,
       FormulaReceived = 0b00000001u,
       AllowanceMapReceived = 0b00000010u,
+      ResultReceived = 0b00010000u,
       FormulaParsed = 0b00000100u,
       WaitingForWork = 0b00001000u
     };

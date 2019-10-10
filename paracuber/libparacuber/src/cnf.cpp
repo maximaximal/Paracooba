@@ -29,7 +29,7 @@ CNF::CNF(ConfigPtr config,
   , m_dimacsFile(dimacsFile)
   , m_log(log)
   , m_logger(log->createLogger())
-  , m_cnfTree(std::make_unique<CNFTree>())
+  , m_cnfTree(std::make_unique<CNFTree>(config, originId))
 {
   if(dimacsFile != "") {
     struct stat statbuf;
@@ -47,7 +47,7 @@ CNF::CNF(const CNF& o)
   , m_dimacsFile(o.m_dimacsFile)
   , m_log(o.m_log)
   , m_logger(o.m_log->createLogger())
-  , m_cnfTree(std::make_unique<CNFTree>())
+  , m_cnfTree(std::make_unique<CNFTree>(o.m_config, o.m_originId))
 {}
 
 CNF::~CNF() {}
@@ -157,6 +157,58 @@ CNF::sendAllowanceMap(boost::asio::ip::tcp::socket* socket,
 }
 
 void
+CNF::sendResult(boost::asio::ip::tcp::socket* socket,
+                CNFTree::Path p,
+                SendFinishedCB finishedCallback)
+{
+  assert(rootTaskReady.isReady());
+
+  const auto resultIt = m_results.find(p);
+  if(resultIt == m_results.end()) {
+    PARACUBER_LOG(m_logger, LocalWarning)
+      << "No result found for path " << CNFTree::pathToStrNoAlloc(p) << "!";
+    return;
+  }
+  const auto& result = resultIt->second;
+
+  // Write the subject (a Result).
+  TransmissionSubject subject = TransmitResult;
+  socket->write_some(boost::asio::buffer(
+    reinterpret_cast<const char*>(&subject), sizeof(subject)));
+
+  // Write the originator ID.
+  int64_t id = m_config->getInt64(Config::Id);
+  socket->write_some(
+    boost::asio::buffer(reinterpret_cast<const char*>(&id), sizeof(id)));
+
+  // Write the path.
+  socket->write_some(
+    boost::asio::buffer(reinterpret_cast<const char*>(&p), sizeof(p)));
+
+  // Write the result state from the CNFTree.
+  CNFTree::State state;
+  m_cnfTree->getState(p, state);
+  socket->write_some(
+    boost::asio::buffer(reinterpret_cast<const char*>(&state), sizeof(state)));
+
+  // Write the result size.
+  uint32_t resultSize = result.assignment.size();
+  socket->write_some(boost::asio::buffer(
+    reinterpret_cast<const char*>(&resultSize), sizeof(resultSize)));
+
+  if(state == CNFTree::SAT) {
+    // Write the full result.
+    socket->async_write_some(
+      boost::asio::buffer(
+        reinterpret_cast<const char*>(result.assignment.data()),
+        result.size * sizeof(result.assignment[0])),
+      std::bind(finishedCallback));
+  } else {
+    // Write the UNSAT proof.
+  }
+}
+
+void
 CNF::sendCB(SendDataStruct* data,
             CNFTree::Path path,
             boost::asio::ip::tcp::socket* socket)
@@ -207,6 +259,45 @@ CNF::requestInfoGlobally(CNFTree::Path p, int64_t handle)
       }
       return false;
     });
+}
+
+void
+CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
+{
+  Result res;
+  res.p = p;
+
+  {
+    auto& resultMut = const_cast<TaskResult&>(result);
+    auto task = static_unique_pointer_cast<CaDiCaLTask>(
+      std::move(resultMut.getTaskPtr()));
+    res.task = std::move(task);
+  }
+
+  res.size = res.task->getVarCount();
+
+  switch(result.getStatus()) {
+    case TaskResult::Satisfiable:
+      m_cnfTree->setState(p, CNFTree::SAT);
+      res.state = CNFTree::SAT;
+      // The result assignment must be received from the solver too and written
+      // into an uint8_t vector for efficient transfer.
+      //
+      // TODO!!
+      break;
+    case TaskResult::Unsatisfiable:
+      m_cnfTree->setState(p, CNFTree::UNSAT);
+      res.state = CNFTree::UNSAT;
+      break;
+    default:
+      // Other results are not handled here.
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Invalid status received for finished solver task: "
+        << result.getStatus();
+      return;
+  }
+
+  m_results.insert(std::make_pair(p, std::move(res)));
 }
 
 template<typename T>
@@ -280,6 +371,9 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
             break;
           case TransmitAllowanceMap:
             d.state = ReceiveAllowanceMapSize;
+            break;
+          case TransmitResult:
+            d.state = ReceiveResultPath;
             break;
           default:
             PARACUBER_LOG(m_logger, GlobalError)
@@ -413,6 +507,77 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         while(cubeVar != nullptr) {
           m_cuberRegistry->getAllowanceMap().push_back(*cubeVar);
           cubeVar = receiveValueFromBuffer<CNFTree::CubeVar>(d, &buf, &length);
+        }
+
+        break;
+      }
+      case ReceiveResultPath: {
+        CNFTree::Path* path =
+          receiveValueFromBuffer<CNFTree::Path>(d, &buf, &length);
+        if(path) {
+          d.path = *path;
+          assert(m_results.find(*path) == m_results.end());
+          Result r{ *path, CNFTree::State::Unknown };
+          d.result = &r;
+          m_results.insert(std::make_pair(*path, std::move(r)));
+          d.state = ReceiveResultState;
+        }
+      }
+      case ReceiveResultState: {
+        CNFTree::State* state =
+          receiveValueFromBuffer<CNFTree::State>(d, &buf, &length);
+        if(state) {
+          assert(d.result);
+          d.result->state = *state;
+          d.state = ReceiveResultSize;
+        }
+        break;
+      }
+      case ReceiveResultSize: {
+        uint32_t* size = receiveValueFromBuffer<uint32_t>(d, &buf, &length);
+        if(size) {
+          assert(d.result);
+          d.result->assignment.reserve(*size);
+          d.result->size = *size;
+          d.state = ReceiveResultData;
+        }
+        break;
+      }
+      case ReceiveResultData: {
+        if(length == 0 && buf == nullptr) {
+          // This marks the end of the transmission, the result sequence is
+          // finished.
+          d.result->finished = true;
+          ERASE_AND_RETURN_SUBJECT()
+        }
+
+        uint8_t* next8Vals = receiveValueFromBuffer<uint8_t>(d, &buf, &length);
+        while(next8Vals != nullptr) {
+          assert(d.result);
+          Result* r = d.result;
+          uint8_t next = *next8Vals;
+          // Get next assignments, depending on remaining size. At the very end,
+          // only valid variables shall be extracted.
+          switch(r->size - r->assignment.size()) {
+            default:
+              r->assignment.push_back(next & 0b00000001u);
+            case 7:
+              r->assignment.push_back(next & 0b00000010u);
+            case 6:
+              r->assignment.push_back(next & 0b00000100u);
+            case 5:
+              r->assignment.push_back(next & 0b00001000u);
+            case 4:
+              r->assignment.push_back(next & 0b00010000u);
+            case 3:
+              r->assignment.push_back(next & 0b00100000u);
+            case 2:
+              r->assignment.push_back(next & 0b01000000u);
+            case 1:
+              r->assignment.push_back(next & 0b10000000u);
+            case 0:
+              break;
+          }
         }
 
         break;

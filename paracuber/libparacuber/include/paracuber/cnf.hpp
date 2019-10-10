@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <functional>
+#include <map>
 #include <set>
 #include <string>
 #include <string_view>
@@ -13,6 +14,7 @@
 #include "cnftree.hpp"
 #include "log.hpp"
 #include "readywaiter.hpp"
+#include "taskresult.hpp"
 
 namespace paracuber {
 class NetworkedNode;
@@ -48,7 +50,8 @@ class CNF
   {
     TransmitFormula = 1,
     TransmitAllowanceMap = 2,
-    TransmissionSubjectUnknown = 3,
+    TransmitResult = 3,
+    TransmissionSubjectUnknown = 4,
   };
 
   enum ReceiveState
@@ -60,6 +63,20 @@ class CNF
     ReceiveCube,
     ReceiveAllowanceMapSize,
     ReceiveAllowanceMap,
+    ReceiveResultPath,
+    ReceiveResultState,
+    ReceiveResultSize,
+    ReceiveResultData,
+  };
+
+  struct Result
+  {
+    CNFTree::Path p;
+    CNFTree::State state;
+    uint32_t size = 0;
+    std::vector<uint8_t> assignment;
+    bool finished = false;
+    std::unique_ptr<CaDiCaLTask> task;
   };
 
   struct ReceiveDataStruct
@@ -71,6 +88,7 @@ class CNF
     size_t receiveVarPos = 0;
     char receiveVarBuf[8];
     int64_t originator = 0;
+    Result* result = nullptr;
   };
 
   std::string_view getDimacsFile() { return m_dimacsFile; }
@@ -83,6 +101,9 @@ class CNF
             bool first = true);
   void sendAllowanceMap(boost::asio::ip::tcp::socket* socket,
                         SendFinishedCB finishedCallback);
+  void sendResult(boost::asio::ip::tcp::socket* socket,
+                  CNFTree::Path p,
+                  SendFinishedCB finishedCallback);
 
   TransmissionSubject receive(boost::asio::ip::tcp::socket* socket,
                               char* buf,
@@ -104,6 +125,8 @@ class CNF
   void requestInfoGlobally(CNFTree::Path p, int64_t handle = 0);
 
   void setTaskFactory(TaskFactory* f) { m_taskFactory = f; }
+
+  void solverFinishedSlot(const TaskResult& result, CNFTree::Path path);
 
   private:
   struct SendDataStruct
@@ -134,6 +157,8 @@ class CNF
 
   std::unique_ptr<cuber::Registry> m_cuberRegistry;
   std::unique_ptr<CNFTree> m_cnfTree;
+
+  std::map<CNFTree::Path, Result> m_results;
 
   ConfigPtr m_config;
   LogPtr m_log;

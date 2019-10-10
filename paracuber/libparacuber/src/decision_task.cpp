@@ -72,10 +72,11 @@ DecisionTask::execute()
 
     return std::make_unique<TaskResult>(TaskResult::DecisionMade);
   } else {
-    // This is an invalid leaf without a decision! Only one level above can a
-    // solver be created.
     PARACUBER_LOG(*m_logger, Trace) << "No decision made!";
-    cnfTree.setState(m_path, CNFTree::Dropped);
+    cnfTree.setState(m_path, CNFTree::Solving);
+
+    m_factory->addPath(m_path, TaskFactory::Solve, m_originator);
+
     return std::make_unique<TaskResult>(TaskResult::NoDecisionMade);
   }
 }

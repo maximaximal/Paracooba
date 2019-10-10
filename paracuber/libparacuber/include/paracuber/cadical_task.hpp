@@ -83,9 +83,12 @@ class CaDiCaLTask : public Task
   CaDiCaL::Solver& getSolver() { return *m_solver; }
   uint32_t getVarCount() { return m_internalVarCount; }
 
+  void setRootCNF(std::shared_ptr<CNF> rootCNF) { m_cnf = rootCNF; }
+
   private:
   friend class Terminator;
   std::unique_ptr<Terminator> m_terminator;
+  std::shared_ptr<CNF> m_cnf;
   Mode m_mode = ParseAndSolve;
 
   std::unique_ptr<CaDiCaL::Solver> m_solver;

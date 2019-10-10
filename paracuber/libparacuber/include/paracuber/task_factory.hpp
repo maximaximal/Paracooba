@@ -43,7 +43,7 @@ class TaskFactory
 
   std::pair<std::unique_ptr<Task>, int64_t> produceTask();
   inline bool canProduceTask() const { return m_availableTasks > 0; }
-  inline uint64_t getSize() const { return m_skeletons.size(); }
+  inline uint64_t getSize() const { return m_availableTasks; }
   int64_t getOriginId() const;
 
   private:

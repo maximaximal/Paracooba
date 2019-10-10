@@ -1,11 +1,17 @@
 #include "../include/paracuber/cnftree.hpp"
+#include "../include/paracuber/communicator.hpp"
+#include "../include/paracuber/config.hpp"
+#include "../include/paracuber/util.hpp"
 #include <cassert>
 #include <iostream>
 
 namespace paracuber {
 const size_t CNFTree::maxPathDepth = sizeof(CNFTree::Path) * 8 - 6;
 
-CNFTree::CNFTree() {}
+CNFTree::CNFTree(std::shared_ptr<Config> config, int64_t originCNFId)
+  : m_config(config)
+  , m_originCNFId(originCNFId)
+{}
 CNFTree::~CNFTree() {}
 
 bool
@@ -110,7 +116,7 @@ CNFTree::setState(Path p, State state)
 {
   assert(getDepth(p) < maxPathDepth);
 
-  Node* n = &m_root;
+  Node *n = &m_root, *sibling = nullptr;
   uint8_t depth = 0;
   bool end = false;
 
@@ -121,16 +127,52 @@ CNFTree::setState(Path p, State state)
 
     if(depth == getDepth(p)) {
       n->state = state;
-      return true;
+
+      if(n->remote != 0) {
+        // This change must be propagated to the remote compute node! This is
+        // done through the communicator class.
+        std::shared_ptr<CNF> rootCNF =
+          GetRootCNF(m_config.get(), m_originCNFId);
+        assert(rootCNF);
+        auto& statNode =
+          m_config->getCommunicator()->getClusterStatistics()->getNode(
+            n->remote);
+        m_config->getCommunicator()->sendCNFResultToNode(
+          rootCNF, p, statNode.getNetworkedNode());
+      }
+      break;
     }
 
     bool assignment = getAssignment(p, depth + 1);
     std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+    std::unique_ptr<Node>& siblingPtr = !assignment ? n->left : n->right;
 
     n = nextPtr.get();
+    sibling = siblingPtr.get();
     ++depth;
   }
-  return false;
+
+  switch(state) {
+    case SAT:
+      // A SAT assignment must directly be propagated upwards.
+      if(getDepth(p) > 0) {
+        setState(setDepth(p, getDepth(p) - 1), SAT);
+      }
+      break;
+    case UNSAT:
+      // Only if the other sibling is also UNSAT, this must be propagated.
+      if(sibling) {
+        if(sibling->state == UNSAT) {
+          setState(setDepth(p, getDepth(p) - 1), UNSAT);
+        }
+      }
+      break;
+    default:
+      // No other cases covered.
+      break;
+  }
+
+  return depth == getDepth(p);
 }
 
 bool
@@ -208,6 +250,7 @@ CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
   }
   return false;
 }
+
 void
 CNFTree::pathToStr(Path p, char* str)
 {

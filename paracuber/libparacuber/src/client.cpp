@@ -42,6 +42,7 @@ Client::solve()
   CaDiCaLTask::Mode mode = CaDiCaLTask::Parse;
 
   auto task = std::make_unique<CaDiCaLTask>(&m_cnfVarCount, mode);
+  task->setRootCNF(m_rootCNF);
   auto& finishedSignal = task->getFinishedSignal();
   task->readDIMACSFile(getDIMACSSourcePathFromConfig());
   m_communicator->getRunner()->push(std::move(task),

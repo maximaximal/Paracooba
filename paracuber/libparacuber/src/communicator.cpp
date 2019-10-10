@@ -578,6 +578,11 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
           // Finished sending AllowanceMap!
         });
         break;
+      case TCPClientMode::TransmitCNFResult:
+        m_cnf->sendResult(&m_socket, m_path, [this, ptr]() {
+          // Finished sending AllowanceMap!
+        });
+        break;
     }
   }
 
@@ -670,6 +675,9 @@ class Communicator::TCPServer
                   break;
                 case CNF::TransmitAllowanceMap:
                   change = Daemon::Context::AllowanceMapReceived;
+                  break;
+                case CNF::TransmitResult:
+                  change = Daemon::Context::ResultReceived;
                   break;
                 default:
                   change = Daemon::Context::JustCreated;
@@ -974,6 +982,25 @@ Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf,
     // Also send the allowance map to a CNF, if this transmits the root formula.
     sendAllowanceMapToNodeWhenReady(cnf, nn);
   }
+}
+
+void
+Communicator::sendCNFResultToNode(std::shared_ptr<CNF> cnf,
+                                  CNFTree::Path path,
+                                  NetworkedNode* nn)
+{
+  assert(nn);
+  // This indirection is required to make this work from worker threads.
+  m_ioService.post([this, cnf, path, nn]() {
+    auto client = std::make_shared<TCPClient>(this,
+                                              m_log,
+                                              m_ioService,
+                                              nn->getRemoteTcpEndpoint(),
+                                              TCPClientMode::TransmitCNFResult,
+                                              cnf,
+                                              path);
+    client->connect();
+  });
 }
 
 void

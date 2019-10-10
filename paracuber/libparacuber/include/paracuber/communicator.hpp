@@ -18,15 +18,6 @@
 #include <boost/version.hpp>
 
 namespace boost {
-namespace asio {
-#if(BOOST_VERSION / 100 % 1000) >= 69
-class io_context;
-using io_service = io_context;
-class signal_set;
-#else
-class io_service;
-#endif
-}
 namespace system {
 class error_code;
 }
@@ -98,12 +89,17 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   enum class TCPClientMode
   {
     TransmitCNF,
-    TransmitAllowanceMap
+    TransmitAllowanceMap,
+    TransmitCNFResult
   };
 
   void sendCNFToNode(std::shared_ptr<CNF> cnf,
                      CNFTree::Path path,
                      NetworkedNode* nn);
+
+  void sendCNFResultToNode(std::shared_ptr<CNF> cnf,
+                           CNFTree::Path path,
+                           NetworkedNode* nn);
 
   void sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
                                        NetworkedNode* nn);

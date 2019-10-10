@@ -49,6 +49,7 @@ CaDiCaLTask::CaDiCaLTask(const TaskResult& result)
 CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
   : m_terminator(std::move(other.m_terminator))
   , m_solver(std::move(other.m_solver))
+  , m_cnf(std::move(other.m_cnf))
 {
   m_terminator->setCaDiCaLTask(this);
   m_name = "CaDiCaL Task (moved)";
@@ -79,6 +80,7 @@ CaDiCaLTask::copyFromCaDiCaLTask(const CaDiCaLTask& other)
 
   m_mode = other.m_mode;
   other.m_solver->copy(*m_solver);
+  m_cnf = other.m_cnf;
 }
 
 void
@@ -86,12 +88,18 @@ CaDiCaLTask::applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree)
 {
   m_name = "Solver Task for Path " + CNFTree::pathToStdString(p);
   tree.visit(
-    p,
+    CNFTree::setDepth(p, CNFTree::getDepth(p) - 1),
     [this](
       CNFTree::CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
       m_solver->assume(p);
       return false;
     });
+
+  // This means, that the task was assigned from a factory, a callback must be
+  // given.
+  assert(m_cnf);
+  m_finishedSignal.connect(
+    std::bind(&CNF::solverFinishedSlot, m_cnf, std::placeholders::_1, p));
 }
 
 void
@@ -103,6 +111,7 @@ CaDiCaLTask::readDIMACSFile(std::string_view sourcePath)
 void
 CaDiCaLTask::readCNF(std::shared_ptr<CNF> cnf, CNFTree::Path path)
 {
+  m_cnf = cnf;
   /// This applies the CNF tree to the current solver object. This means, that
   /// the solver applies all missing rules from the CNF tree to the current
   /// context. See @ref CNFTree for more.
@@ -112,7 +121,7 @@ CaDiCaLTask::readCNF(std::shared_ptr<CNF> cnf, CNFTree::Path path)
     m_mode = Parse;
     readDIMACSFile(cnf->getDimacsFile());
   } else {
-    // Apply the CNF tree to the current solver.
+    applyPathFromCNFTree(path, cnf->getCNFTree());
   }
 }
 

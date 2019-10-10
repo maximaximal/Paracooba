@@ -32,15 +32,15 @@ TaskFactory::addPath(CNFTree::Path p, Mode mode, int64_t originator)
 std::pair<std::unique_ptr<Task>, int64_t>
 TaskFactory::produceTask()
 {
-  if(canProduceTask()) {
-    --m_availableTasks;
-  } else {
-    return { nullptr, 0 };
-  }
-
   TaskSkeleton skel;
   {
     std::unique_lock lock(m_skeletonsMutex);
+    if(canProduceTask()) {
+      --m_availableTasks;
+    } else {
+      return { nullptr, 0 };
+    }
+
     skel = std::move(m_skeletons.front());
     m_skeletons.pop();
   }
