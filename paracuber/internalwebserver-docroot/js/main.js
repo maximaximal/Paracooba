@@ -110,7 +110,6 @@ class CNFTree {
 		id = app.local_config['id'];
 	    }
 	    app.highlightClusterNode(id);
-	    console.log(id);
 	});
     }
 
