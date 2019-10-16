@@ -354,7 +354,14 @@ class Webserver::HTTPSession
         auto weakPtr = weak_from_this();
         wsSendPropertyTree(weakPtr, ptree);
       }
+    } else {
+      m_buffer.consume(m_buffer.size());
     }
+
+    // This consume is required, because there would still be data left at this
+    // stage if it was not used here. This stems from sending data inside a read
+    // handler.
+    m_buffer.consume(m_buffer.size());
 
     wsDoRead();
   }
@@ -382,6 +389,7 @@ class Webserver::HTTPSession
       return false;
     assert(ptr->m_webserver);
     assert(ptr->m_websocket);
+    ptr->m_buffer.consume(ptr->m_buffer.size());
     auto os = boost::beast::ostream(ptr->m_buffer);
     boost::property_tree::json_parser::write_json(os, tree);
     ptr->m_websocket->text(true);
