@@ -75,7 +75,7 @@ Daemon::Context::start(State change)
       // depending on the heuristics of the current compute node.
     });
     m_daemon->m_communicator->getRunner()->push(
-      std::move(task), m_originatorID, m_taskFactory.get());
+      std::move(task), m_originatorID, 0, m_taskFactory.get());
   } else if(change == FormulaReceived && m_state & WaitingForWork) {
     // Received a cubing task! Submit it to the local cubing factory. This is
     // done inside the CNF class.

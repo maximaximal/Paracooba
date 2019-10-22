@@ -13,7 +13,9 @@ Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
   , m_logger(log->createLogger())
   , m_communicator(communicator)
   , m_numberOfRunningTasks(0)
-  , m_taskQueue(config->getUint64(Config::WorkQueueCapacity))
+  , m_taskQueue(
+      std::make_unique<PriorityQueueLockSemanticsUniquePtr<QueueEntry>>(
+        config->getUint64(Config::WorkQueueCapacity)))
 {}
 Runner::~Runner() {}
 
@@ -54,6 +56,7 @@ Runner::stop()
 std::future<std::unique_ptr<TaskResult>>
 Runner::push(std::unique_ptr<Task> task,
              int64_t originator,
+             int priority,
              TaskFactory* factory)
 {
   task->m_runner = this;
@@ -61,12 +64,12 @@ Runner::push(std::unique_ptr<Task> task,
   task->m_config = m_config.get();
   task->m_communicator = m_communicator;
 
-  std::unique_ptr<QueueEntry> entry =
-    std::make_unique<QueueEntry>(std::move(task), 0, originator, factory);
+  std::unique_ptr<QueueEntry> entry = std::make_unique<QueueEntry>(
+    std::move(task), priority, originator, factory);
   std::promise<std::unique_ptr<TaskResult>>& promise = entry->result;
   auto future = promise.get_future();
-  std::unique_lock<std::mutex> lock(m_taskQueueMutex);
-  push_(std::move(entry));
+  std::unique_lock<std::mutex> lock(m_taskQueue->getMutex());
+  m_taskQueue->pushNoLock(std::move(entry));
   m_newTasksVerifier = true;
   m_newTasks.notify_one();
   return std::move(future);
@@ -93,20 +96,18 @@ Runner::worker(uint32_t workerId, Logger logger)
     "workerID", boost::log::attributes::constant<decltype(workerId)>(workerId));
   PARACUBER_LOG(logger, Trace) << "Worker " << workerId << " started.";
   while(m_running) {
-    std::unique_ptr<QueueEntry> entry;
+    std::unique_ptr<QueueEntry> entry = nullptr;
     {
       checkTaskFactories();
-      std::unique_lock<std::mutex> lock(m_taskQueueMutex);
+      std::unique_lock<std::mutex> lock(m_taskQueue->getMutex());
       while(m_running && !m_newTasksVerifier) {
         PARACUBER_LOG(logger, Trace)
           << "Worker " << workerId << " waiting for tasks.";
         m_newTasks.wait(lock);
       }
-      entry = pop_();
 
-      if(entry && m_taskCount == 0) {
-        // Only reset the verifier if this really was the thread to receive the
-        // notification and this thread was not just started.
+      if(m_taskQueue->size() > 0) {
+        entry = m_taskQueue->popNoLock();
         m_newTasksVerifier = false;
       }
     }
@@ -152,38 +153,21 @@ Runner::QueueEntry::QueueEntry(std::unique_ptr<Task> task,
 Runner::QueueEntry::~QueueEntry() {}
 
 void
-Runner::push_(std::unique_ptr<QueueEntry> entry)
-{
-  ++m_taskCount;
-  m_taskQueue.push_back(std::move(entry));
-  std::push_heap(m_taskQueue.begin(), m_taskQueue.end());
-}
-std::unique_ptr<Runner::QueueEntry>
-Runner::pop_()
-{
-  --m_taskCount;
-  if(m_taskQueue.size() > 0) {
-    std::pop_heap(m_taskQueue.begin(), m_taskQueue.end());
-    auto result = std::move(m_taskQueue.back());
-    m_taskQueue.pop_back();
-    return result;
-  }
-  return nullptr;
-}
-
-void
 Runner::checkTaskFactories()
 {
+  static int i = 0;
+
   std::shared_lock lock(m_taskFactoriesMutex);
   for(auto factory : m_taskFactories) {
     // Check if more tasks should be requested for every factory and if new
     // tasks should be requested, request multiple of them.
-    while(m_taskCount < m_currentlyRunningTasks.size() * 3 &&
+    while(m_taskQueue->size() < m_currentlyRunningTasks.size() * 3 &&
           factory->canProduceTask()) {
       // Receive and submit the task.
-      auto [task, originator] = factory->produceTask();
+      auto [task, originator, priority] = factory->produceTask();
+
       if(task) {
-        push(std::move(task), originator, factory);
+        push(std::move(task), originator, priority, factory);
       }
     }
   }

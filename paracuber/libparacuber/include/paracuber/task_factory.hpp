@@ -5,6 +5,7 @@
 
 #include "cnftree.hpp"
 #include "log.hpp"
+#include "paracuber/priority_queue_lock_semantics.hpp"
 #include <atomic>
 #include <mutex>
 
@@ -37,27 +38,47 @@ class TaskFactory
     Mode mode;
     int64_t originator;
     CNFTree::Path p;
+
+    TaskSkeleton(Mode mode, int64_t originator, CNFTree::Path p)
+      : mode(mode)
+      , originator(originator)
+      , p(p)
+    {}
+
+    inline int getPriority() const
+    {
+      return (CNFTree::maxPathDepth - CNFTree::getDepth(p)) -
+             (mode == Solve ? 100 : 0);
+    }
+
+    inline bool operator<(TaskSkeleton const& b) const
+    {
+      return getPriority() < b.getPriority();
+    }
+  };
+
+  struct ProducedTask
+  {
+    std::unique_ptr<Task> task;
+    int64_t originator;
+    int priority;
   };
 
   void addPath(CNFTree::Path p, Mode m, int64_t originator);
 
-  std::pair<std::unique_ptr<Task>, int64_t> produceTask();
-  inline bool canProduceTask() const { return m_availableTasks > 0; }
-  inline uint64_t getSize() const { return m_availableTasks; }
+  ProducedTask produceTask();
+  inline bool canProduceTask() const { return !m_skeletons.empty(); }
+  inline uint64_t getSize() const { return m_skeletons.size(); }
   int64_t getOriginId() const;
 
   private:
-  std::pair<std::unique_ptr<Task>, int64_t> produceCubeOrSolveTask(
-    TaskSkeleton skel);
-  std::pair<std::unique_ptr<Task>, int64_t> produceSolveTask(TaskSkeleton skel);
+  ProducedTask produceCubeOrSolveTask(std::unique_ptr<TaskSkeleton> skel);
+  ProducedTask produceSolveTask(std::unique_ptr<TaskSkeleton> skel);
 
   ConfigPtr m_config;
   Logger m_logger;
-  std::mutex m_skeletonsMutex;
-  std::queue<TaskSkeleton> m_skeletons;
+  PriorityQueueLockSemanticsUniquePtr<TaskSkeleton> m_skeletons;
   std::shared_ptr<CNF> m_rootCNF;
-
-  std::atomic<uint64_t> m_availableTasks = 0;
 };
 }
 

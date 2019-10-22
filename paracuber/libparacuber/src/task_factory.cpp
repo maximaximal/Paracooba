@@ -15,37 +15,33 @@ TaskFactory::TaskFactory(ConfigPtr config,
   , m_logger(log->createLogger())
   , m_rootCNF(rootCNF)
 {
-  m_config->getCommunicator()->getRunner()->registerTaskFactory(this);
+  if(m_config->hasCommunicator()) {
+    m_config->getCommunicator()->getRunner()->registerTaskFactory(this);
+  }
 }
 TaskFactory::~TaskFactory()
 {
-  m_config->getCommunicator()->getRunner()->deregisterTaskFactory(this);
+  if(m_config->hasCommunicator()) {
+    m_config->getCommunicator()->getRunner()->deregisterTaskFactory(this);
+  }
 }
 
 void
 TaskFactory::addPath(CNFTree::Path p, Mode mode, int64_t originator)
 {
-  std::unique_lock lock(m_skeletonsMutex);
-  m_skeletons.push(TaskSkeleton{ mode, originator, p });
-  ++m_availableTasks;
+  m_skeletons.push(std::make_unique<TaskSkeleton>(mode, originator, p));
 }
-std::pair<std::unique_ptr<Task>, int64_t>
+TaskFactory::ProducedTask
 TaskFactory::produceTask()
 {
-  TaskSkeleton skel;
-  {
-    std::unique_lock lock(m_skeletonsMutex);
-    if(canProduceTask()) {
-      --m_availableTasks;
-    } else {
-      return { nullptr, 0 };
-    }
-
-    skel = std::move(m_skeletons.front());
-    m_skeletons.pop();
+  std::unique_lock lock(m_skeletons.getMutex());
+  if(m_skeletons.empty()) {
+    return { nullptr, 0, 0 };
   }
+  auto skel(std::move(m_skeletons.popNoLock()));
+  lock.unlock();// Early unlock: This could happen in parallel.
 
-  switch(skel.mode) {
+  switch(skel->mode) {
     case CubeOrSolve:
       return produceCubeOrSolveTask(std::move(skel));
       break;
@@ -56,7 +52,7 @@ TaskFactory::produceTask()
       break;
   }
 
-  return { nullptr, skel.originator };
+  return { nullptr, skel->originator, 0 };
 }
 
 int64_t
@@ -65,21 +61,21 @@ TaskFactory::getOriginId() const
   return m_rootCNF->getOriginId();
 }
 
-std::pair<std::unique_ptr<Task>, int64_t>
-TaskFactory::produceCubeOrSolveTask(TaskSkeleton skel)
+TaskFactory::ProducedTask
+TaskFactory::produceCubeOrSolveTask(std::unique_ptr<TaskSkeleton> skel)
 {
   std::unique_ptr<DecisionTask> task =
-    std::make_unique<DecisionTask>(m_rootCNF, skel.p);
-  return { std::move(task), skel.originator };
+    std::make_unique<DecisionTask>(m_rootCNF, skel->p);
+  return { std::move(task), skel->originator, skel->getPriority() };
 }
-std::pair<std::unique_ptr<Task>, int64_t>
-TaskFactory::produceSolveTask(TaskSkeleton skel)
+TaskFactory::ProducedTask
+TaskFactory::produceSolveTask(std::unique_ptr<TaskSkeleton> skel)
 {
   CaDiCaLTask* rootTask = m_rootCNF->getRootTask();
   assert(rootTask);
   std::unique_ptr<CaDiCaLTask> task = std::make_unique<CaDiCaLTask>(*rootTask);
   task->setMode(CaDiCaLTask::Solve);
-  task->applyPathFromCNFTree(skel.p, m_rootCNF->getCNFTree());
-  return { std::move(task), skel.originator };
+  task->applyPathFromCNFTree(skel->p, m_rootCNF->getCNFTree());
+  return { std::move(task), skel->originator, skel->getPriority() };
 }
 }

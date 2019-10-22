@@ -23,6 +23,8 @@ class DecisionTask : public Task
   virtual TaskResultPtr execute();
   virtual void terminate();
 
+  CNFTree::Path getPath() const { return m_path; }
+
   private:
   std::shared_ptr<CNF> m_rootCNF;
   CNFTree::Path m_path;

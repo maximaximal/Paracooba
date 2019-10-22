@@ -11,6 +11,8 @@
 #include <thread>
 #include <vector>
 
+#include "priority_queue_lock_semantics.hpp"
+
 namespace paracuber {
 class Communicator;
 class Task;
@@ -44,7 +46,7 @@ class Runner
   /** @brief Reports if the runner is already running. */
   inline bool isRunning() { return m_running; }
 
-  inline uint64_t getWorkQueueSize() { return m_taskCount; }
+  inline uint64_t getWorkQueueSize() { return m_taskQueue->size(); }
 
   /** @brief Push a new task to the internal task queue.
    *
@@ -53,11 +55,13 @@ class Runner
    *
    * @param task The task to schedule.
    * @param originator The compute node ID that pushed this task.
+   * @param priority Priority of the new task. Higher is more important.
    * @param factory May contain the factory assigned to this task, if
    * applicable.
    */
   std::future<std::unique_ptr<TaskResult>> push(std::unique_ptr<Task> task,
                                                 int64_t originator,
+                                                int priority = 0,
                                                 TaskFactory* factory = nullptr);
 
   void registerTaskFactory(TaskFactory* f);
@@ -104,11 +108,8 @@ class Runner
     }
   };
 
-  void push_(std::unique_ptr<QueueEntry> entry);
-  std::unique_ptr<QueueEntry> pop_();
-  std::vector<std::unique_ptr<QueueEntry>> m_taskQueue;
+  std::unique_ptr<PriorityQueueLockSemanticsUniquePtr<QueueEntry>> m_taskQueue;
 
-  std::mutex m_taskQueueMutex;
   std::condition_variable m_newTasks;
 
   /// Used against spurious wake-ups:
@@ -117,7 +118,6 @@ class Runner
 
   std::vector<Task*> m_currentlyRunningTasks;
   std::atomic<uint32_t> m_numberOfRunningTasks;
-  std::atomic<uint64_t> m_taskCount;
 
   std::shared_mutex m_taskFactoriesMutex;
   TaskFactoryVector m_taskFactories;

@@ -139,16 +139,19 @@ class Config
     assert(m_client);
     return m_client;
   }
+  bool hasClient() { return m_daemon; }
   Daemon* getDaemon()
   {
     assert(m_daemon);
     return m_daemon;
   }
+  bool hasDaemon() { return m_daemon; }
   Communicator* getCommunicator()
   {
     assert(m_communicator);
     return m_communicator;
   }
+  bool hasCommunicator() { return m_communicator; }
 
   private:
   friend class Client;
