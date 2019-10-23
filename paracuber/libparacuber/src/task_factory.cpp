@@ -29,7 +29,11 @@ TaskFactory::~TaskFactory()
 void
 TaskFactory::addPath(CNFTree::Path p, Mode mode, int64_t originator)
 {
-  m_skeletons.push(std::make_unique<TaskSkeleton>(mode, originator, p));
+  auto ptr = std::make_unique<TaskSkeleton>(mode, originator, p);
+  PARACUBER_LOG(m_logger, Trace)
+    << "Pushing path " << CNFTree::pathToStrNoAlloc(p) << " with priority "
+    << ptr->getPriority();
+  m_skeletons.push(std::move(ptr));
 }
 TaskFactory::ProducedTask
 TaskFactory::produceTask()

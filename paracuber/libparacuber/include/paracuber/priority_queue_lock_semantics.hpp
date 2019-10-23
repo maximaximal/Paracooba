@@ -9,12 +9,13 @@
 #include <vector>
 
 namespace paracuber {
-template<typename T>
+template<typename T, class C = std::less<T>>
 class PriorityQueueLockSemantics
 {
   public:
-  PriorityQueueLockSemantics(size_t size = 1)
+  PriorityQueueLockSemantics(size_t size = 1, C compare = C())
     : m_queue(size)
+    , m_compare(compare)
   {}
   ~PriorityQueueLockSemantics() {}
 
@@ -22,7 +23,7 @@ class PriorityQueueLockSemantics
   {
     ++m_size;
     m_queue.push_back(std::move(obj));
-    std::push_heap(m_queue.begin(), m_queue.end());
+    std::push_heap(m_queue.begin(), m_queue.end(), m_compare);
   }
 
   void push(T obj)
@@ -35,7 +36,7 @@ class PriorityQueueLockSemantics
   {
     --m_size;
     auto result = std::move(m_queue.front());
-    std::pop_heap(m_queue.begin(), m_queue.end());
+    std::pop_heap(m_queue.begin(), m_queue.end(), m_compare);
     m_queue.pop_back();
     return result;
   }
@@ -56,11 +57,28 @@ class PriorityQueueLockSemantics
   std::vector<T> m_queue;
   std::atomic_int64_t m_size = 0;
   std::mutex m_mutex;
+  C m_compare;
+};
+
+template<typename T>
+struct unique_ptr_less
+{
+  inline bool operator()(const std::unique_ptr<T>& l,
+                         const std::unique_ptr<T>& r)
+  {
+    if(l && !r)
+      return 0;
+    if(!l && r)
+      return -1;
+    if(!l && !r)
+      return 0;
+    return *l < *r;
+  }
 };
 
 template<typename T>
 using PriorityQueueLockSemanticsUniquePtr =
-  PriorityQueueLockSemantics<std::unique_ptr<T>>;
+  PriorityQueueLockSemantics<std::unique_ptr<T>, unique_ptr_less<T>>;
 }
 
 #endif

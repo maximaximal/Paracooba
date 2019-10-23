@@ -116,7 +116,8 @@ Runner::worker(uint32_t workerId, Logger logger)
       if(entry->task) {
         PARACUBER_LOG(logger, Trace)
           << "Worker " << workerId
-          << " has received a new task: " << entry->task->name();
+          << " has received a new task: " << entry->task->name()
+          << " with priority " << entry->priority;
 
         // Insert the logger from this worker thread.
         entry->task->m_logger = &logger;

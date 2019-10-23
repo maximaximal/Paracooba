@@ -47,8 +47,8 @@ class TaskFactory
 
     inline int getPriority() const
     {
-      return (CNFTree::maxPathDepth - CNFTree::getDepth(p)) -
-             (mode == Solve ? 100 : 0);
+      return (CNFTree::maxPathDepth - CNFTree::getDepth(p)) +
+             (mode != Solve ? 100 : 0);
     }
 
     inline bool operator<(TaskSkeleton const& b) const
