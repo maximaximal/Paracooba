@@ -100,7 +100,7 @@ Runner::worker(uint32_t workerId, Logger logger)
     {
       checkTaskFactories();
       std::unique_lock<std::mutex> lock(m_taskQueue->getMutex());
-      while(m_running && !m_newTasksVerifier) {
+      while(m_running && !m_newTasksVerifier && m_taskQueue->size() == 0) {
         PARACUBER_LOG(logger, Trace)
           << "Worker " << workerId << " waiting for tasks.";
         m_newTasks.wait(lock);
