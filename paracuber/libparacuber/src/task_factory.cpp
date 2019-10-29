@@ -35,28 +35,58 @@ TaskFactory::addPath(CNFTree::Path p, Mode mode, int64_t originator)
     << ptr->getPriority();
   m_skeletons.push(std::move(ptr));
 }
+
+template<class Functor>
 TaskFactory::ProducedTask
-TaskFactory::produceTask()
+parametricProduceTask(
+  PriorityQueueLockSemanticsUniquePtr<TaskFactory::TaskSkeleton>& queue,
+  TaskFactory& factory,
+  Functor f)
 {
-  std::unique_lock lock(m_skeletons.getMutex());
-  if(m_skeletons.empty()) {
+  std::unique_lock lock(queue.getMutex());
+  if(queue.empty()) {
     return { nullptr, 0, 0 };
   }
-  auto skel(std::move(m_skeletons.popNoLock()));
+  std::unique_ptr<TaskFactory::TaskSkeleton> skel = f(queue);
   lock.unlock();// Early unlock: This could happen in parallel.
 
   switch(skel->mode) {
-    case CubeOrSolve:
-      return produceCubeOrSolveTask(std::move(skel));
+    case TaskFactory::CubeOrSolve:
+      return factory.produceCubeOrSolveTask(std::move(skel));
       break;
-    case Solve:
-      return produceSolveTask(std::move(skel));
+    case TaskFactory::Solve:
+      return factory.produceSolveTask(std::move(skel));
       break;
     default:
       break;
   }
 
   return { nullptr, skel->originator, 0 };
+}
+
+std::unique_ptr<TaskFactory::TaskSkeleton>
+popFromFrontOfQueue(
+  PriorityQueueLockSemanticsUniquePtr<TaskFactory::TaskSkeleton>& queue)
+{
+  return queue.popNoLock();
+}
+std::unique_ptr<TaskFactory::TaskSkeleton>
+popFromBackOfQueue(
+  PriorityQueueLockSemanticsUniquePtr<TaskFactory::TaskSkeleton>& queue)
+{
+  return queue.popBackNoLock();
+}
+
+TaskFactory::ProducedTask
+TaskFactory::produceTask()
+{
+  return parametricProduceTask(m_skeletons, *this, &popFromFrontOfQueue);
+}
+
+TaskFactory::ProducedTask
+TaskFactory::produceTaskBackwards()
+{
+  return parametricProduceTask(m_skeletons, *this, &popFromBackOfQueue);
 }
 
 int64_t

@@ -13,7 +13,7 @@ template<typename T, class C = std::less<T>>
 class PriorityQueueLockSemantics
 {
   public:
-  PriorityQueueLockSemantics(size_t size = 1, C compare = C())
+  PriorityQueueLockSemantics(size_t size = 0, C compare = C())
     : m_queue(size)
     , m_compare(compare)
   {}
@@ -45,6 +45,20 @@ class PriorityQueueLockSemantics
   {
     std::unique_lock lock(m_mutex);
     return popNoLock();
+  }
+
+  T popBackNoLock()
+  {
+    --m_size;
+    auto result = std::move(*(m_queue.begin() + m_size));
+    m_queue.pop_back();
+    return result;
+  }
+
+  T popBack()
+  {
+    std::unique_lock lock(m_mutex);
+    return popBackNoLock();
   }
 
   inline bool empty() const { return m_size == 0; }

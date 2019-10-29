@@ -165,7 +165,7 @@ Runner::checkTaskFactories()
     while(m_taskQueue->size() < m_currentlyRunningTasks.size() * 3 &&
           factory->canProduceTask()) {
       // Receive and submit the task.
-      auto [task, originator, priority] = factory->produceTask();
+      auto [task, originator, priority] = factory->produceTaskBackwards();
 
       if(task) {
         push(std::move(task), originator, priority, factory);

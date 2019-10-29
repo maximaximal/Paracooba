@@ -67,14 +67,16 @@ class TaskFactory
   void addPath(CNFTree::Path p, Mode m, int64_t originator);
 
   ProducedTask produceTask();
+  ProducedTask produceTaskBackwards();
+
   inline bool canProduceTask() const { return !m_skeletons.empty(); }
   inline uint64_t getSize() const { return m_skeletons.size(); }
   int64_t getOriginId() const;
 
-  private:
   ProducedTask produceCubeOrSolveTask(std::unique_ptr<TaskSkeleton> skel);
   ProducedTask produceSolveTask(std::unique_ptr<TaskSkeleton> skel);
 
+  private:
   ConfigPtr m_config;
   Logger m_logger;
   PriorityQueueLockSemanticsUniquePtr<TaskSkeleton> m_skeletons;
