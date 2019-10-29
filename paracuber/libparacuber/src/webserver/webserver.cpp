@@ -391,7 +391,7 @@ class Webserver::HTTPSession
     assert(ptr->m_websocket);
     ptr->m_buffer.consume(ptr->m_buffer.size());
     auto os = boost::beast::ostream(ptr->m_buffer);
-    boost::property_tree::json_parser::write_json(os, tree);
+    boost::property_tree::json_parser::write_json(os, tree, false);
     ptr->m_websocket->text(true);
 
     ptr->m_websocket->write(ptr->m_buffer.data());

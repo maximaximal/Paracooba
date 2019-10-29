@@ -136,22 +136,34 @@ class CNFTree {
     }
 
     onWSMessage(event) {
-	let msg = null;
-	try {
-	    msg = JSON.parse(event.data);
-	} catch(e) {
-	    console.log("Could not parse message from WS! Message:" + e);
-	    console.log(event.data);
+
+	// Sometimes, the websocket on the server side can be overloaded and the framing
+	// does not work correctly. In these cases, every incoming line is
+	// split to still be able to frame JSON messages.
+	let data = event.data.split('\n');
+
+	for(let i = 0; i < data.length; ++i) {
+	    if(data[i].length < 3) continue;
+
+	    let msg = null;
+	    try {
+		msg = JSON.parse(data[i]);
+	    } catch(e) {
+		console.log("Could not parse message from WS! Message:" + e);
+		console.log(event.data[i]);
+		continue;
+	    }
+
+	    if(msg === null) continue;
+
+	    try {
+		this.handleWSMessage(msg);
+	    } catch(e) {
+		console.log("Could not process message from WS! Message: " + e);
+		console.log(msg);
+	    }
 	}
 
-	if(msg === null) return;
-
-	try {
-	    this.handleWSMessage(msg);
-	} catch(e) {
-	    console.log("Could not process message from WS! Message: " + e);
-	    console.log(msg);
-	}
     }
 
     handleWSMessage(msg) {
