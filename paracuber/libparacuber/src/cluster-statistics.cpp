@@ -195,4 +195,8 @@ ClusterStatistics::clearChanged()
   m_changed = false;
   return changed;
 }
+
+void
+ClusterStatistics::rebalance()
+{}
 }

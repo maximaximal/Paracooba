@@ -279,6 +279,8 @@ class ClusterStatistics
                         std::shared_ptr<CNF> rootCNF,
                         CNFTree::Path p);
 
+  void rebalance();
+
   protected:
   friend class Communicator;
   void addNode(Node&& node);

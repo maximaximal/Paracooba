@@ -1142,6 +1142,8 @@ Communicator::tick()
     }
   }
 
+  m_clusterStatistics->rebalance();
+
   m_tickTimer.expires_from_now(
     std::chrono::milliseconds(m_config->getUint64(Config::TickMilliseconds)));
   m_tickTimer.async_wait(std::bind(&Communicator::tick, this));
