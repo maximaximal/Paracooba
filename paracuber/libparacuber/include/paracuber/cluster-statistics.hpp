@@ -4,6 +4,7 @@
 #include "cnftree.hpp"
 #include "log.hpp"
 #include "util.hpp"
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -126,6 +127,8 @@ class ClusterStatistics
       return static_cast<float>(m_workQueueSize) /
              static_cast<float>(m_availableWorkers);
     }
+    /** @brief Calculate fitness for new assigned work. Lower means fitter.
+     */
     float getFitnessForNewAssignment() const
     {
       // This addition determines the weight local decisions have. A greater
@@ -172,6 +175,18 @@ class ClusterStatistics
         size += e.second.queueSize;
       }
       return size;
+    }
+
+    bool isFullyUtilized() const
+    {
+      return ((float)m_workQueueSize / (float)m_availableWorkers) > 1.5;
+    }
+
+    size_t getSlotsLeft() const
+    {
+      return static_cast<uint64_t>(m_availableWorkers) -
+             std::min(m_workQueueSize,
+                      static_cast<uint64_t>(m_availableWorkers));
     }
 
     using TaskFactoryVector = std::vector<TaskFactory*>;
@@ -279,6 +294,21 @@ class ClusterStatistics
                         std::shared_ptr<CNF> rootCNF,
                         CNFTree::Path p);
 
+  const Node* getFittestNodeForNewWork(int originator);
+
+  /** @brief Start rebalancing of work to other nodes.
+   *
+   * Must be done once for every context on a daemon.
+   *
+   * Part of @see Rebalancing.
+   */
+  void rebalance(int originator, TaskFactory& factory);
+  /** @brief Start rebalancing of work to other nodes.
+   *
+   * Automatically calls rebalance(int) with correct context.
+   *
+   * Part of @see Rebalancing.
+   */
   void rebalance();
 
   protected:

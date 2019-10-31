@@ -83,6 +83,18 @@ TaskFactory::produceTask()
   return parametricProduceTask(m_skeletons, *this, &popFromFrontOfQueue);
 }
 
+TaskFactory::TaskSkeleton
+TaskFactory::produceTaskSkeleton()
+{
+  return std::move(*m_skeletons.pop());
+}
+
+TaskFactory::TaskSkeleton
+TaskFactory::produceTaskSkeletonBackwards()
+{
+  return std::move(*m_skeletons.popBack());
+}
+
 TaskFactory::ProducedTask
 TaskFactory::produceTaskBackwards()
 {

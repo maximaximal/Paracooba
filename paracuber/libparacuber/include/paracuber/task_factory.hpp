@@ -69,9 +69,13 @@ class TaskFactory
   ProducedTask produceTask();
   ProducedTask produceTaskBackwards();
 
+  TaskSkeleton produceTaskSkeleton();
+  TaskSkeleton produceTaskSkeletonBackwards();
+
   inline bool canProduceTask() const { return !m_skeletons.empty(); }
   inline uint64_t getSize() const { return m_skeletons.size(); }
   int64_t getOriginId() const;
+  std::shared_ptr<CNF> getRootCNF() const { return m_rootCNF; }
 
   ProducedTask produceCubeOrSolveTask(std::unique_ptr<TaskSkeleton> skel);
   ProducedTask produceSolveTask(std::unique_ptr<TaskSkeleton> skel);

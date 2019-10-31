@@ -45,6 +45,8 @@ class Client
 
   uint32_t getCNFVarCount() const { return m_cnfVarCount; }
 
+  TaskFactory* getTaskFactory() { return m_taskFactory.get(); }
+
   private:
   ConfigPtr m_config;
   LogPtr m_log;
@@ -54,7 +56,6 @@ class Client
   std::shared_ptr<CNF> m_rootCNF;
   uint32_t m_cnfVarCount = 0;
   std::unique_ptr<TaskFactory> m_taskFactory;
-
 };
 }
 

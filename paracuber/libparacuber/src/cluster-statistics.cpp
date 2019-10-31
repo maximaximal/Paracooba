@@ -1,8 +1,10 @@
 #include "../include/paracuber/cluster-statistics.hpp"
+#include "../include/paracuber/client.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/networked_node.hpp"
+#include "../include/paracuber/task.hpp"
 #include "../include/paracuber/task_factory.hpp"
 #include <algorithm>
 #include <boost/iterator/filter_iterator.hpp>
@@ -136,12 +138,19 @@ ClusterStatistics::getTargetComputeNodeForNewDecision(CNFTree::Path p,
     return nullptr;
   }
 
+  return getFittestNodeForNewWork(originator);
+}
+
+const ClusterStatistics::Node*
+ClusterStatistics::getFittestNodeForNewWork(int originator)
+{
   auto [map, lock] = getNodeMap();
 
   int64_t localId = m_config->getInt64(Config::Id);
   auto filterFunc = [originator, localId](auto& e) {
     auto& n = e.second;
-    return n.getFullyKnown() && n.getReadyForWork() && n.getId() != originator;
+    return n.getFullyKnown() && n.getReadyForWork() &&
+           n.getId() != originator && n.getId() != localId;
   };
 
   // Filter to only contain nodes that can be worked with.
@@ -163,10 +172,6 @@ ClusterStatistics::getTargetComputeNodeForNewDecision(CNFTree::Path p,
 
   // No limit for max node utilisation! Just send the node to the best fitting
   // place.
-  if(target == m_thisNode) {
-    return nullptr;
-  }
-
   return target;
 }
 
@@ -197,6 +202,38 @@ ClusterStatistics::clearChanged()
 }
 
 void
+ClusterStatistics::rebalance(int originator, TaskFactory& factory)
+{
+  // Rebalancing must be done once for every context.
+  auto mostFitNode = getFittestNodeForNewWork(originator);
+  if(mostFitNode && !mostFitNode->isFullyUtilized() &&
+     factory.canProduceTask()) {
+    PARACUBER_LOG(m_logger, Trace)
+      << "Rebalance " << mostFitNode->getSlotsLeft() + 1
+      << " tasks for work with origin " << originator << " to node "
+      << mostFitNode->getName() << " (" << mostFitNode->getId() << ")";
+
+    // Send as much work over there as that node has space left, but always at
+    // least 1.
+    for(size_t i = 0;
+        i < mostFitNode->getSlotsLeft() + 1 && factory.canProduceTask();
+        ++i) {
+      auto skel = factory.produceTaskSkeleton();
+      handlePathOnNode(mostFitNode, factory.getRootCNF(), skel.p);
+    }
+  }
+}
+void
 ClusterStatistics::rebalance()
-{}
+{
+  if(m_config->hasDaemon()) {
+    auto [contextMap, lock] = m_config->getDaemon()->getContextMap();
+    for(auto& ctx : contextMap) {
+      rebalance(ctx.second->getOriginatorId(), *ctx.second->getTaskFactory());
+    }
+  } else {
+    rebalance(m_config->getInt64(Config::Id),
+              *m_config->getClient()->getTaskFactory());
+  }
+}
 }
