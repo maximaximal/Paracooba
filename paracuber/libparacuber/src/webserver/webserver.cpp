@@ -306,6 +306,7 @@ class Webserver::HTTPSession
   }
   void wsDoRead()
   {
+    m_buffer.consume(m_buffer.size());
     m_websocket->async_read(
       m_buffer,
       boost::asio::bind_executor(m_strand,
@@ -369,7 +370,7 @@ class Webserver::HTTPSession
   void wsOnWrite(boost::system::error_code ec, std::size_t bytes_transferred)
   {
     boost::ignore_unused(bytes_transferred);
-    m_buffer.consume(m_buffer.size());
+    m_sendBuffer.consume(m_sendBuffer.size());
 
     // Happens when the timer closes the socket
     if(ec == boost::asio::error::operation_aborted)
@@ -389,13 +390,13 @@ class Webserver::HTTPSession
       return false;
     assert(ptr->m_webserver);
     assert(ptr->m_websocket);
-    ptr->m_buffer.consume(ptr->m_buffer.size());
-    auto os = boost::beast::ostream(ptr->m_buffer);
+    ptr->m_sendBuffer.consume(ptr->m_sendBuffer.size());
+    auto os = boost::beast::ostream(ptr->m_sendBuffer);
     boost::property_tree::json_parser::write_json(os, tree, false);
     ptr->m_websocket->text(true);
 
-    ptr->m_websocket->write(ptr->m_buffer.data());
-    ptr->m_buffer.consume(ptr->m_buffer.size());
+    ptr->m_websocket->write(ptr->m_sendBuffer.data());
+    ptr->m_sendBuffer.consume(ptr->m_sendBuffer.size());
     tree.clear();
     return true;
   }
@@ -405,17 +406,19 @@ class Webserver::HTTPSession
     auto ptr = weakPtr.lock();
     if(!ptr)
       return false;
+    ptr->m_sendBuffer.consume(ptr->m_sendBuffer.size());
     assert(ptr->m_webserver);
     assert(ptr->m_websocket);
     ptr->m_websocket->text(true);
-    boost::beast::ostream(ptr->m_buffer) << data;
-    ptr->m_websocket->write(ptr->m_buffer.data());
-    ptr->m_buffer.consume(ptr->m_buffer.size());
+    boost::beast::ostream(ptr->m_sendBuffer) << data;
+    ptr->m_websocket->write(ptr->m_sendBuffer.data());
+    ptr->m_sendBuffer.consume(ptr->m_sendBuffer.size());
     return true;
   }
   void doRead()
   {
     // Read a request
+    m_buffer.consume(m_buffer.size());
     http::async_read(
       m_socket,
       m_buffer,
@@ -458,6 +461,7 @@ class Webserver::HTTPSession
                bool close)
   {
     boost::ignore_unused(bytes_transferred);
+    m_buffer.consume(m_buffer.size());
 
     if(ec != boost::system::errc::success) {
       PARACUBER_LOG(m_logger, LocalError)
@@ -538,6 +542,7 @@ class Webserver::HTTPSession
   tcp::socket m_socket;
   boost::asio::strand<boost::asio::io_context::executor_type> m_strand;
   boost::beast::flat_buffer m_buffer;
+  boost::beast::flat_buffer m_sendBuffer;
   std::string const& m_docRoot;
   http::request<http::string_body> m_req;
   std::shared_ptr<void> m_res;
