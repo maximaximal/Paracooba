@@ -90,6 +90,7 @@ class CaDiCaLTask : public Task
   std::unique_ptr<Terminator> m_terminator;
   std::shared_ptr<CNF> m_cnf;
   Mode m_mode = ParseAndSolve;
+  CNFTree::Path m_path = CNFTree::DefaultUninitiatedPath;
 
   std::unique_ptr<CaDiCaL::Solver> m_solver;
   std::string m_sourcePath;

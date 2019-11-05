@@ -87,6 +87,7 @@ void
 CaDiCaLTask::applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree)
 {
   m_name = "Solver Task for Path " + CNFTree::pathToStdString(p);
+  m_path = p;
   tree.visit(
     CNFTree::setDepth(p, CNFTree::getDepth(p) - 1),
     [this](
@@ -112,6 +113,7 @@ void
 CaDiCaLTask::readCNF(std::shared_ptr<CNF> cnf, CNFTree::Path path)
 {
   m_cnf = cnf;
+  m_path = path;
   /// This applies the CNF tree to the current solver object. This means, that
   /// the solver applies all missing rules from the CNF tree to the current
   /// context. See @ref CNFTree for more.
@@ -158,7 +160,9 @@ CaDiCaLTask::execute()
     PARACUBER_LOG((*m_logger), Trace)
       << "Start solving CNF formula using CaDiCaL CNF solver.";
     int solveResult = m_solver->solve();
-    PARACUBER_LOG((*m_logger), Trace) << "CNF formula solved.";
+    PARACUBER_LOG((*m_logger), Trace)
+      << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
+      << " solved.";
 
     switch(solveResult) {
       case 0:

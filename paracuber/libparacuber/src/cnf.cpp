@@ -163,11 +163,31 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
 {
   assert(rootTaskReady.isReady());
 
-  const auto resultIt = m_results.find(p);
+  auto resultIt = m_results.find(p);
   if(resultIt == m_results.end()) {
-    PARACUBER_LOG(m_logger, LocalWarning)
-      << "No result found for path " << CNFTree::pathToStrNoAlloc(p) << "!";
-    return;
+    // No result in result map! Therefore, the solver state must be saved in the
+    // CNFTree.
+    CNFTree::State s;
+    CNFTree::Path parentPath = CNFTree::getParent(p);
+    m_cnfTree->getState(parentPath, s);
+
+    // The state must either be SAT or UNSAT for this to be normal control flow.
+    switch(s) {
+      case CNFTree::SAT:
+        break;
+      case CNFTree::UNSAT:
+        break;
+      default:
+        PARACUBER_LOG(m_logger, LocalWarning)
+          << "No result found for path " << CNFTree::pathToStrNoAlloc(p)
+          << " and the state in the CNFTree for parent is " << s << "!";
+        return;
+    }
+
+    Result res;
+    res.state = s;
+
+    resultIt = m_results.insert(std::make_pair(p, std::move(res))).first;
   }
   const auto& result = resultIt->second;
 
@@ -205,6 +225,7 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
       std::bind(finishedCallback));
   } else {
     // Write the UNSAT proof.
+    finishedCallback();
   }
 }
 
@@ -267,6 +288,8 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
   Result res;
   res.p = p;
 
+  CNFTree::State state = CNFTree::Unknown;
+
   {
     auto& resultMut = const_cast<TaskResult&>(result);
     auto task = static_unique_pointer_cast<CaDiCaLTask>(
@@ -278,16 +301,14 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
 
   switch(result.getStatus()) {
     case TaskResult::Satisfiable:
-      m_cnfTree->setState(p, CNFTree::SAT);
-      res.state = CNFTree::SAT;
+      state = CNFTree::SAT;
       // The result assignment must be received from the solver too and written
       // into an uint8_t vector for efficient transfer.
       //
       // TODO!!
       break;
     case TaskResult::Unsatisfiable:
-      m_cnfTree->setState(p, CNFTree::UNSAT);
-      res.state = CNFTree::UNSAT;
+      state = CNFTree::UNSAT;
       break;
     default:
       // Other results are not handled here.
@@ -298,6 +319,10 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
   }
 
   m_results.insert(std::make_pair(p, std::move(res)));
+
+  if(state != CNFTree::Unknown) {
+    m_cnfTree->setState(p, state);
+  }
 }
 
 template<typename T>
@@ -624,6 +649,9 @@ operator<<(std::ostream& o, CNF::TransmissionSubject s)
     case CNF::TransmissionSubject::TransmitAllowanceMap:
       o << "Transmit Allowance Map";
       break;
+    case CNF::TransmissionSubject::TransmitResult:
+      o << "Transmit Result";
+      break;
     default:
       o << "(! UNKNOWN TRANSMISSION SUBJECT !)";
       break;
@@ -654,6 +682,18 @@ operator<<(std::ostream& o, CNF::ReceiveState s)
       break;
     case CNF::ReceiveState::ReceiveTransmissionSubject:
       o << "Receive Transmission Subject";
+      break;
+    case CNF::ReceiveState::ReceiveResultData:
+      o << "Receive Result Data";
+      break;
+    case CNF::ReceiveState::ReceiveResultPath:
+      o << "Receive Result Path";
+      break;
+    case CNF::ReceiveState::ReceiveResultSize:
+      o << "Receive Result Size";
+      break;
+    case CNF::ReceiveState::ReceiveResultState:
+      o << "Receive Result State";
       break;
     default:
       o << "(! UNKNOWN RECEIVE STATE !)";

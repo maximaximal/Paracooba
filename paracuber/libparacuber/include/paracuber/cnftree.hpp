@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 
 namespace paracuber {
@@ -21,6 +22,8 @@ class CNFTree
 
   using Path = uint64_t;
   using CubeVar = int32_t;
+
+  static const Path DefaultUninitiatedPath = std::numeric_limits<Path>::max();
 
   enum StateEnum
   {
@@ -207,6 +210,11 @@ class CNFTree
   {
     assert(d <= maxPathDepth);
     return getPath(p) | (d & 0b00111111);
+  }
+
+  static inline Path getParent(Path p) {
+    assert(getDepth(p) >= 1);
+    return setDepth(p, getDepth(p) - 1);
   }
 
   static void pathToStr(Path p, char* str);

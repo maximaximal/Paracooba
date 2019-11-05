@@ -72,7 +72,8 @@ DecisionTask::execute()
 
     return std::make_unique<TaskResult>(TaskResult::DecisionMade);
   } else {
-    PARACUBER_LOG(*m_logger, Trace) << "No decision made!";
+    PARACUBER_LOG(*m_logger, Trace)
+      << "No decision made for path " << CNFTree::pathToStrNoAlloc(m_path);
     cnfTree.setState(m_path, CNFTree::Solving);
 
     m_factory->addPath(m_path, TaskFactory::Solve, m_originator);

@@ -27,12 +27,13 @@ CNFTree::setDecision(Path p, CubeVar decision, int64_t originator)
     if(depth == getDepth(p)) {
       // New value needs to be applied.
       n->decision = decision;
-      n->remote = originator;
       if(n->isLeaf()) {
         // Create left and right branches as leaves. They have invalid decisions
         // but are required to mark the current node to have a valid decision.
         n->left = std::make_unique<Node>();
+        n->left->remote = originator;
         n->right = std::make_unique<Node>();
+        n->right->remote = originator;
         return true;
       }
 
@@ -44,6 +45,7 @@ CNFTree::setDecision(Path p, CubeVar decision, int64_t originator)
 
     if(!nextPtr) {
       nextPtr = std::make_unique<Node>();
+      nextPtr->remote = originator;
     }
 
     n = nextPtr.get();
@@ -116,7 +118,7 @@ CNFTree::setState(Path p, State state)
 {
   assert(getDepth(p) < maxPathDepth);
 
-  Node *n = &m_root, *sibling = nullptr;
+  Node *n = &m_root, *sibling = nullptr, *lastNode = nullptr;
   uint8_t depth = 0;
   bool end = false;
 
@@ -128,7 +130,7 @@ CNFTree::setState(Path p, State state)
     if(depth == getDepth(p)) {
       n->state = state;
 
-      if(n->remote != 0) {
+      if(n->isRemote() && (state == SAT || state == UNSAT)) {
         // This change must be propagated to the remote compute node! This is
         // done through the communicator class.
         std::shared_ptr<CNF> rootCNF =
@@ -139,7 +141,10 @@ CNFTree::setState(Path p, State state)
             n->remote);
         m_config->getCommunicator()->sendCNFResultToNode(
           rootCNF, p, statNode.getNetworkedNode());
+
+        return true;
       }
+
       break;
     }
 
@@ -147,8 +152,9 @@ CNFTree::setState(Path p, State state)
     std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
     std::unique_ptr<Node>& siblingPtr = !assignment ? n->left : n->right;
 
-    n = nextPtr.get();
+    lastNode = n;
     sibling = siblingPtr.get();
+    n = nextPtr.get();
     ++depth;
   }
 
@@ -156,15 +162,26 @@ CNFTree::setState(Path p, State state)
     case SAT:
       // A SAT assignment must directly be propagated upwards.
       if(getDepth(p) > 0) {
-        setState(setDepth(p, getDepth(p) - 1), SAT);
+        setState(getParent(p), SAT);
       }
       break;
     case UNSAT:
       // Only if the other sibling is also UNSAT, this must be propagated.
-      if(sibling) {
-        if(sibling->state == UNSAT) {
-          setState(setDepth(p, getDepth(p) - 1), UNSAT);
-        }
+      assert(sibling);
+      if(!sibling->isRemote() && sibling->state == UNSAT) {
+        setState(getParent(p), UNSAT);
+      } else if(sibling->isRemote()) {
+        assert(lastNode);
+        // This change must be propagated to the remote compute node! This is
+        // done through the communicator class.
+        std::shared_ptr<CNF> rootCNF =
+          GetRootCNF(m_config.get(), m_originCNFId);
+        assert(rootCNF);
+        auto& statNode =
+          m_config->getCommunicator()->getClusterStatistics()->getNode(
+            lastNode->remote);
+        m_config->getCommunicator()->sendCNFResultToNode(
+          rootCNF, p, statNode.getNetworkedNode());
       }
       break;
     default:
@@ -263,6 +280,8 @@ CNFTree::pathToStr(Path p, char* str)
 const char*
 CNFTree::pathToStrNoAlloc(Path p)
 {
+  if(getDepth(p) > maxPathDepth)
+    return "INVALID PATH";
   static thread_local char arr[maxPathDepth];
   pathToStr(p, arr);
   return arr;

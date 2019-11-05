@@ -580,7 +580,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
         break;
       case TCPClientMode::TransmitCNFResult:
         m_cnf->sendResult(&m_socket, m_path, [this, ptr]() {
-          // Finished sending AllowanceMap!
+          // Finished sending Result!
         });
         break;
     }
@@ -727,8 +727,7 @@ class Communicator::TCPServer
         m_context = &context;
         m_cnf = m_context->getRootCNF();
       } else {
-        // This is some other CNF that was sent back to the client. Handle it
-        // using the main orchestrator.
+        m_cnf = m_comm->m_config->getClient()->getRootCNF();
       }
 
       m_state = Receiving;
@@ -1251,6 +1250,9 @@ operator<<(std::ostream& o, Communicator::TCPClientMode mode)
       break;
     case Communicator::TCPClientMode::TransmitAllowanceMap:
       o << "Transmit Allowance Map";
+      break;
+    case Communicator::TCPClientMode::TransmitCNFResult:
+      o << "Transmit CNF Result";
       break;
   }
   return o;
