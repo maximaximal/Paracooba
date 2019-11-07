@@ -128,6 +128,8 @@ class CNF
 
   void solverFinishedSlot(const TaskResult& result, CNFTree::Path path);
 
+  void handleFinishedResultReceived(Result &result);
+
   private:
   struct SendDataStruct
   {

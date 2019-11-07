@@ -167,12 +167,13 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
   if(resultIt == m_results.end()) {
     // No result in result map! Therefore, the solver state must be saved in the
     // CNFTree.
-    CNFTree::State s;
+    CNFTree::State parentS, nodeS;
     CNFTree::Path parentPath = CNFTree::getParent(p);
-    m_cnfTree->getState(parentPath, s);
+    m_cnfTree->getState(p, nodeS);
+    m_cnfTree->getState(parentPath, parentS);
 
     // The state must either be SAT or UNSAT for this to be normal control flow.
-    switch(s) {
+    switch(nodeS) {
       case CNFTree::SAT:
         break;
       case CNFTree::UNSAT:
@@ -180,12 +181,13 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
       default:
         PARACUBER_LOG(m_logger, LocalWarning)
           << "No result found for path " << CNFTree::pathToStrNoAlloc(p)
-          << " and the state in the CNFTree for parent is " << s << "!";
+          << " and the state in the CNFTree for parent is " << parentS
+          << ", the state for the node is " << nodeS << "!";
         return;
     }
 
     Result res;
-    res.state = s;
+    res.state = nodeS;
 
     resultIt = m_results.insert(std::make_pair(p, std::move(res))).first;
   }
@@ -573,6 +575,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           // This marks the end of the transmission, the result sequence is
           // finished.
           d.result->finished = true;
+          handleFinishedResultReceived(*d.result);
           ERASE_AND_RETURN_SUBJECT()
         }
 
@@ -637,6 +640,14 @@ CaDiCaLTask*
 CNF::getRootTask()
 {
   return m_rootTask.get();
+}
+
+void
+CNF::handleFinishedResultReceived(Result& result)
+{
+  PARACUBER_LOG(m_logger, Trace)
+    << "Finished result received! State: " << result.state << " on path "
+    << CNFTree::pathToStrNoAlloc(result.p);
 }
 
 std::ostream&
