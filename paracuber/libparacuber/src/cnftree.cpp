@@ -129,6 +129,7 @@ CNFTree::setState(Path p, State state)
 
     if(depth == getDepth(p)) {
       n->state = state;
+      signalIfRootStateChanged(p, state);
 
       if(n->isRemote() && (state == SAT || state == UNSAT)) {
         // This change must be propagated to the remote compute node! This is
@@ -165,13 +166,8 @@ CNFTree::setState(Path p, State state)
         setState(getParent(p), SAT);
       }
       break;
-    case UNSAT:
-      // Only if the other sibling is also UNSAT, this must be propagated.
-      assert(sibling);
-      if(!sibling->isRemote() && sibling->state == UNSAT) {
-        setState(getParent(p), UNSAT);
-      } else if(sibling->isRemote()) {
-        assert(lastNode);
+    case UNSAT: {
+      if(lastNode && lastNode->isRemote()) {
         // This change must be propagated to the remote compute node! This is
         // done through the communicator class.
         std::shared_ptr<CNF> rootCNF =
@@ -182,14 +178,23 @@ CNFTree::setState(Path p, State state)
             lastNode->remote);
         m_config->getCommunicator()->sendCNFResultToNode(
           rootCNF, p, statNode.getNetworkedNode());
+      } else {
+        if(sibling->state == UNSAT) {
+          setState(getParent(p), UNSAT);
+        }
       }
       break;
+    }
     default:
       // No other cases covered.
       break;
   }
 
-  return depth == getDepth(p);
+  if(depth == getDepth(p)) {
+    signalIfRootStateChanged(p, state);
+    return true;
+  }
+  return false;
 }
 
 bool
@@ -244,6 +249,7 @@ CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
         if(!n->right) {
           n->right = std::make_unique<Node>();
         }
+        signalIfRootStateChanged(p, state);
         return true;
       }
 
@@ -263,6 +269,7 @@ CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
 
   if(depth == getDepth(p)) {
     n->decision = decision;
+    signalIfRootStateChanged(p, state);
     return true;
   }
   return false;

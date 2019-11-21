@@ -41,6 +41,22 @@ Client::solve()
 {
   CaDiCaLTask::Mode mode = CaDiCaLTask::Parse;
 
+  // Result found signal.
+  m_rootCNF->getResultFoundSignal().connect([this](const CNF::Result& result) {
+    switch(result.state) {
+      case CNFTree::SAT:
+        m_status = TaskResult::Satisfiable;
+        break;
+      case CNFTree::UNSAT:
+        m_status = TaskResult::Unsatisfiable;
+        break;
+      default:
+        m_status = TaskResult::Unsolved;
+        break;
+    }
+    m_communicator->exit();
+  });
+
   auto task = std::make_unique<CaDiCaLTask>(&m_cnfVarCount, mode);
   task->setRootCNF(m_rootCNF);
   auto& finishedSignal = task->getFinishedSignal();

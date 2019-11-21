@@ -1,6 +1,7 @@
 #ifndef PARACUBER_CNF_HPP
 #define PARACUBER_CNF_HPP
 
+#include <boost/signals2/signal.hpp>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -94,6 +95,7 @@ class CNF
   std::string_view getDimacsFile() { return m_dimacsFile; }
 
   using SendFinishedCB = std::function<void()>;
+  using ResultFoundSignal = boost::signals2::signal<void(const Result&)>;
 
   void send(boost::asio::ip::tcp::socket* socket,
             CNFTree::Path path,
@@ -128,7 +130,9 @@ class CNF
 
   void solverFinishedSlot(const TaskResult& result, CNFTree::Path path);
 
-  void handleFinishedResultReceived(Result &result);
+  void handleFinishedResultReceived(Result& result);
+
+  ResultFoundSignal& getResultFoundSignal() { return m_resultSignal; }
 
   private:
   struct SendDataStruct
@@ -166,6 +170,7 @@ class CNF
   LogPtr m_log;
   Logger m_logger;
   TaskFactory* m_taskFactory = nullptr;
+  ResultFoundSignal m_resultSignal;
 };
 
 std::ostream&

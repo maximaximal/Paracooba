@@ -48,7 +48,15 @@ CNF::CNF(const CNF& o)
   , m_log(o.m_log)
   , m_logger(o.m_log->createLogger())
   , m_cnfTree(std::make_unique<CNFTree>(o.m_config, o.m_originId))
-{}
+{
+  m_cnfTree->getRootStateChangedSignal().connect(
+    [this](CNFTree::Path p, CNFTree::State state) {
+      PARACUBER_LOG(m_logger, Trace) << "CNF: Found a result and send to all "
+                                        "subscribers of signals! End Result: "
+                                     << state;
+      m_resultSignal(m_results[0]);
+    });
+}
 
 CNF::~CNF() {}
 
@@ -208,17 +216,15 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
     boost::asio::buffer(reinterpret_cast<const char*>(&p), sizeof(p)));
 
   // Write the result state from the CNFTree.
-  CNFTree::State state;
-  m_cnfTree->getState(p, state);
-  socket->write_some(
-    boost::asio::buffer(reinterpret_cast<const char*>(&state), sizeof(state)));
+  socket->write_some(boost::asio::buffer(
+    reinterpret_cast<const char*>(&result.state), sizeof(result.state)));
 
   // Write the result size.
   uint32_t resultSize = result.assignment.size();
   socket->write_some(boost::asio::buffer(
     reinterpret_cast<const char*>(&resultSize), sizeof(resultSize)));
 
-  if(state == CNFTree::SAT) {
+  if(result.state == CNFTree::SAT) {
     // Write the full result.
     socket->async_write_some(
       boost::asio::buffer(
@@ -648,6 +654,9 @@ CNF::handleFinishedResultReceived(Result& result)
   PARACUBER_LOG(m_logger, Trace)
     << "Finished result received! State: " << result.state << " on path "
     << CNFTree::pathToStrNoAlloc(result.p);
+
+  // Insert result into local CNF Tree.
+  m_cnfTree->setState(result.p, result.state);
 }
 
 std::ostream&

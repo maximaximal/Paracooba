@@ -2,6 +2,7 @@
 #define PARACUBER_CNFTREE_HPP
 
 #include <atomic>
+#include <boost/signals2/signal.hpp>
 #include <cassert>
 #include <cstdint>
 #include <functional>
@@ -38,6 +39,7 @@ class CNFTree
     _STATE_COUNT
   };
   using State = StateEnum;
+  using StateChangedSignal = boost::signals2::signal<void(Path, StateEnum)>;
 
   /** @brief Visitor function for traversing a CNF tree.
    *
@@ -163,6 +165,13 @@ class CNFTree
    */
   bool setDecisionAndState(Path p, CubeVar decision, State state);
 
+  /** @brief This signal is called when the root state changes.
+   */
+  StateChangedSignal& getRootStateChangedSignal()
+  {
+    return m_rootStateChangedSignal;
+  }
+
   /** @brief Traverse the decision tree and write the specified path to a given
    * container.
    */
@@ -212,7 +221,8 @@ class CNFTree
     return getPath(p) | (d & 0b00111111);
   }
 
-  static inline Path getParent(Path p) {
+  static inline Path getParent(Path p)
+  {
     assert(getDepth(p) >= 1);
     return setDepth(p, getDepth(p) - 1);
   }
@@ -265,6 +275,13 @@ class CNFTree
   Node m_root;
   std::shared_ptr<Config> m_config;
   int64_t m_originCNFId;
+  StateChangedSignal m_rootStateChangedSignal;
+
+  inline void signalIfRootStateChanged(Path p, State s)
+  {
+    if(getDepth(p) == 0)
+      m_rootStateChangedSignal(p, s);
+  }
 };
 
 constexpr const char*
