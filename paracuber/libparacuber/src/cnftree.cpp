@@ -1,4 +1,5 @@
 #include "../include/paracuber/cnftree.hpp"
+#include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/util.hpp"
@@ -114,7 +115,7 @@ CNFTree::getDecision(Path p, CubeVar& var) const
 }
 
 bool
-CNFTree::setState(Path p, State state)
+CNFTree::setState(Path p, State state, bool keepLocal)
 {
   assert(getDepth(p) < maxPathDepth);
 
@@ -129,23 +130,6 @@ CNFTree::setState(Path p, State state)
 
     if(depth == getDepth(p)) {
       n->state = state;
-      signalIfRootStateChanged(p, state);
-
-      if(n->isRemote() && (state == SAT || state == UNSAT)) {
-        // This change must be propagated to the remote compute node! This is
-        // done through the communicator class.
-        std::shared_ptr<CNF> rootCNF =
-          GetRootCNF(m_config.get(), m_originCNFId);
-        assert(rootCNF);
-        auto& statNode =
-          m_config->getCommunicator()->getClusterStatistics()->getNode(
-            n->remote);
-        m_config->getCommunicator()->sendCNFResultToNode(
-          rootCNF, p, statNode.getNetworkedNode());
-
-        return true;
-      }
-
       break;
     }
 
@@ -159,39 +143,76 @@ CNFTree::setState(Path p, State state)
     ++depth;
   }
 
-  switch(state) {
-    case SAT:
-      // A SAT assignment must directly be propagated upwards.
-      if(getDepth(p) > 0) {
-        setState(getParent(p), SAT);
-      }
-      break;
-    case UNSAT: {
-      if(lastNode && lastNode->isRemote()) {
-        // This change must be propagated to the remote compute node! This is
-        // done through the communicator class.
-        std::shared_ptr<CNF> rootCNF =
-          GetRootCNF(m_config.get(), m_originCNFId);
-        assert(rootCNF);
-        auto& statNode =
-          m_config->getCommunicator()->getClusterStatistics()->getNode(
-            lastNode->remote);
-        m_config->getCommunicator()->sendCNFResultToNode(
-          rootCNF, p, statNode.getNetworkedNode());
-      } else {
-        if(sibling->state == UNSAT) {
-          setState(getParent(p), UNSAT);
+  if(getDepth(p) > 0) {
+    assert(sibling);
+
+    switch(state) {
+      case SAT:
+        // A SAT assignment must directly be propagated upwards this depends on
+        // the parent being remote or not. If the parent is remote, send the
+        // result to the parent. If not, keep it directly local.
+        setCNFResult(getParent(p), SAT, p);
+        if(lastNode->isLocal()) {
+          setState(getParent(p), SAT);
+        } else {
+          sendPathToRemote(getParent(p), lastNode);
         }
+        break;
+      case UNSAT: {
+        if(lastNode->isLocal()) {
+          // This applies to cases 1 and 2.
+          //
+          // Case 1:
+          //   The parent (local) will receive the UNSAT result once both
+          //   sibling nodes set their states.
+          //
+          // Case 2:
+          //   The parent (local) will get the UNSAT result, once the sibling
+          //   sends the result over the network and lands in the sibling
+          //   node. The sibling setState() call then propagates the result
+          //   upwards.
+          if(sibling->state == UNSAT) {
+            // Derive new CNF result for parent path!
+            setCNFResult(getParent(p), UNSAT, p);
+            setState(getParent(p), UNSAT);
+          }
+        } else {
+          // This applies to cases 3 and 4.
+          //
+          // Case 3:
+          //   The parent (remote) must know about this UNSAT result only if the
+          //   sibling is also UNSAT. This node collects the result from both
+          //   siblings and only sends the finished notification once both are
+          //   UNSAT.
+          //
+          // Case 4:
+          //   The parent (remote) must know about this result, as the sibling
+          //   is also remote and will send its result to the mutual parent.
+          //   This means, this result must directly be sent to the parent.
+          if(sibling->isLocal()) {
+            // Case 3
+            if(sibling->state == UNSAT) {
+              // Derive new CNF result for parent path!
+              setCNFResult(getParent(p), UNSAT, p);
+              sendPathToRemote(getParent(p), lastNode);
+            } else {
+              // Not handled in this context, once the sibling finishes, this
+              // will come from the other side.
+            }
+          } else {
+            // Case 4
+            sendPathToRemote(p, lastNode);
+          }
+        }
+        break;
       }
-      break;
+      default:
+        // No other cases covered.
+        break;
     }
-    default:
-      // No other cases covered.
-      break;
   }
 
   if(depth == getDepth(p)) {
-    signalIfRootStateChanged(p, state);
     return true;
   }
   return false;
@@ -249,7 +270,6 @@ CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
         if(!n->right) {
           n->right = std::make_unique<Node>();
         }
-        signalIfRootStateChanged(p, state);
         return true;
       }
 
@@ -269,7 +289,6 @@ CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
 
   if(depth == getDepth(p)) {
     n->decision = decision;
-    signalIfRootStateChanged(p, state);
     return true;
   }
   return false;
@@ -317,6 +336,26 @@ CNFTree::isLocal(Path p)
       return false;
     });
   return isLocal;
+}
+
+void
+CNFTree::sendPathToRemote(Path p, Node* n)
+{
+  assert(n);
+  std::shared_ptr<CNF> rootCNF = GetRootCNF(m_config.get(), m_originCNFId);
+  assert(rootCNF);
+  auto& statNode =
+    m_config->getCommunicator()->getClusterStatistics()->getNode(n->remote);
+  m_config->getCommunicator()->sendCNFResultToNode(
+    rootCNF, p, statNode.getNetworkedNode());
+}
+
+void
+CNFTree::setCNFResult(Path p, State state, Path source)
+{
+  std::shared_ptr<CNF> rootCNF = GetRootCNF(m_config.get(), m_originCNFId);
+  rootCNF->insertResult(p, state, source);
+  signalIfRootStateChanged(p, state);
 }
 
 CNFTree::Path

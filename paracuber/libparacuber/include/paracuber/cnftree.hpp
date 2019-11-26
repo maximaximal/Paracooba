@@ -69,7 +69,8 @@ class CNFTree
     std::unique_ptr<Node> right;
 
     inline bool isLeaf() const { return (!left) && (!right); }
-    inline bool isRemote() const { return isLeaf() && remote != 0; }
+    inline bool isRemote() const { return remote != 0; }
+    inline bool isLocal() const { return !isRemote(); }
   };
 
   /** @brief Visit the tree and call the provided visitor function.
@@ -144,10 +145,12 @@ class CNFTree
    *
    * The node at the path must already exist.
    *
+   * By keeping a state change local, no network call is made.
+   *
    * @return False if the path does not exist yet, true if assignment was
    * successful.
    */
-  bool setState(Path p, State state);
+  bool setState(Path p, State state, bool keepLocal = false);
 
   /** @brief Set the remote for a given path.
    *
@@ -277,9 +280,13 @@ class CNFTree
   int64_t m_originCNFId;
   StateChangedSignal m_rootStateChangedSignal;
 
+  void sendPathToRemote(Path p, Node* n);
+  void setCNFResult(Path p, State state, Path source);
+
   inline void signalIfRootStateChanged(Path p, State s)
   {
-    if(getDepth(p) == 0)
+    if(m_root.state != s && getDepth(p) == 0 &&
+       (s == SAT || s == UNSAT || s == Unknown))
       m_rootStateChangedSignal(p, s);
   }
 };

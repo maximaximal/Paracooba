@@ -127,9 +127,14 @@ class Communicator::UDPServer
           handleAnnouncementRequest(msg);
           break;
         case Message::NODE_STATUS:
+          /*
+          // These logging messages are not required most of the time and only
+          // waste processor time.
+
           PARACUBER_LOG(m_logger, Trace)
             << "  -> Node Status from " << m_remoteEndpoint
             << " (ID: " << msg.getOrigin() << ")";
+          */
           handleNodeStatus(msg);
           break;
         case Message::CNF_TREE_NODE_STATUS_REQUEST:

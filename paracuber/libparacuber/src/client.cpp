@@ -42,8 +42,8 @@ Client::solve()
   CaDiCaLTask::Mode mode = CaDiCaLTask::Parse;
 
   // Result found signal.
-  m_rootCNF->getResultFoundSignal().connect([this](const CNF::Result& result) {
-    switch(result.state) {
+  m_rootCNF->getResultFoundSignal().connect([this](CNF::Result *result) {
+    switch(result->state) {
       case CNFTree::SAT:
         m_status = TaskResult::Satisfiable;
         break;

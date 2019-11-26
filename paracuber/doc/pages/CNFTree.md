@@ -42,3 +42,19 @@ The most efficient way to apply cubes to an existing solver with
 an internal CNF formula is to just copy the solver and apply each new
 cube with the same path to this copied instance. A deeper cube must be applied by stepping through the
 CNF tree and applying all cubes on the path from the root formula until the desired target cube.
+
+Remote Nodes and Local Nodes during Upward Propagation
+------------------------------------------------------
+
+There are four cases to consider when propagating state updates upwards
+in the CNF Tree. These cases are:
+
+  1. Local Parent & Local Sibling
+  2. Local Parent & Remote Sibling
+  3. Remote Parent & Local Sibling
+  4. Remote Parent & Remote Sibling
+
+These situations are differentiated in paracuber::CNFTree::setState.
+
+Additionally, only UNSAT results need to be handled with care. SAT results
+can always just be sent upwards.

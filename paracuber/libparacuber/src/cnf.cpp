@@ -10,6 +10,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <iostream>
+#include <shared_mutex>
+#include <vector>
 
 extern "C"
 {
@@ -40,6 +42,8 @@ CNF::CNF(ConfigPtr config,
     m_fd = open(m_dimacsFile.c_str(), O_RDONLY);
     assert(m_fd > 0);
   }
+
+  connectToCNFTreeSignal();
 }
 CNF::CNF(const CNF& o)
   : m_config(o.m_config)
@@ -49,13 +53,7 @@ CNF::CNF(const CNF& o)
   , m_logger(o.m_log->createLogger())
   , m_cnfTree(std::make_unique<CNFTree>(o.m_config, o.m_originId))
 {
-  m_cnfTree->getRootStateChangedSignal().connect(
-    [this](CNFTree::Path p, CNFTree::State state) {
-      PARACUBER_LOG(m_logger, Trace) << "CNF: Found a result and send to all "
-                                        "subscribers of signals! End Result: "
-                                     << state;
-      m_resultSignal(m_results[0]);
-    });
+  connectToCNFTreeSignal();
 }
 
 CNF::~CNF() {}
@@ -115,6 +113,7 @@ CNF::send(boost::asio::ip::tcp::socket* socket,
 
     // Transmit all decisions on the given path.
     data->decisions.reserve(CNFTree::getDepth(path) - 1);
+    std::shared_lock lock(m_cnfTreeMutex);
     m_cnfTree->writePathToLiteralContainer(
       data->decisions, CNFTree::setDepth(path, CNFTree::getDepth(path) - 1));
 
@@ -173,31 +172,10 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
 
   auto resultIt = m_results.find(p);
   if(resultIt == m_results.end()) {
-    // No result in result map! Therefore, the solver state must be saved in the
-    // CNFTree.
-    CNFTree::State parentS, nodeS;
-    CNFTree::Path parentPath = CNFTree::getParent(p);
-    m_cnfTree->getState(p, nodeS);
-    m_cnfTree->getState(parentPath, parentS);
-
-    // The state must either be SAT or UNSAT for this to be normal control flow.
-    switch(nodeS) {
-      case CNFTree::SAT:
-        break;
-      case CNFTree::UNSAT:
-        break;
-      default:
-        PARACUBER_LOG(m_logger, LocalWarning)
-          << "No result found for path " << CNFTree::pathToStrNoAlloc(p)
-          << " and the state in the CNFTree for parent is " << parentS
-          << ", the state for the node is " << nodeS << "!";
-        return;
-    }
-
-    Result res;
-    res.state = nodeS;
-
-    resultIt = m_results.insert(std::make_pair(p, std::move(res))).first;
+    PARACUBER_LOG(m_logger, LocalError)
+      << "Could not find result for path " << CNFTree::pathToStrNoAlloc(p)
+      << "! Cannot send result.";
+    return;
   }
   const auto& result = resultIt->second;
 
@@ -220,7 +198,7 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
     reinterpret_cast<const char*>(&result.state), sizeof(result.state)));
 
   // Write the result size.
-  uint32_t resultSize = result.assignment.size();
+  uint32_t resultSize = result.assignment->size();
   socket->write_some(boost::asio::buffer(
     reinterpret_cast<const char*>(&resultSize), sizeof(resultSize)));
 
@@ -228,13 +206,25 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
     // Write the full result.
     socket->async_write_some(
       boost::asio::buffer(
-        reinterpret_cast<const char*>(result.assignment.data()),
-        result.size * sizeof(result.assignment[0])),
+        reinterpret_cast<const char*>(result.assignment->data()),
+        result.size * sizeof((*result.assignment)[0])),
       std::bind(finishedCallback));
   } else {
     // Write the UNSAT proof.
     finishedCallback();
   }
+}
+
+void
+CNF::connectToCNFTreeSignal()
+{
+  m_cnfTree->getRootStateChangedSignal().connect(
+    [this](CNFTree::Path p, CNFTree::State state) {
+      PARACUBER_LOG(m_logger, Trace) << "CNF: Found a result and send to all "
+                                        "subscribers of signals! End Result: "
+                                     << state;
+      m_resultSignal(&m_results[0]);
+    });
 }
 
 void
@@ -266,6 +256,7 @@ void
 CNF::requestInfoGlobally(CNFTree::Path p, int64_t handle)
 {
   Communicator* comm = m_config->getCommunicator();
+  std::shared_lock lock(m_cnfTreeMutex);
   m_cnfTree->visit(
     p,
     [this, handle, comm, p](CNFTree::CubeVar var,
@@ -296,8 +287,6 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
   Result res;
   res.p = p;
 
-  CNFTree::State state = CNFTree::Unknown;
-
   {
     auto& resultMut = const_cast<TaskResult&>(result);
     auto task = static_unique_pointer_cast<CaDiCaLTask>(
@@ -309,14 +298,14 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
 
   switch(result.getStatus()) {
     case TaskResult::Satisfiable:
-      state = CNFTree::SAT;
+      res.state = CNFTree::SAT;
       // The result assignment must be received from the solver too and written
       // into an uint8_t vector for efficient transfer.
       //
       // TODO!!
       break;
     case TaskResult::Unsatisfiable:
-      state = CNFTree::UNSAT;
+      res.state = CNFTree::UNSAT;
       break;
     default:
       // Other results are not handled here.
@@ -328,8 +317,9 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
 
   m_results.insert(std::make_pair(p, std::move(res)));
 
-  if(state != CNFTree::Unknown) {
-    m_cnfTree->setState(p, state);
+  if(res.state != CNFTree::Unknown) {
+    std::unique_lock lock(m_cnfTreeMutex);
+    m_cnfTree->setState(p, res.state);
   }
 }
 
@@ -473,7 +463,8 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         m_ofstream.write(buf, length);
         length = 0;
         break;
-      case ReceiveCube:
+      case ReceiveCube: {
+        std::unique_lock lock(m_cnfTreeMutex);
         if(length == 0 && buf == nullptr) {
           // This marks the end of the transmission, the decision sequence is
           // finished.
@@ -503,7 +494,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
             }
           }
         }
-        break;
+      } break;
       case ReceiveAllowanceMapSize: {
         if(!m_cuberRegistry) {
           m_cuberRegistry =
@@ -551,8 +542,9 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           d.path = *path;
           assert(m_results.find(*path) == m_results.end());
           Result r{ *path, CNFTree::State::Unknown };
-          d.result = &r;
-          m_results.insert(std::make_pair(*path, std::move(r)));
+          r.assignment = std::make_shared<std::vector<uint8_t>>();
+          d.result = &m_results.insert(std::make_pair(*path, std::move(r)))
+                        .first->second;
           d.state = ReceiveResultState;
         }
       }
@@ -570,7 +562,8 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         uint32_t* size = receiveValueFromBuffer<uint32_t>(d, &buf, &length);
         if(size) {
           assert(d.result);
-          d.result->assignment.reserve(*size);
+          assert(d.result->assignment);
+          d.result->assignment->reserve(*size);
           d.result->size = *size;
           d.state = ReceiveResultData;
         }
@@ -592,23 +585,23 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           uint8_t next = *next8Vals;
           // Get next assignments, depending on remaining size. At the very end,
           // only valid variables shall be extracted.
-          switch(r->size - r->assignment.size()) {
+          switch(r->size - r->assignment->size()) {
             default:
-              r->assignment.push_back(next & 0b00000001u);
+              r->assignment->push_back(next & 0b00000001u);
             case 7:
-              r->assignment.push_back(next & 0b00000010u);
+              r->assignment->push_back(next & 0b00000010u);
             case 6:
-              r->assignment.push_back(next & 0b00000100u);
+              r->assignment->push_back(next & 0b00000100u);
             case 5:
-              r->assignment.push_back(next & 0b00001000u);
+              r->assignment->push_back(next & 0b00001000u);
             case 4:
-              r->assignment.push_back(next & 0b00010000u);
+              r->assignment->push_back(next & 0b00010000u);
             case 3:
-              r->assignment.push_back(next & 0b00100000u);
+              r->assignment->push_back(next & 0b00100000u);
             case 2:
-              r->assignment.push_back(next & 0b01000000u);
+              r->assignment->push_back(next & 0b01000000u);
             case 1:
-              r->assignment.push_back(next & 0b10000000u);
+              r->assignment->push_back(next & 0b10000000u);
             case 0:
               break;
           }
@@ -655,8 +648,37 @@ CNF::handleFinishedResultReceived(Result& result)
     << "Finished result received! State: " << result.state << " on path "
     << CNFTree::pathToStrNoAlloc(result.p);
 
-  // Insert result into local CNF Tree.
-  m_cnfTree->setState(result.p, result.state);
+  // Insert result into local CNF Tree. The state change should only stay local,
+  // no propagate to the node that sent this change.
+  std::unique_lock lock(m_cnfTreeMutex);
+  m_cnfTree->setState(result.p, result.state, true);
+}
+
+void
+CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
+{
+  Result res = { 0 };
+  res.p = p;
+  res.state = state;
+
+  if(source != CNFTree::DefaultUninitiatedPath) {
+    // Reference old result.
+    auto resultIt = m_results.find(source);
+    if(resultIt == m_results.end()) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not find result reference of " << CNFTree::pathToStrNoAlloc(p)
+        << " to " << CNFTree::pathToStrNoAlloc(source)
+        << "! Not inserting result.";
+      return;
+    }
+    const Result& oldResult = resultIt->second;
+    res.task = oldResult.task;
+    res.assignment = oldResult.assignment;
+  } else {
+    res.assignment = std::make_shared<std::vector<uint8_t>>();
+  }
+
+  m_results.insert(std::make_pair(p, std::move(res)));
 }
 
 std::ostream&

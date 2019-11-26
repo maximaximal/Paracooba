@@ -38,6 +38,8 @@ class NetworkedNode
   void setTcpPort(uint16_t p) { m_remoteTcpEndoint.port(p); }
   int64_t getId() const { return m_id; }
 
+  inline std::ostream& operator<<(std::ostream& o) { return o << getId(); }
+
   private:
   boost::asio::ip::udp::endpoint m_remoteUdpEndoint;
   boost::asio::ip::tcp::endpoint m_remoteTcpEndoint;

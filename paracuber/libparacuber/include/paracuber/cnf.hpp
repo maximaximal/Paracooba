@@ -5,6 +5,7 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <string_view>
@@ -31,7 +32,7 @@ class Registry;
  * A dimacs file can be sent, if it is the root formula. All appended cubes
  * are transferred only afterwards, the root formula is not touched again.
  */
-class CNF
+class CNF : public std::enable_shared_from_this<CNF>
 {
   public:
   /** @brief Construct a CNF from existing literals based on DIMACS file or on
@@ -75,9 +76,10 @@ class CNF
     CNFTree::Path p;
     CNFTree::State state;
     uint32_t size = 0;
-    std::vector<uint8_t> assignment;
     bool finished = false;
-    std::unique_ptr<CaDiCaLTask> task;
+    std::shared_ptr<std::vector<uint8_t>> assignment =
+      std::make_shared<std::vector<uint8_t>>();
+    std::shared_ptr<CaDiCaLTask> task;
   };
 
   struct ReceiveDataStruct
@@ -95,7 +97,7 @@ class CNF
   std::string_view getDimacsFile() { return m_dimacsFile; }
 
   using SendFinishedCB = std::function<void()>;
-  using ResultFoundSignal = boost::signals2::signal<void(const Result&)>;
+  using ResultFoundSignal = boost::signals2::signal<void(Result*)>;
 
   void send(boost::asio::ip::tcp::socket* socket,
             CNFTree::Path path,
@@ -134,6 +136,10 @@ class CNF
 
   ResultFoundSignal& getResultFoundSignal() { return m_resultSignal; }
 
+  void insertResult(CNFTree::Path p,
+                    CNFTree::State state,
+                    CNFTree::Path source);
+
   private:
   struct SendDataStruct
   {
@@ -141,6 +147,8 @@ class CNF
     SendFinishedCB cb;
     std::vector<CNFTree::CubeVar> decisions;
   };
+
+  void connectToCNFTreeSignal();
 
   void sendCB(SendDataStruct* data,
               CNFTree::Path path,
@@ -163,6 +171,7 @@ class CNF
 
   std::unique_ptr<cuber::Registry> m_cuberRegistry;
   std::unique_ptr<CNFTree> m_cnfTree;
+  std::shared_mutex m_cnfTreeMutex;
 
   std::map<CNFTree::Path, Result> m_results;
 
