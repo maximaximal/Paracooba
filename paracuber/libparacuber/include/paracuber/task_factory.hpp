@@ -11,6 +11,8 @@
 
 namespace paracuber {
 class Task;
+class CaDiCaLMgr;
+class CaDiCaLTask;
 
 /** @brief Creates new tasks for the runners during the solving process.
  *
@@ -77,6 +79,9 @@ class TaskFactory
   int64_t getOriginId() const;
   std::shared_ptr<CNF> getRootCNF() const { return m_rootCNF; }
 
+  void setRootTask(CaDiCaLTask* rootTask);
+  void initWorkerSlots(size_t workers);
+
   ProducedTask produceCubeOrSolveTask(std::unique_ptr<TaskSkeleton> skel);
   ProducedTask produceSolveTask(std::unique_ptr<TaskSkeleton> skel);
 
@@ -85,6 +90,7 @@ class TaskFactory
   Logger m_logger;
   PriorityQueueLockSemanticsUniquePtr<TaskSkeleton> m_skeletons;
   std::shared_ptr<CNF> m_rootCNF;
+  std::unique_ptr<CaDiCaLMgr> m_cadicalMgr;
 };
 }
 

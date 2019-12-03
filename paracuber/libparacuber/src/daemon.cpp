@@ -69,6 +69,8 @@ Daemon::Context::start(State change)
       m_rootCNF->setRootTask(static_unique_pointer_cast<CaDiCaLTask>(
         std::move(resultMut.getTaskPtr())));
 
+      m_taskFactory->setRootTask(m_rootCNF->getRootTask());
+
       start(FormulaParsed);
       // Once the CNF is parsed, this compute node sits idle until cubes arrive.
       // These cubes can then be cubed further or just solved directly,

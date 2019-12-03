@@ -113,6 +113,7 @@ Client::solve()
     // parallel. Decisions are always guided by the CNFTree class, which
     // knows how many decisions are left in any given path.
     m_taskFactory = std::make_unique<TaskFactory>(m_config, m_log, m_rootCNF);
+    m_taskFactory->setRootTask(m_rootCNF->getRootTask());
 
     m_taskFactory->addPath(
       0, TaskFactory::CubeOrSolve, m_config->getInt64(Config::Id));

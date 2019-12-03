@@ -1,4 +1,5 @@
 #include "../include/paracuber/cadical_task.hpp"
+#include "../include/paracuber/cadical_mgr.hpp"
 #include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include <boost/asio.hpp>
@@ -29,7 +30,10 @@ class Terminator : public CaDiCaL::Terminator
 };
 
 CaDiCaLTask::CaDiCaLTask(const CaDiCaLTask& other)
-  : CaDiCaLTask(nullptr, Solve)
+  : m_terminator(std::make_unique<Terminator>(this))
+  , m_varCount(other.m_varCount)
+  , m_mode(other.m_mode)
+  , m_cadicalMgr(other.m_cadicalMgr)
 {
   copyFromCaDiCaLTask(other);
   m_name = "CaDiCaL Task (copied)";
@@ -50,6 +54,7 @@ CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
   : m_terminator(std::move(other.m_terminator))
   , m_solver(std::move(other.m_solver))
   , m_cnf(std::move(other.m_cnf))
+  , m_cadicalMgr(other.m_cadicalMgr)
 {
   m_terminator->setCaDiCaLTask(this);
   m_name = "CaDiCaL Task (moved)";
@@ -57,11 +62,10 @@ CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
 
 CaDiCaLTask::CaDiCaLTask(uint32_t* varCount, Mode mode)
   : m_terminator(std::make_unique<Terminator>(this))
-  , m_solver(std::make_unique<CaDiCaL::Solver>())
   , m_varCount(varCount)
   , m_mode(mode)
+  , m_solver(std::make_unique<CaDiCaL::Solver>())
 {
-  m_solver->connect_terminator(m_terminator.get());
   m_name = "CaDiCaL Task (completely new)";
 }
 CaDiCaLTask::~CaDiCaLTask() {}
@@ -76,18 +80,24 @@ void
 CaDiCaLTask::copyFromCaDiCaLTask(const CaDiCaLTask& other)
 {
   assert(m_terminator);
-  assert(m_solver);
 
   m_mode = other.m_mode;
-  other.m_solver->copy(*m_solver);
   m_cnf = other.m_cnf;
+  m_cadicalMgr = other.m_cadicalMgr;
+}
+
+void
+CaDiCaLTask::applyPathFromCNFTreeDeferred(CNFTree::Path p, const CNFTree& tree)
+{
+  m_name = "Solver Task for Path " + CNFTree::pathToStdString(p);
+  m_path = p;
 }
 
 void
 CaDiCaLTask::applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree)
 {
-  m_name = "Solver Task for Path " + CNFTree::pathToStdString(p);
-  m_path = p;
+  provideSolver();
+
   tree.visit(
     CNFTree::setDepth(p, CNFTree::getDepth(p) - 1),
     [this](
@@ -117,19 +127,25 @@ CaDiCaLTask::readCNF(std::shared_ptr<CNF> cnf, CNFTree::Path path)
   /// This applies the CNF tree to the current solver object. This means, that
   /// the solver applies all missing rules from the CNF tree to the current
   /// context. See @ref CNFTree for more.
-  if(path == 0) {
-    // Root CNF - this must be parsed only. The root CNF never has to be solved
-    // directly, as this is done by the client.
-    m_mode = Parse;
-    readDIMACSFile(cnf->getDimacsFile());
-  } else {
-    applyPathFromCNFTree(path, cnf->getCNFTree());
-  }
+
+  /// This function is executed in the execute() function, execution will
+  /// therefore be deferred until the task is actually run!
 }
 
 TaskResultPtr
 CaDiCaLTask::execute()
 {
+  provideSolver();
+
+  if(m_path == 0) {
+    // Root CNF - this must be parsed only. The root CNF never has to be solved
+    // directly, as this is done by the client.
+    m_mode = Parse;
+    readDIMACSFile(m_cnf->getDimacsFile());
+  } else if(m_path != CNFTree::DefaultUninitiatedPath) {
+    applyPathFromCNFTree(m_path, m_cnf->getCNFTree());
+  }
+
   TaskResult::Status status;
   if(m_mode & Parse) {
     if(!boost::filesystem::exists(m_sourcePath)) {
@@ -185,5 +201,26 @@ void
 CaDiCaLTask::terminate()
 {
   m_terminate = true;
+}
+void
+CaDiCaLTask::releaseSolver()
+{
+  assert(m_cadicalMgr);
+  m_cadicalMgr->returnSolverFromWorker(std::move(m_solver), m_workerId);
+}
+
+void
+CaDiCaLTask::provideSolver()
+{
+  if(m_solver)
+    return;
+
+  assert(m_cadicalMgr);
+
+  m_solver = m_cadicalMgr->getSolverForWorker(m_workerId);
+
+  assert(m_solver);
+
+  m_solver->connect_terminator(m_terminator.get());
 }
 }

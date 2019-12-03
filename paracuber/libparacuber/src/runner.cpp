@@ -78,6 +78,7 @@ Runner::push(std::unique_ptr<Task> task,
 void
 Runner::registerTaskFactory(TaskFactory* f)
 {
+  f->initWorkerSlots(m_config->getUint32(Config::ThreadCount));
   std::unique_lock lock(m_taskFactoriesMutex);
   m_taskFactories.push_back(f);
 }
@@ -123,6 +124,7 @@ Runner::worker(uint32_t workerId, Logger logger)
         entry->task->m_logger = &logger;
         entry->task->m_factory = entry->factory;
         entry->task->m_originator = entry->originator;
+        entry->task->m_workerId = workerId;
 
         m_currentlyRunningTasks[workerId] = entry->task.get();
         ++m_numberOfRunningTasks;

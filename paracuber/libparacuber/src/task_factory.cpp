@@ -1,4 +1,5 @@
 #include "../include/paracuber/task_factory.hpp"
+#include "../include/paracuber/cadical_mgr.hpp"
 #include "../include/paracuber/cadical_task.hpp"
 #include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/communicator.hpp"
@@ -14,6 +15,7 @@ TaskFactory::TaskFactory(ConfigPtr config,
   : m_config(config)
   , m_logger(log->createLogger())
   , m_rootCNF(rootCNF)
+  , m_cadicalMgr(std::make_unique<CaDiCaLMgr>())
 {
   if(m_config->hasCommunicator()) {
     m_config->getCommunicator()->getRunner()->registerTaskFactory(this);
@@ -107,6 +109,19 @@ TaskFactory::getOriginId() const
   return m_rootCNF->getOriginId();
 }
 
+void
+TaskFactory::setRootTask(CaDiCaLTask* rootTask)
+{
+  assert(m_cadicalMgr);
+  m_cadicalMgr->setRootTask(rootTask);
+}
+void
+TaskFactory::initWorkerSlots(size_t workers)
+{
+  assert(m_cadicalMgr);
+  m_cadicalMgr->initWorkerSlots(workers);
+}
+
 TaskFactory::ProducedTask
 TaskFactory::produceCubeOrSolveTask(std::unique_ptr<TaskSkeleton> skel)
 {
@@ -119,9 +134,11 @@ TaskFactory::produceSolveTask(std::unique_ptr<TaskSkeleton> skel)
 {
   CaDiCaLTask* rootTask = m_rootCNF->getRootTask();
   assert(rootTask);
+  assert(m_cadicalMgr);
   std::unique_ptr<CaDiCaLTask> task = std::make_unique<CaDiCaLTask>(*rootTask);
   task->setMode(CaDiCaLTask::Solve);
-  task->applyPathFromCNFTree(skel->p, m_rootCNF->getCNFTree());
+  task->setCaDiCaLMgr(m_cadicalMgr.get());
+  task->applyPathFromCNFTreeDeferred(skel->p, m_rootCNF->getCNFTree());
   return { std::move(task), skel->originator, skel->getPriority() };
 }
 }

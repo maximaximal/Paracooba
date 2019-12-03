@@ -52,6 +52,9 @@ class Task
   FinishedSignal m_finishedSignal;
   void finish(const TaskResult& result);
 
+  /// Id of the worker that is running this task. Guaranteed to be available in
+  /// execute().
+  uint32_t m_workerId = 0;
   /// Pointer to the runner that runs this task. Guaranteed to be available in
   /// execute().
   Runner* m_runner = nullptr;

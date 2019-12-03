@@ -22,4 +22,6 @@ set(PARACUBER_SRCS
 
     ${CMAKE_CURRENT_SOURCE_DIR}/cadical_task.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/decision_task.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/cadical_mgr.cpp
     PARENT_SCOPE)

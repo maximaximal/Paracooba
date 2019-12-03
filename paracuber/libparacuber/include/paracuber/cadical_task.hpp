@@ -12,6 +12,7 @@ class Solver;
 namespace paracuber {
 class Terminator;
 class CNF;
+class CaDiCaLMgr;
 
 /** @brief Wraps a CDCL solver process.
  */
@@ -60,8 +61,10 @@ class CaDiCaLTask : public Task
   void copyFromCaDiCaLTask(const CaDiCaLTask& other);
 
   /** @brief Apply the given path to the internal solver as assumptions.
+   *
+   * Runs once the execute() function is called.
    */
-  void applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree);
+  void applyPathFromCNFTreeDeferred(CNFTree::Path p, const CNFTree& tree);
 
   /** @brief Queue parsing a DIMACS file into the internal solver instance.
    *
@@ -80,12 +83,26 @@ class CaDiCaLTask : public Task
   virtual TaskResultPtr execute();
   virtual void terminate();
 
-  CaDiCaL::Solver& getSolver() { return *m_solver; }
+  CaDiCaL::Solver& getSolver()
+  {
+    assert(m_solver);
+    return *m_solver;
+  }
   uint32_t getVarCount() { return m_internalVarCount; }
 
   void setRootCNF(std::shared_ptr<CNF> rootCNF) { m_cnf = rootCNF; }
 
+  void setCaDiCaLMgr(CaDiCaLMgr* cadicalMgr) { m_cadicalMgr = cadicalMgr; }
+
+  void releaseSolver();
+
   private:
+  void provideSolver();
+
+  /** @brief Apply the given path to the internal solver as assumptions.
+   */
+  void applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree);
+
   friend class Terminator;
   std::unique_ptr<Terminator> m_terminator;
   std::shared_ptr<CNF> m_cnf;
@@ -97,6 +114,8 @@ class CaDiCaLTask : public Task
   bool m_terminate = false;
   uint32_t* m_varCount = nullptr;
   uint32_t m_internalVarCount = 0;
+
+  CaDiCaLMgr* m_cadicalMgr = nullptr;
 };
 
 inline CaDiCaLTask::Mode

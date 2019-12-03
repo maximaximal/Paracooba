@@ -9,6 +9,7 @@
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <boost/log/expressions/formatters/c_decorator.hpp>
 #include <iostream>
 #include <shared_mutex>
 #include <vector>
@@ -220,9 +221,9 @@ CNF::connectToCNFTreeSignal()
 {
   m_cnfTree->getRootStateChangedSignal().connect(
     [this](CNFTree::Path p, CNFTree::State state) {
-      PARACUBER_LOG(m_logger, Trace) << "CNF: Found a result and send to all "
-                                        "subscribers of signals! End Result: "
-                                     << state;
+      PARACUBER_LOG(m_logger, Info) << "CNF: Found a result and send to all "
+                                       "subscribers of signals! End Result: "
+                                    << state;
       m_resultSignal(&m_results[0]);
     });
 }
@@ -294,6 +295,9 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
     res.task = std::move(task);
   }
 
+  if(!res.task)
+    return;
+
   res.size = res.task->getVarCount();
 
   switch(result.getStatus()) {
@@ -312,14 +316,19 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
       PARACUBER_LOG(m_logger, LocalError)
         << "Invalid status received for finished solver task: "
         << result.getStatus();
-      return;
   }
 
-  m_results.insert(std::make_pair(p, std::move(res)));
+  // Give back the solver handle from the result after it was fully processed.
+  res.task->releaseSolver();
 
-  if(res.state != CNFTree::Unknown) {
-    std::unique_lock lock(m_cnfTreeMutex);
-    m_cnfTree->setState(p, res.state);
+  if(res.state == CNFTree::SAT || res.state == CNFTree::UNSAT ||
+     res.state == CNFTree::Unknown) {
+    m_results.insert(std::make_pair(p, std::move(res)));
+
+    if(res.state != CNFTree::Unknown) {
+      std::unique_lock lock(m_cnfTreeMutex);
+      m_cnfTree->setState(p, res.state);
+    }
   }
 }
 
