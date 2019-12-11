@@ -5,13 +5,16 @@ using namespace paracuber;
 
 struct Solver
 {
-  bool val(int lit)
+  bool val(int lit) const
   {
+    // Literals start at 1, as they also represent negations in SAT solvers.
+    lit -= 1;
+
     REQUIRE(lit < getVarCount());
     return assignment[lit];
   }
   std::vector<bool> assignment;
-  int getVarCount() { return assignment.size(); }
+  int getVarCount() const { return assignment.size(); }
 };
 
 struct Test

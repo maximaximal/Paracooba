@@ -6,15 +6,29 @@
 
 namespace paracuber {
 
-#define PC_SHIFT(X) (((solver.val(i + X)) & 0b00000001) << (7 - X))
-#define PC_SHIFT_CASE(X)                                    \
-  case X:                                                   \
-    b |= (((solver.val(i)) & 0b00000001) << (7 - (i % 8))); \
+#define PC_SHIFT(X) (((solver.val(i + X + 1)) & 0b00000001) << (7 - X))
+#define PC_SHIFT_CASE(X)                                        \
+  case X:                                                       \
+    b |= (((solver.val(i + 1)) & 0b00000001) << (7 - (i % 8))); \
     ++i;
 
+/** @brief Serialise the given solver results into an assignment vector.
+ *
+ * Encodes literals sequentially into bytes. Each byte has 8 literals,
+ * represented as bits. A set bit is a set literal, an unset bit is an unset
+ * literal.
+ *
+ * All literals are inserted left-to-right, like this:
+ * BYTE:     0b00000000
+ * Literals:   12345678
+ *
+ * Literals start at 1!
+ */
 template<class Solver, typename AssignmentVector>
 inline void
-SerializeAssignment(int varCount, Solver& solver, AssignmentVector& assignment)
+SerializeAssignment(const int varCount,
+                    Solver& solver,
+                    AssignmentVector& assignment)
 {
   size_t i = 0, pos = 0;
   // This should ignore the last remaining elements in a block of 8 entries. The
