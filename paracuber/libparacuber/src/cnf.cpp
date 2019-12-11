@@ -303,10 +303,7 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
   switch(result.getStatus()) {
     case TaskResult::Satisfiable:
       res.state = CNFTree::SAT;
-      // The result assignment must be received from the solver too and written
-      // into an uint8_t vector for efficient transfer.
-      //
-      // TODO!!
+      res.task->writeAssignment(*res.assignment);
       break;
     case TaskResult::Unsatisfiable:
       res.state = CNFTree::UNSAT;
@@ -588,7 +585,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         }
 
         uint8_t* next8Vals = receiveValueFromBuffer<uint8_t>(d, &buf, &length);
-        while(next8Vals != nullptr) {
+        while(next8Vals) {
           assert(d.result);
           Result* r = d.result;
           uint8_t next = *next8Vals;

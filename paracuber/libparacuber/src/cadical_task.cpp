@@ -1,4 +1,5 @@
 #include "../include/paracuber/cadical_task.hpp"
+#include "../include/paracuber/assignment_serializer.hpp"
 #include "../include/paracuber/cadical_mgr.hpp"
 #include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/communicator.hpp"
@@ -207,6 +208,15 @@ CaDiCaLTask::releaseSolver()
 {
   assert(m_cadicalMgr);
   m_cadicalMgr->returnSolverFromWorker(std::move(m_solver), m_workerId);
+}
+
+void
+CaDiCaLTask::writeAssignment(AssignmentVector& assignment)
+{
+  assert(m_solver);
+  assert(m_solver->state() == CaDiCaL::SATISFIED);
+
+  SerializeAssignment(m_internalVarCount, *m_solver, assignment);
 }
 
 void

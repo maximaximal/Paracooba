@@ -3,6 +3,7 @@ set(TEST_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/cnf-test.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cnftree-test.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/path_factory_test.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/assignment_serializer_test.cpp
     )
 
 add_executable(parac-test ${TEST_SRCS})

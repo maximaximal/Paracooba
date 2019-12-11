@@ -19,6 +19,8 @@ class CaDiCaLMgr;
 class CaDiCaLTask : public Task
 {
   public:
+  using AssignmentVector = std::vector<uint8_t>;
+
   enum Mode
   {
     Solve = 0b00000001,
@@ -95,6 +97,8 @@ class CaDiCaLTask : public Task
   void setCaDiCaLMgr(CaDiCaLMgr* cadicalMgr) { m_cadicalMgr = cadicalMgr; }
 
   void releaseSolver();
+
+  void writeAssignment(AssignmentVector&);
 
   private:
   void provideSolver();
