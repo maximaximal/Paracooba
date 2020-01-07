@@ -10,6 +10,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/log/expressions/formatters/c_decorator.hpp>
+#include <cadical/cadical.hpp>
 #include <iostream>
 #include <shared_mutex>
 #include <vector>
@@ -37,7 +38,11 @@ CNF::CNF(ConfigPtr config,
   if(dimacsFile != "") {
     struct stat statbuf;
     int result = stat(m_dimacsFile.c_str(), &statbuf);
-    assert(result != -1);
+    if(result == -1) {
+      PARACUBER_LOG(m_logger, Fatal)
+        << "Could not find file \"" << dimacsFile << "\"!";
+      return;
+    }
 
     m_fileSize = statbuf.st_size;
     m_fd = open(m_dimacsFile.c_str(), O_RDONLY);
@@ -224,7 +229,10 @@ CNF::connectToCNFTreeSignal()
       PARACUBER_LOG(m_logger, Info) << "CNF: Found a result and send to all "
                                        "subscribers of signals! End Result: "
                                     << state;
-      m_resultSignal(&m_results[0]);
+
+      Result* result = &m_results[0];
+      assert(result);
+      m_resultSignal(result);
     });
 }
 
@@ -572,6 +580,10 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           d.result->assignment->reserve(*size);
           d.result->size = *size;
           d.state = ReceiveResultData;
+          PARACUBER_LOG(m_logger, Trace)
+            << "Currently receiving result " << d.result->state << " on path "
+            << CNFTree::pathToStrNoAlloc(d.result->p) << " has size " << *size
+            << ".";
         }
         break;
       }
@@ -666,6 +678,15 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
   Result res = { 0 };
   res.p = p;
   res.state = state;
+
+  PARACUBER_LOG(m_logger, Trace)
+    << "Insert result " << state << " for path " << CNFTree::pathToStrNoAlloc(p)
+    << " from source path " << CNFTree::pathToStrNoAlloc(source);
+
+  // Assign the path directly to 0 to make referencing it easier, if this is the
+  // root path.
+  if(CNFTree::getDepth(p) == 0)
+    p = 0;
 
   if(source != CNFTree::DefaultUninitiatedPath) {
     // Reference old result.

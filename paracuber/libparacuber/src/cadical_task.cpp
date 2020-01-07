@@ -215,6 +215,7 @@ CaDiCaLTask::writeAssignment(AssignmentVector& assignment)
 {
   assert(m_solver);
   assert(m_solver->state() == CaDiCaL::SATISFIED);
+  m_internalVarCount = m_solver->vars();
 
   SerializeAssignment(m_internalVarCount, *m_solver, assignment);
 }

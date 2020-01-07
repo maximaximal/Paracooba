@@ -30,6 +30,7 @@ SerializeAssignment(const int varCount,
                     Solver& solver,
                     AssignmentVector& assignment)
 {
+  assignment.resize((varCount - 1) / 8 + 1);
   size_t i = 0, pos = 0;
   // This should ignore the last remaining elements in a block of 8 entries. The
   // 1s, 2s, and 4s are therefore cut off.
@@ -40,7 +41,7 @@ SerializeAssignment(const int varCount,
     assignment[pos] = b;
   }
 
-  {
+  if(varCount > 0) {
     uint8_t b = 0;
     switch(varCount - i) {
       PC_SHIFT_CASE(7)
@@ -54,6 +55,10 @@ SerializeAssignment(const int varCount,
         break;
     }
     assignment[pos] = b;
+  } else {
+    // It is very unlikely this ever happens, there should be some variables.
+    // No error handling is done here though, this should be handled from
+    // outside.
   }
 }
 

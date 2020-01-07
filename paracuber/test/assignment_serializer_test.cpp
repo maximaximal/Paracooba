@@ -41,6 +41,8 @@ TEST_CASE("Serialize SAT Assignment")
           { 0b10001111, 0b00000001, 0b01010101 } },
     Test{ { { T, F, F, F, T, T, T, T /* 1st byte */ } }, { 0b10001111 } });
 
+  CAPTURE(test.solver.getVarCount());
+
   std::vector<uint8_t> actual((test.solver.getVarCount() - 1) / 8 + 1);
 
   SerializeAssignment(test.solver.getVarCount(), test.solver, actual);

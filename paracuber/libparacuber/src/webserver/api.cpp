@@ -53,9 +53,6 @@ API::injectClusterStatisticsUpdate(ClusterStatistics& stats)
   sstream << stats;
   std::string data = sstream.str();
 
-  PARACUBER_LOG(m_logger, Trace)
-    << "NEW CLUSTER STATS: Internal clients: " << m_wsData.size();
-
   for(auto& it : m_wsData) {
     auto& conn = *it.second;
     conditionalEraseConn(it.first, conn.dataCB(conn.session, data));

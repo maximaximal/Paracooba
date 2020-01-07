@@ -42,7 +42,7 @@ Client::solve()
   CaDiCaLTask::Mode mode = CaDiCaLTask::Parse;
 
   // Result found signal.
-  m_rootCNF->getResultFoundSignal().connect([this](CNF::Result *result) {
+  m_rootCNF->getResultFoundSignal().connect([this](CNF::Result* result) {
     switch(result->state) {
       case CNFTree::SAT:
         m_status = TaskResult::Satisfiable;
@@ -54,6 +54,9 @@ Client::solve()
         m_status = TaskResult::Unsolved;
         break;
     }
+    PARACUBER_LOG(m_logger, Trace)
+      << "Received result in Client, exit Communicator. Result: "
+      << result->state;
     m_communicator->exit();
   });
 

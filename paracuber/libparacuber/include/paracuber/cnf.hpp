@@ -71,14 +71,16 @@ class CNF : public std::enable_shared_from_this<CNF>
     ReceiveResultData,
   };
 
+  using AssignmentVector = std::vector<uint8_t>;
+  using AssignmentVectorPtr = std::shared_ptr<AssignmentVector>;
+
   struct Result
   {
     CNFTree::Path p;
     CNFTree::State state;
     uint32_t size = 0;
     bool finished = false;
-    std::shared_ptr<std::vector<uint8_t>> assignment =
-      std::make_shared<std::vector<uint8_t>>();
+    AssignmentVectorPtr assignment = std::make_shared<AssignmentVector>();
     std::shared_ptr<CaDiCaLTask> task;
   };
 
