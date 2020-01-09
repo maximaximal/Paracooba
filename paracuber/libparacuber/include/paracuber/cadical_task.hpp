@@ -98,7 +98,8 @@ class CaDiCaLTask : public Task
 
   void releaseSolver();
 
-  void writeAssignment(AssignmentVector&);
+  void writeEncodedAssignment(AssignmentVector&);
+  void writeDecodedAssignment(AssignmentVector&);
 
   private:
   void provideSolver();

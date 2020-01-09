@@ -57,12 +57,16 @@ TEST_CASE("(Un-)Serialize SAT Assignment")
   CAPTURE(varCount);
 
   std::vector<uint8_t> actual((varCount - 1) / 8 + 1);
+  std::vector<uint8_t> actual2((varCount - 1) / 8 + 1);
 
-  SerializeAssignment(varCount, test.solver, actual);
+  SerializeAssignmentFromSolver(actual, varCount, test.solver);
+  SerializeAssignmentFromArray(actual2, varCount, test.assignments);
 
   REQUIRE(test.expected == actual);
+  REQUIRE(test.expected == actual2);
 
   // Other direction.
-  auto calculatedAssignments = DeSerializeToAssignment(actual, varCount);
+  std::vector<uint8_t> calculatedAssignments;
+  DeSerializeToAssignment(calculatedAssignments, actual, varCount);
   REQUIRE(test.assignments == calculatedAssignments);
 }

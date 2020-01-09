@@ -43,9 +43,18 @@ Client::solve()
 
   // Result found signal.
   m_rootCNF->getResultFoundSignal().connect([this](CNF::Result* result) {
+    PARACUBER_LOG(m_logger, Trace)
+      << "Received result in Client, exit Communicator. Result: "
+      << result->state;
+
     switch(result->state) {
       case CNFTree::SAT:
         m_status = TaskResult::Satisfiable;
+        assert(result->decodedAssignment);
+        m_satAssignment = result->decodedAssignment;
+        PARACUBER_LOG(m_logger, Trace)
+          << "Satisfying assignment available with "
+          << result->decodedAssignment->size() << " literals.";
         break;
       case CNFTree::UNSAT:
         m_status = TaskResult::Unsatisfiable;
@@ -54,9 +63,6 @@ Client::solve()
         m_status = TaskResult::Unsolved;
         break;
     }
-    PARACUBER_LOG(m_logger, Trace)
-      << "Received result in Client, exit Communicator. Result: "
-      << result->state;
     m_communicator->exit();
   });
 

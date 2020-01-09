@@ -1,4 +1,5 @@
 #include "../include/paracuber/cnf.hpp"
+#include "../include/paracuber/assignment_serializer.hpp"
 #include "../include/paracuber/cadical_task.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
@@ -183,7 +184,7 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
       << "! Cannot send result.";
     return;
   }
-  const auto& result = resultIt->second;
+  auto& result = resultIt->second;
 
   // Write the subject (a Result).
   TransmissionSubject subject = TransmitResult;
@@ -204,16 +205,20 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
     reinterpret_cast<const char*>(&result.state), sizeof(result.state)));
 
   // Write the result size.
-  uint32_t resultSize = result.assignment->size();
+  uint32_t resultSize = result.size;
   socket->write_some(boost::asio::buffer(
     reinterpret_cast<const char*>(&resultSize), sizeof(resultSize)));
+
+  // Encoded assignment required.
+  result.encodeAssignment();
 
   if(result.state == CNFTree::SAT) {
     // Write the full result.
     socket->async_write_some(
       boost::asio::buffer(
-        reinterpret_cast<const char*>(result.assignment->data()),
-        result.size * sizeof((*result.assignment)[0])),
+        reinterpret_cast<const char*>(result.encodedAssignment->data()),
+        result.encodedAssignment->size() *
+          sizeof((*result.encodedAssignment)[0])),
       std::bind(finishedCallback));
   } else {
     // Write the UNSAT proof.
@@ -232,6 +237,12 @@ CNF::connectToCNFTreeSignal()
 
       Result* result = &m_results[0];
       assert(result);
+
+      if(result->state == CNFTree::SAT) {
+        // The result must contain the assignment if it is satisfiable.
+        result->decodeAssignment();
+      }
+
       m_resultSignal(result);
     });
 }
@@ -311,7 +322,14 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
   switch(result.getStatus()) {
     case TaskResult::Satisfiable:
       res.state = CNFTree::SAT;
-      res.task->writeAssignment(*res.assignment);
+
+      // Satisfiable results must be directly wrapped in the result array, as
+      // the solver instances are shared between solver tasks.
+      if(m_config->isDaemonMode()) {
+        res.encodeAssignment();
+      } else {
+        res.decodeAssignment();
+      }
       break;
     case TaskResult::Unsatisfiable:
       res.state = CNFTree::UNSAT;
@@ -556,7 +574,6 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           d.path = *path;
           assert(m_results.find(*path) == m_results.end());
           Result r{ *path, CNFTree::State::Unknown };
-          r.assignment = std::make_shared<std::vector<uint8_t>>();
           d.result = &m_results.insert(std::make_pair(*path, std::move(r)))
                         .first->second;
           d.state = ReceiveResultState;
@@ -576,8 +593,10 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         uint32_t* size = receiveValueFromBuffer<uint32_t>(d, &buf, &length);
         if(size) {
           assert(d.result);
-          assert(d.result->assignment);
-          d.result->assignment->reserve(*size);
+          assert(!d.result->encodedAssignment);
+          d.result->encodedAssignment = std::make_shared<AssignmentVector>();
+          d.result->encodedAssignment->resize(0);
+          d.result->encodedAssignment->reserve(*size);
           d.result->size = *size;
           d.state = ReceiveResultData;
           PARACUBER_LOG(m_logger, Trace)
@@ -596,35 +615,10 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
           ERASE_AND_RETURN_SUBJECT()
         }
 
-        uint8_t* next8Vals = receiveValueFromBuffer<uint8_t>(d, &buf, &length);
-        while(next8Vals) {
-          assert(d.result);
-          Result* r = d.result;
-          uint8_t next = *next8Vals;
-          // Get next assignments, depending on remaining size. At the very end,
-          // only valid variables shall be extracted.
-          switch(r->size - r->assignment->size()) {
-            default:
-              r->assignment->push_back(next & 0b00000001u);
-            case 7:
-              r->assignment->push_back(next & 0b00000010u);
-            case 6:
-              r->assignment->push_back(next & 0b00000100u);
-            case 5:
-              r->assignment->push_back(next & 0b00001000u);
-            case 4:
-              r->assignment->push_back(next & 0b00010000u);
-            case 3:
-              r->assignment->push_back(next & 0b00100000u);
-            case 2:
-              r->assignment->push_back(next & 0b01000000u);
-            case 1:
-              r->assignment->push_back(next & 0b10000000u);
-            case 0:
-              break;
-          }
-        }
-
+        assert(d.result);
+        Result* r = d.result;
+        std::copy(buf, buf + length, std::back_inserter(*r->encodedAssignment));
+        length = 0;
         break;
       }
     }
@@ -700,12 +694,46 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
     }
     const Result& oldResult = resultIt->second;
     res.task = oldResult.task;
-    res.assignment = oldResult.assignment;
-  } else {
-    res.assignment = std::make_shared<std::vector<uint8_t>>();
+    res.size = oldResult.size;
+    res.encodedAssignment = oldResult.encodedAssignment;
+    res.decodedAssignment = oldResult.decodedAssignment;
   }
 
   m_results.insert(std::make_pair(p, std::move(res)));
+}
+
+void
+CNF::Result::encodeAssignment()
+{
+  if(encodedAssignment)
+    return;
+  assert(decodedAssignment || task);
+  encodedAssignment = std::make_shared<AssignmentVector>();
+
+  if(decodedAssignment) {
+    // Encode from currently decoded assignment.
+    SerializeAssignmentFromArray(*encodedAssignment, size, *decodedAssignment);
+  } else {
+    // Write directly from solver.
+    task->writeEncodedAssignment(*encodedAssignment);
+  }
+}
+
+void
+CNF::Result::decodeAssignment()
+{
+  if(decodedAssignment)
+    return;
+  assert(encodedAssignment || task);
+  decodedAssignment = std::make_shared<AssignmentVector>();
+
+  if(encodedAssignment) {
+    // Use the already encoded assignment to generate decoded one.
+    DeSerializeToAssignment(*decodedAssignment, *encodedAssignment, size);
+  } else {
+    // Receive assignment directly from solver.
+    task->writeDecodedAssignment(*decodedAssignment);
+  }
 }
 
 std::ostream&

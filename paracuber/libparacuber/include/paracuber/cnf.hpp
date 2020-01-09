@@ -80,8 +80,12 @@ class CNF : public std::enable_shared_from_this<CNF>
     CNFTree::State state;
     uint32_t size = 0;
     bool finished = false;
-    AssignmentVectorPtr assignment = std::make_shared<AssignmentVector>();
+    AssignmentVectorPtr encodedAssignment;
+    AssignmentVectorPtr decodedAssignment;
     std::shared_ptr<CaDiCaLTask> task;
+
+    void encodeAssignment();
+    void decodeAssignment();
   };
 
   struct ReceiveDataStruct

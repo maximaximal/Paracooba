@@ -7,32 +7,19 @@
 
 namespace paracuber {
 
-#define PC_SHIFT(X) (((solver.val(i + X + 1)) & 0b00000001) << (7 - X))
-#define PC_SHIFT_CASE(X)                                                       \
-  case X:                                                                      \
-    b |=                                                                       \
-      (((solver.val(i + 1)) & 0b00000001) << (7 - (i % 8) - (8 - remaining))); \
+#define PC_SHIFT(X) (((getter(i + X)) & 0b00000001) << (7 - X))
+#define PC_SHIFT_CASE(X)                                                  \
+  case X:                                                                 \
+    b |= (((getter(i)) & 0b00000001) << (7 - (i % 8) - (8 - remaining))); \
     ++i;
 
-/** @brief Serialise the given solver results into an assignment vector.
- *
- * Encodes literals sequentially into bytes. Each byte has 8 literals,
- * represented as bits. A set bit is a set literal, an unset bit is an unset
- * literal.
- *
- * All literals are inserted left-to-right, like this:
- * BYTE:     0b00000000
- * Literals:   12345678
- *
- * Literals start at 1!
- */
-template<class Solver, typename AssignmentVector>
+template<typename AssignmentVector, typename ValueGetter>
 inline void
-SerializeAssignment(const int varCount,
-                    Solver& solver,
-                    AssignmentVector& assignment)
+SerializeAssignment(AssignmentVector& target,
+                    const int varCount,
+                    ValueGetter getter)
 {
-  assignment.resize((varCount - 1) / 8 + 1);
+  target.resize((varCount - 1) / 8 + 1);
   size_t i = 0, pos = 0;
   // This should ignore the last remaining elements in a block of 8 entries. The
   // 1s, 2s, and 4s are therefore cut off.
@@ -40,7 +27,7 @@ SerializeAssignment(const int varCount,
     uint8_t b = 0;
     b = PC_SHIFT(0) | PC_SHIFT(1) | PC_SHIFT(2) | PC_SHIFT(3) | PC_SHIFT(4) |
         PC_SHIFT(5) | PC_SHIFT(6) | PC_SHIFT(7);
-    assignment[pos] = b;
+    target[pos] = b;
   }
 
   if(varCount > 0) {
@@ -57,12 +44,44 @@ SerializeAssignment(const int varCount,
       default:
         break;
     }
-    assignment[pos] = b;
+    target[pos] = b;
   } else {
     // It is very unlikely this ever happens, there should be some variables.
     // No error handling is done here though, this should be handled from
     // outside.
   }
+}
+
+/** @brief Serialise the given solver results into an assignment vector.
+ *
+ * Encodes literals sequentially into bytes. Each byte has 8 literals,
+ * represented as bits. A set bit is a set literal, an unset bit is an unset
+ * literal. The last byte is encoded with a padding on the left side to make
+ * parsing easier.
+ *
+ * All literals are inserted left-to-right, like this:
+ * BYTE:     0b00000000
+ * Literals:   12345678
+ *
+ * Literals start at 1!
+ */
+template<class Solver, typename AssignmentVector>
+inline void
+SerializeAssignmentFromSolver(AssignmentVector& target,
+                              const int varCount,
+                              Solver& solver)
+{
+  SerializeAssignment(
+    target, varCount, [&solver](int i) { return solver.val(i + 1); });
+}
+
+template<typename AssignmentVector, typename SourceArray>
+inline void
+SerializeAssignmentFromArray(AssignmentVector& target,
+                              const int varCount,
+                              const SourceArray& source)
+{
+  SerializeAssignment(target, varCount, [&source](int i) { return source[i]; });
 }
 
 template<typename AssignmentVector>
@@ -94,10 +113,11 @@ DeSerializeSingleToAssignment(AssignmentVector& target, uint8_t next, size_t n)
 }
 
 template<typename AssignmentVector>
-inline std::vector<uint8_t>
-DeSerializeToAssignment(AssignmentVector& source, size_t varCount)
+inline void
+DeSerializeToAssignment(AssignmentVector& out,
+                        AssignmentVector& source,
+                        size_t varCount)
 {
-  std::vector<uint8_t> out;
   out.reserve(varCount);
 
   size_t i;
@@ -106,7 +126,6 @@ DeSerializeToAssignment(AssignmentVector& source, size_t varCount)
   }
 
   DeSerializeSingleToAssignment(out, source[i], varCount);
-  return std::move(out);
 }
 
 #undef PC_SHIFT

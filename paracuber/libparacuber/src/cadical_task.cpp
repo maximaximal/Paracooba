@@ -211,13 +211,26 @@ CaDiCaLTask::releaseSolver()
 }
 
 void
-CaDiCaLTask::writeAssignment(AssignmentVector& assignment)
+CaDiCaLTask::writeEncodedAssignment(AssignmentVector& encodedAssignment)
 {
   assert(m_solver);
   assert(m_solver->state() == CaDiCaL::SATISFIED);
   m_internalVarCount = m_solver->vars();
 
-  SerializeAssignment(m_internalVarCount, *m_solver, assignment);
+  SerializeAssignmentFromSolver(
+    encodedAssignment, m_internalVarCount, *m_solver);
+}
+
+void
+CaDiCaLTask::writeDecodedAssignment(AssignmentVector& decodedAssignment)
+{
+  assert(m_solver);
+  assert(m_solver->state() == CaDiCaL::SATISFIED);
+  m_internalVarCount = m_solver->vars();
+  decodedAssignment.resize(m_internalVarCount);
+
+  for(int i = 0; i < m_internalVarCount; ++i)
+    decodedAssignment[i] = static_cast<bool>(m_solver->val(i + 1));
 }
 
 void
