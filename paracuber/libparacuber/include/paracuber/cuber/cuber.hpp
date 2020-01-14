@@ -23,6 +23,22 @@ class Cuber
 
   using LiteralMap = std::vector<CNFTree::CubeVar>;
 
+  struct LiteralOccurence
+  {
+    LiteralOccurence(int literal = 0)
+      : literal(literal)
+    {}
+
+    int literal;
+    size_t count = 0;
+
+    void operator=(int lit) { this->literal = lit; }
+
+    bool operator<(const LiteralOccurence& o) { return count < o.count; }
+    bool operator>(const LiteralOccurence& o) { return count > o.count; }
+  };
+  using LiteralOccurenceMap = std::vector<LiteralOccurence>;
+
   /** @brief Generates the next cube on a given path.
    *
    * Required method for implementing cubing algorithms.
@@ -44,6 +60,14 @@ class Cuber
   {
     return CNFTree::getDepthShiftedPath(p);
   }
+
+  /** @brief Sorts and converts the given LiteralOccurenceMap to a given
+   * LiteralMap.
+   */
+  static void literalOccurenceMapToLiteralMap(LiteralMap& target,
+                                              LiteralOccurenceMap&& source);
+
+  static void initLiteralOccurenceMap(LiteralOccurenceMap& map, size_t n);
 
   protected:
   friend class Registry;

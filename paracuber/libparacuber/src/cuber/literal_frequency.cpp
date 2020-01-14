@@ -13,7 +13,7 @@ namespace cuber {
 class ClauseIterator : public CaDiCaL::ClauseIterator
 {
   public:
-  explicit ClauseIterator(Cuber::LiteralMap& m)
+  explicit ClauseIterator(Cuber::LiteralOccurenceMap& m)
     : m_m(m)
   {}
   ~ClauseIterator() {}
@@ -21,13 +21,13 @@ class ClauseIterator : public CaDiCaL::ClauseIterator
   virtual bool clause(const std::vector<int>& clause)
   {
     for(int l : clause) {
-      m_m[FastAbsolute(l)] += 1;
+      m_m[FastAbsolute(l)].count += 1;
     }
     return true;
   }
 
   private:
-  Cuber::LiteralMap& m_m;
+  Cuber::LiteralOccurenceMap& m_m;
 };
 
 LiteralFrequency::LiteralFrequency(ConfigPtr config,
@@ -49,7 +49,11 @@ LiteralFrequency::init()
 
   *m_literalFrequency =
     LiteralMap(m_rootCNF.getRootTask()->getVarCount() + 1, 0);
-  ClauseIterator it(*m_literalFrequency);
+
+  LiteralOccurenceMap occurenceMap;
+  initLiteralOccurenceMap(occurenceMap, m_literalFrequency->size());
+
+  ClauseIterator it(occurenceMap);
   PARACUBER_LOG(m_logger, Trace) << "Begin traversing CNF clauses for naive "
                                     "cutter literal frequency map. Map Size: "
                                  << m_literalFrequency->size() << " elements.";
@@ -57,37 +61,16 @@ LiteralFrequency::init()
   PARACUBER_LOG(m_logger, Trace)
     << "Finished traversing CNF clauses for"
        " literal frequency map. The map size in RAM is "
-    << BytePrettyPrint(m_literalFrequency->size() *
-                       sizeof((*m_literalFrequency)[0]))
+    << BytePrettyPrint(occurenceMap.size() * sizeof(occurenceMap[0]))
     << ". Sorting by value now.";
 
-  const size_t logCheck = 10000;
-  const size_t abortConditionCheck = 1000;
-
-  auto litIt = m_literalFrequency->begin();
-  while(litIt != m_literalFrequency->end()) {
-    auto maxIt = std::max_element(litIt, m_literalFrequency->end());
-    *maxIt = *litIt;
-    *litIt = (maxIt - m_literalFrequency->begin());
-    ++litIt;
-    if((litIt - m_literalFrequency->begin()) % logCheck == 0) {
-      PARACUBER_LOG(m_logger, Trace)
-        << "  -> Currently at element " << litIt - m_literalFrequency->begin();
-    }
-
-    if((litIt - m_literalFrequency->begin()) % abortConditionCheck == 0) {
-      if(!m_config->getCommunicator()->getRunner()->isRunning()) {
-        PARACUBER_LOG(m_logger, Trace)
-          << "  -> Aborted at element " << litIt - m_literalFrequency->begin()
-          << "! (Abort condition checked every " << abortConditionCheck
-          << " elements)";
-        return false;
-      }
-    }
-  }
+  literalOccurenceMapToLiteralMap(*m_literalFrequency, std::move(occurenceMap));
 
   PARACUBER_LOG(m_logger, Trace)
-    << "Finished sorting by value for literal frequency map.";
+    << "Finished sorting CNF clauses by frequency. Reduced Map size ready for "
+       "transmission: "
+    << BytePrettyPrint(m_literalFrequency->size() *
+                       sizeof((*m_literalFrequency)[0]));
   return true;
 }
 
