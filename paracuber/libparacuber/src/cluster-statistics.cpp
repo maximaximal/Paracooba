@@ -160,6 +160,7 @@ ClusterStatistics::getFittestNodeForNewWork(int originator)
     boost::make_filter_iterator(filterFunc, map.end(), map.end());
 
   if(filteredMap == filteredMapEnd) {
+    PARACUBER_LOG(m_logger, Trace) << "No other nodes available for rebalance.";
     return nullptr;
   }
 
