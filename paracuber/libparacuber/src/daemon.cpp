@@ -16,7 +16,7 @@ Daemon::Context::Context(std::shared_ptr<CNF> rootCNF,
   : m_rootCNF(rootCNF)
   , m_originatorID(originatorID)
   , m_daemon(daemon)
-  , m_logger(daemon->m_log->createLogger())
+  , m_logger(daemon->m_log->createLogger("Daemon"))
   , m_statisticsNode(statsNode)
   , m_taskFactory(
       std::make_unique<TaskFactory>(daemon->m_config, daemon->m_log, rootCNF))

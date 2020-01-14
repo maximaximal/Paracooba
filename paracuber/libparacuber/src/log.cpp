@@ -2,8 +2,10 @@
 #include "../include/paracuber/config.hpp"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/log/attributes.hpp>
+#include <boost/log/attributes/constant.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
+#include <boost/log/expressions/predicates/has_attr.hpp>
 #include <boost/log/sinks/text_file_backend.hpp>
 #include <boost/log/sources/global_logger_storage.hpp>
 #include <boost/log/sources/logger.hpp>
@@ -33,6 +35,11 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_localname,
 BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_timestamp,
                             "Timestamp",
                             boost::posix_time::ptime)
+
+BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_context, "Context", std::string)
+BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_context_meta,
+                            "ContextMeta",
+                            std::string)
 
 thread_local MutableConstant<int> lineAttr = MutableConstant<int>(5);
 thread_local MutableConstant<const char*> fileAttr =
@@ -86,12 +93,17 @@ Log::Log(ConfigPtr config)
     m_consoleSink = logging::add_console_log(
       std::clog,
       keywords::format =
-        (expr::stream << "[" << paracuber_logger_timestamp << "] ["
-                      << paracuber_logger_localname << "] ["
-                      << expr::attr<Log::Severity, Log::Severity_Tag>(
-                           "Severity")
-                      << "] " << expr::smessage << "\t\t\t{'StackSize':"
-                      << paracuber_logger_stack_size << "}"));
+        (expr::stream
+         << "[" << paracuber_logger_timestamp << "] ["
+         << paracuber_logger_localname << "] "
+         << expr::if_(expr::has_attr<std::string>(
+              "ContextMeta"))[expr::stream
+                              << "[" << paracuber_logger_context << "<"
+                              << paracuber_logger_context_meta << ">]"]
+              .else_[expr::stream << "[" << paracuber_logger_context << "]"]
+         << " [" << expr::attr<Log::Severity, Log::Severity_Tag>("Severity")
+         << "] " << expr::smessage
+         << "\t\t\t{'StackSize':" << paracuber_logger_stack_size << "}"));
     boost::log::core::get()->add_sink(m_consoleSink);
   } catch(const std::exception& e) {
     std::cerr << "> Exception during initialisation of log sinks! Error: "
@@ -102,15 +114,23 @@ Log::Log(ConfigPtr config)
 Log::~Log() {}
 
 boost::log::sources::severity_logger<Log::Severity>
-Log::createLogger()
+Log::createLogger(const std::string& context, const std::string& meta)
 {
   auto lg = boost::log::sources::severity_logger<Log::Severity>();
+  lg.add_attribute("Context", boost::log::attributes::make_constant(context));
+  if(meta != "")
+    lg.add_attribute("ContextMeta",
+                     boost::log::attributes::make_constant(meta));
   return std::move(lg);
 }
 boost::log::sources::severity_logger_mt<Log::Severity>
-Log::createLoggerMT()
+Log::createLoggerMT(const std::string& context, const std::string& meta)
 {
   auto lg = boost::log::sources::severity_logger_mt<Log::Severity>();
+  lg.add_attribute("Context", boost::log::attributes::make_constant(context));
+  if(meta != "")
+    lg.add_attribute("ContextMeta",
+                     boost::log::attributes::make_constant(meta));
   return std::move(lg);
 }
 

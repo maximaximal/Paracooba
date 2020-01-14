@@ -73,7 +73,7 @@ ClusterStatistics::Node::applyTaskFactoryVector(const TaskFactoryVector& v)
 
 ClusterStatistics::ClusterStatistics(ConfigPtr config, LogPtr log)
   : m_config(config)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("ClusterStatistics"))
 {}
 
 ClusterStatistics::~ClusterStatistics() {}

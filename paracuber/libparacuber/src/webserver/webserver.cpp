@@ -247,7 +247,10 @@ class Webserver::HTTPSession
               tcp::socket socket,
               std::string const& docRoot)
     : m_webserver(webserver)
-    , m_logger(m_webserver->m_log->createLogger())
+    , m_logger(m_webserver->m_log->createLogger(
+        "HTTPSession",
+        socket.remote_endpoint().address().to_string() + ":" +
+          std::to_string(socket.remote_endpoint().port())))
     , m_socket(std::move(socket))
     , m_strand(webserver->getIOService().get_executor())
     , m_docRoot(docRoot)
@@ -557,7 +560,7 @@ class Webserver::HTTPListener
                tcp::endpoint&& endpoint,
                std::string_view const& docRoot)
     : m_webserver(webserver)
-    , m_logger(m_webserver->m_log->createLogger())
+    , m_logger(m_webserver->m_log->createLogger("HTTPListener"))
     , m_acceptor(ioService)
     , m_socket(ioService)
     , m_docRoot(docRoot)
@@ -680,7 +683,7 @@ Webserver::Webserver(ConfigPtr config,
                      boost::asio::io_service& ioService)
   : m_config(config)
   , m_log(log)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("Webserver"))
   , m_ioService(ioService)
   , m_api(std::make_unique<API>(this, m_config, m_log))
 {

@@ -27,7 +27,7 @@ main(int argc, char* argv[])
   }
 
   std::shared_ptr<Log> log = std::make_shared<Log>(config);
-  auto logger = log->createLogger();
+  auto logger = log->createLogger("main");
 
   PARACUBER_LOG(logger, Trace)
     << "Starting paracuber \"" << config->getString(Config::LocalName)

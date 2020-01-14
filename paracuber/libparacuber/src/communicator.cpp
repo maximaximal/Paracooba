@@ -69,7 +69,7 @@ class Communicator::UDPServer
             uint16_t port)
     : m_communicator(comm)
     , m_socket(ioService, udp::endpoint(udp::v4(), port))
-    , m_logger(log->createLogger())
+    , m_logger(log->createLogger("UDPServer"))
     , m_port(port)
     , m_clusterStatistics(comm->getClusterStatistics())
   {
@@ -612,7 +612,7 @@ class Communicator::TCPServer
             boost::asio::io_service& ioService,
             uint16_t port)
     : m_communicator(comm)
-    , m_logger(log->createLogger())
+    , m_logger(log->createLogger("TCPServer"))
     , m_log(log)
     , m_port(port)
     , m_ioService(ioService)
@@ -637,7 +637,7 @@ class Communicator::TCPServer
                     Communicator* comm)
       : m_ioService(ioService)
       , m_socket(ioService)
-      , m_logger(log->createLogger())
+      , m_logger(log->createLogger("TCPServerClient"))
       , m_comm(comm)
     {}
     virtual ~TCPServerClient() {}
@@ -805,7 +805,7 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   : m_config(config)
   , m_log(log)
   , m_ioServiceWork(m_ioService)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("Communicator"))
   , m_signalSet(std::make_unique<boost::asio::signal_set>(m_ioService, SIGINT))
   , m_clusterStatistics(std::make_shared<ClusterStatistics>(config, log))
   , m_tickTimer(

@@ -13,7 +13,7 @@ Initiator::Initiator(ConfigPtr config,
   : m_config(config)
   , m_log(log)
   , m_ioService(ioService)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("Initiator"))
 {}
 Initiator::~Initiator() {}
 

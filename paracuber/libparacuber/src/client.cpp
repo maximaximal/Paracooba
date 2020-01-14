@@ -12,7 +12,7 @@ namespace paracuber {
 Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
   : m_config(config)
   , m_log(log)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("Client"))
   , m_communicator(communicator)
 {
   m_config->m_client = this;

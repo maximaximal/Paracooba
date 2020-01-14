@@ -13,7 +13,7 @@ TaskFactory::TaskFactory(ConfigPtr config,
                          LogPtr log,
                          std::shared_ptr<CNF> rootCNF)
   : m_config(config)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("TaskFactory"))
   , m_rootCNF(rootCNF)
   , m_cadicalMgr(std::make_unique<CaDiCaLMgr>())
 {

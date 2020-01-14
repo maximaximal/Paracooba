@@ -20,7 +20,7 @@ const std::regex API::matchLocalInfoRequest("^/api/local-info.json$");
 
 API::API(Webserver* webserver, ConfigPtr config, LogPtr log)
   : m_webserver(webserver)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("API"))
   , m_config(config)
 {}
 API::~API() {}

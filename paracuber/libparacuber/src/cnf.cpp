@@ -33,7 +33,7 @@ CNF::CNF(ConfigPtr config,
   , m_originId(originId)
   , m_dimacsFile(dimacsFile)
   , m_log(log)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("CNF"))
   , m_cnfTree(std::make_unique<CNFTree>(config, originId))
 {
   if(dimacsFile != "") {
@@ -57,7 +57,7 @@ CNF::CNF(const CNF& o)
   , m_originId(o.m_originId)
   , m_dimacsFile(o.m_dimacsFile)
   , m_log(o.m_log)
-  , m_logger(o.m_log->createLogger())
+  , m_logger(o.m_log->createLogger("CNF"))
   , m_cnfTree(std::make_unique<CNFTree>(o.m_config, o.m_originId))
 {
   connectToCNFTreeSignal();

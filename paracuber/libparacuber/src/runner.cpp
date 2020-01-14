@@ -10,7 +10,7 @@ namespace paracuber {
 Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
   : m_config(config)
   , m_log(log)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("Runner"))
   , m_communicator(communicator)
   , m_numberOfRunningTasks(0)
   , m_taskQueue(
@@ -29,7 +29,10 @@ Runner::start()
     m_running = true;
     for(i = 0; i < threadCount; ++i) {
       m_pool.push_back(std::thread(
-        std::bind(&Runner::worker, this, i, m_log->createLogger())));
+        std::bind(&Runner::worker,
+                  this,
+                  i,
+                  m_log->createLogger("Worker", std::to_string(i)))));
     }
   } catch(std::system_error& e) {
     PARACUBER_LOG(m_logger, LocalError)

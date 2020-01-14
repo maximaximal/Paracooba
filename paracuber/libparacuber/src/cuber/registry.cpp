@@ -8,7 +8,7 @@ namespace cuber {
 Registry::Registry(ConfigPtr config, LogPtr log, CNF& rootCNF)
   : m_config(config)
   , m_log(log)
-  , m_logger(log->createLogger())
+  , m_logger(log->createLogger("Registry"))
   , m_rootCNF(rootCNF)
 {}
 Registry::~Registry() {}

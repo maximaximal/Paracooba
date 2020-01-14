@@ -78,8 +78,12 @@ class Log
   /** @brief Create a logger for a specific environment, which may receive
    * multiple custom attributes.
    */
-  boost::log::sources::severity_logger<Severity> createLogger();
-  boost::log::sources::severity_logger_mt<Severity> createLoggerMT();
+  boost::log::sources::severity_logger<Severity> createLogger(
+    const std::string& context,
+    const std::string& meta = "");
+  boost::log::sources::severity_logger_mt<Severity> createLoggerMT(
+    const std::string& context,
+    const std::string& meta = "");
 
   private:
   ConfigPtr m_config;
