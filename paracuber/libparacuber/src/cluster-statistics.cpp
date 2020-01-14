@@ -149,8 +149,7 @@ ClusterStatistics::getFittestNodeForNewWork(int originator)
   int64_t localId = m_config->getInt64(Config::Id);
   auto filterFunc = [originator, localId](auto& e) {
     auto& n = e.second;
-    return n.getFullyKnown() && n.getReadyForWork() &&
-           n.getId() != originator && n.getId() != localId;
+    return n.getFullyKnown() && n.getReadyForWork() && n.getId() != localId;
   };
 
   // Filter to only contain nodes that can be worked with.
@@ -160,7 +159,6 @@ ClusterStatistics::getFittestNodeForNewWork(int originator)
     boost::make_filter_iterator(filterFunc, map.end(), map.end());
 
   if(filteredMap == filteredMapEnd) {
-    PARACUBER_LOG(m_logger, Trace) << "No other nodes available for rebalance.";
     return nullptr;
   }
 

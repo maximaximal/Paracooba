@@ -28,7 +28,6 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_severity,
 BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_file, "File", std::string)
 BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_function, "Function", std::string)
 BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_line, "Line", int)
-BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_stack_size, "StackSize", size_t)
 BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_localname,
                             "LocalName",
                             std::string_view)
@@ -46,7 +45,6 @@ thread_local MutableConstant<const char*> fileAttr =
   MutableConstant<const char*>("");
 thread_local MutableConstant<const char*> functionAttr =
   MutableConstant<const char*>("");
-thread_local MutableConstant<size_t> stackSizeAttr = MutableConstant<size_t>(0);
 
 namespace paracuber {
 
@@ -71,7 +69,6 @@ Log::Log(ConfigPtr config)
       "LocalName",
       logging::attributes::constant<std::string_view>(
         config->getString(Config::LocalName)));
-    logging::core::get()->add_global_attribute("StackSize", stackSizeAttr);
     logging::add_common_attributes();
 
     // Logging Filter
@@ -102,8 +99,7 @@ Log::Log(ConfigPtr config)
                               << paracuber_logger_context_meta << ">]"]
               .else_[expr::stream << "[" << paracuber_logger_context << "]"]
          << " [" << expr::attr<Log::Severity, Log::Severity_Tag>("Severity")
-         << "] " << expr::smessage
-         << "\t\t\t{'StackSize':" << paracuber_logger_stack_size << "}"));
+         << "] " << expr::smessage));
     boost::log::core::get()->add_sink(m_consoleSink);
   } catch(const std::exception& e) {
     std::cerr << "> Exception during initialisation of log sinks! Error: "

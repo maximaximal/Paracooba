@@ -209,10 +209,10 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
   socket->write_some(boost::asio::buffer(
     reinterpret_cast<const char*>(&resultSize), sizeof(resultSize)));
 
-  // Encoded assignment required.
-  result.encodeAssignment();
-
   if(result.state == CNFTree::SAT) {
+    // Encoded assignment required.
+    result.encodeAssignment();
+
     // Write the full result.
     socket->async_write_some(
       boost::asio::buffer(
@@ -325,11 +325,9 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
 
       // Satisfiable results must be directly wrapped in the result array, as
       // the solver instances are shared between solver tasks.
-      if(m_config->isDaemonMode()) {
-        res.encodeAssignment();
-      } else {
-        res.decodeAssignment();
-      }
+      PARACUBER_LOG(m_logger, Trace)
+        << "Encode Assignment because SAT encountered!";
+      res.encodeAssignment();
       break;
     case TaskResult::Unsatisfiable:
       res.state = CNFTree::UNSAT;

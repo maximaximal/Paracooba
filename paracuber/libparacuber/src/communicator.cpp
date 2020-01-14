@@ -516,6 +516,9 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
     , m_endpoint(endpoint)
     , m_socket(ioService)
     , m_path(path)
+    , m_logger(log->createLoggerMT("TCPClient",
+                                   CNFTree::pathToStdString(path) + "|" +
+                                     endpoint.address().to_string()))
   {
     PARACUBER_LOG(m_logger, Trace)
       << "Start TCPClient to " << m_endpoint << " for path "

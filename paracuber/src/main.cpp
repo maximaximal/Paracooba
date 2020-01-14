@@ -15,10 +15,6 @@ using namespace paracuber;
 int
 main(int argc, char* argv[])
 {
-  // Stack size tracking code.
-  char c = 'S';
-  StackStart = reinterpret_cast<int64_t>(&c);
-
   // Start of main.
   std::shared_ptr<Config> config = std::make_shared<Config>();
   bool continueRunning = config->parseParameters(argc, argv);
