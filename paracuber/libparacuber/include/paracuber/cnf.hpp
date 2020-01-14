@@ -178,6 +178,7 @@ class CNF : public std::enable_shared_from_this<CNF>
   std::unique_ptr<cuber::Registry> m_cuberRegistry;
   std::unique_ptr<CNFTree> m_cnfTree;
   std::shared_mutex m_cnfTreeMutex;
+  std::shared_mutex m_resultsMutex;
 
   std::map<CNFTree::Path, Result> m_results;
 

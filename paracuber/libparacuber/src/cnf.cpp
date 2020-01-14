@@ -177,6 +177,8 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
 {
   assert(rootTaskReady.isReady());
 
+  std::shared_lock lock(m_resultsMutex);
+
   auto resultIt = m_results.find(p);
   if(resultIt == m_results.end()) {
     PARACUBER_LOG(m_logger, LocalError)
@@ -235,6 +237,7 @@ CNF::connectToCNFTreeSignal()
                                        "subscribers of signals! End Result: "
                                     << state;
 
+      std::shared_lock lock(m_resultsMutex);
       Result* result = &m_results[0];
       assert(result);
 
@@ -344,6 +347,7 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
 
   if(res.state == CNFTree::SAT || res.state == CNFTree::UNSAT ||
      res.state == CNFTree::Unknown) {
+    std::unique_lock lock(m_resultsMutex);
     m_results.insert(std::make_pair(p, std::move(res)));
 
     if(res.state != CNFTree::Unknown) {
@@ -571,6 +575,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         if(path) {
           d.path = *path;
           assert(m_results.find(*path) == m_results.end());
+          std::shared_lock lock(m_resultsMutex);
           Result r{ *path, CNFTree::State::Unknown };
           d.result = &m_results.insert(std::make_pair(*path, std::move(r)))
                         .first->second;
@@ -681,6 +686,7 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
     p = 0;
 
   if(source != CNFTree::DefaultUninitiatedPath) {
+    std::unique_lock shared_lock(m_resultsMutex);
     // Reference old result.
     auto resultIt = m_results.find(source);
     if(resultIt == m_results.end()) {
@@ -697,6 +703,7 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
     res.decodedAssignment = oldResult.decodedAssignment;
   }
 
+  std::unique_lock unique_lock(m_resultsMutex);
   m_results.insert(std::make_pair(p, std::move(res)));
 }
 
