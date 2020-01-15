@@ -347,8 +347,10 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
 
   if(res.state == CNFTree::SAT || res.state == CNFTree::UNSAT ||
      res.state == CNFTree::Unknown) {
-    std::unique_lock lock(m_resultsMutex);
-    m_results.insert(std::make_pair(p, std::move(res)));
+    {
+      std::unique_lock lock(m_resultsMutex);
+      m_results.insert(std::make_pair(p, std::move(res)));
+    }
 
     if(res.state != CNFTree::Unknown) {
       std::unique_lock lock(m_cnfTreeMutex);
