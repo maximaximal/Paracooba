@@ -40,11 +40,20 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_context_meta,
                             "ContextMeta",
                             std::string)
 
+BOOST_LOG_ATTRIBUTE_KEYWORD(paracuber_logger_thread_name,
+                            "ThreadName",
+                            std::string)
+
+template<typename T>
+using Constant = boost::log::attributes::constant<T>;
+
 thread_local MutableConstant<int> lineAttr = MutableConstant<int>(5);
 thread_local MutableConstant<const char*> fileAttr =
   MutableConstant<const char*>("");
 thread_local MutableConstant<const char*> functionAttr =
   MutableConstant<const char*>("");
+thread_local bool threadNameAttrSet = false;
+thread_local Constant<std::string> threadNameAttr = Constant<std::string>("");
 
 namespace paracuber {
 
@@ -55,6 +64,9 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_INIT(global_logger,
   lg.add_attribute("Line", lineAttr);
   lg.add_attribute("File", fileAttr);
   lg.add_attribute("Function", functionAttr);
+  lg.add_attribute(
+    "ThreadName",
+    boost::log::attributes::make_constant<std::string>("UnknownThread"));
   return lg;
 }
 
@@ -92,7 +104,8 @@ Log::Log(ConfigPtr config)
       keywords::format =
         (expr::stream
          << "[" << paracuber_logger_timestamp << "] ["
-         << paracuber_logger_localname << "] "
+         << paracuber_logger_localname << "] [" << paracuber_logger_thread_name
+         << "] "
          << expr::if_(expr::has_attr<std::string>(
               "ContextMeta"))[expr::stream
                               << "[" << paracuber_logger_context << "<"
@@ -109,25 +122,40 @@ Log::Log(ConfigPtr config)
 }
 Log::~Log() {}
 
-boost::log::sources::severity_logger<Log::Severity>
-Log::createLogger(const std::string& context, const std::string& meta)
+template<typename LoggerType>
+static LoggerType
+createGenericLogger(const std::string& context, const std::string& meta)
 {
-  auto lg = boost::log::sources::severity_logger<Log::Severity>();
-  lg.add_attribute("Context", boost::log::attributes::make_constant(context));
+  auto lg = LoggerType();
+  auto contextConstant = boost::log::attributes::make_constant(context);
+  lg.add_attribute("Context", contextConstant);
   if(meta != "")
     lg.add_attribute("ContextMeta",
                      boost::log::attributes::make_constant(meta));
+
+  if(!threadNameAttrSet) {
+    std::string threadName = context;
+    if(meta != "")
+      threadName += "<" + meta + ">";
+    threadNameAttr = boost::log::attributes::make_constant(threadName);
+    threadNameAttrSet = true;
+  }
+  lg.add_attribute("ThreadName", threadNameAttr);
+
   return std::move(lg);
+}
+
+boost::log::sources::severity_logger<Log::Severity>
+Log::createLogger(const std::string& context, const std::string& meta)
+{
+  return createGenericLogger<
+    boost::log::sources::severity_logger<Log::Severity>>(context, meta);
 }
 boost::log::sources::severity_logger_mt<Log::Severity>
 Log::createLoggerMT(const std::string& context, const std::string& meta)
 {
-  auto lg = boost::log::sources::severity_logger_mt<Log::Severity>();
-  lg.add_attribute("Context", boost::log::attributes::make_constant(context));
-  if(meta != "")
-    lg.add_attribute("ContextMeta",
-                     boost::log::attributes::make_constant(meta));
-  return std::move(lg);
+  return createGenericLogger<
+    boost::log::sources::severity_logger_mt<Log::Severity>>(context, meta);
 }
 
 std::ostream&

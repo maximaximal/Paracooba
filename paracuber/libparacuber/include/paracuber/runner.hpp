@@ -85,7 +85,7 @@ class Runner
 
   std::vector<std::thread> m_pool;
 
-  void worker(uint32_t workerId, Logger logger);
+  void worker(uint32_t workerId);
 
   struct QueueEntry
   {

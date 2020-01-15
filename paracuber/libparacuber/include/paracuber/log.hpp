@@ -25,9 +25,9 @@ extern thread_local MutableConstant<int> lineAttr;
 extern thread_local MutableConstant<const char*> fileAttr;
 extern thread_local MutableConstant<const char*> functionAttr;
 
-#define PARACUBER_LOG_LOCATION(lg)              \
-  lineAttr.set(__LINE__);                       \
-  fileAttr.set(FILE_BASENAME);                  \
+#define PARACUBER_LOG_LOCATION(lg) \
+  lineAttr.set(__LINE__);          \
+  fileAttr.set(FILE_BASENAME);     \
   functionAttr.set(__PRETTY_FUNCTION__);
 
 #define PARACUBER_LOG(LOGGER, SEVERITY) \

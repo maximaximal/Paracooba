@@ -28,11 +28,7 @@ Runner::start()
   try {
     m_running = true;
     for(i = 0; i < threadCount; ++i) {
-      m_pool.push_back(std::thread(
-        std::bind(&Runner::worker,
-                  this,
-                  i,
-                  m_log->createLogger("Worker", std::to_string(i)))));
+      m_pool.push_back(std::thread(std::bind(&Runner::worker, this, i)));
     }
   } catch(std::system_error& e) {
     PARACUBER_LOG(m_logger, LocalError)
@@ -94,10 +90,9 @@ Runner::deregisterTaskFactory(TaskFactory* f)
 }
 
 void
-Runner::worker(uint32_t workerId, Logger logger)
+Runner::worker(uint32_t workerId)
 {
-  logger.add_attribute(
-    "workerID", boost::log::attributes::constant<decltype(workerId)>(workerId));
+  auto logger = m_log->createLogger("Worker", std::to_string(workerId));
   PARACUBER_LOG(logger, Trace) << "Worker " << workerId << " started.";
   while(m_running) {
     std::unique_ptr<QueueEntry> entry = nullptr;
