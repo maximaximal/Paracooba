@@ -75,6 +75,14 @@ target_link_libraries(parac PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(parac PUBLIC Boost::log Boost::program_options)
 target_include_directories(parac PUBLIC ${libcadical_INCLUDE_DIRS})
 
+# Installation logic.
+include(GNUInstallDirs)
+
+install(TARGETS parac
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static)
+
 # Documentation
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
@@ -87,7 +95,6 @@ if(DOXYGEN_FOUND)
 endif(DOXYGEN_FOUND)
 
 # Packaging
-
 set(CPACK_GENERATOR "DEB")
 
 set(CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/README.md)

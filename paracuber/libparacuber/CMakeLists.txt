@@ -19,3 +19,17 @@ target_link_libraries(paracuber PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(paracuber PUBLIC Boost::log Boost::program_options Boost::thread Boost::filesystem)
 target_link_libraries(paracuber PUBLIC CapnProto::capnp)
 target_link_libraries(paracuber PRIVATE libcadical)
+
+include(GNUInstallDirs)
+
+install(TARGETS paracuber
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/paracuber)
+
+install(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/paracuber
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/
+
+    PATTERN "*~" EXCLUDE)
