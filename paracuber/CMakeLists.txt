@@ -110,9 +110,9 @@ set(CPACK_RESSOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 set(CPACK_OUTPUT_FILE_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/packages)
 set(CPACK_PACKAGE_CONTACT "Max Heisinger <maximilian.heisinger@jku.at>")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS
-    "libboost-system1.65.0,
-    libboost-log1.65.0,
-    libboost-program-options1.65.0")
+    "libboost-system1.65.1,
+    libboost-log1.65.1,
+    libboost-program-options1.65.1")
 set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
 
 include(CPack)
