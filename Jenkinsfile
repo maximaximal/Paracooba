@@ -21,6 +21,13 @@ pipeline {
 		}
 	    }
 	}
+	stage('Package') {
+	    steps {
+		dir('paracuber') {
+		    cpack arguments: '-DBUILD_NUMBER=${currentBuild.number}', installation: 'InSearchPath', workingDir: 'build'
+		}
+	    }
+	}
     }
 
     post {
