@@ -35,8 +35,6 @@ include(CTest)
 include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/catch/Catch2-2.9.2/contrib/Catch.cmake)
 enable_testing()
 
-find_package(CapnProto REQUIRED)
-
 add_subdirectory(third_party)
 
 add_subdirectory(libparacuber)

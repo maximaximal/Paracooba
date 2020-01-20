@@ -17,7 +17,7 @@ endif()
 
 target_link_libraries(paracuber PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(paracuber PUBLIC Boost::log Boost::program_options Boost::thread Boost::filesystem)
-target_link_libraries(paracuber PUBLIC CapnProto::capnp)
+target_link_libraries(paracuber PRIVATE cereal)
 target_link_libraries(paracuber PRIVATE libcadical)
 
 include(GNUInstallDirs)
