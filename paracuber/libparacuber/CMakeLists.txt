@@ -3,7 +3,7 @@ add_subdirectory(src)
 add_subdirectory(capnp-schemas)
 
 # Library
-add_library(paracuber SHARED ${PARACUBER_SRCS} $<TARGET_OBJECTS:capnp_schemas_lib>)
+add_library(paracuber SHARED ${PARACUBER_SRCS})
 set_property(TARGET paracuber PROPERTY CXX_STANDARD 17)
 target_include_directories(paracuber PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(paracuber PUBLIC ${libcadical_INCLUDE_DIRS})

@@ -47,7 +47,6 @@ struct AnnouncementRequest
 struct OnlineAnnouncement
 {
   node @0 : Node;
-  knownNodes @1 : List(Node);
 }
 # Announce a node is online. May be sent regularily or
 # after issuing an AnnouncementRequest.

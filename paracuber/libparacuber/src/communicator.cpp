@@ -6,6 +6,12 @@
 #include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/networked_node.hpp"
 #include "../include/paracuber/runner.hpp"
+
+#include "../include/paracuber/messages/message.hpp"
+#include "../include/paracuber/messages/node.hpp"
+#include "paracuber/messages/cnftree_node_status_reply.hpp"
+#include "paracuber/messages/cnftree_node_status_request.hpp"
+
 #include <boost/asio.hpp>
 #include <boost/asio/socket_base.hpp>
 #include <boost/bind.hpp>
@@ -14,21 +20,19 @@
 #include <mutex>
 #include <regex>
 
+#include <cereal/archives/binary.hpp>
+
 #ifdef ENABLE_INTERNAL_WEBSERVER
 #include "../include/paracuber/webserver/api.hpp"
 #endif
 
-#include <capnp-schemas/message.capnp.h>
-#include <capnp/serialize.h>
+#define REC_BUF_SIZE 4096
 
 using boost::asio::ip::udp;
-using namespace paracuber::message;
-
-#define REC_BUF_SIZE 4096
 
 namespace paracuber {
 void
-applyMessageNodeToStatsNode(const message::Node::Reader& src,
+applyMessageNodeToStatsNode(const messages::Node& src,
                             ClusterStatistics::Node& tgt)
 {
   tgt.setName(src.getName());
@@ -44,7 +48,7 @@ applyMessageNodeToStatsNode(const message::Node::Reader& src,
   tgt.setDaemon(src.getDaemonMode());
 }
 void
-applyMessageNodeStatusToStatsNode(const message::NodeStatus::Reader& src,
+applyMessageNodeStatusToStatsNode(const messages::NodeStatus& src,
                                   ClusterStatistics::Node& tgt,
                                   Config& config)
 {
@@ -87,8 +91,8 @@ class Communicator::UDPServer
     m_socket.set_option(boost::asio::socket_base::broadcast(true));
 
     m_socket.async_receive_from(
-      boost::asio::buffer(reinterpret_cast<std::byte*>(&m_recBuf[0]),
-                          m_recBuf.size() * sizeof(::capnp::word)),
+      // TODO
+      m_recStreambuf,
       m_remoteEndpoint,
       boost::bind(&UDPServer::handleReceive,
                   this,
@@ -102,31 +106,33 @@ class Communicator::UDPServer
     if(!error || error == boost::asio::error::message_size) {
       // Alignment handled by the creation of m_recBuf.
 
-      ::capnp::FlatArrayMessageReader reader(
-        kj::arrayPtr(reinterpret_cast<::capnp::word*>(m_recBuf.begin()),
-                     bytes / sizeof(::capnp::word)));
+      // TODO Reader
 
-      Message::Reader msg = reader.getRoot<Message>();
-      switch(msg.which()) {
-        case Message::ONLINE_ANNOUNCEMENT:
+      messages::Message msg;
+      std::istream recIstream(&m_recStreambuf);
+      cereal::BinaryInputArchive iarchive(recIstream);
+      iarchive(msg);
+
+      switch(msg.getType()) {
+        case messages::Type::OnlineAnnouncement:
           PARACUBER_LOG(m_logger, Trace)
             << "  -> Online Announcement from " << m_remoteEndpoint
             << " (ID: " << msg.getOrigin() << ")";
           handleOnlineAnnouncement(msg);
           break;
-        case Message::OFFLINE_ANNOUNCEMENT:
+        case messages::Type::OfflineAnnouncement:
           PARACUBER_LOG(m_logger, Trace)
             << "  -> Offline Announcement from " << m_remoteEndpoint
             << " (ID: " << msg.getOrigin() << ")";
           handleOfflineAnnouncement(msg);
           break;
-        case Message::ANNOUNCEMENT_REQUEST:
+        case messages::Type::AnnouncementRequest:
           PARACUBER_LOG(m_logger, Trace)
             << "  -> Announcement Request from " << m_remoteEndpoint
             << " (ID: " << msg.getOrigin() << ")";
           handleAnnouncementRequest(msg);
           break;
-        case Message::NODE_STATUS:
+        case messages::Type::NodeStatus:
           /*
           // These logging messages are not required most of the time and only
           // waste processor time.
@@ -137,13 +143,13 @@ class Communicator::UDPServer
           */
           handleNodeStatus(msg);
           break;
-        case Message::CNF_TREE_NODE_STATUS_REQUEST:
+        case messages::Type::CNFTreeNodeStatusRequest:
           PARACUBER_LOG(m_logger, Trace)
             << "  -> CNFTree Node Status Request from " << m_remoteEndpoint
             << " (ID: " << msg.getOrigin() << ")";
           handleCNFTreeNodeStatusRequest(msg);
           break;
-        case Message::CNF_TREE_NODE_STATUS_REPLY:
+        case messages::Type::CNFTreeNodeStatusReply:
           PARACUBER_LOG(m_logger, Trace)
             << "  -> CNFTree Node Status Reply from " << m_remoteEndpoint
             << " (ID: " << msg.getOrigin() << ")";
@@ -181,10 +187,11 @@ class Communicator::UDPServer
     }
   }
 
-  void handleOnlineAnnouncement(Message::Reader& msg)
+  void handleOnlineAnnouncement(const messages::Message& msg)
   {
-    const OnlineAnnouncement::Reader& reader = msg.getOnlineAnnouncement();
-    const Node::Reader& messageNode = reader.getNode();
+    const messages::OnlineAnnouncement& onlineAnnouncement =
+      msg.getOnlineAnnouncement();
+    const messages::Node& messageNode = onlineAnnouncement.getNode();
 
     int64_t id = msg.getOrigin();
 
@@ -211,19 +218,21 @@ class Communicator::UDPServer
     PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
     m_communicator->checkAndTransmitClusterStatisticsChanges();
   }
-  void handleOfflineAnnouncement(Message::Reader& msg)
+  void handleOfflineAnnouncement(const messages::Message& msg)
   {
-    const OfflineAnnouncement::Reader& reader = msg.getOfflineAnnouncement();
+    const messages::OfflineAnnouncement& offlineAnnouncement =
+      msg.getOfflineAnnouncement();
 
     m_clusterStatistics->removeNode(msg.getOrigin());
 
     PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
     m_communicator->checkAndTransmitClusterStatisticsChanges();
   }
-  void handleAnnouncementRequest(Message::Reader& msg)
+  void handleAnnouncementRequest(const messages::Message& msg)
   {
-    const AnnouncementRequest::Reader& reader = msg.getAnnouncementRequest();
-    const Node::Reader& requester = reader.getRequester();
+    const messages::AnnouncementRequest& announcementRequest =
+      msg.getAnnouncementRequest();
+    const messages::Node& requester = announcementRequest.getRequester();
 
     auto [statisticsNode, inserted] =
       m_clusterStatistics->getOrCreateNode(requester.getId());
@@ -243,22 +252,21 @@ class Communicator::UDPServer
       }
     }
 
-    auto nameMatch = reader.getNameMatch();
-    switch(nameMatch.which()) {
-      case AnnouncementRequest::NameMatch::NO_RESTRICTION:
+    switch(announcementRequest.getNameMatchType()) {
+      case messages::AnnouncementRequest::NameMatch::NO_RESTRICTION:
         break;
-      case AnnouncementRequest::NameMatch::REGEX:
+      case messages::AnnouncementRequest::NameMatch::REGEX:
         if(!std::regex_match(std::string(m_communicator->m_config->getString(
                                Config::LocalName)),
-                             std::regex(nameMatch.getRegex().cStr()))) {
+                             std::regex(announcementRequest.getRegexMatch()))) {
           PARACUBER_LOG(m_logger, Trace)
-            << "No regex match! Regex: " << nameMatch.getRegex().cStr();
+            << "No regex match! Regex: " << announcementRequest.getRegexMatch();
           return;
         }
         break;
-      case AnnouncementRequest::NameMatch::ID:
+      case messages::AnnouncementRequest::NameMatch::ID:
         if(!m_communicator->m_config->getInt64(Config::Id) ==
-           nameMatch.getId()) {
+           announcementRequest.getIdMatch()) {
           return;
         }
     }
@@ -270,29 +278,30 @@ class Communicator::UDPServer
                   statisticsNode.getNetworkedNode()));
     }
   }
-  void handleNodeStatus(Message::Reader& msg)
+  void handleNodeStatus(const messages::Message& msg)
   {
-    const NodeStatus::Reader& reader = msg.getNodeStatus();
+    const messages::NodeStatus& nodeStatus = msg.getNodeStatus();
 
     int64_t id = msg.getOrigin();
 
     auto [statisticsNode, inserted] = m_clusterStatistics->getOrCreateNode(id);
 
     applyMessageNodeStatusToStatsNode(
-      reader, statisticsNode, *m_communicator->m_config);
+      nodeStatus, statisticsNode, *m_communicator->m_config);
 
     networkStatisticsNode(statisticsNode);
 
     m_communicator->checkAndTransmitClusterStatisticsChanges();
   }
 
-  void handleCNFTreeNodeStatusRequest(Message::Reader& msg)
+  void handleCNFTreeNodeStatusRequest(const messages::Message& msg)
   {
-    const CNFTreeNodeStatusRequest::Reader& reader =
-      msg.getCnfTreeNodeStatusRequest();
+    const messages::CNFTreeNodeStatusRequest& cnfTreeNodeStatusRequest =
+      msg.getCNFTreeNodeStatusRequest();
+
     int64_t originId = msg.getOrigin();
-    int64_t cnfId = reader.getCnfId();
-    CNFTree::Path path = reader.getPath();
+    int64_t cnfId = cnfTreeNodeStatusRequest.getCnfId();
+    CNFTree::Path path = cnfTreeNodeStatusRequest.getPath();
 
     CNF* cnf = nullptr;
     auto [statisticsNode, inserted] =
@@ -319,54 +328,44 @@ class Communicator::UDPServer
     }
 
     // Build answer message.
-    auto msgBuilder = getMessageBuilder();
-    auto reply = msgBuilder.initCnfTreeNodeStatusReply();
-    reply.setCnfId(cnfId);
-    reply.setHandle(reader.getHandle());
-    reply.setPath(reader.getPath());
+    messages::Message replyMsg;
+    messages::CNFTreeNodeStatusReply reply(cnfTreeNodeStatusRequest.getHandle(),
+                                           cnfTreeNodeStatusRequest.getPath(),
+                                           cnfId);
 
-    std::vector<std::pair<CNFTree::State, CNFTree::CubeVar>> entries;
-
-    cnf->getCNFTree().visit(reader.getPath(),
-                            [this, path, &entries, &msg](CNFTree::CubeVar var,
-                                                         uint8_t depth,
-                                                         CNFTree::State state,
-                                                         int64_t remote) {
+    cnf->getCNFTree().visit(cnfTreeNodeStatusRequest.getPath(),
+                            [this, path, &reply](CNFTree::CubeVar var,
+                                                 uint8_t depth,
+                                                 CNFTree::State state,
+                                                 int64_t remote) {
                               var = FastAbsolute(var);
-                              entries.push_back({ state, var });
+                              reply.addNode(state, var);
                               return false;
                             });
 
-    if(entries.size() != CNFTree::getDepth(path) + 1) {
+    if(reply.getNodeSize() != CNFTree::getDepth(path) + 1) {
       // Not enough local information for a reply.
       PARACUBER_LOG(m_logger, LocalError)
         << "No reply to request for path " << CNFTree::pathToStrNoAlloc(path);
       return;
     }
 
-    auto nodes = reply.initNodes(entries.size());
-    auto it = nodes.begin();
-    for(auto& entry : entries) {
-      it->setState(entry.first);
-      it->setLiteral(entry.second);
-      ++it;
-    }
-
-    sendBuiltMessage(m_remoteEndpoint, false);
+    replyMsg.insertCNFTreeNodeStatusReply(std::move(reply));
+    sendMessage(m_remoteEndpoint, replyMsg, false);
   }
-  void handleCNFTreeNodeStatusReply(Message::Reader& msg)
+  void handleCNFTreeNodeStatusReply(const messages::Message& msg)
   {
-    const CNFTreeNodeStatusReply::Reader& reader =
-      msg.getCnfTreeNodeStatusReply();
+    const messages::CNFTreeNodeStatusReply& cnfTreeNodeStatusReply =
+      msg.getCNFTreeNodeStatusReply();
     int64_t originId = msg.getOrigin();
-    int64_t cnfId = reader.getCnfId();
-    int64_t handle = reader.getHandle();
-    uint64_t path = reader.getPath();
+    int64_t cnfId = cnfTreeNodeStatusReply.getCnfId();
+    int64_t handle = cnfTreeNodeStatusReply.getHandle();
+    uint64_t path = cnfTreeNodeStatusReply.getPath();
 
     // Depending on the handle, this is sent to the internal CNFTree handling
     // mechanism (handle == 0) or to the webserver for viewing (handle != 0).
 
-    auto nodes = reader.getNodes();
+    auto nodes = cnfTreeNodeStatusReply.getNodes();
 
     if(nodes.size() == 0) {
       PARACUBER_LOG(m_logger, GlobalWarning)
@@ -391,8 +390,8 @@ class Communicator::UDPServer
         cnfId,
         handle,
         path,
-        lastEntry->getLiteral(),
-        static_cast<CNFTree::StateEnum>(lastEntry->getState()),
+        lastEntry->literal,
+        static_cast<CNFTree::StateEnum>(lastEntry->state),
         originId);
     }
   }
@@ -410,30 +409,16 @@ class Communicator::UDPServer
     }
   }
 
-  inline ::capnp::MallocMessageBuilder& getMallocMessageBuilder()
+  messages::Message buildMessage()
   {
-    // This mechanism destructs the message builder, so it can be reconstructed
-    // afterwards. This should be able to be improved at a later stage, but
-    // could require deeper modifications of Capn'Proto.
-    m_mallocMessageBuilder.~MallocMessageBuilder();
-    new(&m_mallocMessageBuilder)::capnp::MallocMessageBuilder(m_sendBuf);
-    return m_mallocMessageBuilder;
+    return messages::Message(m_communicator->m_config->getInt64(Config::Id));
   }
-  Message::Builder getMessageBuilder()
-  {
-    auto msg = getMallocMessageBuilder().getRoot<Message>();
-    msg.setOrigin(m_communicator->m_config->getInt64(Config::Id));
-    msg.setId(m_communicator->getAndIncrementCurrentMessageId());
-    return std::move(msg);
-  }
-  void sendBuiltMessage(boost::asio::ip::udp::endpoint endpoint,
-                        bool fromRunner = true,
-                        bool async = true)
-  {
-    // One copy cannot be avoided.
-    auto buf = std::move(::capnp::messageToFlatArray(m_mallocMessageBuilder));
-    size_t size = ::capnp::computeSerializedSizeInWords(m_mallocMessageBuilder);
 
+  void sendMessage(boost::asio::ip::udp::endpoint endpoint,
+                   const messages::Message& msg,
+                   bool fromRunner = true,
+                   bool async = true)
+  {
     {
       // Lock the mutex when sending and unlock it when the data has been sent
       // in the handleSend function. This way, async sending is still fast when
@@ -447,13 +432,13 @@ class Communicator::UDPServer
         m_sendBufMutex.lock();
       }
 
-      auto bufBytes = buf.asBytes();
-      std::copy(bufBytes.begin(), bufBytes.end(), m_sendBufBytes.begin());
+      std::ostream sendOstream(&m_sendStreambuf);
+      cereal::BinaryOutputArchive oarchive(sendOstream);
+      oarchive(msg);
 
       if(async) {
         m_socket.async_send_to(
-          boost::asio::buffer(reinterpret_cast<std::byte*>(&m_sendBufBytes[0]),
-                              size * sizeof(::capnp::word)),
+          m_sendStreambuf,
           endpoint,
           boost::bind(&UDPServer::handleSend,
                       this,
@@ -461,10 +446,7 @@ class Communicator::UDPServer
                       boost::asio::placeholders::bytes_transferred,
                       &m_sendBufMutex));
       } else {
-        m_socket.send_to(
-          boost::asio::buffer(reinterpret_cast<std::byte*>(&m_sendBufBytes[0]),
-                              size * sizeof(::capnp::word)),
-          endpoint);
+        m_socket.send_to(m_sendStreambuf, endpoint);
 
         if(fromRunner) {
           m_sendBufMutex.unlock();
@@ -480,25 +462,16 @@ class Communicator::UDPServer
 
   udp::socket m_socket;
   udp::endpoint m_remoteEndpoint;
-  boost::array<::capnp::word, REC_BUF_SIZE / sizeof(::capnp::word)> m_recBuf;
+  boost::asio::streambuf m_recStreambuf;
 
   ClusterStatisticsPtr m_clusterStatistics;
 
-  static thread_local kj::FixedArray<::capnp::word,
-                                     REC_BUF_SIZE / sizeof(::capnp::word)>
-    m_sendBuf;
-  static thread_local boost::array<unsigned char, REC_BUF_SIZE> m_sendBufBytes;
-  static thread_local ::capnp::MallocMessageBuilder m_mallocMessageBuilder;
+  static thread_local boost::asio::streambuf m_sendStreambuf;
   static thread_local std::mutex m_sendBufMutex;
 };
 
-thread_local kj::FixedArray<::capnp::word, REC_BUF_SIZE / sizeof(::capnp::word)>
-  Communicator::UDPServer::m_sendBuf;
-thread_local boost::array<unsigned char, REC_BUF_SIZE>
-  Communicator::UDPServer::m_sendBufBytes;
+thread_local boost::asio::streambuf Communicator::UDPServer::m_sendStreambuf;
 thread_local std::mutex Communicator::UDPServer::m_sendBufMutex;
-thread_local ::capnp::MallocMessageBuilder
-  Communicator::UDPServer::m_mallocMessageBuilder;
 
 class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
 {
@@ -1088,12 +1061,10 @@ Communicator::sendCNFTreeNodeStatusRequest(int64_t targetId,
 {
   auto& statNode = m_clusterStatistics->getNode(targetId);
   auto* nn = statNode.getNetworkedNode();
-  auto msgBuilder = m_udpServer->getMessageBuilder();
-  auto req = msgBuilder.initCnfTreeNodeStatusRequest();
-  req.setCnfId(cnfId);
-  req.setPath(p);
-  req.setHandle(handle);
-  m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false);
+  messages::CNFTreeNodeStatusRequest request(handle, p, cnfId);
+  auto msg = m_udpServer->buildMessage();
+  msg.insert(std::move(request));
+  m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);
 }
 
 void
@@ -1110,32 +1081,33 @@ Communicator::tick()
   }
   checkAndTransmitClusterStatisticsChanges();
 
-  auto msg = m_udpServer->getMessageBuilder();
-  auto nodeStatus = msg.initNodeStatus();
-  nodeStatus.setWorkQueueSize(m_runner->getWorkQueueSize());
+  messages::NodeStatus::OptionalDaemon optionalDaemon = std::nullopt;
 
   if(m_config->isDaemonMode()) {
     auto daemon = m_config->getDaemon();
     assert(daemon);
 
-    auto daemonStruct = nodeStatus.initDaemon();
+    messages::Daemon daemonMsg;
 
     auto [contextMap, lock] = daemon->getContextMap();
-    auto contextList = daemonStruct.initContexts(contextMap.size());
-
-    auto contextStructIt = contextList.begin();
 
     for(auto& it : contextMap) {
       auto& context = *it.second;
-      contextStructIt->setOriginator(context.getOriginatorId());
-      contextStructIt->setState(static_cast<uint8_t>(context.getState()));
-      contextStructIt->setFactorySize(context.getFactoryQueueSize());
-      ++contextStructIt;
+      messages::DaemonContext ctx(context.getOriginatorId(),
+                                  static_cast<uint8_t>(context.getState()),
+                                  context.getFactoryQueueSize());
+      daemonMsg.addContext(std::move(ctx));
     }
+
+    optionalDaemon = daemonMsg;
   } else {
     auto client = m_config->getClient();
     assert(client);
   }
+
+  messages::NodeStatus nodeStatus(m_runner->getWorkQueueSize(), optionalDaemon);
+  messages::Message msg = m_udpServer->buildMessage();
+  msg.insert(std::move(nodeStatus));
 
   // Send built message to all other known nodes.
   auto [nodeMap, lock] = m_clusterStatistics->getNodeMap();
@@ -1144,7 +1116,7 @@ Communicator::tick()
     if(node.getId() != m_config->getInt64(Config::Id)) {
       auto nn = node.getNetworkedNode();
       if(node.getFullyKnown() && nn) {
-        m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false, true);
+        m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false, true);
       }
     }
   }

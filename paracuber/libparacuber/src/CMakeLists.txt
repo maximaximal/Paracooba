@@ -1,5 +1,6 @@
 add_subdirectory(cuber)
 add_subdirectory(webserver)
+add_subdirectory(messages)
 
 set(PARACUBER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/orchestrator.cpp
@@ -19,6 +20,7 @@ set(PARACUBER_SRCS
 
     ${CUBER_SRCS}
     ${WEBSERVER_SRCS}
+    ${MESSAGES_SRCS}
 
     ${CMAKE_CURRENT_SOURCE_DIR}/cadical_task.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/decision_task.cpp

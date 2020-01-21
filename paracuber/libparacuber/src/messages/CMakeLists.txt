@@ -1,0 +1,2 @@
+set(MESSAGES_SRCS
+    PARENT_SCOPE)
