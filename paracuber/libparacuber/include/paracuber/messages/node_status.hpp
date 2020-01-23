@@ -5,6 +5,7 @@
 #include <optional>
 
 #include <cereal/access.hpp>
+#include <cereal/types/optional.hpp>
 
 #include "daemon.hpp"
 

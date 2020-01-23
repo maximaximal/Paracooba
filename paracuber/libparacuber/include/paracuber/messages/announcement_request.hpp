@@ -16,7 +16,21 @@ namespace messages {
 class AnnouncementRequest
 {
   public:
-  explicit AnnouncementRequest() {}
+  AnnouncementRequest()
+    : nameMatch(false)
+  {}
+  AnnouncementRequest(const Node& requester)
+    : requester(requester)
+    , nameMatch(false)
+  {}
+  AnnouncementRequest(const Node& requester, const std::string& regex)
+    : requester(requester)
+    , nameMatch(regex)
+  {}
+  AnnouncementRequest(const Node& requester, int64_t id)
+    : requester(requester)
+    , nameMatch(id)
+  {}
   virtual ~AnnouncementRequest() {}
 
   enum NameMatch
@@ -41,6 +55,7 @@ class AnnouncementRequest
       return REGEX;
     if(std::holds_alternative<int64_t>(nameMatch))
       return ID;
+    return NO_RESTRICTION;
   }
 
   private:

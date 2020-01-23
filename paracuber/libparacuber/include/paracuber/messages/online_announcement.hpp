@@ -12,7 +12,13 @@ namespace messages {
 class OnlineAnnouncement
 {
   public:
-  explicit OnlineAnnouncement() {}
+  OnlineAnnouncement() {}
+  OnlineAnnouncement(const Node& node)
+    : node(node)
+  {}
+  OnlineAnnouncement(Node&& node)
+    : node(std::move(node))
+  {}
   virtual ~OnlineAnnouncement() {}
 
   const Node& getNode() const { return node; }

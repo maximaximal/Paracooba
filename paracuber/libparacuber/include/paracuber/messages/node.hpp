@@ -13,6 +13,27 @@ class Node
 {
   public:
   Node() {}
+  Node(const std::string& name,
+       int64_t id,
+       uint16_t availableWorkers,
+       uint64_t workQueueCapacity,
+       uint64_t workQueueSize,
+       uint64_t maximumCPUFrequency,
+       uint32_t uptime,
+       uint16_t udpListenPort,
+       uint16_t tcpListenPort,
+       bool daemonMode)
+    : name(name)
+    , id(id)
+    , availableWorkers(availableWorkers)
+    , workQueueCapacity(workQueueCapacity)
+    , workQueueSize(workQueueSize)
+    , maximumCPUFrequency(maximumCPUFrequency)
+    , uptime(uptime)
+    , udpListenPort(udpListenPort)
+    , tcpListenPort(tcpListenPort)
+    , daemonMode(daemonMode)
+  {}
   virtual ~Node() {}
 
   const std::string& getName() const { return name; };

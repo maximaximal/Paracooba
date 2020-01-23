@@ -9,8 +9,11 @@
 
 #include "../include/paracuber/messages/message.hpp"
 #include "../include/paracuber/messages/node.hpp"
+#include "paracuber/messages/announcement_request.hpp"
 #include "paracuber/messages/cnftree_node_status_reply.hpp"
 #include "paracuber/messages/cnftree_node_status_request.hpp"
+#include "paracuber/messages/offline_announcement.hpp"
+#include "paracuber/messages/online_announcement.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/asio/socket_base.hpp>
@@ -92,7 +95,7 @@ class Communicator::UDPServer
 
     m_socket.async_receive_from(
       // TODO
-      m_recStreambuf,
+      m_recStreambuf.prepare(REC_BUF_SIZE),
       m_remoteEndpoint,
       boost::bind(&UDPServer::handleReceive,
                   this,
@@ -438,7 +441,7 @@ class Communicator::UDPServer
 
       if(async) {
         m_socket.async_send_to(
-          m_sendStreambuf,
+          m_sendStreambuf.data(),
           endpoint,
           boost::bind(&UDPServer::handleSend,
                       this,
@@ -446,7 +449,7 @@ class Communicator::UDPServer
                       boost::asio::placeholders::bytes_transferred,
                       &m_sendBufMutex));
       } else {
-        m_socket.send_to(m_sendStreambuf, endpoint);
+        m_socket.send_to(m_sendStreambuf.data(), endpoint);
 
         if(fromRunner) {
           m_sendBufMutex.unlock();
@@ -1129,18 +1132,6 @@ Communicator::tick()
 }
 
 void
-setupNode(Node::Builder& n, Config& config)
-{
-  n.setName(std::string(config.getString(Config::LocalName)));
-  n.setId(config.getInt64(Config::Id));
-  n.setAvailableWorkers(config.getUint32(Config::ThreadCount));
-  n.setWorkQueueCapacity(config.getUint64(Config::WorkQueueCapacity));
-  n.setUdpListenPort(config.getUint16(Config::UDPListenPort));
-  n.setTcpListenPort(config.getUint16(Config::TCPListenPort));
-  n.setDaemonMode(config.isDaemonMode());
-}
-
-void
 Communicator::task_requestAnnounce(int64_t id,
                                    std::string regex,
                                    NetworkedNode* nn)
@@ -1150,27 +1141,28 @@ Communicator::task_requestAnnounce(int64_t id,
 
   PARACUBER_LOG(m_logger, Trace) << "Send announcement request.";
 
-  auto msg = m_udpServer->getMessageBuilder();
+  messages::Message msg = m_udpServer->buildMessage();
+  messages::Node node = m_config->buildNode();
 
-  auto req = msg.initAnnouncementRequest();
-  auto nameMatch = req.initNameMatch();
-
-  if(id != 0) {
-    nameMatch.setId(id);
-  } else if(regex != "") {
-    nameMatch.setRegex(regex);
-  }
-
-  auto requester = req.initRequester();
-  setupNode(requester, *m_config);
+  messages::AnnouncementRequest announcementRequest =
+    [&]() -> messages::AnnouncementRequest {
+    if(id != 0) {
+      return messages::AnnouncementRequest(node, id);
+    } else if(regex != "") {
+      return messages::AnnouncementRequest(node, regex);
+    } else {
+      return messages::AnnouncementRequest(node);
+    }
+  }();
 
   if(nn) {
-    m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false);
+    m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);
   } else {
-    m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
-                                    boost::asio::ip::address_v4::broadcast(),
-                                    m_config->getUint16(Config::UDPTargetPort)),
-                                  false);
+    m_udpServer->sendMessage(boost::asio::ip::udp::endpoint(
+                               boost::asio::ip::address_v4::broadcast(),
+                               m_config->getUint16(Config::UDPTargetPort)),
+                             msg,
+                             false);
   }
 }
 void
@@ -1180,20 +1172,17 @@ Communicator::task_announce(NetworkedNode* nn)
     return;
   PARACUBER_LOG(m_logger, Trace) << "Send announcement.";
 
-  auto msg = m_udpServer->getMessageBuilder();
-
-  auto req = msg.initOnlineAnnouncement();
-
-  auto node = req.initNode();
-  setupNode(node, *m_config);
+  auto msg = m_udpServer->buildMessage();
+  msg.insert(messages::OnlineAnnouncement(m_config->buildNode()));
 
   if(nn) {
-    m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false);
+    m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);
   } else {
-    m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
-                                    boost::asio::ip::address_v4::broadcast(),
-                                    m_config->getUint16(Config::UDPTargetPort)),
-                                  false);
+    m_udpServer->sendMessage(boost::asio::ip::udp::endpoint(
+                               boost::asio::ip::address_v4::broadcast(),
+                               m_config->getUint16(Config::UDPTargetPort)),
+                             msg,
+                             false);
   }
 }
 
@@ -1204,20 +1193,18 @@ Communicator::task_offlineAnnouncement(NetworkedNode* nn)
     return;
   PARACUBER_LOG(m_logger, Trace) << "Send offline announcement.";
 
-  auto msg = m_udpServer->getMessageBuilder();
-
-  auto off = msg.initOfflineAnnouncement();
-
-  off.setReason("Shutdown");
+  auto msg = m_udpServer->buildMessage();
+  msg.insert(messages::OfflineAnnouncement("Shutdown"));
 
   if(nn) {
-    m_udpServer->sendBuiltMessage(nn->getRemoteUdpEndpoint(), false);
+    m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);
   } else {
-    m_udpServer->sendBuiltMessage(boost::asio::ip::udp::endpoint(
-                                    boost::asio::ip::address_v4::broadcast(),
-                                    m_config->getUint16(Config::UDPTargetPort)),
-                                  false,
-                                  false);
+    m_udpServer->sendMessage(boost::asio::ip::udp::endpoint(
+                               boost::asio::ip::address_v4::broadcast(),
+                               m_config->getUint16(Config::UDPTargetPort)),
+                             msg,
+                             false,
+                             false);
   }
 }
 

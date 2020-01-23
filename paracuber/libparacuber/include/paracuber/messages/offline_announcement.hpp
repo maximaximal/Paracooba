@@ -12,7 +12,10 @@ namespace messages {
 class OfflineAnnouncement
 {
   public:
-  explicit OfflineAnnouncement() {}
+  OfflineAnnouncement() {}
+  OfflineAnnouncement(const std::string& reason)
+    : reason(reason)
+  {}
   virtual ~OfflineAnnouncement() {}
 
   const std::string& getReason() const { return reason; }

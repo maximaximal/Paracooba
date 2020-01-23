@@ -16,6 +16,10 @@ namespace webserver {
 class API;
 }
 
+namespace messages {
+class Node;
+}
+
 /** @brief Store for communication options specific for each node.
  *
  */
@@ -152,6 +156,8 @@ class Config
     return m_communicator;
   }
   bool hasCommunicator() { return m_communicator; }
+
+  messages::Node buildNode();
 
   private:
   friend class Client;

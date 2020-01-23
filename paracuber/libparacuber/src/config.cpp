@@ -1,4 +1,7 @@
 #include "../include/paracuber/config.hpp"
+#include "../include/paracuber/communicator.hpp"
+#include "../include/paracuber/messages/node.hpp"
+#include "../include/paracuber/runner.hpp"
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -216,5 +219,23 @@ Config::getInternalWebserverDefaultDocRoot()
   CHECK_PATH("../internalwebserver-docroot/")
   CHECK_PATH("/usr/local/share/paracuber/internalwebserver/")
   return "/usr/local/share/paracuber/internalwebserver/";
+}
+
+messages::Node
+Config::buildNode()
+{
+  uint64_t maxCPUFreq = 0;
+  uint64_t workQueueSize = getCommunicator()->getRunner()->getWorkQueueSize();
+  uint32_t uptime = 0;
+  return std::move(messages::Node(std::string(getString(Key::LocalName)),
+                                  getInt64(Key::Id),
+                                  getUint16(Key::ThreadCount),
+                                  getUint64(Key::WorkQueueCapacity),
+                                  workQueueSize,
+                                  maxCPUFreq,
+                                  uptime,
+                                  getUint16(Key::UDPListenPort),
+                                  getUint16(Key::TCPListenPort),
+                                  isDaemonMode()));
 }
 }
