@@ -16,6 +16,7 @@
 #include "paracuber/messages/online_announcement.hpp"
 
 #include <boost/asio.hpp>
+#include <boost/asio/buffer.hpp>
 #include <boost/asio/socket_base.hpp>
 #include <boost/bind.hpp>
 #include <cassert>
@@ -93,8 +94,9 @@ class Communicator::UDPServer
   {
     m_socket.set_option(boost::asio::socket_base::broadcast(true));
 
+    m_recStreambuf.consume(m_recStreambuf.size() + 1);
+
     m_socket.async_receive_from(
-      // TODO
       m_recStreambuf.prepare(REC_BUF_SIZE),
       m_remoteEndpoint,
       boost::bind(&UDPServer::handleReceive,
@@ -107,14 +109,21 @@ class Communicator::UDPServer
   {
     // No framing required. A single receive always maps directly to a message.
     if(!error || error == boost::asio::error::message_size) {
-      // Alignment handled by the creation of m_recBuf.
-
-      // TODO Reader
-
       messages::Message msg;
-      std::istream recIstream(&m_recStreambuf);
-      cereal::BinaryInputArchive iarchive(recIstream);
-      iarchive(msg);
+
+      try {
+        m_recStreambuf.commit(bytes);
+
+        std::istream recIstream(&m_recStreambuf);
+        cereal::BinaryInputArchive iarchive(recIstream);
+        iarchive(msg);
+      } catch(cereal::Exception& e) {
+        PARACUBER_LOG(m_logger, GlobalError)
+          << "Received invalid message, parsing threw serialisation exception! "
+             "Message: "
+          << e.what();
+        return;
+      }
 
       switch(msg.getType()) {
         case messages::Type::OnlineAnnouncement:
@@ -159,7 +168,6 @@ class Communicator::UDPServer
           handleCNFTreeNodeStatusReply(msg);
           break;
       }
-
       startReceive();
     } else {
       PARACUBER_LOG(m_logger, LocalError)
@@ -236,6 +244,8 @@ class Communicator::UDPServer
     const messages::AnnouncementRequest& announcementRequest =
       msg.getAnnouncementRequest();
     const messages::Node& requester = announcementRequest.getRequester();
+
+    PARACUBER_LOG(m_logger, Trace) << "REQUESTER: " << requester.getId();
 
     auto [statisticsNode, inserted] =
       m_clusterStatistics->getOrCreateNode(requester.getId());
@@ -401,11 +411,20 @@ class Communicator::UDPServer
 
   void handleSend(const boost::system::error_code& error,
                   std::size_t bytes,
-                  std::mutex* sendBufMutex)
+                  std::mutex* sendBufMutex,
+                  boost::asio::streambuf* sendStreambuf,
+                  size_t bytesToSend)
   {
     sendBufMutex->unlock();
 
+    sendStreambuf->consume(sendStreambuf->size() + 1);
+
     if(!error || error == boost::asio::error::message_size) {
+      if(bytes != bytesToSend) {
+        PARACUBER_LOG(m_logger, LocalError)
+          << "Only (asynchronously) sent " << bytes << " of target "
+          << bytesToSend << "!";
+      }
     } else {
       PARACUBER_LOG(m_logger, LocalError)
         << "Error sending data from UDP socket. Error: " << error.message();
@@ -420,7 +439,7 @@ class Communicator::UDPServer
   void sendMessage(boost::asio::ip::udp::endpoint endpoint,
                    const messages::Message& msg,
                    bool fromRunner = true,
-                   bool async = true)
+                   bool async = false)
   {
     {
       // Lock the mutex when sending and unlock it when the data has been sent
@@ -435,9 +454,13 @@ class Communicator::UDPServer
         m_sendBufMutex.lock();
       }
 
-      std::ostream sendOstream(&m_sendStreambuf);
-      cereal::BinaryOutputArchive oarchive(sendOstream);
-      oarchive(msg);
+      {
+        std::ostream sendOstream(&m_sendStreambuf);
+        cereal::BinaryOutputArchive oarchive(sendOstream);
+        oarchive(msg);
+      }
+
+      size_t bytesToSend = m_sendStreambuf.size();
 
       if(async) {
         m_socket.async_send_to(
@@ -447,9 +470,17 @@ class Communicator::UDPServer
                       this,
                       boost::asio::placeholders::error,
                       boost::asio::placeholders::bytes_transferred,
-                      &m_sendBufMutex));
+                      &m_sendBufMutex,
+                      &m_sendStreambuf,
+                      bytesToSend));
       } else {
-        m_socket.send_to(m_sendStreambuf.data(), endpoint);
+        size_t bytes = m_socket.send_to(m_sendStreambuf.data(), endpoint);
+        if(bytes != bytesToSend) {
+          PARACUBER_LOG(m_logger, LocalError)
+            << "Only (synchronously) sent " << bytes << " of target "
+            << bytesToSend << "!";
+        }
+        m_sendStreambuf.consume(m_sendStreambuf.size() + 1);
 
         if(fromRunner) {
           m_sendBufMutex.unlock();
@@ -1154,6 +1185,7 @@ Communicator::task_requestAnnounce(int64_t id,
       return messages::AnnouncementRequest(node);
     }
   }();
+  msg.insert(std::move(announcementRequest));
 
   if(nn) {
     m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);

@@ -15,7 +15,7 @@ class Node
   Node() {}
   Node(const std::string& name,
        int64_t id,
-       uint16_t availableWorkers,
+       uint32_t availableWorkers,
        uint64_t workQueueCapacity,
        uint64_t workQueueSize,
        uint64_t maximumCPUFrequency,
@@ -38,7 +38,7 @@ class Node
 
   const std::string& getName() const { return name; };
   int64_t getId() const { return id; }
-  uint16_t getAvailableWorkers() const { return availableWorkers; }
+  uint32_t getAvailableWorkers() const { return availableWorkers; }
   uint64_t getWorkQueueCapacity() const { return workQueueCapacity; }
   uint64_t getWorkQueueSize() const { return workQueueSize; }
   uint64_t getMaximumCPUFrequency() const { return maximumCPUFrequency; }
@@ -51,7 +51,7 @@ class Node
   friend class cereal::access;
 
   int64_t id;
-  uint16_t availableWorkers;
+  uint32_t availableWorkers;
   uint64_t workQueueCapacity;
   uint64_t workQueueSize;
   uint64_t maximumCPUFrequency;

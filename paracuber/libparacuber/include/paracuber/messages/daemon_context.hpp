@@ -12,13 +12,13 @@ namespace messages {
 class DaemonContext
 {
   public:
-  DaemonContext();
+  DaemonContext() {}
   DaemonContext(int64_t originator, uint8_t state, uint64_t factorySize)
     : originator(originator)
     , state(state)
     , factorySize(factorySize)
   {}
-  ~DaemonContext();
+  ~DaemonContext() {}
 
   int64_t getOriginator() const { return originator; }
   uint8_t getState() const { return state; }

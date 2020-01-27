@@ -25,6 +25,15 @@ class CNFTreeNodeStatusReply
   {
     uint8_t state;
     int32_t literal;
+
+    private:
+    friend class cereal::access;
+
+    template<class Archive>
+    void serialize(Archive& ar)
+    {
+      ar(state, literal);
+    }
   };
 
   using NodeVector = std::vector<Node>;

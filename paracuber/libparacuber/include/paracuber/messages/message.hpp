@@ -16,10 +16,26 @@
 
 #define PARACUBER_MESSAGES_MESSAGE_GETSET_BODY(NAME)             \
   const NAME& get##NAME() const { return std::get<NAME>(body); } \
-  void insert##NAME(const NAME& val) { body = val; }             \
-  void insert##NAME(const NAME&& val) { body = std::move(val); } \
-  void insert(const NAME& val) { body = std::move(val); }        \
-  void insert(const NAME&& val) { body = std::move(val); }
+  Message insert##NAME(const NAME& val)                          \
+  {                                                              \
+    body = val;                                                  \
+    return *this;                                                \
+  }                                                              \
+  Message insert##NAME(const NAME&& val)                         \
+  {                                                              \
+    body = std::move(val);                                       \
+    return *this;                                                \
+  }                                                              \
+  Message insert(const NAME& val)                                \
+  {                                                              \
+    body = val;                                                  \
+    return *this;                                                \
+  }                                                              \
+  Message insert(const NAME&& val)                               \
+  {                                                              \
+    body = std::move(val);                                       \
+    return *this;                                                \
+  }
 
 namespace paracuber {
 namespace messages {

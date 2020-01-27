@@ -33,6 +33,12 @@ TypeToStr(Type type)
   }
   return "Unknown Type";
 }
+
+inline std::ostream&
+operator<<(std::ostream& o, Type t)
+{
+  return o << TypeToStr(t);
+}
 }
 }
 

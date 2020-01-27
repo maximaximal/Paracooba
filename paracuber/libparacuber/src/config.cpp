@@ -218,6 +218,7 @@ Config::getInternalWebserverDefaultDocRoot()
 {
   CHECK_PATH("../internalwebserver-docroot/")
   CHECK_PATH("/usr/local/share/paracuber/internalwebserver/")
+  CHECK_PATH("/usr/share/paracuber/internalwebserver/")
   return "/usr/local/share/paracuber/internalwebserver/";
 }
 
@@ -229,7 +230,7 @@ Config::buildNode()
   uint32_t uptime = 0;
   return std::move(messages::Node(std::string(getString(Key::LocalName)),
                                   getInt64(Key::Id),
-                                  getUint16(Key::ThreadCount),
+                                  getUint32(Key::ThreadCount),
                                   getUint64(Key::WorkQueueCapacity),
                                   workQueueSize,
                                   maxCPUFreq,
