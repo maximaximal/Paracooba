@@ -8,7 +8,6 @@
 #include "../include/paracuber/task_factory.hpp"
 #include <algorithm>
 #include <boost/iterator/filter_iterator.hpp>
-#include <capnp-schemas/message.capnp.h>
 
 namespace paracuber {
 
