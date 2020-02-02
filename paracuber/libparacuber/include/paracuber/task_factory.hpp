@@ -85,6 +85,12 @@ class TaskFactory
   ProducedTask produceCubeOrSolveTask(std::unique_ptr<TaskSkeleton> skel);
   ProducedTask produceSolveTask(std::unique_ptr<TaskSkeleton> skel);
 
+  CaDiCaLMgr* getCaDiCaLMgr()
+  {
+    assert(m_cadicalMgr);
+    return m_cadicalMgr.get();
+  }
+
   private:
   ConfigPtr m_config;
   Logger m_logger;

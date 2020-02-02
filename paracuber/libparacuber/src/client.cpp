@@ -82,24 +82,7 @@ Client::solve()
       return;
     }
 
-    // If local solving is enabled, create a new task to solve the parsed
-    // formula.
-    if(m_config->isClientCaDiCaLEnabled()) {
-      auto task = std::make_unique<CaDiCaLTask>(
-        static_cast<CaDiCaLTask&>(result.getTask()));
-      task->setMode(CaDiCaLTask::Solve);
-      auto& finishedSignal = task->getFinishedSignal();
-      task->readDIMACSFile(getDIMACSSourcePathFromConfig());
-      m_communicator->getRunner()->push(std::move(task),
-                                        m_config->getInt64(Config::Id));
-      finishedSignal.connect([this](const TaskResult& result) {
-        // Finished solving using client CaDiCaL!
-        m_status = result.getStatus();
-        m_communicator->exit();
-      });
-    }
-
-    // Formula has been parsed successfully and local solver has been started.
+    // Formula has been parsed successfully
     // The internal CNF can therefore now be fully initialised with this root
     // CNF solver task. The root CNF now has a valid unique_ptr to a completely
     // parsed CaDiCaL task.
@@ -123,6 +106,24 @@ Client::solve()
     // knows how many decisions are left in any given path.
     m_taskFactory = std::make_unique<TaskFactory>(m_config, m_log, m_rootCNF);
     m_taskFactory->setRootTask(m_rootCNF->getRootTask());
+
+    // If local solving is enabled, create a new task to solve the parsed
+    // formula.
+    if(m_config->isClientCaDiCaLEnabled()) {
+      auto task = std::make_unique<CaDiCaLTask>(
+        static_cast<CaDiCaLTask&>(*m_rootCNF->getRootTask()));
+      task->setMode(CaDiCaLTask::Solve);
+      task->setCaDiCaLMgr(m_taskFactory->getCaDiCaLMgr());
+      auto& finishedSignal = task->getFinishedSignal();
+      task->readDIMACSFile(getDIMACSSourcePathFromConfig());
+      m_communicator->getRunner()->push(std::move(task),
+                                        m_config->getInt64(Config::Id));
+      finishedSignal.connect([this](const TaskResult& result) {
+        // Finished solving using client CaDiCaL!
+        m_status = result.getStatus();
+        m_communicator->exit();
+      });
+    }
 
     m_taskFactory->addPath(
       0, TaskFactory::CubeOrSolve, m_config->getInt64(Config::Id));
