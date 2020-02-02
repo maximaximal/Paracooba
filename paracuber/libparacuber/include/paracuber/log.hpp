@@ -24,16 +24,19 @@ using MutableConstant = boost::log::attributes::mutable_constant<T>;
 extern thread_local MutableConstant<int> lineAttr;
 extern thread_local MutableConstant<const char*> fileAttr;
 extern thread_local MutableConstant<const char*> functionAttr;
+extern thread_local MutableConstant<std::string> threadNameAttr;
+extern thread_local std::string paracCurrentThreadName;
 
 #define PARACUBER_LOG_LOCATION(lg) \
   lineAttr.set(__LINE__);          \
   fileAttr.set(FILE_BASENAME);     \
   functionAttr.set(__PRETTY_FUNCTION__);
 
-#define PARACUBER_LOG(LOGGER, SEVERITY) \
-  do {                                  \
-    PARACUBER_LOG_LOCATION(LOGGER)      \
-  } while(false);                       \
+#define PARACUBER_LOG(LOGGER, SEVERITY)         \
+  do {                                          \
+    PARACUBER_LOG_LOCATION(LOGGER)              \
+    threadNameAttr.set(paracCurrentThreadName); \
+  } while(false);                               \
   BOOST_LOG_SEV(LOGGER, ::paracuber::Log::Severity::SEVERITY)
 
 namespace paracuber {

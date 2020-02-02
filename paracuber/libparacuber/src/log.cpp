@@ -52,8 +52,10 @@ thread_local MutableConstant<const char*> fileAttr =
   MutableConstant<const char*>("");
 thread_local MutableConstant<const char*> functionAttr =
   MutableConstant<const char*>("");
+thread_local MutableConstant<std::string> threadNameAttr =
+  MutableConstant<std::string>("");
 thread_local bool threadNameAttrSet = false;
-thread_local Constant<std::string> threadNameAttr = Constant<std::string>("");
+thread_local std::string paracCurrentThreadName = "";
 
 namespace paracuber {
 
@@ -137,8 +139,8 @@ createGenericLogger(const std::string& context, const std::string& meta)
     std::string threadName = context;
     if(meta != "")
       threadName += "<" + meta + ">";
-    threadNameAttr = boost::log::attributes::make_constant(threadName);
     threadNameAttrSet = true;
+    paracCurrentThreadName = threadName;
   }
   lg.add_attribute("ThreadName", threadNameAttr);
 
