@@ -92,6 +92,10 @@ if(DOXYGEN_FOUND)
 	)
 endif(DOXYGEN_FOUND)
 
+install(
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/parac.sh
+    DESTINATION /usr/share/bash-completion/completions)
+
 # Packaging
 set(CPACK_GENERATOR "DEB")
 
