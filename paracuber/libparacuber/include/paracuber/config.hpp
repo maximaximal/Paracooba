@@ -44,6 +44,7 @@ class Config
     TickMilliseconds,
     HTTPListenPort,
     HTTPDocRoot,
+    LogToSTDOUT,
 
     FreqCuberCutoff,
 
@@ -131,6 +132,8 @@ class Config
   /** @brief Set daemon mode active. */
   inline void setDaemonMode(bool v) { m_daemonMode = v; }
 
+  /** @brief Check if STDOUT should be used for logging instead of CLOG. */
+  inline bool useSTDOUTForLogging() { return m_useSTDOUTForLogging; }
   /** @brief Check if direct client-side solving via CaDiCaL is enabled. */
   inline bool isClientCaDiCaLEnabled() { return !m_disableClientCaDiCaL; }
   /** @brief Check if internal webserver is enabled. */
@@ -179,6 +182,7 @@ class Config
   bool m_infoMode = false;
   bool m_daemonMode = false;
   bool m_disableClientCaDiCaL = false;
+  bool m_useSTDOUTForLogging = false;
 #ifdef ENABLE_INTERNAL_WEBSERVER
   bool m_enableInternalWebserver = true;
 #else
@@ -228,6 +232,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "tick-milliseconds";
     case Config::MaxNodeUtilization:
       return "max-node-utilization";
+    case Config::LogToSTDOUT:
+      return "log-to-stdout";
     default:
       return "";
   }

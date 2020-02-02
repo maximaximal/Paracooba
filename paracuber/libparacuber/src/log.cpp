@@ -101,8 +101,10 @@ Log::Log(ConfigPtr config)
     BOOST_THROW_EXCEPTION(e);
   }
   try {
+    auto &targetStream = m_config->useSTDOUTForLogging() ? std::cout : std::clog;
+
     m_consoleSink = logging::add_console_log(
-      std::clog,
+      targetStream,
       keywords::format =
         (expr::stream
          << "[" << paracuber_logger_timestamp << "] ["
