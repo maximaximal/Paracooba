@@ -299,6 +299,7 @@ class Communicator::UDPServer
 
     auto [statisticsNode, inserted] = m_clusterStatistics->getOrCreateNode(id);
 
+    statisticsNode.statusReceived();
     applyMessageNodeStatusToStatsNode(
       nodeStatus, statisticsNode, *m_communicator->m_config);
 
@@ -1120,6 +1121,9 @@ Communicator::tick()
   if(m_config->isDaemonMode()) {
     auto daemon = m_config->getDaemon();
     assert(daemon);
+
+    // Tick the daemon -> this could remove some connections.
+    daemon->tick();
 
     messages::Daemon daemonMsg;
 

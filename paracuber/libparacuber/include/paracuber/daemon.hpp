@@ -48,6 +48,11 @@ class Daemon
     TaskFactory* getTaskFactory() { return m_taskFactory.get(); };
 
     private:
+    friend class Daemon;
+
+    void tick();
+    void forget(const std::string& reason);
+
     std::shared_ptr<CNF> m_rootCNF;
     std::unique_ptr<TaskFactory> m_taskFactory;
     int64_t m_originatorID = 0;
@@ -73,12 +78,17 @@ class Daemon
 
   using ContextMap = std::map<int64_t, std::unique_ptr<Context>>;
 
+  UniqueLockView<ContextMap&> getUniqueContextMap();
   ConstSharedLockView<ContextMap> getContextMap();
   SharedLockView<Context*> getContext(int64_t id);
 
   std::pair<Context&, bool> getOrCreateContext(int64_t id);
 
+  void tick();
+
   private:
+  void forgetAboutContext(int64_t id);
+
   std::shared_ptr<Config> m_config;
   ContextMap m_contextMap;
   std::shared_mutex m_contextMapMutex;

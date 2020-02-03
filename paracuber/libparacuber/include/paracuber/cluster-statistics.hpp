@@ -5,6 +5,7 @@
 #include "log.hpp"
 #include "util.hpp"
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -189,6 +190,25 @@ class ClusterStatistics
                       static_cast<uint64_t>(m_availableWorkers));
     }
 
+    void statusReceived()
+    {
+      auto now = std::chrono::system_clock::now();
+      auto durationSinceLastStatus = now - m_lastStatusReceived;
+      m_lastStatusReceived = now;
+      m_acc_durationSinceLastStatus(durationSinceLastStatus);
+    }
+
+    std::chrono::duration<double> getDurationSinceLastStatus() const
+    {
+      auto now = std::chrono::system_clock::now();
+      return now - m_lastStatusReceived;
+    }
+
+    std::chrono::duration<double> getMeanDurationSinceLastStatus() const
+    {
+      return ::boost::accumulators::rolling_mean(m_acc_durationSinceLastStatus);
+    }
+
     using TaskFactoryVector = std::vector<TaskFactory*>;
     void applyTaskFactoryVector(const TaskFactoryVector& v);
 
@@ -198,6 +218,8 @@ class ClusterStatistics
     std::string m_name = "Unknown";
     std::string m_host = "";
     std::unique_ptr<NetworkedNode> m_networkedNode;
+
+    std::chrono::time_point<std::chrono::system_clock> m_lastStatusReceived;
 
     uint16_t m_maximumCPUFrequency = 0;
     uint16_t m_availableWorkers = 0;
@@ -222,6 +244,11 @@ class ClusterStatistics
       uint64_t,
       ::boost::accumulators::stats<::boost::accumulators::tag::rolling_mean>>
       m_acc_workQueueSize;
+
+    ::boost::accumulators::accumulator_set<
+      std::chrono::duration<double>,
+      ::boost::accumulators::stats<::boost::accumulators::tag::rolling_mean>>
+      m_acc_durationSinceLastStatus;
 
     bool operator=(const Node& n) { return m_id == n.m_id; }
 

@@ -15,6 +15,8 @@ ClusterStatistics::Node::Node(bool& changed, int64_t thisId, int64_t id)
   : m_changed(changed)
   , m_acc_workQueueSize(boost::accumulators::tag::rolling_window::window_size =
                           20)
+  , m_acc_durationSinceLastStatus(
+      boost::accumulators::tag::rolling_window::window_size = 20)
   , m_thisId(thisId)
   , m_id(id)
 {}
@@ -37,6 +39,8 @@ ClusterStatistics::Node::Node(Node&& o) noexcept
   , m_thisId(o.m_thisId)
   , m_acc_workQueueSize(boost::accumulators::tag::rolling_window::window_size =
                           20)
+  , m_acc_durationSinceLastStatus(
+      boost::accumulators::tag::rolling_window::window_size = 20)
 {}
 ClusterStatistics::Node::~Node() {}
 
