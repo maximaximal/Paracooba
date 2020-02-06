@@ -17,31 +17,44 @@ namespace messages {
 class JobInitiator
 {
   public:
-  JobInitiator(CubingKind cubingKind)
-    : cubingKind(cubingKind)
-  {}
-  ~JobInitiator() {}
-
+  /** MUST MATCH CUBING KIND IN CNF! */
   enum CubingKind
   {
     LiteralFrequency,
     PregeneratedCubes
   };
 
+  JobInitiator() {}
+  JobInitiator(CubingKind cubingKind)
+    : cubingKind(cubingKind)
+  {}
+  ~JobInitiator() {}
+
   CubingKind getCubingKind() const { return cubingKind; }
 
+  using LiteralMap = std::vector<int>;
   using CubeMap = std::vector<int>;
   using JumpList = std::vector<size_t>;
 
+  LiteralMap& initLiteralMap()
+  {
+    cubingKind = LiteralFrequency;
+    return intVec;
+  }
   CubeMap& initCubeMap()
   {
-    assert(getCubingKind() == PregeneratedCubes);
-    return optionalCubeMap.emplace(std::move(CubeMap()));
+    cubingKind = PregeneratedCubes;
+    return intVec;
   }
   const CubeMap& getCubeMap() const
   {
     assert(getCubingKind() == PregeneratedCubes);
-    return optionalCubeMap.value();
+    return intVec;
+  }
+  const LiteralMap& getLiteralMap() const
+  {
+    assert(getCubingKind() == LiteralFrequency);
+    return intVec;
   }
   size_t getCubeCount() const { return cubeCount; }
 
@@ -53,7 +66,6 @@ class JobInitiator
   void realise()
   {
     assert(getCubingKind() == PregeneratedCubes);
-    assert(optionalCubeMap.has_value());
     assert(!optionalJumpList.has_value());
 
     auto& cubeMap = getCubeMap();
@@ -72,12 +84,10 @@ class JobInitiator
   const int* getCube(size_t i) const
   {
     assert(getCubingKind() == PregeneratedCubes);
-    assert(optionalCubeMap.has_value());
     assert(optionalJumpList.has_value());
-    auto& cubeMap = optionalCubeMap.value();
     auto& jumpList = optionalJumpList.value();
     assert(i < jumpList.size());
-    return cubeMap.data() + jumpList[i];
+    return intVec.data() + jumpList[i];
   }
   const int* operator[](size_t i) const { return getCube(i); }
 
@@ -85,16 +95,18 @@ class JobInitiator
   friend class cereal::access;
 
   CubingKind cubingKind;
-  std::optional<CubeMap> optionalCubeMap;
+  std::vector<int> intVec;
   std::optional<JumpList> optionalJumpList;
   size_t cubeCount;
 
   template<class Archive>
   void serialize(Archive& ar)
   {
-    ar(CEREAL_NVP(cubingKind),
-       CEREAL_NVP(optionalCubeMap),
-       CEREAL_NVP(cubeCount));
+    ar(CEREAL_NVP(cubingKind), CEREAL_NVP(intVec), CEREAL_NVP(cubeCount));
+
+    // This immediately realises the jumplist on receive.
+    if(cubingKind == PregeneratedCubes && !optionalJumpList.has_value())
+      realise();
   }
 };
 }

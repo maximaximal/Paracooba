@@ -4,6 +4,7 @@
 #include "cluster-statistics.hpp"
 #include "cnftree.hpp"
 #include "log.hpp"
+#include "messages/jobdescription_transmitter.hpp"
 #include "readywaiter.hpp"
 #include "webserver/initiator.hpp"
 
@@ -45,7 +46,9 @@ using ClusterStatisticsPtr = std::shared_ptr<ClusterStatistics>;
  *
  * \dotfile solver-network-flow.dot
  */
-class Communicator : public std::enable_shared_from_this<Communicator>
+class Communicator
+  : public std::enable_shared_from_this<Communicator>
+  , public messages::JobDescriptionTransmitter
 {
   public:
   class UDPServer;
@@ -86,11 +89,10 @@ class Communicator : public std::enable_shared_from_this<Communicator>
     return m_currentMessageId++;
   }
 
-  enum class TCPClientMode
+  enum class TCPMode
   {
     TransmitCNF,
-    TransmitAllowanceMap,
-    TransmitCNFResult
+    TransmitJobDescription
   };
 
   void sendCNFToNode(std::shared_ptr<CNF> cnf,
@@ -117,6 +119,10 @@ class Communicator : public std::enable_shared_from_this<Communicator>
                                     int64_t cnfId,
                                     CNFTree::Path p,
                                     int64_t handle);
+
+  virtual void transmitJobDescription(const messages::JobDescription& jd,
+                                      NetworkedNode* nn,
+                                      std::function<void()> sendFinishedCB);
 
   private:
   friend class webserver::API;
@@ -162,7 +168,7 @@ class Communicator : public std::enable_shared_from_this<Communicator>
 };
 
 std::ostream&
-operator<<(std::ostream& o, Communicator::TCPClientMode mode);
+operator<<(std::ostream& o, Communicator::TCPMode mode);
 
 using CommunicatorPtr = std::shared_ptr<Communicator>;
 }

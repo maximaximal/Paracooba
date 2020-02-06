@@ -6,6 +6,9 @@
 #include "../include/paracuber/cuber/registry.hpp"
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task_factory.hpp"
+#include "paracuber/messages/job_initiator.hpp"
+#include "paracuber/messages/job_result.hpp"
+#include "paracuber/messages/jobdescription.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
@@ -51,6 +54,7 @@ CNF::CNF(ConfigPtr config,
   }
 
   connectToCNFTreeSignal();
+  m_jobDescriptionTransmitter = config->getCommunicator();
 }
 CNF::CNF(const CNF& o)
   : m_config(o.m_config)
@@ -59,6 +63,7 @@ CNF::CNF(const CNF& o)
   , m_log(o.m_log)
   , m_logger(o.m_log->createLogger("CNF"))
   , m_cnfTree(std::make_unique<CNFTree>(o.m_config, o.m_originId))
+  , m_jobDescriptionTransmitter(o.m_jobDescriptionTransmitter)
 {
   connectToCNFTreeSignal();
 }
@@ -66,79 +71,40 @@ CNF::CNF(const CNF& o)
 CNF::~CNF() {}
 
 void
-CNF::send(boost::asio::ip::tcp::socket* socket,
-          CNFTree::Path path,
-          SendFinishedCB cb,
-          bool first)
+CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
 {
   SendDataStruct* data = &m_sendData[socket];
 
   if(first) {
     data->cb = cb;
     data->offset = 0;
-
-    // Write the subject.
-    TransmissionSubject subject = TransmitFormula;
-    socket->write_some(boost::asio::buffer(
-      reinterpret_cast<const char*>(&subject), sizeof(subject)));
-
-    // Write the originator ID.
-    int64_t id = m_config->getInt64(Config::Id);
-    socket->write_some(
-      boost::asio::buffer(reinterpret_cast<const char*>(&id), sizeof(id)));
-
-    // Send the path to use.
-    socket->write_some(
-      boost::asio::buffer(reinterpret_cast<const char*>(&path), sizeof(path)));
   }
 
-  if(path == 0) {
-    if(first) {
-      // Send the filename, so that the used compression algorithm can be known.
-      // Also transfer the terminating \0.
-      boost::filesystem::path p(m_dimacsFile);
-      std::string dimacsBasename = p.filename().string();
-      socket->write_some(
-        boost::asio::buffer(dimacsBasename.c_str(), dimacsBasename.size() + 1));
+  if(first) {
+    // Send the filename, so that the used compression algorithm can be known.
+    // Also transfer the terminating \0.
+    boost::filesystem::path p(m_dimacsFile);
+    std::string dimacsBasename = p.filename().string();
+    socket->write_some(
+      boost::asio::buffer(dimacsBasename.c_str(), dimacsBasename.size() + 1));
 
-      first = false;
-    }
-
-    // This is the root CNF, send over the file directly using the sendfile()
-    // syscall.
-    int ret =
-      sendfile(socket->native_handle(), m_fd, &data->offset, m_fileSize);
-    if(ret == -1) {
-      std::cerr << "ERROR DURING SENDFILE: " << strerror(errno) << std::endl;
-      m_sendData.erase(socket);
-    }
-
-    socket->async_write_some(boost::asio::null_buffers(),
-                             std::bind(&CNF::sendCB, this, data, path, socket));
-  } else {
     first = false;
-
-    // Transmit all decisions on the given path.
-    data->decisions.reserve(CNFTree::getDepth(path) - 1);
-    std::shared_lock lock(m_cnfTreeMutex);
-    m_cnfTree->writePathToLiteralContainer(
-      data->decisions, CNFTree::setDepth(path, CNFTree::getDepth(path) - 1));
-
-    // After this async write operation has finished, the local data can be
-    // erased again. This happens when the file offset reaches the file size, so
-    // the file offset is set to the filesize in this statement.
-    data->offset = m_fileSize;
-
-    socket->async_write_some(
-      boost::asio::buffer(reinterpret_cast<const char*>(data->decisions.data()),
-                          data->decisions.size() * sizeof(CNFTree::CubeVar)),
-      std::bind(&CNF::sendCB, this, data, path, socket));
   }
+
+  // This is the root CNF, send over the file directly using the sendfile()
+  // syscall.
+  int ret = sendfile(socket->native_handle(), m_fd, &data->offset, m_fileSize);
+  if(ret == -1) {
+    std::cerr << "ERROR DURING SENDFILE: " << strerror(errno) << std::endl;
+    m_sendData.erase(socket);
+  }
+
+  socket->async_write_some(boost::asio::null_buffers(),
+                           std::bind(&CNF::sendCB, this, data, socket));
 }
 
 void
-CNF::sendAllowanceMap(boost::asio::ip::tcp::socket* socket,
-                      SendFinishedCB finishedCallback)
+CNF::sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCallback)
 {
   assert(rootTaskReady.isReady());
   assert(m_cuberRegistry->allowanceMapWaiter.isReady());
@@ -148,30 +114,17 @@ CNF::sendAllowanceMap(boost::asio::ip::tcp::socket* socket,
   // The allowance map may take a while to generate.
   assert(map.size() > 0);
 
-  // Write the subject (an AllowanceMap).
-  TransmissionSubject subject = TransmitAllowanceMap;
-  socket->write_some(boost::asio::buffer(
-    reinterpret_cast<const char*>(&subject), sizeof(subject)));
+  auto initiator = messages::JobInitiator(
+    static_cast<messages::JobInitiator::CubingKind>(m_cubingKind));
+  initiator.initLiteralMap() = map;
+  messages::JobDescription jd(m_originId);
+  jd.insert(initiator);
 
-  // Write the originator ID.
-  int64_t id = m_config->getInt64(Config::Id);
-  socket->write_some(
-    boost::asio::buffer(reinterpret_cast<const char*>(&id), sizeof(id)));
-
-  // Write the map size.
-  uint32_t mapSize = map.size();
-  socket->write_some(boost::asio::buffer(
-    reinterpret_cast<const char*>(&mapSize), sizeof(mapSize)));
-
-  // Write the map itself asynchronously.
-  socket->async_write_some(
-    boost::asio::buffer(reinterpret_cast<const char*>(map.data()),
-                        mapSize * sizeof(map[0])),
-    std::bind(finishedCallback));
+  m_jobDescriptionTransmitter->transmitJobDescription(jd, nn, finishedCallback);
 }
 
 void
-CNF::sendResult(boost::asio::ip::tcp::socket* socket,
+CNF::sendResult(NetworkedNode* nn,
                 CNFTree::Path p,
                 SendFinishedCB finishedCallback)
 {
@@ -188,44 +141,28 @@ CNF::sendResult(boost::asio::ip::tcp::socket* socket,
   }
   auto& result = resultIt->second;
 
-  // Write the subject (a Result).
-  TransmissionSubject subject = TransmitResult;
-  socket->write_some(boost::asio::buffer(
-    reinterpret_cast<const char*>(&subject), sizeof(subject)));
+  messages::JobResult::State jobResultState = [&result]() {
+    switch(result.state) {
+      case CNFTree::SAT:
+        return messages::JobResult::State::SAT;
+      case CNFTree::UNSAT:
+        return messages::JobResult::State::UNSAT;
+      default:
+        return messages::JobResult::State::UNKNOWN;
+    }
+  }();
 
-  // Write the originator ID.
-  int64_t id = m_config->getInt64(Config::Id);
-  socket->write_some(
-    boost::asio::buffer(reinterpret_cast<const char*>(&id), sizeof(id)));
+  auto jobResult = messages::JobResult(result.p, jobResultState);
 
-  // Write the path.
-  socket->write_some(
-    boost::asio::buffer(reinterpret_cast<const char*>(&p), sizeof(p)));
-
-  // Write the result state from the CNFTree.
-  socket->write_some(boost::asio::buffer(
-    reinterpret_cast<const char*>(&result.state), sizeof(result.state)));
-
-  // Write the result size.
-  uint32_t resultSize = result.size;
-  socket->write_some(boost::asio::buffer(
-    reinterpret_cast<const char*>(&resultSize), sizeof(resultSize)));
-
-  if(result.state == CNFTree::SAT) {
-    // Encoded assignment required.
+  if(jobResultState == messages::JobResult::State::SAT) {
     result.encodeAssignment();
-
-    // Write the full result.
-    socket->async_write_some(
-      boost::asio::buffer(
-        reinterpret_cast<const char*>(result.encodedAssignment->data()),
-        result.encodedAssignment->size() *
-          sizeof((*result.encodedAssignment)[0])),
-      std::bind(finishedCallback));
-  } else {
-    // Write the UNSAT proof.
-    finishedCallback();
+    jobResult.initDataVec() = *result.encodedAssignment;
   }
+
+  auto jd = messages::JobDescription(m_originId);
+  jd.insert(jobResult);
+
+  m_jobDescriptionTransmitter->transmitJobDescription(jd, nn, finishedCallback);
 }
 
 void
@@ -251,9 +188,7 @@ CNF::connectToCNFTreeSignal()
 }
 
 void
-CNF::sendCB(SendDataStruct* data,
-            CNFTree::Path path,
-            boost::asio::ip::tcp::socket* socket)
+CNF::sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket)
 {
   if(data->offset >= m_fileSize) {
     data->cb();
@@ -265,7 +200,7 @@ CNF::sendCB(SendDataStruct* data,
     m_sendData.erase(socket);
   } else {
     // Repeated sends, as long as the file is transferred.
-    send(socket, path, data->cb, false);
+    send(socket, data->cb, false);
   }
 }
 bool
@@ -386,14 +321,7 @@ receiveValueFromBuffer(CNF::ReceiveDataStruct& d, char** buf, std::size_t* len)
   return returnVal;
 }
 
-#define ERASE_AND_RETURN_SUBJECT()        \
-  {                                       \
-    TransmissionSubject subj = d.subject; \
-    m_receiveData.erase(socket);          \
-    return subj;                          \
-  }
-
-CNF::TransmissionSubject
+void
 CNF::receive(boost::asio::ip::tcp::socket* socket,
              char* buf,
              std::size_t length)
@@ -405,62 +333,6 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
 
   while(length > 0 || buf == nullptr) {
     switch(d.state) {
-      case ReceiveTransmissionSubject:
-        if(length < (sizeof(TransmissionSubject) + sizeof(int64_t))) {
-          // Remote has directly aborted the transmission.
-          PARACUBER_LOG(m_logger, GlobalError)
-            << "Remote "
-            << ((socket != nullptr)
-                  ? socket->remote_endpoint().address().to_string()
-                  : "(Unknwon)")
-            << " aborted TCP transmission before transmitting subject.";
-          ERASE_AND_RETURN_SUBJECT()
-        }
-        d.subject = *reinterpret_cast<TransmissionSubject*>(buf);
-        buf += sizeof(TransmissionSubject);
-        length -= sizeof(TransmissionSubject);
-
-        d.originator = *reinterpret_cast<int64_t*>(buf);
-        buf += sizeof(int64_t);
-        length -= sizeof(int64_t);
-
-        switch(d.subject) {
-          case TransmitFormula:
-            d.state = ReceivePath;
-            break;
-          case TransmitAllowanceMap:
-            d.state = ReceiveAllowanceMapSize;
-            break;
-          case TransmitResult:
-            d.state = ReceiveResultPath;
-            break;
-          default:
-            PARACUBER_LOG(m_logger, GlobalError)
-              << "Unknown subject received from " << socket->remote_endpoint()
-              << "!";
-            ERASE_AND_RETURN_SUBJECT()
-        }
-
-        PARACUBER_LOG(m_logger, Trace)
-          << "Receive TCP transmission (" << d.subject << ") from "
-          << socket->remote_endpoint() << " (ID: " << d.originator << ")";
-
-        break;
-      case ReceivePath:
-        if(length < sizeof(ReceiveDataStruct::path)) {
-          // Remote has directly aborted the transmission.
-          ERASE_AND_RETURN_SUBJECT()
-        }
-        d.path = *(reinterpret_cast<int64_t*>(buf));
-        buf += sizeof(ReceiveDataStruct::path);
-        length -= sizeof(ReceiveDataStruct::path);
-
-        if(d.path == 0) {
-          d.state = ReceiveFileName;
-        } else {
-          d.state = ReceiveCube;
-        }
-        break;
       case ReceiveFileName: {
         // First, receive the filename.
         bool end = false;
@@ -493,142 +365,15 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         if(length == 0) {
           // This marks the end of the transmission, the file is finished.
           m_ofstream.close();
-          ERASE_AND_RETURN_SUBJECT()
+          m_receiveData.erase(socket);
+          return;
         }
 
         m_ofstream.write(buf, length);
         length = 0;
         break;
-      case ReceiveCube: {
-        std::unique_lock lock(m_cnfTreeMutex);
-        if(length == 0 && buf == nullptr) {
-          // This marks the end of the transmission, the decision sequence is
-          // finished.
-
-          // This also means, the task factory needs to get this newly received
-          // path.
-          assert(m_taskFactory);
-          m_cnfTree->setDecisionAndState(d.path, 0, CNFTree::Unvisited);
-          m_taskFactory->addPath(
-            d.path, TaskFactory::CubeOrSolve, d.originator);
-
-          ERASE_AND_RETURN_SUBJECT()
-        }
-        for(std::size_t i = 0; i < length; i += sizeof(CNFTree::CubeVar)) {
-          CNFTree::CubeVar* var =
-            receiveValueFromBuffer<CNFTree::CubeVar>(d, &buf, &length);
-          if(var) {
-            *var = FastAbsolute(*var);
-            // Valid literal received, insert into CNFTree.
-            if(!m_cnfTree->setDecision(
-                 CNFTree::setDepth(d.path, d.currentDepth++),
-                 *var,
-                 d.originator)) {
-              PARACUBER_LOG(m_logger, LocalError)
-                << "Could not apply decision <" << *var
-                << "> into CNFTree of CNF " << m_originId;
-            }
-          }
-        }
-      } break;
-      case ReceiveAllowanceMapSize: {
-        if(!m_cuberRegistry) {
-          m_cuberRegistry =
-            std::make_unique<cuber::Registry>(m_config, m_log, *this);
-          if(!m_cuberRegistry->init()) {
-            PARACUBER_LOG(m_logger, Fatal)
-              << "Could not initialise cuber registry!";
-            m_cuberRegistry.reset();
-            return d.subject;
-          }
-        }
-        uint32_t* size = receiveValueFromBuffer<uint32_t>(d, &buf, &length);
-        if(size) {
-          PARACUBER_LOG(m_logger, Trace)
-            << "Receive allowance map from " << socket->remote_endpoint()
-            << " with size " << *size << ".";
-          m_cuberRegistry->getAllowanceMap().clear();
-          m_cuberRegistry->getAllowanceMap().reserve(*size);
-        }
-        d.state = ReceiveAllowanceMap;
-        break;
-      }
-      case ReceiveAllowanceMap: {
-        if(length == 0 && buf == nullptr) {
-          // This marks the end of the transmission, the decision sequence is
-          // finished.
-          m_cuberRegistry->allowanceMapWaiter.setReady(
-            &m_cuberRegistry->getAllowanceMap());
-          ERASE_AND_RETURN_SUBJECT()
-        }
-
-        CNFTree::CubeVar* cubeVar =
-          receiveValueFromBuffer<CNFTree::CubeVar>(d, &buf, &length);
-        while(cubeVar != nullptr) {
-          m_cuberRegistry->getAllowanceMap().push_back(*cubeVar);
-          cubeVar = receiveValueFromBuffer<CNFTree::CubeVar>(d, &buf, &length);
-        }
-
-        break;
-      }
-      case ReceiveResultPath: {
-        CNFTree::Path* path =
-          receiveValueFromBuffer<CNFTree::Path>(d, &buf, &length);
-        if(path) {
-          d.path = *path;
-          assert(m_results.find(*path) == m_results.end());
-          std::shared_lock lock(m_resultsMutex);
-          Result r{ *path, CNFTree::State::Unknown };
-          d.result = &m_results.insert(std::make_pair(*path, std::move(r)))
-                        .first->second;
-          d.state = ReceiveResultState;
-        }
-      }
-      case ReceiveResultState: {
-        CNFTree::State* state =
-          receiveValueFromBuffer<CNFTree::State>(d, &buf, &length);
-        if(state) {
-          assert(d.result);
-          d.result->state = *state;
-          d.state = ReceiveResultSize;
-        }
-        break;
-      }
-      case ReceiveResultSize: {
-        uint32_t* size = receiveValueFromBuffer<uint32_t>(d, &buf, &length);
-        if(size) {
-          assert(d.result);
-          assert(!d.result->encodedAssignment);
-          d.result->encodedAssignment = std::make_shared<AssignmentVector>();
-          d.result->encodedAssignment->resize(0);
-          d.result->encodedAssignment->reserve(*size);
-          d.result->size = *size;
-          d.state = ReceiveResultData;
-          PARACUBER_LOG(m_logger, Trace)
-            << "Currently receiving result " << d.result->state << " on path "
-            << CNFTree::pathToStrNoAlloc(d.result->p) << " has size " << *size
-            << ".";
-        }
-        break;
-      }
-      case ReceiveResultData: {
-        if(length == 0 && buf == nullptr) {
-          // This marks the end of the transmission, the result sequence is
-          // finished.
-          d.result->finished = true;
-          handleFinishedResultReceived(*d.result);
-          ERASE_AND_RETURN_SUBJECT()
-        }
-
-        assert(d.result);
-        Result* r = d.result;
-        std::copy(buf, buf + length, std::back_inserter(*r->encodedAssignment));
-        length = 0;
-        break;
-      }
     }
   }
-  return d.subject;
 }
 
 void
@@ -744,60 +489,14 @@ CNF::Result::decodeAssignment()
 }
 
 std::ostream&
-operator<<(std::ostream& o, CNF::TransmissionSubject s)
-{
-  switch(s) {
-    case CNF::TransmissionSubject::TransmitFormula:
-      o << "Transmit Formula";
-      break;
-    case CNF::TransmissionSubject::TransmitAllowanceMap:
-      o << "Transmit Allowance Map";
-      break;
-    case CNF::TransmissionSubject::TransmitResult:
-      o << "Transmit Result";
-      break;
-    default:
-      o << "(! UNKNOWN TRANSMISSION SUBJECT !)";
-      break;
-  }
-  return o;
-}
-std::ostream&
 operator<<(std::ostream& o, CNF::ReceiveState s)
 {
   switch(s) {
-    case CNF::ReceiveState::ReceiveCube:
-      o << "Receive Cube";
-      break;
     case CNF::ReceiveState::ReceiveFile:
       o << "Receive File";
       break;
-    case CNF::ReceiveState::ReceivePath:
-      o << "Receive Path";
-      break;
     case CNF::ReceiveState::ReceiveFileName:
       o << "Receive File Name";
-      break;
-    case CNF::ReceiveState::ReceiveAllowanceMap:
-      o << "Receive Allowance Map";
-      break;
-    case CNF::ReceiveState::ReceiveAllowanceMapSize:
-      o << "Receive Allowance Map Size";
-      break;
-    case CNF::ReceiveState::ReceiveTransmissionSubject:
-      o << "Receive Transmission Subject";
-      break;
-    case CNF::ReceiveState::ReceiveResultData:
-      o << "Receive Result Data";
-      break;
-    case CNF::ReceiveState::ReceiveResultPath:
-      o << "Receive Result Path";
-      break;
-    case CNF::ReceiveState::ReceiveResultSize:
-      o << "Receive Result Size";
-      break;
-    case CNF::ReceiveState::ReceiveResultState:
-      o << "Receive Result State";
       break;
     default:
       o << "(! UNKNOWN RECEIVE STATE !)";

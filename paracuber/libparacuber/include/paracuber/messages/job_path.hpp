@@ -14,11 +14,14 @@ namespace messages {
 class JobPath
 {
   public:
-  JobPath() {}
-  ~JobPath() {}
-
   using Path = int64_t;
   using TraceVector = std::vector<int>;
+
+  JobPath() {}
+  JobPath(Path path)
+    : path(path)
+  {}
+  ~JobPath() {}
 
   /** @brief The path to work on.
    *
@@ -36,7 +39,7 @@ class JobPath
   private:
   friend class cereal::access;
 
-  Path path;
+  Path path = 0;
 
   std::optional<TraceVector> optionalTrace;
 

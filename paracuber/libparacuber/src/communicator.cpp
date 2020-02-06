@@ -12,6 +12,7 @@
 #include "paracuber/messages/announcement_request.hpp"
 #include "paracuber/messages/cnftree_node_status_reply.hpp"
 #include "paracuber/messages/cnftree_node_status_request.hpp"
+#include "paracuber/messages/jobdescription.hpp"
 #include "paracuber/messages/offline_announcement.hpp"
 #include "paracuber/messages/online_announcement.hpp"
 
@@ -19,6 +20,7 @@
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/socket_base.hpp>
 #include <boost/bind.hpp>
+#include <boost/system/error_code.hpp>
 #include <cassert>
 #include <chrono>
 #include <mutex>
@@ -515,7 +517,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
             LogPtr log,
             boost::asio::io_service& ioService,
             boost::asio::ip::tcp::endpoint endpoint,
-            TCPClientMode mode,
+            TCPMode mode,
             std::shared_ptr<CNF> cnf,
             CNFTree::Path path = 0)
     : m_comm(comm)
@@ -535,6 +537,13 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   virtual ~TCPClient()
   {
     PARACUBER_LOG(m_logger, Trace) << "Destroy TCPClient to " << m_endpoint;
+  }
+
+  void insertJobDescription(messages::JobDescription&& jd,
+                            std::function<void()> finishedCB)
+  {
+    m_jobDescription = std::move(jd);
+    m_finishedCB = finishedCB;
   }
 
   void connect()
@@ -563,17 +572,17 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
                (char*)&option,
                sizeof(option));
 
-    int64_t id = 0;
-    if(m_comm->m_config->isDaemonMode()) {
-      id = m_cnf->getOriginId();
-    } else {
-      id = m_comm->m_config->getInt64(Config::Id);
-    };
+    /// TCP Transmission Protocol specified in \ref tcpcommunication.
 
+    // Sending always starts with the ID of the sender.
+    int64_t id = m_comm->m_config->getInt64(Config::Id);
     m_socket.write_some(
       boost::asio::buffer(reinterpret_cast<int64_t*>(&id), sizeof(int64_t)));
 
-    auto ptr = shared_from_this();
+    // Afterwards, send the mode. From here on, modes are different.
+    uint8_t mode = static_cast<uint8_t>(m_mode);
+    m_socket.write_some(
+      boost::asio::buffer(reinterpret_cast<uint8_t*>(&mode), sizeof(uint8_t)));
 
     m_socket.native_non_blocking(true);
 
@@ -582,24 +591,35 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
     // ID is handled outside to be able to match the connection to the CNF on
     // the other side.
     switch(m_mode) {
-      case TCPClientMode::TransmitCNF:
-        // Let the sending be handled by the CNF itself.
-        m_cnf->send(&m_socket, m_path, [this, ptr]() {
-          // Finished sending CNF!
-        });
+      case TCPMode::TransmitCNF:
+        transmitCNF();
         break;
-      case TCPClientMode::TransmitAllowanceMap:
-        // Let the sending be handled by the CNF itself.
-        m_cnf->sendAllowanceMap(&m_socket, [this, ptr]() {
-          // Finished sending AllowanceMap!
-        });
-        break;
-      case TCPClientMode::TransmitCNFResult:
-        m_cnf->sendResult(&m_socket, m_path, [this, ptr]() {
-          // Finished sending Result!
-        });
+      case TCPMode::TransmitJobDescription:
+        transmitJobDescription();
         break;
     }
+  }
+
+  void transmitCNF()
+  {
+    auto ptr = shared_from_this();
+
+    // Let the sending be handled by the CNF itself.
+    m_cnf->send(&m_socket, [this, ptr]() {
+      // Finished sending CNF!
+    });
+  }
+
+  void transmitJobDescription()
+  {
+    auto ptr = shared_from_this();
+
+    boost::asio::streambuf sendStreambuf;
+    std::ostream outStream(&sendStreambuf);
+    cereal::BinaryOutputArchive oa(outStream);
+    oa(m_jobDescription.value());
+    m_socket.async_send(sendStreambuf.data(),
+                        [this, ptr]() { m_finishedCB(); });
   }
 
   ReadyWaiter<boost::asio::ip::tcp::socket> socketWaiter;
@@ -612,7 +632,9 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   boost::asio::ip::tcp::socket m_socket;
   boost::asio::ip::tcp::endpoint m_endpoint;
   boost::array<char, REC_BUF_SIZE> m_recBuffer;
-  TCPClientMode m_mode;
+  TCPMode m_mode;
+  std::optional<messages::JobDescription> m_jobDescription;
+  std::function<void()> m_finishedCB;
 };
 
 class Communicator::TCPServer
@@ -653,24 +675,50 @@ class Communicator::TCPServer
     {}
     virtual ~TCPServerClient() {}
 
-    enum State
-    {
-      NewConnection,
-      Receiving,
-    };
-
     boost::asio::ip::tcp::socket& socket() { return m_socket; }
 
-    void start() { startReceive(); }
+    void start() { handshake(); }
 
-    void startReceive()
+    enum class HandshakePhase
+    {
+      Start,
+      ReadSenderID,
+      ReadSubject,
+      End
+    };
+
+    void handshake(
+      boost::system::error_code error = boost::system::error_code(),
+      std::size_t bytes = 0,
+      HandshakePhase phase = HandshakePhase::Start)
     {
       using namespace boost::asio;
-      m_socket.async_receive(buffer(&m_recBuffer[0], m_recBuffer.size()),
-                             boost::bind(&TCPServerClient::handleReceive,
-                                         shared_from_this(),
-                                         placeholders::error,
-                                         placeholders::bytes_transferred));
+
+      switch(phase) {
+        case HandshakePhase::Start:
+          phase = HandshakePhase::ReadSenderID;
+          bytes = sizeof(int64_t);
+          break;
+        case HandshakePhase::ReadSenderID: {
+          std::istream inStream(&m_streambuf);
+          inStream >> m_senderID;
+
+          phase = HandshakePhase::ReadSubject;
+          bytes = sizeof(uint8_t);
+          break;
+        }
+        default:
+          break;
+      }
+
+      auto buffer = m_streambuf.prepare(bytes);
+
+      m_socket.async_read_some(buffer,
+                               boost::bind(&TCPServerClient::handshake,
+                                           shared_from_this(),
+                                           placeholders::error,
+                                           placeholders::bytes_transferred,
+                                           phase));
     }
 
     void handleReceive(const boost::system::error_code& error,
@@ -768,12 +816,13 @@ class Communicator::TCPServer
 
     boost::asio::io_service& m_ioService;
     boost::asio::ip::tcp::socket m_socket;
-    boost::array<char, REC_BUF_SIZE> m_recBuffer;
-    std::size_t m_pos = 0;
+    boost::asio::streambuf m_streambuf;
     Logger m_logger;
     Communicator* m_comm;
-    State m_state = NewConnection;
     Daemon::Context* m_context = nullptr;
+
+    int64_t m_senderID;
+    TCPMode m_mode;
   };
 
   void startAccept()
@@ -988,7 +1037,7 @@ Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf,
                                               m_log,
                                               m_ioService,
                                               nn->getRemoteTcpEndpoint(),
-                                              TCPClientMode::TransmitCNF,
+                                              TCPClientMode::TransmitPath,
                                               cnf,
                                               path);
     client->connect();

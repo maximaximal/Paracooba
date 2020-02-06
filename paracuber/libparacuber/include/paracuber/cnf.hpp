@@ -15,8 +15,12 @@
 
 #include "cnftree.hpp"
 #include "log.hpp"
+#include "paracuber/messages/job_initiator.hpp"
 #include "readywaiter.hpp"
 #include "taskresult.hpp"
+
+#include "messages/jobdescription_receiver.hpp"
+#include "messages/jobdescription_transmitter.hpp"
 
 namespace paracuber {
 class NetworkedNode;
@@ -32,7 +36,9 @@ class Registry;
  * A dimacs file can be sent, if it is the root formula. All appended cubes
  * are transferred only afterwards, the root formula is not touched again.
  */
-class CNF : public std::enable_shared_from_this<CNF>
+class CNF
+  : public std::enable_shared_from_this<CNF>
+  , public messages::JobDescriptionReceiver
 {
   public:
   /** @brief Construct a CNF from existing literals based on DIMACS file or on
@@ -48,27 +54,10 @@ class CNF : public std::enable_shared_from_this<CNF>
   CNF(const CNF& o);
   virtual ~CNF();
 
-  enum TransmissionSubject
-  {
-    TransmitFormula = 1,
-    TransmitAllowanceMap = 2,
-    TransmitResult = 3,
-    TransmissionSubjectUnknown = 4,
-  };
-
   enum ReceiveState
   {
-    ReceiveTransmissionSubject,
-    ReceivePath,
     ReceiveFileName,
     ReceiveFile,
-    ReceiveCube,
-    ReceiveAllowanceMapSize,
-    ReceiveAllowanceMap,
-    ReceiveResultPath,
-    ReceiveResultState,
-    ReceiveResultSize,
-    ReceiveResultData,
   };
 
   using AssignmentVector = std::vector<uint8_t>;
@@ -90,8 +79,7 @@ class CNF : public std::enable_shared_from_this<CNF>
 
   struct ReceiveDataStruct
   {
-    TransmissionSubject subject = TransmissionSubjectUnknown;
-    ReceiveState state = ReceiveTransmissionSubject;
+    ReceiveState state = ReceiveFileName;
     CNFTree::Path path = 0;
     uint8_t currentDepth = 0;
     size_t receiveVarPos = 0;
@@ -105,19 +93,27 @@ class CNF : public std::enable_shared_from_this<CNF>
   using SendFinishedCB = std::function<void()>;
   using ResultFoundSignal = boost::signals2::signal<void(Result*)>;
 
+  /** @brief Send the underlying DIMACS file to the given socket. */
   void send(boost::asio::ip::tcp::socket* socket,
-            CNFTree::Path path,
             SendFinishedCB finishedCallback,
             bool first = true);
-  void sendAllowanceMap(boost::asio::ip::tcp::socket* socket,
-                        SendFinishedCB finishedCallback);
-  void sendResult(boost::asio::ip::tcp::socket* socket,
+
+  void sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCallback);
+
+  void sendResult(NetworkedNode* nn,
                   CNFTree::Path p,
                   SendFinishedCB finishedCallback);
 
-  TransmissionSubject receive(boost::asio::ip::tcp::socket* socket,
-                              char* buf,
-                              std::size_t length);
+  /** @brief Receive DIMACS file.
+   *
+   * This writes directly to disk and contains the
+   * filename! */
+  void receive(boost::asio::ip::tcp::socket* socket,
+               char* buf,
+               std::size_t length);
+
+  virtual void receiveJobDescription(int64_t sentFromID,
+                                     messages::JobDescription&& jd);
 
   inline int64_t getOriginId() { return m_originId; }
 
@@ -156,12 +152,20 @@ class CNF : public std::enable_shared_from_this<CNF>
 
   void connectToCNFTreeSignal();
 
-  void sendCB(SendDataStruct* data,
-              CNFTree::Path path,
-              boost::asio::ip::tcp::socket* socket);
+  void sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket);
 
   int64_t m_originId = 0;
   std::string m_dimacsFile = "";
+
+  enum CubingKind
+  {
+    LiteralFrequency,
+    PregeneratedCubes
+  };
+
+  CubingKind m_cubingKind = LiteralFrequency;
+
+  messages::JobDescriptionTransmitter* m_jobDescriptionTransmitter;
 
   // Ofstream for outputting the original CNF file.
   std::ofstream m_ofstream;
@@ -189,8 +193,6 @@ class CNF : public std::enable_shared_from_this<CNF>
   ResultFoundSignal m_resultSignal;
 };
 
-std::ostream&
-operator<<(std::ostream& m, CNF::TransmissionSubject s);
 std::ostream&
 operator<<(std::ostream& m, CNF::ReceiveState s);
 }

@@ -1,12 +1,11 @@
 #ifndef PARACUBER_MESSAGES_JOBDESCRIPTION
 #define PARACUBER_MESSAGES_JOBDESCRIPTION
 
+#include <cereal/access.hpp>
+#include <cereal/types/variant.hpp>
 #include <cstdint>
 #include <string>
 #include <variant>
-
-#include <cereal/access.hpp>
-#include <cereal/types/variant.hpp>
 
 #include "job_initiator.hpp"
 #include "job_path.hpp"
@@ -36,12 +35,17 @@
   }
 
 namespace paracuber {
+class NetworkedNode;
+
 namespace messages {
 class JobDescription
 {
   public:
-  JobDescription();
-  ~JobDescription();
+  JobDescription() {}
+  JobDescription(int64_t originatorID)
+    : originatorID(originatorID)
+  {}
+  ~JobDescription() {}
 
   enum Kind
   {
@@ -58,7 +62,7 @@ class JobDescription
     if(std::holds_alternative<JobResult>(body))
       return Kind::Result;
     if(std::holds_alternative<JobInitiator>(body))
-      return Kind::JobInitiator;
+      return Kind::Initiator;
     return Unknown;
   }
 
@@ -66,18 +70,38 @@ class JobDescription
   PARACUBER_MESSAGES_JOBDESCRIPTION_GETSET_BODY(JobResult)
   PARACUBER_MESSAGES_JOBDESCRIPTION_GETSET_BODY(JobInitiator)
 
+  int64_t getOriginatorID() const { return originatorID; }
+
+  using JobsVariant = std::variant<JobPath, JobResult, JobInitiator>;
+
   private:
   friend class cereal::access;
 
-  using JobsVariant = std::variant<JobPath, JobResult, JobInitiator>;
+  int64_t originatorID;
   JobsVariant body;
 
   template<class Archive>
   void serialize(Archive& ar)
   {
-    ar(CEREAL_NVP(body));
+    ar(CEREAL_NVP(originatorID), CEREAL_NVP(body));
   }
 };
+
+inline std::ostream&
+operator<<(std::ostream& m, JobDescription::Kind kind)
+{
+  switch(kind) {
+    case JobDescription::Kind::Path:
+      return m << "Path";
+    case JobDescription::Kind::Result:
+      return m << "Result";
+    case JobDescription::Kind::Initiator:
+      return m << "Initiator";
+    case JobDescription::Kind::Unknown:
+      return m << "Unknown";
+  }
+  return m;
+}
 }
 }
 
