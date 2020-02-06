@@ -1,0 +1,21 @@
+@startuml
+Master --> Daemon: (UDP) Announcement Request
+Master --> Daemon_n: (UDP) Announcement Request
+Master <-- Daemon: (UDP) Online Announcement
+Master <-- Daemon_n: (UDP) Online Announcement
+
+Master -> Daemon: (TCP) CNF Formula in DIMACS Format
+Master -> Daemon_n: (TCP) CNF Formula in DIMACS Format
+Master -> Daemon: (TCP) JobDescription { JobInitiator }
+Master -> Daemon_n: (TCP) JobDescription { JobInitiator }
+
+Master -> Daemon: (TCP) JobPath
+Daemon -> Daemon_n: (TCP) JobPath
+
+Daemon_n --> Daemon_n: Work
+
+Daemon --> Daemon: Work
+
+Daemon_n -> Daemon: (TCP) JobResult
+Daemon -> Master: (TCP) JobResult
+@enduml
