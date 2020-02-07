@@ -37,10 +37,13 @@ class JobResult
   DataVec& getDataVec() { return data.value(); }
   const DataVec& getDataVec() const { return data.value(); }
 
+  std::string tagline() const;
+
   private:
   friend class cereal::access;
 
   Path path = 0;
+  Path originPath = 0;
   State state = UNKNOWN;
 
   std::optional<DataVec> data;
@@ -51,6 +54,9 @@ class JobResult
     ar(CEREAL_NVP(path), CEREAL_NVP(state), CEREAL_NVP(data));
   }
 };
+
+std::ostream&
+operator<<(std::ostream& m, JobResult::State s);
 }
 }
 

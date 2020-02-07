@@ -25,6 +25,7 @@
 #include <chrono>
 #include <mutex>
 #include <regex>
+#include <sstream>
 
 #include <cereal/archives/binary.hpp>
 
@@ -224,11 +225,9 @@ class Communicator::UDPServer
 
       m_communicator->sendCNFToNode(
         m_communicator->m_config->getClient()->getRootCNF(),
-        0,// Send root node only.
         statisticsNode.getNetworkedNode());
     }
 
-    PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
     m_communicator->checkAndTransmitClusterStatisticsChanges();
   }
   void handleOfflineAnnouncement(const messages::Message& msg)
@@ -262,7 +261,6 @@ class Communicator::UDPServer
       if(requester.getDaemonMode()) {
         m_communicator->sendCNFToNode(
           m_communicator->m_config->getClient()->getRootCNF(),
-          0,// Send the root node only, no path required yet at this stage.
           statisticsNode.getNetworkedNode());
       }
     }
@@ -518,22 +516,16 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
             boost::asio::io_service& ioService,
             boost::asio::ip::tcp::endpoint endpoint,
             TCPMode mode,
-            std::shared_ptr<CNF> cnf,
-            CNFTree::Path path = 0)
+            std::shared_ptr<CNF> cnf = nullptr)
     : m_comm(comm)
     , m_cnf(cnf)
     , m_mode(mode)
     , m_endpoint(endpoint)
     , m_socket(ioService)
-    , m_path(path)
+    , m_log(log)
     , m_logger(log->createLoggerMT("TCPClient",
-                                   CNFTree::pathToStdString(path) + "|" +
-                                     endpoint.address().to_string()))
-  {
-    PARACUBER_LOG(m_logger, Trace)
-      << "Start TCPClient to " << m_endpoint << " for path "
-      << CNFTree::pathToStrNoAlloc(path) << " with mode " << mode;
-  }
+                                   "(0)|" + endpoint.address().to_string()))
+  {}
   virtual ~TCPClient()
   {
     PARACUBER_LOG(m_logger, Trace) << "Destroy TCPClient to " << m_endpoint;
@@ -544,10 +536,16 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   {
     m_jobDescription = std::move(jd);
     m_finishedCB = finishedCB;
+
+    m_log->createLoggerMT("TCPClient",
+                          m_jobDescription->tagline() + "|" +
+                            m_endpoint.address().to_string());
   }
 
   void connect()
   {
+    PARACUBER_LOG(m_logger, Trace)
+      << "Start TCPClient to " << m_endpoint << " with mode " << m_mode;
     m_socket.async_connect(m_endpoint,
                            boost::bind(&TCPClient::handleConnect,
                                        shared_from_this(),
@@ -619,16 +617,16 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
     cereal::BinaryOutputArchive oa(outStream);
     oa(m_jobDescription.value());
     m_socket.async_send(sendStreambuf.data(),
-                        [this, ptr]() { m_finishedCB(); });
+                        std::bind([this, ptr]() { m_finishedCB(); }));
   }
 
   ReadyWaiter<boost::asio::ip::tcp::socket> socketWaiter;
 
   private:
+  LogPtr m_log;
   LoggerMT m_logger;
   Communicator* m_comm;
   std::shared_ptr<CNF> m_cnf;
-  CNFTree::Path m_path;
   boost::asio::ip::tcp::socket m_socket;
   boost::asio::ip::tcp::endpoint m_endpoint;
   boost::array<char, REC_BUF_SIZE> m_recBuffer;
@@ -682,8 +680,10 @@ class Communicator::TCPServer
     enum class HandshakePhase
     {
       Start,
-      ReadSenderID,
-      ReadSubject,
+      ReadSenderIDAndSubject,
+      ReadBody,
+      ReadLength,
+      ReadJobDescription,
       End
     };
 
@@ -693,123 +693,135 @@ class Communicator::TCPServer
       HandshakePhase phase = HandshakePhase::Start)
     {
       using namespace boost::asio;
+      bool readSome = false;
 
       switch(phase) {
         case HandshakePhase::Start:
-          phase = HandshakePhase::ReadSenderID;
-          bytes = sizeof(int64_t);
+          phase = HandshakePhase::ReadSenderIDAndSubject;
+          bytes = sizeof(int64_t) + sizeof(uint8_t);
           break;
-        case HandshakePhase::ReadSenderID: {
+        case HandshakePhase::ReadSenderIDAndSubject: {
+          m_streambuf.commit(bytes);
           std::istream inStream(&m_streambuf);
           inStream >> m_senderID;
+          uint8_t mode = 0;
+          inStream >> mode;
 
-          phase = HandshakePhase::ReadSubject;
-          bytes = sizeof(uint8_t);
+          switch(m_mode) {
+            case TCPMode::TransmitCNF:
+              phase = HandshakePhase::ReadBody;
+              bytes = REC_BUF_SIZE;
+              readSome = true;
+              break;
+            case TCPMode::TransmitJobDescription:
+              phase = HandshakePhase::ReadLength;
+              bytes = sizeof(uint32_t);
+              break;
+          }
+          break;
+
+          if(m_comm->m_config->isDaemonMode()) {
+            auto [context, inserted] =
+              m_comm->m_config->getDaemon()->getOrCreateContext(m_senderID);
+            m_context = &context;
+            m_cnf = m_context->getRootCNF();
+          } else {
+            m_cnf = m_comm->m_config->getClient()->getRootCNF();
+          }
+        }
+        case HandshakePhase::ReadBody: {
+          m_streambuf.commit(bytes);
+          std::stringstream ssOut;
+          boost::asio::streambuf::const_buffers_type constBuffer =
+            m_streambuf.data();
+
+          std::copy(boost::asio::buffers_begin(constBuffer),
+                    boost::asio::buffers_begin(constBuffer) + bytes,
+                    std::ostream_iterator<uint8_t>(ssOut));
+
+          m_cnf->receive(&m_socket, ssOut.str().c_str(), bytes);
+
+          bytes = REC_BUF_SIZE;
+          readSome = true;
           break;
         }
+        case HandshakePhase::ReadLength: {
+          m_streambuf.commit(bytes);
+          std::istream inStream(&m_streambuf);
+          uint32_t jdSize = 0;
+          inStream >> jdSize;
+          bytes = jdSize;
+          phase = HandshakePhase::ReadJobDescription;
+          break;
+        }
+
+        case HandshakePhase::ReadJobDescription: {
+          m_streambuf.commit(bytes);
+          std::istream inStream(&m_streambuf);
+          cereal::BinaryInputArchive inAr(inStream);
+          messages::JobDescription jd;
+          inAr(jd);
+          m_cnf->receiveJobDescription(m_senderID, std::move(jd));
+
+          if(m_context) {
+            switch(jd.getKind()) {
+              case messages::JobDescription::Kind::Path:
+                break;
+              case messages::JobDescription::Kind::Result:
+                m_context->start(Daemon::Context::State::ResultReceived);
+                break;
+              case messages::JobDescription::Kind::Unknown:
+                break;
+              case messages::JobDescription::Kind::Initiator:
+                m_context->start(Daemon::Context::State::AllowanceMapReceived);
+                break;
+            }
+          }
+          break;
+        }
+
         default:
           break;
       }
 
-      auto buffer = m_streambuf.prepare(bytes);
-
-      m_socket.async_read_some(buffer,
-                               boost::bind(&TCPServerClient::handshake,
-                                           shared_from_this(),
-                                           placeholders::error,
-                                           placeholders::bytes_transferred,
-                                           phase));
-    }
-
-    void handleReceive(const boost::system::error_code& error,
-                       std::size_t bytes)
-    {
       if(error == boost::asio::error::eof) {
-        switch(m_state) {
-          case NewConnection:
-            break;
-          case Receiving:
-            CNF::TransmissionSubject subject =
-              m_cnf->receive(&m_socket, nullptr, 0);
-            if(m_context) {
-              Daemon::Context::State change;
-              switch(subject) {
-                case CNF::TransmitFormula:
-                  change = Daemon::Context::FormulaReceived;
-                  break;
-                case CNF::TransmitAllowanceMap:
-                  change = Daemon::Context::AllowanceMapReceived;
-                  break;
-                case CNF::TransmitResult:
-                  change = Daemon::Context::ResultReceived;
-                  break;
-                default:
-                  change = Daemon::Context::JustCreated;
-                  break;
-              }
-              m_context->start(change);
-            }
-            break;
+
+        if(phase == HandshakePhase::ReadBody) {
+          // End the CNF receiving.
+          m_cnf->receive(&m_socket, nullptr, 0);
+          if(m_context) {
+            m_context->start(Daemon::Context::FormulaReceived);
+          }
         }
+
         PARACUBER_LOG(m_logger, Trace)
           << "TCP Connection ended from " << m_socket.remote_endpoint();
-        return;
-      }
-      if(error) {
-        PARACUBER_LOG(m_logger, LocalError)
-          << "Could read from TCP connection! Error: " << error.message();
-        return;
-      }
-      m_pos = 0;
-
-      switch(m_state) {
-        case NewConnection: {
-          state_newConnection(bytes);
-          break;
-        }
-        case Receiving: {
-          state_receiving(bytes);
-          break;
-        }
-      }
-
-      startReceive();
-    }
-
-    private:
-    void state_newConnection(std::size_t bytes)
-    {
-      // If the connection is new, this client must be initialised first. A
-      // connection has a header containing its type and assorted data. This
-      // is extracted in this stage (first few bytes of the TCP stream).
-      int64_t originator = *reinterpret_cast<int64_t*>(&m_recBuffer[m_pos]);
-      m_pos += sizeof(int64_t);
-
-      if(m_comm->m_config->isDaemonMode()) {
-        auto [context, inserted] =
-          m_comm->m_config->getDaemon()->getOrCreateContext(originator);
-        m_context = &context;
-        m_cnf = m_context->getRootCNF();
       } else {
-        m_cnf = m_comm->m_config->getClient()->getRootCNF();
+        if(error) {
+          PARACUBER_LOG(m_logger, LocalError)
+            << "Could read from TCP connection! Error: " << error.message();
+          return;
+        }
+
+        auto buffer = m_streambuf.prepare(bytes);
+
+        if(readSome) {
+          m_socket.async_read_some(buffer,
+                                   boost::bind(&TCPServerClient::handshake,
+                                               shared_from_this(),
+                                               placeholders::error,
+                                               placeholders::bytes_transferred,
+                                               phase));
+        } else {
+          async_read(m_socket,
+                     buffer,
+                     boost::bind(&TCPServerClient::handshake,
+                                 shared_from_this(),
+                                 placeholders::error,
+                                 placeholders::bytes_transferred,
+                                 phase));
+        }
       }
-
-      m_state = Receiving;
-
-      state_receiving(bytes - m_pos);
-    }
-    void state_receiving(std::size_t bytes)
-    {
-      // The receiving file state exists to shuffle data from the network
-      // stream into the locally created file. After finishing, the created
-      // file can be given to a new task to be solved.
-
-      if(bytes == 0) {
-        // This can happen in the initial request.
-        return;
-      }
-
-      m_cnf->receive(&m_socket, &m_recBuffer[m_pos], bytes);
     }
 
     std::shared_ptr<CNF> m_cnf;
@@ -1021,73 +1033,37 @@ Communicator::listenForIncomingTCP(uint16_t port)
 }
 
 void
-Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf,
-                            CNFTree::Path path,
-                            NetworkedNode* nn)
+Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn)
 {
-  if(path != 0) {
-    // The root formula (path == 0) is always sent, other formulas on demand.
-    cnf->getCNFTree().setRemote(path, nn->getId());
-  }
-
   assert(nn);
   // This indirection is required to make this work from worker threads.
-  m_ioService.post([this, cnf, path, nn]() {
+  m_ioService.post([this, cnf, nn]() {
     auto client = std::make_shared<TCPClient>(this,
                                               m_log,
                                               m_ioService,
                                               nn->getRemoteTcpEndpoint(),
-                                              TCPClientMode::TransmitPath,
-                                              cnf,
-                                              path);
+                                              TCPMode::TransmitCNF,
+                                              cnf);
     client->connect();
   });
-  if(path == 0) {
-    // Also send the allowance map to a CNF, if this transmits the root formula.
-    sendAllowanceMapToNodeWhenReady(cnf, nn);
-  }
+
+  // Also send the allowance map to a CNF, if this transmits the root formula.
+  cnf->sendAllowanceMap(nn, []() {});
 }
 
 void
-Communicator::sendCNFResultToNode(std::shared_ptr<CNF> cnf,
-                                  CNFTree::Path path,
-                                  NetworkedNode* nn)
+Communicator::transmitJobDescription(messages::JobDescription&& jd,
+                                     NetworkedNode* nn,
+                                     std::function<void()> sendFinishedCB)
 {
-  assert(nn);
-  // This indirection is required to make this work from worker threads.
-  m_ioService.post([this, cnf, path, nn]() {
+  m_ioService.post([this, nn, jd{ std::move(jd) }, sendFinishedCB]() mutable {
     auto client = std::make_shared<TCPClient>(this,
                                               m_log,
                                               m_ioService,
                                               nn->getRemoteTcpEndpoint(),
-                                              TCPClientMode::TransmitCNFResult,
-                                              cnf,
-                                              path);
+                                              TCPMode::TransmitCNF);
+    client->insertJobDescription(std::move(jd), sendFinishedCB);
     client->connect();
-  });
-}
-
-void
-Communicator::sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
-                                              NetworkedNode* nn)
-{
-  // First, wait for the allowance map to be ready.
-  cnf->rootTaskReady.callWhenReady([this, cnf, nn](CaDiCaLTask& ptr) {
-    // Registry is only initialised after the root task arrived.
-    cnf->getCuberRegistry().allowanceMapWaiter.callWhenReady(
-      [this, cnf, nn](cuber::Registry::AllowanceMap& map) {
-        // This indirection is required to make this work from worker threads.
-        m_ioService.post([this, cnf, nn]() {
-          auto client =
-            std::make_shared<TCPClient>(this,
-                                        m_log,
-                                        m_ioService,
-                                        nn->getRemoteTcpEndpoint(),
-                                        TCPClientMode::TransmitAllowanceMap,
-                                        cnf);
-          client->connect();
-        });
-      });
   });
 }
 
@@ -1294,17 +1270,14 @@ Communicator::task_offlineAnnouncement(NetworkedNode* nn)
 }
 
 std::ostream&
-operator<<(std::ostream& o, Communicator::TCPClientMode mode)
+operator<<(std::ostream& o, Communicator::TCPMode mode)
 {
   switch(mode) {
-    case Communicator::TCPClientMode::TransmitCNF:
+    case Communicator::TCPMode::TransmitCNF:
       o << "Transmit CNF";
       break;
-    case Communicator::TCPClientMode::TransmitAllowanceMap:
-      o << "Transmit Allowance Map";
-      break;
-    case Communicator::TCPClientMode::TransmitCNFResult:
-      o << "Transmit CNF Result";
+    case Communicator::TCPMode::TransmitJobDescription:
+      o << "Transmit Job Description";
       break;
   }
   return o;

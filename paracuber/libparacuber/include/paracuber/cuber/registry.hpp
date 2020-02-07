@@ -5,11 +5,17 @@
 #include "../log.hpp"
 #include "../readywaiter.hpp"
 #include <memory>
+#include <optional>
 #include <queue>
 #include <vector>
 
 namespace paracuber {
 class CNF;
+
+namespace messages {
+class JobInitiator;
+}
+
 namespace cuber {
 class Cuber;
 
@@ -19,7 +25,13 @@ class Registry
   explicit Registry(ConfigPtr config, LogPtr log, CNF& rootCNF);
   ~Registry();
 
-  bool init();
+  enum Mode
+  {
+    PregeneratedCubes,
+    LiteralFrequency
+  };
+
+  bool init(Mode mode, messages::JobInitiator* ji = nullptr);
 
   using CuberVector = std::vector<std::unique_ptr<Cuber>>;
   using AllowanceMap = std::vector<CNFTree::CubeVar>;
@@ -38,6 +50,7 @@ class Registry
   CNF& m_rootCNF;
 
   AllowanceMap m_allowanceMap;
+  Mode m_mode = LiteralFrequency;
 };
 }
 }

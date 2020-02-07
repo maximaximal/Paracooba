@@ -346,8 +346,7 @@ CNFTree::sendPathToRemote(Path p, Node* n)
   assert(rootCNF);
   auto& statNode =
     m_config->getCommunicator()->getClusterStatistics()->getNode(n->remote);
-  m_config->getCommunicator()->sendCNFResultToNode(
-    rootCNF, p, statNode.getNetworkedNode());
+  rootCNF->sendResult(statNode.getNetworkedNode(), p, []() {});
 }
 
 void

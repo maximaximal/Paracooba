@@ -58,11 +58,11 @@ class JobDescription
   Kind getKind()
   {
     if(std::holds_alternative<JobPath>(body))
-      return Kind::Path;
+      return Path;
     if(std::holds_alternative<JobResult>(body))
-      return Kind::Result;
+      return Result;
     if(std::holds_alternative<JobInitiator>(body))
-      return Kind::Initiator;
+      return Initiator;
     return Unknown;
   }
 
@@ -71,6 +71,21 @@ class JobDescription
   PARACUBER_MESSAGES_JOBDESCRIPTION_GETSET_BODY(JobInitiator)
 
   int64_t getOriginatorID() const { return originatorID; }
+
+  /** @brief Generate short tagline about characteristics of this JD. */
+  std::string tagline()
+  {
+    switch(getKind()) {
+      case Path:
+        return getJobPath().tagline();
+      case Result:
+        return getJobResult().tagline();
+      case Initiator:
+        return getJobInitiator().tagline();
+      default:
+        return "Unknown JD";
+    }
+  }
 
   using JobsVariant = std::variant<JobPath, JobResult, JobInitiator>;
 

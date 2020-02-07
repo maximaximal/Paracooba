@@ -12,7 +12,7 @@ class JobDescription;
 class JobDescriptionTransmitter
 {
   public:
-  virtual void transmitJobDescription(const JobDescription& jd,
+  virtual void transmitJobDescription(JobDescription&& jd,
                                       NetworkedNode* nn,
                                       std::function<void()> sendFinishedCB) = 0;
 };

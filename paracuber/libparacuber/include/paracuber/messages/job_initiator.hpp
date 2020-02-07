@@ -91,6 +91,8 @@ class JobInitiator
   }
   const int* operator[](size_t i) const { return getCube(i); }
 
+  std::string tagline() const;
+
   private:
   friend class cereal::access;
 

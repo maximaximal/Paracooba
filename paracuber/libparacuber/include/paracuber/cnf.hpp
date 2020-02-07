@@ -98,7 +98,9 @@ class CNF
             SendFinishedCB finishedCallback,
             bool first = true);
 
-  void sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCallback);
+  void sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCB);
+
+  void sendPath(NetworkedNode* nn, CNFTree::Path p, SendFinishedCB finishedCB);
 
   void sendResult(NetworkedNode* nn,
                   CNFTree::Path p,
@@ -109,7 +111,7 @@ class CNF
    * This writes directly to disk and contains the
    * filename! */
   void receive(boost::asio::ip::tcp::socket* socket,
-               char* buf,
+               const char* buf,
                std::size_t length);
 
   virtual void receiveJobDescription(int64_t sentFromID,
@@ -142,6 +144,12 @@ class CNF
                     CNFTree::State state,
                     CNFTree::Path source);
 
+  enum CubingKind
+  {
+    LiteralFrequency,
+    PregeneratedCubes
+  };
+
   private:
   struct SendDataStruct
   {
@@ -156,12 +164,6 @@ class CNF
 
   int64_t m_originId = 0;
   std::string m_dimacsFile = "";
-
-  enum CubingKind
-  {
-    LiteralFrequency,
-    PregeneratedCubes
-  };
 
   CubingKind m_cubingKind = LiteralFrequency;
 
@@ -195,6 +197,8 @@ class CNF
 
 std::ostream&
 operator<<(std::ostream& m, CNF::ReceiveState s);
+std::ostream&
+operator<<(std::ostream& m, CNF::CubingKind k);
 }
 
 #endif

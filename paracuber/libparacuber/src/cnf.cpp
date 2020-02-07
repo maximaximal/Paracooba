@@ -7,6 +7,7 @@
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task_factory.hpp"
 #include "paracuber/messages/job_initiator.hpp"
+#include "paracuber/messages/job_path.hpp"
 #include "paracuber/messages/job_result.hpp"
 #include "paracuber/messages/jobdescription.hpp"
 
@@ -106,21 +107,31 @@ CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
 void
 CNF::sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCallback)
 {
-  assert(rootTaskReady.isReady());
-  assert(m_cuberRegistry->allowanceMapWaiter.isReady());
+  // First, wait for the allowance map to be ready.
+  rootTaskReady.callWhenReady([this, nn, finishedCallback](CaDiCaLTask& ptr) {
+    // Registry is only initialised after the root task arrived.
+    getCuberRegistry().allowanceMapWaiter.callWhenReady(
+      [this, nn, finishedCallback](cuber::Registry::AllowanceMap& map) {
+        // This indirection is required to make this work from worker threads.
+        // The allowance map may take a while to generate.
+        assert(map.size() > 0);
 
-  auto& map = m_cuberRegistry->getAllowanceMap();
+        auto initiator = messages::JobInitiator(
+          static_cast<messages::JobInitiator::CubingKind>(m_cubingKind));
+        initiator.initLiteralMap() = map;
+        messages::JobDescription jd(m_originId);
+        jd.insert(initiator);
 
-  // The allowance map may take a while to generate.
-  assert(map.size() > 0);
+        m_jobDescriptionTransmitter->transmitJobDescription(
+          std::move(jd), nn, finishedCallback);
+      });
+  });
+}
 
-  auto initiator = messages::JobInitiator(
-    static_cast<messages::JobInitiator::CubingKind>(m_cubingKind));
-  initiator.initLiteralMap() = map;
-  messages::JobDescription jd(m_originId);
-  jd.insert(initiator);
-
-  m_jobDescriptionTransmitter->transmitJobDescription(jd, nn, finishedCallback);
+void
+CNF::sendPath(NetworkedNode* nn, CNFTree::Path p, SendFinishedCB finishedCB)
+{
+  assert(CNFTree::getDepth(p) > 0);
 }
 
 void
@@ -162,7 +173,64 @@ CNF::sendResult(NetworkedNode* nn,
   auto jd = messages::JobDescription(m_originId);
   jd.insert(jobResult);
 
-  m_jobDescriptionTransmitter->transmitJobDescription(jd, nn, finishedCallback);
+  m_jobDescriptionTransmitter->transmitJobDescription(
+    std::move(jd), nn, finishedCallback);
+}
+
+static CNFTree::State
+jrStateToCNFTreeState(messages::JobResult::State s)
+{
+  switch(s) {
+    case messages::JobResult::SAT:
+      return CNFTree::SAT;
+    case messages::JobResult::UNSAT:
+      return CNFTree::UNSAT;
+    case messages::JobResult::UNKNOWN:
+      return CNFTree::Unknown;
+    default:
+      return CNFTree::Unknown;
+  }
+}
+
+void
+CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
+{
+  switch(jd.getKind()) {
+    case messages::JobDescription::Kind::Path: {
+      const auto jp = jd.getJobPath();
+      m_taskFactory->addPath(
+        jp.getPath(), TaskFactory::CubeOrSolve, jd.getOriginatorID());
+      break;
+    }
+    case messages::JobDescription::Kind::Result: {
+      const auto jr = jd.getJobResult();
+      insertResult(jr.getPath(),
+                   jrStateToCNFTreeState(jr.getState()),
+                   CNFTree::DefaultUninitiatedPath);
+      break;
+    }
+    case messages::JobDescription::Kind::Initiator: {
+      const auto ji = jd.getJobInitiator();
+
+      if(!m_cuberRegistry)
+        m_cuberRegistry =
+          std::make_unique<cuber::Registry>(m_config, m_log, *this);
+
+      cuber::Registry::Mode mode = cuber::Registry::LiteralFrequency;
+
+      switch(ji.getCubingKind()) {
+        case messages::JobInitiator::PregeneratedCubes:
+          mode = cuber::Registry::PregeneratedCubes;
+          break;
+        case messages::JobInitiator::LiteralFrequency:
+          mode = cuber::Registry::LiteralFrequency;
+          break;
+      }
+
+      rootTaskReady.setReady(m_rootTask.get());
+      break;
+    }
+  }
 }
 
 void
@@ -323,7 +391,7 @@ receiveValueFromBuffer(CNF::ReceiveDataStruct& d, char** buf, std::size_t* len)
 
 void
 CNF::receive(boost::asio::ip::tcp::socket* socket,
-             char* buf,
+             const char* buf,
              std::size_t length)
 {
   using namespace boost::filesystem;
@@ -384,18 +452,24 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
   /// registry in m_cuberRegistry.
   assert(!m_rootTask);
   m_rootTask = std::move(root);
-  if(!m_cuberRegistry) {
+
+  if(!m_cuberRegistry && !m_config->isDaemonMode()) {
     // The cuber registry may already have been created if this is a daemon
     // node. It can then just be re-used, as the daemon cuber registry did not
     // need the root node to be created.
     m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
-    if(!m_cuberRegistry->init()) {
+    if(!m_cuberRegistry->init(m_config->usePregeneratedCubes()
+                                ? cuber::Registry::PregeneratedCubes
+                                : cuber::Registry::LiteralFrequency)) {
       PARACUBER_LOG(m_logger, Fatal) << "Could not initialise cuber registry!";
       m_cuberRegistry.reset();
       return;
     }
   }
-  rootTaskReady.setReady(m_rootTask.get());
+
+  if(!m_config->isDaemonMode()) {
+    rootTaskReady.setReady(m_rootTask.get());
+  }
 }
 CaDiCaLTask*
 CNF::getRootTask()
@@ -500,6 +574,23 @@ operator<<(std::ostream& o, CNF::ReceiveState s)
       break;
     default:
       o << "(! UNKNOWN RECEIVE STATE !)";
+      break;
+  }
+  return o;
+}
+
+std::ostream&
+operator<<(std::ostream& o, CNF::CubingKind k)
+{
+  switch(k) {
+    case CNF::CubingKind::LiteralFrequency:
+      o << "LiteralFrequency";
+      break;
+    case CNF::CubingKind::PregeneratedCubes:
+      o << "PregeneratedCubes";
+      break;
+    default:
+      o << "(! UNKNOWN CUBING KIND !)";
       break;
   }
   return o;

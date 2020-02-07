@@ -1,7 +1,7 @@
 #include "../../include/paracuber/cuber/registry.hpp"
 #include "../../include/paracuber/cuber/cuber.hpp"
-
 #include "../../include/paracuber/cuber/literal_frequency.hpp"
+#include "paracuber/messages/job_initiator.hpp"
 
 namespace paracuber {
 namespace cuber {
@@ -14,20 +14,27 @@ Registry::Registry(ConfigPtr config, LogPtr log, CNF& rootCNF)
 Registry::~Registry() {}
 
 bool
-Registry::init()
+Registry::init(Mode mode, messages::JobInitiator* ji)
 {
   m_cubers.clear();
 
-  auto litFreqPtr = std::make_unique<LiteralFrequency>(
-    m_config, m_log, m_rootCNF, &m_allowanceMap);
-  if(!litFreqPtr->init()) {
-    return false;
-  }
-  LiteralFrequency& litFreq = *litFreqPtr;
-  m_cubers.push_back(std::move(litFreqPtr));
+  switch(mode) {
+    case LiteralFrequency: {
+      auto litFreqPtr = std::make_unique<cuber::LiteralFrequency>(
+        m_config, m_log, m_rootCNF, &m_allowanceMap);
+      if(!litFreqPtr->init()) {
+        return false;
+      }
+      cuber::LiteralFrequency& litFreq = *litFreqPtr;
+      m_cubers.push_back(std::move(litFreqPtr));
 
-  for(auto& cuber : m_cubers) {
-    cuber->m_allowanceMap = litFreq.getLiteralFrequency();
+      for(auto& cuber : m_cubers) {
+        cuber->m_allowanceMap = litFreq.getLiteralFrequency();
+      }
+      break;
+    }
+    case PregeneratedCubes:
+      break;
   }
 
   // Now, the allowance map is ready and all waiting callbacks can be called.

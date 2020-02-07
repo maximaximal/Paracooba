@@ -36,6 +36,8 @@ class JobPath
    */
   const TraceVector& getTrace() const { return optionalTrace.value(); }
 
+  std::string tagline() const;
+
   private:
   friend class cereal::access;
 

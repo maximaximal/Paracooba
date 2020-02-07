@@ -5,6 +5,7 @@
 #include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/networked_node.hpp"
 #include "../include/paracuber/task.hpp"
+#include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/task_factory.hpp"
 #include <algorithm>
 #include <boost/iterator/filter_iterator.hpp>
@@ -191,8 +192,7 @@ ClusterStatistics::handlePathOnNode(const Node* node,
 
   // This path should be handled on another compute node. This means, the
   // other compute node requires a Cube-Beam from the Communicator class.
-  m_config->getCommunicator()->sendCNFToNode(
-    rootCNF, p, node->getNetworkedNode());
+  rootCNF->sendPath(node->getNetworkedNode(), p, []() {});
 }
 
 bool

@@ -95,16 +95,7 @@ class Communicator
     TransmitJobDescription
   };
 
-  void sendCNFToNode(std::shared_ptr<CNF> cnf,
-                     CNFTree::Path path,
-                     NetworkedNode* nn);
-
-  void sendCNFResultToNode(std::shared_ptr<CNF> cnf,
-                           CNFTree::Path path,
-                           NetworkedNode* nn);
-
-  void sendAllowanceMapToNodeWhenReady(std::shared_ptr<CNF> cnf,
-                                       NetworkedNode* nn);
+  void sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn);
 
   void requestCNFPathInfo(CNFTree::Path p, int64_t handle, int64_t cnfId = 0);
 
@@ -120,7 +111,7 @@ class Communicator
                                     CNFTree::Path p,
                                     int64_t handle);
 
-  virtual void transmitJobDescription(const messages::JobDescription& jd,
+  virtual void transmitJobDescription(messages::JobDescription&& jd,
                                       NetworkedNode* nn,
                                       std::function<void()> sendFinishedCB);
 
