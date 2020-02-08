@@ -45,6 +45,20 @@ TEST_CASE("CNFTree::Path manipulation")
   REQUIRE(CNFTree::getDepthShiftedPath(CNFTree::getNextRightPath(p)) ==
           (uint64_t)0b00010001uL);
 
+  p = CNFTree::buildPath((uint32_t)0xFFFFFFF0u, 32);
+  REQUIRE(CNFTree::getAssignment(p, 15));
+  REQUIRE(CNFTree::getAssignment(p, 16));
+  REQUIRE(CNFTree::getAssignment(p, 20));
+  REQUIRE(CNFTree::getAssignment(p, 25));
+  REQUIRE(!CNFTree::getAssignment(p, 31));
+
+  p = CNFTree::buildPath((uint32_t)0xFFFFFFFFu, 16);
+  REQUIRE(CNFTree::getDepth(p) == 16);
+  REQUIRE(CNFTree::getDepth(p) - 1 == 15);
+  REQUIRE(CNFTree::getDepth(CNFTree::setDepth(p, 15)) == 15);
+  REQUIRE(CNFTree::getDepth(CNFTree::setDepth(p, CNFTree::getDepth(p) - 1)) == 15);
+  REQUIRE(CNFTree::getDepth(CNFTree::getParent(p)) == 15);
+
   // This is also a test for cuber::Cuber::getAdditionComponent. The behaviour
   // stays the same.
   p = CNFTree::buildPath((uint8_t)0b11110000u, 4);

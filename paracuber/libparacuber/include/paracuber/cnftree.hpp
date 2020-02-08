@@ -204,7 +204,7 @@ class CNFTree
   static const size_t maxPathDepth;
   static inline uint64_t getPath(Path p)
   {
-    return p & (0xFFFFFFFFFFFFFFF0u | 0b11000000u);
+    return p & (0xFFFFFFFF'FFFFFF00u | 0b11000000u);
   }
   static inline uint8_t getDepth(Path p) { return p & 0b00111111u; }
   static inline uint64_t getShiftedPath(Path p) { return p >> 6u; }
@@ -215,13 +215,13 @@ class CNFTree
 
   static inline Path setPath(Path p, Path path)
   {
-    return (p & 0b00111111) | (path & (0xFFFFFFFFFFFFFFF0u | 0b11000000u));
+    return (p & 0b00111111u) | (path & (0xFFFFFFFF'FFFFFF00u | 0b11000000u));
   }
 
   static inline Path setDepth(Path p, uint8_t d)
   {
     assert(d <= maxPathDepth);
-    return getPath(p) | (d & 0b00111111);
+    return getPath(p) | (d & 0b00111111u);
   }
 
   static inline Path getParent(Path p)
