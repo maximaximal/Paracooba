@@ -222,9 +222,27 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
     }
     case messages::JobDescription::Kind::Result: {
       const auto jr = jd.getJobResult();
-      insertResult(jr.getPath(),
-                   jrStateToCNFTreeState(jr.getState()),
-                   CNFTree::DefaultUninitiatedPath);
+
+      Result res;
+      res.p = jr.getPath();
+      res.state = jrStateToCNFTreeState(jr.getState());
+      if(res.state == CNFTree::SAT) {
+        res.size = jr.getDataVec().size();
+        res.encodedAssignment =
+          std::make_shared<AssignmentVector>(std::move(jr.getDataVec()));
+      } else {
+        res.size = 0;
+      }
+      res.finished = true;
+
+      {
+        std::unique_lock lock(m_resultsMutex);
+        m_results.insert(std::make_pair(jr.getPath(), std::move(res)));
+      }
+      {
+        std::unique_lock lock(m_cnfTreeMutex);
+        m_cnfTree->setState(res.p, res.state, true);
+      }
       break;
     }
     case messages::JobDescription::Kind::Initiator: {

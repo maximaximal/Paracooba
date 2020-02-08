@@ -14,7 +14,7 @@ namespace messages {
 class JobResult
 {
   public:
-  using Path = int64_t;
+  using Path = uint64_t;
   using DataVec = std::vector<uint8_t>;
 
   enum State

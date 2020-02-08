@@ -705,7 +705,6 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   void transmissionFinished(const boost::system::error_code& error,
                             std::size_t bytes)
   {
-    PARACUBER_LOG(m_logger, Trace) << "Written " << bytes << " bytes.";
     if(error == boost::asio::error::eof) {
       m_finishedCB();
     }
@@ -800,8 +799,6 @@ class Communicator::TCPServer
           bytes = sizeof(int64_t) + sizeof(uint8_t);
           break;
         case HandshakePhase::ReadSenderIDAndSubject: {
-          PARACUBER_LOG(m_logger, Trace)
-            << "Receive " << bytes << " bytes over TCP.";
           m_streambuf.commit(bytes);
           uint8_t modeUint = 0;
           readGenericFromStreambuf(m_streambuf, m_senderID);
@@ -868,8 +865,6 @@ class Communicator::TCPServer
         }
         case HandshakePhase::ReadJobDescription: {
           m_streambuf.commit(bytes);
-          PARACUBER_LOG(m_logger, Trace)
-            << "Read Job Description with length " << bytes;
           messages::JobDescription jd;
           try {
             std::istream inStream(&m_streambuf);

@@ -157,8 +157,10 @@ CaDiCaLTask::execute()
       << "Start parsing CNF formula in DIMACS format from \"" << m_sourcePath
       << "\".";
     int vars = 0;
+    bool incremental = false;
+    std::vector<int> cubes;
     const char* parse_status =
-      m_solver->read_dimacs(m_sourcePath.c_str(), vars, 1);
+      m_solver->read_dimacs(m_sourcePath.c_str(), vars, 1, incremental, cubes);
     if(parse_status != 0) {
       return std::move(std::make_unique<TaskResult>(TaskResult::ParsingError));
     }
