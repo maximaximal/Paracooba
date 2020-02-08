@@ -209,6 +209,20 @@ class ClusterStatistics
       return ::boost::accumulators::rolling_mean(m_acc_durationSinceLastStatus);
     }
 
+    bool statusIsOverdue() const
+    {
+      return getDurationSinceLastStatus() >
+             getMeanDurationSinceLastStatus() * 10;
+    }
+
+    void initMeanDuration(size_t windowSize)
+    {
+      using namespace std::chrono_literals;
+      for(size_t i = 0; i < windowSize; ++i) {
+        m_acc_durationSinceLastStatus(5s);
+      }
+    }
+
     using TaskFactoryVector = std::vector<TaskFactory*>;
     void applyTaskFactoryVector(const TaskFactoryVector& v);
 
@@ -219,7 +233,8 @@ class ClusterStatistics
     std::string m_host = "";
     std::unique_ptr<NetworkedNode> m_networkedNode;
 
-    std::chrono::time_point<std::chrono::system_clock> m_lastStatusReceived;
+    std::chrono::time_point<std::chrono::system_clock> m_lastStatusReceived =
+      std::chrono::system_clock::now();
 
     uint16_t m_maximumCPUFrequency = 0;
     uint16_t m_availableWorkers = 0;
@@ -304,6 +319,7 @@ class ClusterStatistics
   using NodeMap = std::map<int64_t, Node>;
 
   ConstSharedLockView<NodeMap> getNodeMap();
+  UniqueLockView<NodeMap&> getUniqueNodeMap();
 
   /** @brief Determine if the next decision should be offloaded to another
    * compute node.
@@ -337,6 +353,9 @@ class ClusterStatistics
    * Part of @see Rebalancing.
    */
   void rebalance();
+
+  /** @brief Check all connections for their timeouts. */
+  void tick();
 
   protected:
   friend class Communicator;

@@ -1,26 +1,31 @@
 #include "../include/paracuber/cluster-statistics.hpp"
 #include "../include/paracuber/client.hpp"
+#include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/daemon.hpp"
 #include "../include/paracuber/networked_node.hpp"
 #include "../include/paracuber/task.hpp"
-#include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/task_factory.hpp"
 #include <algorithm>
 #include <boost/iterator/filter_iterator.hpp>
 
 namespace paracuber {
 
+static const size_t ClusterStatisticsNodeWindowSize = 20;
+
 ClusterStatistics::Node::Node(bool& changed, int64_t thisId, int64_t id)
   : m_changed(changed)
   , m_acc_workQueueSize(boost::accumulators::tag::rolling_window::window_size =
-                          20)
+                          ClusterStatisticsNodeWindowSize)
   , m_acc_durationSinceLastStatus(
-      boost::accumulators::tag::rolling_window::window_size = 20)
+      boost::accumulators::tag::rolling_window::window_size =
+        ClusterStatisticsNodeWindowSize)
   , m_thisId(thisId)
   , m_id(id)
-{}
+{
+  initMeanDuration(ClusterStatisticsNodeWindowSize);
+}
 
 ClusterStatistics::Node::Node(Node&& o) noexcept
   : m_changed(o.m_changed)
@@ -38,10 +43,8 @@ ClusterStatistics::Node::Node(Node&& o) noexcept
   , m_distance(o.m_distance)
   , m_contexts(std::move(o.m_contexts))
   , m_thisId(o.m_thisId)
-  , m_acc_workQueueSize(boost::accumulators::tag::rolling_window::window_size =
-                          20)
-  , m_acc_durationSinceLastStatus(
-      boost::accumulators::tag::rolling_window::window_size = 20)
+  , m_acc_workQueueSize(std::move(o.m_acc_workQueueSize))
+  , m_acc_durationSinceLastStatus(std::move(o.m_acc_durationSinceLastStatus))
 {}
 ClusterStatistics::Node::~Node() {}
 
@@ -131,6 +134,13 @@ ConstSharedLockView<ClusterStatistics::NodeMap>
 ClusterStatistics::getNodeMap()
 {
   std::shared_lock lock(m_nodeMapMutex);
+  return { m_nodeMap, std::move(lock) };
+}
+
+UniqueLockView<ClusterStatistics::NodeMap&>
+ClusterStatistics::getUniqueNodeMap()
+{
+  std::unique_lock lock(m_nodeMapMutex);
   return { m_nodeMap, std::move(lock) };
 }
 
@@ -236,6 +246,15 @@ ClusterStatistics::rebalance()
   } else {
     rebalance(m_config->getInt64(Config::Id),
               *m_config->getClient()->getTaskFactory());
+  }
+}
+void
+ClusterStatistics::tick()
+{
+  auto [map, lock] = getUniqueNodeMap();
+  for(auto& it : map) {
+    auto& statNode = it.second;
+    statNode.getMeanDurationSinceLastStatus();
   }
 }
 }

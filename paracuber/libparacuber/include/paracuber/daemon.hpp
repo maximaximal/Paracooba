@@ -50,9 +50,6 @@ class Daemon
     private:
     friend class Daemon;
 
-    void tick();
-    void forget(const std::string& reason);
-
     std::shared_ptr<CNF> m_rootCNF;
     std::unique_ptr<TaskFactory> m_taskFactory;
     int64_t m_originatorID = 0;
@@ -84,10 +81,9 @@ class Daemon
 
   std::pair<Context&, bool> getOrCreateContext(int64_t id);
 
-  void tick();
+  void forgetAboutContext(int64_t id);
 
   private:
-  void forgetAboutContext(int64_t id);
 
   std::shared_ptr<Config> m_config;
   ContextMap m_contextMap;

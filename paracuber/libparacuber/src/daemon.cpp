@@ -31,31 +31,6 @@ Daemon::Context::~Context()
     << "Destroy context with origin " << m_originatorID;
   m_rootCNF->setTaskFactory(nullptr);
 }
-void
-Daemon::Context::tick()
-{
-  using namespace std;
-
-  auto durationSinceLastStatus = m_statisticsNode.getDurationSinceLastStatus();
-  auto meanDurationSinceLastStatus =
-    m_statisticsNode.getMeanDurationSinceLastStatus();
-
-  if(durationSinceLastStatus > meanDurationSinceLastStatus * 10) {
-    forget(
-      std::string("Duration timeout! Last status update was ") +
-      to_string(chrono::duration_cast<chrono::seconds>(durationSinceLastStatus)
-                  .count()) +
-      "s ago!");
-  }
-}
-
-void
-Daemon::Context::forget(const std::string& reason)
-{
-  PARACUBER_LOG(m_logger, GlobalWarning)
-    << "Context should be forgotten because of reason \"" << reason << "\".";
-  m_daemon->forgetAboutContext(m_originatorID);
-}
 
 void
 Daemon::Context::start(State change)
@@ -141,15 +116,6 @@ Daemon::~Daemon()
   m_config->m_daemon = nullptr;
 }
 
-void
-Daemon::tick()
-{
-  auto [map, lock] = getUniqueContextMap();
-  for(auto& it : map) {
-    it.second->tick();
-  }
-}
-
 std::pair<const Daemon::ContextMap&, std::shared_lock<std::shared_mutex>>
 Daemon::getContextMap()
 {
@@ -167,7 +133,8 @@ Daemon::getUniqueContextMap()
 void
 Daemon::forgetAboutContext(int64_t id)
 {
-  m_contextMap.erase(id);
+  auto [map, lock] = getUniqueContextMap();
+  map.erase(id);
 }
 
 SharedLockView<Daemon::Context*>

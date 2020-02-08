@@ -79,9 +79,7 @@ CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
   if(first) {
     data->cb = cb;
     data->offset = 0;
-  }
 
-  if(first) {
     // Send the filename, so that the used compression algorithm can be known.
     // Also transfer the terminating \0.
     boost::filesystem::path p(m_dimacsFile);

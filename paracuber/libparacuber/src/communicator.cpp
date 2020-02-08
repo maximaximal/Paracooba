@@ -100,10 +100,7 @@ class Communicator::UDPServer
   }
 
   boost::asio::ip::address getIPAddress() { return m_ipAddress; }
-  boost::asio::ip::address getBroadcastAddress()
-  {
-    return m_broadcastAddress;
-  }
+  boost::asio::ip::address getBroadcastAddress() { return m_broadcastAddress; }
 
   void startReceive()
   {
@@ -505,8 +502,8 @@ class Communicator::UDPServer
   private:
   boost::asio::ip::address generateBroadcastAddress()
   {
-    auto ipAddressString =
-      std::string(m_communicator->m_config->getString(Config::IPBroadcastAddress));
+    auto ipAddressString = std::string(
+      m_communicator->m_config->getString(Config::IPBroadcastAddress));
     boost::system::error_code err;
     auto address = boost::asio::ip::make_address(ipAddressString, err);
     if(err) {
@@ -764,7 +761,6 @@ class Communicator::TCPServer
               bytes = sizeof(uint32_t);
               break;
           }
-          break;
 
           if(m_comm->m_config->isDaemonMode()) {
             auto [context, inserted] =
@@ -774,6 +770,7 @@ class Communicator::TCPServer
           } else {
             m_cnf = m_comm->m_config->getClient()->getRootCNF();
           }
+          break;
         }
         case HandshakePhase::ReadBody: {
           m_streambuf.commit(bytes);
@@ -800,7 +797,6 @@ class Communicator::TCPServer
           phase = HandshakePhase::ReadJobDescription;
           break;
         }
-
         case HandshakePhase::ReadJobDescription: {
           m_streambuf.commit(bytes);
           std::istream inStream(&m_streambuf);
@@ -1107,7 +1103,7 @@ Communicator::transmitJobDescription(messages::JobDescription&& jd,
                                               m_log,
                                               m_ioService,
                                               nn->getRemoteTcpEndpoint(),
-                                              TCPMode::TransmitCNF);
+                                              TCPMode::TransmitJobDescription);
     client->insertJobDescription(std::move(jd), sendFinishedCB);
     client->connect();
   });
@@ -1178,6 +1174,8 @@ Communicator::tick()
 {
   m_runner->checkTaskFactories();
 
+  m_clusterStatistics->tick();
+
   // Update workQueueSize
   auto& thisNode = m_clusterStatistics->getThisNode();
   thisNode.setWorkQueueSize(m_runner->getWorkQueueSize());
@@ -1192,9 +1190,6 @@ Communicator::tick()
   if(m_config->isDaemonMode()) {
     auto daemon = m_config->getDaemon();
     assert(daemon);
-
-    // Tick the daemon -> this could remove some connections.
-    daemon->tick();
 
     messages::Daemon daemonMsg;
 
