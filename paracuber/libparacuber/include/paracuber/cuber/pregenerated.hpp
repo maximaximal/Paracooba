@@ -1,7 +1,7 @@
 #ifndef PARACUBER_CUBER_PREGENERATED_HPP
 #define PARACUBER_CUBER_PREGENERATED_HPP
 
-#include "../config.hpp"
+#include "../log.hpp"
 #include "cuber.hpp"
 #include "paracuber/messages/job_initiator.hpp"
 #include <vector>
@@ -14,7 +14,7 @@ class Pregenerated : public Cuber
   explicit Pregenerated(ConfigPtr config,
                         LogPtr log,
                         CNF& rootCNF,
-                        messages::JobInitiator ji);
+                        const messages::JobInitiator& ji);
   virtual ~Pregenerated();
 
   bool init();

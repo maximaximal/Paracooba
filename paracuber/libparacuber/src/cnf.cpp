@@ -114,9 +114,8 @@ CNF::sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCallback)
         // The allowance map may take a while to generate.
         assert(map.size() > 0);
 
-        auto initiator = messages::JobInitiator(
-          static_cast<messages::JobInitiator::CubingKind>(m_cubingKind));
-        initiator.initLiteralMap() = map;
+        auto initiator = messages::JobInitiator();
+        initiator.initAllowanceMap() = map;
         messages::JobDescription jd(m_originId);
         jd.insert(initiator);
 
@@ -130,6 +129,19 @@ void
 CNF::sendPath(NetworkedNode* nn, CNFTree::Path p, SendFinishedCB finishedCB)
 {
   assert(CNFTree::getDepth(p) > 0);
+  assert(rootTaskReady.isReady());
+
+  messages::JobPath jp(p);
+
+  jp.getTrace().reserve(CNFTree::getDepth(p) - 1);
+  std::shared_lock lock(m_cnfTreeMutex);
+  m_cnfTree->writePathToLiteralContainer(
+    jp.getTrace(), CNFTree::setDepth(p, CNFTree::getDepth(p) - 1));
+
+  messages::JobDescription jd(m_originId);
+  jd.insert(jp);
+  m_jobDescriptionTransmitter->transmitJobDescription(
+    std::move(jd), nn, finishedCB);
 }
 
 void
@@ -196,6 +208,14 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
   switch(jd.getKind()) {
     case messages::JobDescription::Kind::Path: {
       const auto jp = jd.getJobPath();
+      std::unique_lock lock(m_cnfTreeMutex);
+      auto trace = jp.getTrace();
+      for(uint8_t i = 0; i < trace.size(); ++i) {
+        int var = FastAbsolute(trace[i]);
+        m_cnfTree->setDecision(
+          CNFTree::setDepth(jp.getPath(), i), var, sentFromID);
+      }
+      m_cnfTree->setDecisionAndState(jp.getPath(), 0, CNFTree::Unvisited);
       m_taskFactory->addPath(
         jp.getPath(), TaskFactory::CubeOrSolve, jd.getOriginatorID());
       break;
@@ -214,14 +234,13 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
         m_cuberRegistry =
           std::make_unique<cuber::Registry>(m_config, m_log, *this);
 
-      cuber::Registry::Mode mode = cuber::Registry::LiteralFrequency;
-
       switch(ji.getCubingKind()) {
         case messages::JobInitiator::PregeneratedCubes:
-          mode = cuber::Registry::PregeneratedCubes;
+          m_cuberRegistry->init(cuber::Registry::PregeneratedCubes, &ji);
           break;
         case messages::JobInitiator::LiteralFrequency:
-          mode = cuber::Registry::LiteralFrequency;
+          m_cuberRegistry->init(cuber::Registry::LiteralFrequency, &ji);
+          m_cuberRegistry->getAllowanceMap() = ji.getAllowanceMap();
           break;
       }
 

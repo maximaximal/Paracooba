@@ -29,12 +29,8 @@ class JobPath
    */
   Path getPath() const { return path; };
 
-  /** @brief Optional Trace of the path currently on.
-   *
-   * Existence depends on the Cubing Mechanism used. If the cubing mechanism is
-   * != PregeneratedCubes, this trace is used. Else, it does not exist.
-   */
-  const TraceVector& getTrace() const { return optionalTrace.value(); }
+  TraceVector& getTrace() { return trace; }
+  const TraceVector& getTrace() const { return trace; }
 
   std::string tagline() const;
 
@@ -42,13 +38,12 @@ class JobPath
   friend class cereal::access;
 
   Path path = 0;
-
-  std::optional<TraceVector> optionalTrace;
+  TraceVector trace;
 
   template<class Archive>
   void serialize(Archive& ar)
   {
-    ar(CEREAL_NVP(path), CEREAL_NVP(optionalTrace));
+    ar(CEREAL_NVP(path), CEREAL_NVP(trace));
   }
 };
 }

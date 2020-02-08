@@ -6,10 +6,13 @@
 #include <cstdint>
 #include <iterator>
 #include <optional>
+#include <variant>
 #include <vector>
 
 #include <cereal/access.hpp>
+#include <cereal/types/map.hpp>
 #include <cereal/types/optional.hpp>
+#include <cereal/types/variant.hpp>
 #include <cereal/types/vector.hpp>
 
 namespace paracuber {
@@ -25,90 +28,80 @@ class JobInitiator
   };
 
   JobInitiator() {}
-  JobInitiator(CubingKind cubingKind)
-    : cubingKind(cubingKind)
-  {}
   ~JobInitiator() {}
 
-  CubingKind getCubingKind() const { return cubingKind; }
+  using AllowanceMap = std::vector<int>;
+  using CubeMap = std::map<uint64_t, int>;
+  using DataVariant = std::variant<AllowanceMap, CubeMap>;
 
-  using LiteralMap = std::vector<int>;
-  using CubeMap = std::vector<int>;
-  using JumpList = std::vector<size_t>;
-
-  LiteralMap& initLiteralMap()
+  CubingKind getCubingKind() const
   {
-    cubingKind = LiteralFrequency;
-    return intVec;
+    if(std::holds_alternative<CubeMap>(body))
+      return PregeneratedCubes;
+    if(std::holds_alternative<AllowanceMap>(body))
+      return LiteralFrequency;
+
+    return PregeneratedCubes;
+  }
+
+  AllowanceMap& initAllowanceMap()
+  {
+    body = std::move(AllowanceMap());
+    return getAllowanceMap();
+  }
+  AllowanceMap& getAllowanceMap()
+  {
+    assert(getCubingKind() == LiteralFrequency);
+    return std::get<AllowanceMap>(body);
+  }
+  const AllowanceMap& getAllowanceMap() const
+  {
+    assert(getCubingKind() == LiteralFrequency);
+    return std::get<AllowanceMap>(body);
   }
   CubeMap& initCubeMap()
   {
-    cubingKind = PregeneratedCubes;
-    return intVec;
+    body = std::move(CubeMap());
+    return getCubeMap();
+  }
+  CubeMap& getCubeMap()
+  {
+    assert(getCubingKind() == PregeneratedCubes);
+    return std::get<CubeMap>(body);
   }
   const CubeMap& getCubeMap() const
   {
     assert(getCubingKind() == PregeneratedCubes);
-    return intVec;
+    return std::get<CubeMap>(body);
   }
-  const LiteralMap& getLiteralMap() const
-  {
-    assert(getCubingKind() == LiteralFrequency);
-    return intVec;
-  }
-  size_t getCubeCount() const { return cubeCount; }
+  size_t getCubeCount() const { return getCubeMap().size(); }
 
-  /** @brief Create internal jump-list required for
-   * CubingKind::PregeneratedCubes.
+  /** @brief Create cube map for
+   * CubingKind::PregeneratedCubes mode.
    *
-   * Can be used with operator[] or getCube().
+   * Can be used with getDecisionOnPath().
    * */
-  void realise()
+  size_t realise(const std::vector<int>& flatCubeArr);
+
+  int getDecisionOnPath(int64_t path) const
   {
     assert(getCubingKind() == PregeneratedCubes);
-    assert(!optionalJumpList.has_value());
-
-    auto& cubeMap = getCubeMap();
-    auto jumpList = JumpList(cubeCount);
-    std::generate(jumpList.begin(), jumpList.end(), [i = 0, cubeMap]() mutable {
-      assert(cubeMap[i] == 0);
-      size_t jumpPos = i;
-      while(cubeMap[++i] != 0) {
-      }
-      return jumpPos;
-    });
-
-    optionalJumpList.emplace(std::move(jumpList));
+    auto map = getCubeMap();
+    auto it = map.find(path);
+    return it == map.end() ? 0 : it->second;
   }
-
-  const int* getCube(size_t i) const
-  {
-    assert(getCubingKind() == PregeneratedCubes);
-    assert(optionalJumpList.has_value());
-    auto& jumpList = optionalJumpList.value();
-    assert(i < jumpList.size());
-    return intVec.data() + jumpList[i];
-  }
-  const int* operator[](size_t i) const { return getCube(i); }
 
   std::string tagline() const;
 
   private:
   friend class cereal::access;
 
-  CubingKind cubingKind;
-  std::vector<int> intVec;
-  std::optional<JumpList> optionalJumpList;
-  size_t cubeCount;
+  DataVariant body;
 
   template<class Archive>
   void serialize(Archive& ar)
   {
-    ar(CEREAL_NVP(cubingKind), CEREAL_NVP(intVec), CEREAL_NVP(cubeCount));
-
-    // This immediately realises the jumplist on receive.
-    if(cubingKind == PregeneratedCubes && !optionalJumpList.has_value())
-      realise();
+    ar(CEREAL_NVP(body));
   }
 };
 }

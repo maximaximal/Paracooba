@@ -1,3 +1,3 @@
 set(MESSAGES_SRCS
-    ${CMAKE_CURRENT_SOURCE_DIR}/job_taglines.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/job_impl.cpp
     PARENT_SCOPE)

@@ -31,7 +31,7 @@ class Registry
     LiteralFrequency
   };
 
-  bool init(Mode mode, messages::JobInitiator* ji = nullptr);
+  bool init(Mode mode, const messages::JobInitiator* ji = nullptr);
 
   using CuberVector = std::vector<std::unique_ptr<Cuber>>;
   using AllowanceMap = std::vector<CNFTree::CubeVar>;

@@ -1,6 +1,7 @@
 #include "../../include/paracuber/cuber/registry.hpp"
 #include "../../include/paracuber/cuber/cuber.hpp"
 #include "../../include/paracuber/cuber/literal_frequency.hpp"
+#include "../../include/paracuber/cuber/pregenerated.hpp"
 #include "paracuber/messages/job_initiator.hpp"
 
 namespace paracuber {
@@ -14,7 +15,7 @@ Registry::Registry(ConfigPtr config, LogPtr log, CNF& rootCNF)
 Registry::~Registry() {}
 
 bool
-Registry::init(Mode mode, messages::JobInitiator* ji)
+Registry::init(Mode mode, const messages::JobInitiator* ji)
 {
   m_cubers.clear();
 
@@ -33,8 +34,12 @@ Registry::init(Mode mode, messages::JobInitiator* ji)
       }
       break;
     }
-    case PregeneratedCubes:
+    case PregeneratedCubes: {
+      assert(ji);
+      auto pregeneratedCubesPtr =
+        std::make_unique<cuber::Pregenerated>(m_config, m_log, m_rootCNF, *ji);
       break;
+    }
   }
 
   // Now, the allowance map is ready and all waiting callbacks can be called.
