@@ -92,7 +92,8 @@ class Communicator
   enum class TCPMode
   {
     TransmitCNF,
-    TransmitJobDescription
+    TransmitJobDescription,
+    Unknown
   };
 
   void sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn);

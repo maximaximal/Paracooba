@@ -74,6 +74,28 @@ applyMessageNodeStatusToStatsNode(const messages::NodeStatus& src,
   }
 }
 
+template<class Socket, typename T>
+size_t
+writeGenericToSocket(Socket& s, const T& val)
+{
+  return boost::asio::write(
+    s,
+    boost::asio::const_buffer(reinterpret_cast<const uint8_t*>(&val),
+                              sizeof(T)));
+}
+
+template<class Streambuf, typename T>
+void
+readGenericFromStreambuf(Streambuf& b, T& val)
+{
+  auto buffer = b.data();
+  uint8_t* tgt = reinterpret_cast<uint8_t*>(&val);
+  std::copy(boost::asio::buffers_begin(buffer),
+            boost::asio::buffers_begin(buffer) + sizeof(T),
+            tgt);
+  b.consume(sizeof(T));
+}
+
 class Communicator::UDPServer
 {
   public:
@@ -579,9 +601,9 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
     m_jobDescription = std::move(jd);
     m_finishedCB = finishedCB;
 
-    m_log->createLoggerMT("TCPClient",
-                          m_jobDescription->tagline() + "|" +
-                            m_endpoint.address().to_string());
+    m_logger = m_log->createLoggerMT("TCPClient",
+                                     m_jobDescription->tagline() + "|" +
+                                       m_endpoint.address().to_string());
   }
 
   void connect()
@@ -611,20 +633,22 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
                TCP_CORK,
                (char*)&option,
                sizeof(option));
+    m_socket.native_non_blocking(true);
 
     /// TCP Transmission Protocol specified in \ref tcpcommunication.
 
     // Sending always starts with the ID of the sender.
-    int64_t id = m_comm->m_config->getInt64(Config::Id);
-    m_socket.write_some(
-      boost::asio::buffer(reinterpret_cast<int64_t*>(&id), sizeof(int64_t)));
+    size_t sentBytes =
+      writeGenericToSocket(m_socket, m_comm->m_config->getInt64(Config::Id));
+    sentBytes += writeGenericToSocket(m_socket, static_cast<uint8_t>(m_mode));
 
-    // Afterwards, send the mode. From here on, modes are different.
-    uint8_t mode = static_cast<uint8_t>(m_mode);
-    m_socket.write_some(
-      boost::asio::buffer(reinterpret_cast<uint8_t*>(&mode), sizeof(uint8_t)));
-
-    m_socket.native_non_blocking(true);
+    const size_t expectedSize = sizeof(int64_t) + sizeof(uint8_t);
+    if(sentBytes != expectedSize) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not send " << expectedSize << " bytes! Only sent "
+        << sentBytes << " bytes.";
+      return;
+    }
 
     // The transmission type handling is done inside the CNF sending functions,
     // receiving is therefore completely handled inside the CNF class. Only the
@@ -636,6 +660,10 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
         break;
       case TCPMode::TransmitJobDescription:
         transmitJobDescription();
+        break;
+      default:
+        PARACUBER_LOG(m_logger, LocalError)
+          << "Cannot send data, mode " << m_mode << " not handled!";
         break;
     }
   }
@@ -652,26 +680,45 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
 
   void transmitJobDescription()
   {
-    auto ptr = shared_from_this();
-
-    boost::asio::streambuf sendStreambuf;
-    std::ostream outStream(&sendStreambuf);
+    std::ostream outStream(&m_sendStreambuf);
     cereal::BinaryOutputArchive oa(outStream);
     oa(m_jobDescription.value());
-    m_socket.async_send(sendStreambuf.data(),
-                        std::bind([this, ptr]() { m_finishedCB(); }));
+
+    uint32_t sizeOfArchive = boost::asio::buffer_size(m_sendStreambuf.data());
+    if(writeGenericToSocket(m_socket, sizeOfArchive) != sizeof(sizeOfArchive)) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not write size of JD Archive!";
+      return;
+    }
+
+    PARACUBER_LOG(m_logger, Trace)
+      << "Transmit job description with size " << sizeOfArchive;
+
+    m_socket.async_send(
+      m_sendStreambuf.data(),
+      boost::bind(&TCPClient::transmissionFinished,
+                  shared_from_this(),
+                  boost::asio::placeholders::error,
+                  boost::asio::placeholders::bytes_transferred));
   }
 
-  ReadyWaiter<boost::asio::ip::tcp::socket> socketWaiter;
+  void transmissionFinished(const boost::system::error_code& error,
+                            std::size_t bytes)
+  {
+    PARACUBER_LOG(m_logger, Trace) << "Written " << bytes << " bytes.";
+    if(error == boost::asio::error::eof) {
+      m_finishedCB();
+    }
+  }
 
   private:
+  boost::asio::streambuf m_sendStreambuf;
   LogPtr m_log;
   LoggerMT m_logger;
   Communicator* m_comm;
   std::shared_ptr<CNF> m_cnf;
   boost::asio::ip::tcp::socket m_socket;
   boost::asio::ip::tcp::endpoint m_endpoint;
-  boost::array<char, REC_BUF_SIZE> m_recBuffer;
   TCPMode m_mode;
   std::optional<messages::JobDescription> m_jobDescription;
   std::function<void()> m_finishedCB;
@@ -714,7 +761,16 @@ class Communicator::TCPServer
       , m_logger(log->createLogger("TCPServerClient"))
       , m_comm(comm)
     {}
-    virtual ~TCPServerClient() {}
+    virtual ~TCPServerClient()
+    {
+      std::string socketDesc = "Unknown Remote Endpoint (Exit)";
+      if(m_socket.is_open()) {
+        socketDesc =
+          boost::lexical_cast<std::string>(m_socket.remote_endpoint());
+      }
+      PARACUBER_LOG(m_logger, Trace)
+        << "TCP Connection ended from " << socketDesc;
+    }
 
     boost::asio::ip::tcp::socket& socket() { return m_socket; }
 
@@ -744,11 +800,19 @@ class Communicator::TCPServer
           bytes = sizeof(int64_t) + sizeof(uint8_t);
           break;
         case HandshakePhase::ReadSenderIDAndSubject: {
+          PARACUBER_LOG(m_logger, Trace)
+            << "Receive " << bytes << " bytes over TCP.";
           m_streambuf.commit(bytes);
-          std::istream inStream(&m_streambuf);
-          inStream >> m_senderID;
-          uint8_t mode = 0;
-          inStream >> mode;
+          uint8_t modeUint = 0;
+          readGenericFromStreambuf(m_streambuf, m_senderID);
+          readGenericFromStreambuf(m_streambuf, modeUint);
+          m_mode = static_cast<TCPMode>(modeUint);
+
+          if(m_senderID == 0) {
+            PARACUBER_LOG(m_logger, LocalError)
+              << "Received id = 0! Invalid ID. Exit TCPServerClient.";
+            return;
+          }
 
           switch(m_mode) {
             case TCPMode::TransmitCNF:
@@ -760,6 +824,10 @@ class Communicator::TCPServer
               phase = HandshakePhase::ReadLength;
               bytes = sizeof(uint32_t);
               break;
+            default:
+              PARACUBER_LOG(m_logger, LocalError)
+                << "Received unknown TCPMode! Mode: " << m_mode;
+              return;
           }
 
           if(m_comm->m_config->isDaemonMode()) {
@@ -782,6 +850,8 @@ class Communicator::TCPServer
                     boost::asio::buffers_begin(constBuffer) + bytes,
                     std::ostream_iterator<uint8_t>(ssOut));
 
+          m_streambuf.consume(bytes);
+
           m_cnf->receive(&m_socket, ssOut.str().c_str(), bytes);
 
           bytes = REC_BUF_SIZE;
@@ -790,19 +860,27 @@ class Communicator::TCPServer
         }
         case HandshakePhase::ReadLength: {
           m_streambuf.commit(bytes);
-          std::istream inStream(&m_streambuf);
           uint32_t jdSize = 0;
-          inStream >> jdSize;
+          readGenericFromStreambuf(m_streambuf, jdSize);
           bytes = jdSize;
           phase = HandshakePhase::ReadJobDescription;
           break;
         }
         case HandshakePhase::ReadJobDescription: {
           m_streambuf.commit(bytes);
-          std::istream inStream(&m_streambuf);
-          cereal::BinaryInputArchive inAr(inStream);
+          PARACUBER_LOG(m_logger, Trace)
+            << "Read Job Description with length " << bytes;
           messages::JobDescription jd;
-          inAr(jd);
+          try {
+            std::istream inStream(&m_streambuf);
+            cereal::BinaryInputArchive inAr(inStream);
+            inAr(jd);
+          } catch(const cereal::Exception& e) {
+            PARACUBER_LOG(m_logger, GlobalError)
+              << "Exception during parsing of job description! Error: "
+              << e.what();
+            return;
+          }
           m_cnf->receiveJobDescription(m_senderID, std::move(jd));
 
           if(m_context) {
@@ -819,7 +897,7 @@ class Communicator::TCPServer
                 break;
             }
           }
-          break;
+          return;
         }
 
         default:
@@ -827,7 +905,6 @@ class Communicator::TCPServer
       }
 
       if(error == boost::asio::error::eof) {
-
         if(phase == HandshakePhase::ReadBody) {
           // End the CNF receiving.
           m_cnf->receive(&m_socket, nullptr, 0);
@@ -835,9 +912,6 @@ class Communicator::TCPServer
             m_context->start(Daemon::Context::FormulaReceived);
           }
         }
-
-        PARACUBER_LOG(m_logger, Trace)
-          << "TCP Connection ended from " << m_socket.remote_endpoint();
       } else {
         if(error) {
           PARACUBER_LOG(m_logger, LocalError)
@@ -875,8 +949,8 @@ class Communicator::TCPServer
     Communicator* m_comm;
     Daemon::Context* m_context = nullptr;
 
-    int64_t m_senderID;
-    TCPMode m_mode;
+    int64_t m_senderID = 0;
+    TCPMode m_mode = TCPMode::Unknown;
   };
 
   void startAccept()
@@ -1323,6 +1397,9 @@ operator<<(std::ostream& o, Communicator::TCPMode mode)
       break;
     case Communicator::TCPMode::TransmitJobDescription:
       o << "Transmit Job Description";
+      break;
+    case Communicator::TCPMode::Unknown:
+      o << "Unknown";
       break;
   }
   return o;
