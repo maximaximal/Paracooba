@@ -3,6 +3,7 @@
 #include "../include/paracuber/messages/node.hpp"
 #include "../include/paracuber/runner.hpp"
 #include <boost/asio/ip/host_name.hpp>
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <cstddef>
@@ -69,6 +70,12 @@ Config::Config()
     (GetConfigNameFromEnum(Config::HTTPDocRoot),
          po::value<std::string>()->default_value(getInternalWebserverDefaultDocRoot())->value_name("string"),
          "document root path of the internal http server")
+    (GetConfigNameFromEnum(Config::IPAddress),
+     po::value<std::string>()->default_value(boost::asio::ip::address_v4().to_string())->value_name("string"),
+         "IP address to use for network communication")
+    (GetConfigNameFromEnum(Config::IPBroadcastAddress),
+     po::value<std::string>()->default_value(boost::asio::ip::address_v4().to_string())->value_name("string"),
+         "IP broadcast address to use for network communication")
     (GetConfigNameFromEnum(Config::Id),
          po::value<int64_t>()->default_value(dist_mac(rng))->value_name("int"),
          "Unique Number (only 48 Bit) (can be MAC address)")
@@ -202,6 +209,10 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::MaxNodeUtilization);
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::DaemonHost);
+  conditionallySetConfigOptionToArray<std::string>(
+    vm, m_config.data(), Config::IPAddress);
+  conditionallySetConfigOptionToArray<std::string>(
+    vm, m_config.data(), Config::IPBroadcastAddress);
 
   if(vm.count(GetConfigNameFromEnum(Id))) {
     m_config[Id] = generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());

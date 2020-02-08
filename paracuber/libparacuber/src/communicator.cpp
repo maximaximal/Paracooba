@@ -18,12 +18,15 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/buffer.hpp>
+#include <boost/asio/ip/address.hpp>
+#include <boost/asio/ip/address_v4.hpp>
 #include <boost/asio/socket_base.hpp>
 #include <boost/bind.hpp>
 #include <boost/system/error_code.hpp>
 #include <cassert>
 #include <chrono>
 #include <mutex>
+#include <netinet/in.h>
 #include <regex>
 #include <sstream>
 
@@ -84,13 +87,22 @@ class Communicator::UDPServer
     , m_port(port)
     , m_clusterStatistics(comm->getClusterStatistics())
   {
+    m_ipAddress = generateIPAddress();
+    m_broadcastAddress = generateBroadcastAddress();
     startReceive();
-    PARACUBER_LOG(m_logger, Trace) << "UDPServer started at port " << port;
+    PARACUBER_LOG(m_logger, Trace)
+      << "UDPServer started at " << m_socket.local_endpoint();
   }
   ~UDPServer()
   {
     PARACUBER_LOG(m_logger, Trace)
       << "UDPServer at port " << m_port << " stopped.";
+  }
+
+  boost::asio::ip::address getIPAddress() { return m_ipAddress; }
+  boost::asio::ip::address getBroadcastAddress()
+  {
+    return m_broadcastAddress;
   }
 
   void startReceive()
@@ -491,6 +503,36 @@ class Communicator::UDPServer
   }
 
   private:
+  boost::asio::ip::address generateBroadcastAddress()
+  {
+    auto ipAddressString =
+      std::string(m_communicator->m_config->getString(Config::IPBroadcastAddress));
+    boost::system::error_code err;
+    auto address = boost::asio::ip::make_address(ipAddressString, err);
+    if(err) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not parse given IP Broadcast Address \"" << ipAddressString
+        << "\". Error: " << err;
+      address = boost::asio::ip::address_v4::broadcast();
+    }
+    return address;
+  }
+
+  boost::asio::ip::address generateIPAddress()
+  {
+    auto ipAddressString =
+      std::string(m_communicator->m_config->getString(Config::IPAddress));
+    boost::system::error_code err;
+    auto address = boost::asio::ip::make_address(ipAddressString, err);
+    if(err) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Could not parse given IP Address \"" << ipAddressString
+        << "\". Error: " << err;
+      address = boost::asio::ip::address_v4::any();
+    }
+    return address;
+  }
+
   Communicator* m_communicator;
   Logger m_logger;
   uint16_t m_port;
@@ -498,6 +540,9 @@ class Communicator::UDPServer
   udp::socket m_socket;
   udp::endpoint m_remoteEndpoint;
   boost::asio::streambuf m_recStreambuf;
+
+  boost::asio::ip::address m_ipAddress;
+  boost::asio::ip::address m_broadcastAddress;
 
   ClusterStatisticsPtr m_clusterStatistics;
 
@@ -652,7 +697,8 @@ class Communicator::TCPServer
         boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port))
   {
     startAccept();
-    PARACUBER_LOG(m_logger, Trace) << "TCPServer started at port " << port;
+    PARACUBER_LOG(m_logger, Trace)
+      << "TCPServer started at " << m_acceptor.local_endpoint();
   }
   virtual ~TCPServer()
   {
@@ -1199,7 +1245,7 @@ Communicator::task_requestAnnounce(int64_t id,
   if(!m_udpServer)
     return;
 
-  PARACUBER_LOG(m_logger, Trace) << "Send announcement request.";
+  uint16_t port = m_config->getUint16(Config::UDPTargetPort);
 
   messages::Message msg = m_udpServer->buildMessage();
   messages::Node node = m_config->buildNode();
@@ -1216,15 +1262,19 @@ Communicator::task_requestAnnounce(int64_t id,
   }();
   msg.insert(std::move(announcementRequest));
 
-  if(nn) {
-    m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);
-  } else {
-    m_udpServer->sendMessage(boost::asio::ip::udp::endpoint(
-                               boost::asio::ip::address_v4::broadcast(),
-                               m_config->getUint16(Config::UDPTargetPort)),
-                             msg,
-                             false);
-  }
+  auto endpoint = [this, nn, port]() {
+    if(nn) {
+      return nn->getRemoteUdpEndpoint();
+    } else {
+      return boost::asio::ip::udp::endpoint(m_udpServer->getBroadcastAddress(),
+                                            port);
+    }
+  }();
+
+  PARACUBER_LOG(m_logger, Trace)
+    << "Send announcement request to endpoint " << endpoint;
+
+  m_udpServer->sendMessage(endpoint, msg, false);
 }
 void
 Communicator::task_announce(NetworkedNode* nn)
@@ -1240,7 +1290,7 @@ Communicator::task_announce(NetworkedNode* nn)
     m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);
   } else {
     m_udpServer->sendMessage(boost::asio::ip::udp::endpoint(
-                               boost::asio::ip::address_v4::broadcast(),
+                               m_udpServer->getBroadcastAddress(),
                                m_config->getUint16(Config::UDPTargetPort)),
                              msg,
                              false);
@@ -1261,7 +1311,7 @@ Communicator::task_offlineAnnouncement(NetworkedNode* nn)
     m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);
   } else {
     m_udpServer->sendMessage(boost::asio::ip::udp::endpoint(
-                               boost::asio::ip::address_v4::broadcast(),
+                               m_udpServer->getBroadcastAddress(),
                                m_config->getUint16(Config::UDPTargetPort)),
                              msg,
                              false,
