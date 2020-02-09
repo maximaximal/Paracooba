@@ -867,7 +867,7 @@ class Communicator::TCPServer
           if(bytes != expectedBytes) {
             PARACUBER_LOG(m_logger, LocalError)
               << "Did not read expected " << expectedBytes << " bytes, but "
-              << bytes << " bytes of Job Description!";
+              << bytes << " bytes of Job Description! Error: " << error;
             return;
           }
           messages::JobDescription jd;
