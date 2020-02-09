@@ -93,7 +93,7 @@ class TaskFactory
 
   private:
   ConfigPtr m_config;
-  Logger m_logger;
+  LoggerMT m_logger;
   PriorityQueueLockSemanticsUniquePtr<TaskSkeleton> m_skeletons;
   std::shared_ptr<CNF> m_rootCNF;
   std::unique_ptr<CaDiCaLMgr> m_cadicalMgr;
