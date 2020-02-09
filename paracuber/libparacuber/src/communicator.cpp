@@ -79,9 +79,7 @@ size_t
 writeGenericToSocket(Socket& s, const T& val)
 {
   return boost::asio::write(
-    s,
-    boost::asio::const_buffer(reinterpret_cast<const uint8_t*>(&val),
-                              sizeof(T)));
+    s, boost::asio::buffer(reinterpret_cast<const uint8_t*>(&val), sizeof(T)));
 }
 
 template<class Streambuf, typename T>
