@@ -101,6 +101,11 @@ class CaDiCaLTask : public Task
   void writeEncodedAssignment(AssignmentVector&);
   void writeDecodedAssignment(AssignmentVector&);
 
+  const std::vector<int>& getPregeneratedCubes() const
+  {
+    return m_pregeneratedCubes;
+  }
+
   private:
   void provideSolver();
 
@@ -113,6 +118,7 @@ class CaDiCaLTask : public Task
   std::shared_ptr<CNF> m_cnf;
   Mode m_mode = ParseAndSolve;
   CNFTree::Path m_path = CNFTree::DefaultUninitiatedPath;
+  std::vector<int> m_pregeneratedCubes;
 
   std::unique_ptr<CaDiCaL::Solver> m_solver;
   std::string m_sourcePath;

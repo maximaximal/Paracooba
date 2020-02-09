@@ -90,8 +90,12 @@ Client::solve()
     // should not be required to const cast the result anywhere else, except in
     // daemon.
     auto& resultMut = const_cast<TaskResult&>(result);
-    m_rootCNF->setRootTask(static_unique_pointer_cast<CaDiCaLTask>(
-      std::move(resultMut.getTaskPtr())));
+    {
+      auto rootTaskMutPtr = static_unique_pointer_cast<CaDiCaLTask>(
+        std::move(resultMut.getTaskPtr()));
+      assert(rootTaskMutPtr);
+      m_rootCNF->setRootTask(std::move(rootTaskMutPtr));
+    }
 
     // Client is now ready for work.
     m_config->m_communicator->getClusterStatistics()
@@ -102,8 +106,7 @@ Client::solve()
     // After the root formula has been set, which completely builds up the CNF
     // object including the cuber::Registry object, decisions can be made.
     // Decisions must be propagated to daemons in order to solve them in
-    // parallel. Decisions are always guided by the CNFTree class, which
-    // knows how many decisions are left in any given path.
+    // parallel.
     m_taskFactory = std::make_unique<TaskFactory>(m_config, m_log, m_rootCNF);
     m_taskFactory->setRootTask(m_rootCNF->getRootTask());
 

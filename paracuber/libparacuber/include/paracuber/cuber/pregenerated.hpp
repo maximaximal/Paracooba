@@ -18,6 +18,7 @@ class Pregenerated : public Cuber
   virtual ~Pregenerated();
 
   bool init();
+  const messages::JobInitiator& getJobInitiator() { return m_ji; }
 
   virtual bool generateCube(CNFTree::Path path, CNFTree::CubeVar& var);
 

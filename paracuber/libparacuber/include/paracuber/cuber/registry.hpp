@@ -40,6 +40,10 @@ class Registry
   bool generateCube(CNFTree::Path path, CNFTree::CubeVar& var);
   inline AllowanceMap& getAllowanceMap() { return m_allowanceMap; }
 
+  Mode getCuberMode() { return m_mode; }
+
+  const messages::JobInitiator* getJobInitiator() { return m_jobInitiator; }
+
   ReadyWaiter<AllowanceMap> allowanceMapWaiter;
 
   private:
@@ -51,6 +55,7 @@ class Registry
 
   AllowanceMap m_allowanceMap;
   Mode m_mode = LiteralFrequency;
+  const messages::JobInitiator* m_jobInitiator = nullptr;
 };
 }
 }

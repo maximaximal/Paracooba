@@ -18,6 +18,7 @@ bool
 Registry::init(Mode mode, const messages::JobInitiator* ji)
 {
   m_cubers.clear();
+  m_mode = mode;
 
   switch(mode) {
     case LiteralFrequency: {
@@ -38,6 +39,8 @@ Registry::init(Mode mode, const messages::JobInitiator* ji)
       assert(ji);
       auto pregeneratedCubesPtr =
         std::make_unique<cuber::Pregenerated>(m_config, m_log, m_rootCNF, *ji);
+      m_jobInitiator = &pregeneratedCubesPtr->getJobInitiator();
+      m_cubers.push_back(std::move(pregeneratedCubesPtr));
       break;
     }
   }

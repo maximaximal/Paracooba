@@ -16,40 +16,35 @@ JobInitiator::tagline() const
 size_t
 JobInitiator::realise(const std::vector<int>& flatCubeArr)
 {
-  assert(getCubingKind() == PregeneratedCubes);
-  auto& map = getCubeMap();
+  auto& map = initCubeMap();
   size_t i = 0;
 
-  CNFTree::Path p = 0;
+  CNFTree::Path p = 0, lastPath = 0;
   int cubeVar = 0;
   for(auto var : flatCubeArr) {
     if(var == 0) {
       // Cube finished.
-      auto [_, inserted] = map.insert(std::make_pair(p, cubeVar));
-      if(!inserted) {
-        // Already inserted previously! This breaks the binary tree property of
-        // the provided cubes!
-        return i;
-      }
       p = 0;
       ++i;
       continue;
     } else {
       // Inside cube.
 
+      cubeVar = FastAbsolute(var);
+      assert(cubeVar != 0);
+
+      auto [currVar, _] = map.insert(std::make_pair(p, cubeVar));
+      if(currVar->second != cubeVar) {
+        // Existing path has different value at this position! This breaks the
+        // binary tree property.
+        return i;
+      }
+
       if(var > 0) {
         p = CNFTree::getNextRightPath(p);
       } else {
         p = CNFTree::getNextLeftPath(p);
       }
-    }
-    cubeVar = FastAbsolute(var);
-
-    auto [currVar, inserted] = map.insert(std::make_pair(p, cubeVar));
-    if(currVar->second != cubeVar) {
-      // Existing path has different value at this position! This breaks the
-      // binary tree property.
-      return i;
     }
   }
   return 0;

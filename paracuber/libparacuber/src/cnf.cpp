@@ -112,12 +112,23 @@ CNF::sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCallback)
       [this, nn, finishedCallback](cuber::Registry::AllowanceMap& map) {
         // This indirection is required to make this work from worker threads.
         // The allowance map may take a while to generate.
-        assert(map.size() > 0);
-
-        auto initiator = messages::JobInitiator();
-        initiator.initAllowanceMap() = map;
         messages::JobDescription jd(m_originId);
-        jd.insert(initiator);
+
+        switch(m_cuberRegistry->getCuberMode()) {
+          case cuber::Registry::LiteralFrequency: {
+            assert(map.size() > 0);
+            auto initiator = messages::JobInitiator();
+            initiator.initAllowanceMap() = map;
+            jd.insert(initiator);
+            break;
+          }
+          case cuber::Registry::PregeneratedCubes: {
+            auto ji = m_cuberRegistry->getJobInitiator();
+            assert(ji);
+            jd.insert(*ji);
+            break;
+          }
+        }
 
         m_jobDescriptionTransmitter->transmitJobDescription(
           std::move(jd), nn, finishedCallback);
@@ -488,14 +499,29 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
   assert(!m_rootTask);
   m_rootTask = std::move(root);
 
-  if(!m_cuberRegistry && !m_config->isDaemonMode()) {
+  if(!m_config->isDaemonMode()) {
+    assert(!m_cuberRegistry);
+
+    const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
+    messages::JobInitiator ji;
+    if(pregenCubes.size() > 0) {
+      size_t realised = ji.realise(pregenCubes);
+      if(realised != 0) {
+        PARACUBER_LOG(m_logger, LocalError)
+          << "Could not parse provided cubes into binary tree format! Error at "
+             "cube "
+          << realised;
+      }
+    }
+
     // The cuber registry may already have been created if this is a daemon
     // node. It can then just be re-used, as the daemon cuber registry did not
     // need the root node to be created.
     m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
-    if(!m_cuberRegistry->init(m_config->usePregeneratedCubes()
+    if(!m_cuberRegistry->init(pregenCubes.size() > 0
                                 ? cuber::Registry::PregeneratedCubes
-                                : cuber::Registry::LiteralFrequency)) {
+                                : cuber::Registry::LiteralFrequency,
+                              &ji)) {
       PARACUBER_LOG(m_logger, Fatal) << "Could not initialise cuber registry!";
       m_cuberRegistry.reset();
       return;

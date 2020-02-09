@@ -100,7 +100,7 @@ CaDiCaLTask::applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree)
   provideSolver();
 
   tree.visit(
-    CNFTree::setDepth(p, CNFTree::getDepth(p) - 1),
+    CNFTree::getParent(p),
     [this](
       CNFTree::CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
       m_solver->assume(p);
@@ -158,11 +158,18 @@ CaDiCaLTask::execute()
       << "\".";
     int vars = 0;
     bool incremental = false;
-    std::vector<int> cubes;
-    const char* parse_status =
-      m_solver->read_dimacs(m_sourcePath.c_str(), vars, 1, incremental, cubes);
+    const char* parse_status = m_solver->read_dimacs(
+      m_sourcePath.c_str(), vars, 1, incremental, m_pregeneratedCubes);
+
     if(parse_status != 0) {
       return std::move(std::make_unique<TaskResult>(TaskResult::ParsingError));
+    }
+
+    if(incremental) {
+      PARACUBER_LOG((*m_logger), Trace)
+        << "Incremental DIMCAS encountered! Pregenerated cube array size: "
+        << BytePrettyPrint(m_pregeneratedCubes.size() * sizeof(int))
+        << " (will be parsed at a later stage)";
     }
 
     if(m_varCount != nullptr) {

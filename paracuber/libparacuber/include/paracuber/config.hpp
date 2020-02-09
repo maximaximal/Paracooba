@@ -47,7 +47,6 @@ class Config
     HTTPListenPort,
     HTTPDocRoot,
     LogToSTDOUT,
-    UsePregeneratedCubes,
 
     FreqCuberCutoff,
 
@@ -141,8 +140,6 @@ class Config
   inline bool isClientCaDiCaLEnabled() { return !m_disableClientCaDiCaL; }
   /** @brief Check if internal webserver is enabled. */
   inline bool isInternalWebserverEnabled() { return m_enableInternalWebserver; }
-  /** @brief Use pregenerated cubes.. */
-  inline bool usePregeneratedCubes() { return m_usePregeneratedCubes; }
 
   int64_t generateId(int64_t uniqueNumber);
 
@@ -188,7 +185,6 @@ class Config
   bool m_daemonMode = false;
   bool m_disableClientCaDiCaL = false;
   bool m_useSTDOUTForLogging = false;
-  bool m_usePregeneratedCubes = false;
 #ifdef ENABLE_INTERNAL_WEBSERVER
   bool m_enableInternalWebserver = true;
 #else
