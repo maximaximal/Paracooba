@@ -786,7 +786,8 @@ class Communicator::TCPServer
     void handshake(
       boost::system::error_code error = boost::system::error_code(),
       std::size_t bytes = 0,
-      HandshakePhase phase = HandshakePhase::Start)
+      HandshakePhase phase = HandshakePhase::Start,
+      size_t expectedBytes = 0)
     {
       using namespace boost::asio;
       bool readSome = false;
@@ -863,6 +864,12 @@ class Communicator::TCPServer
         }
         case HandshakePhase::ReadJobDescription: {
           m_streambuf.commit(bytes);
+          if(bytes != expectedBytes) {
+            PARACUBER_LOG(m_logger, LocalError)
+              << "Did not read expected " << expectedBytes << " bytes, but "
+              << bytes << " bytes of Job Description!";
+            return;
+          }
           messages::JobDescription jd;
           try {
             std::istream inStream(&m_streambuf);
@@ -920,7 +927,8 @@ class Communicator::TCPServer
                                                shared_from_this(),
                                                placeholders::error,
                                                placeholders::bytes_transferred,
-                                               phase));
+                                               phase,
+                                               bytes));
         } else {
           async_read(m_socket,
                      buffer,
@@ -928,7 +936,8 @@ class Communicator::TCPServer
                                  shared_from_this(),
                                  placeholders::error,
                                  placeholders::bytes_transferred,
-                                 phase));
+                                 phase,
+                                 bytes));
         }
       }
     }
