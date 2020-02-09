@@ -527,7 +527,7 @@ class Communicator::UDPServer
     auto ipAddressString = std::string(
       m_communicator->m_config->getString(Config::IPBroadcastAddress));
     boost::system::error_code err;
-    auto address = boost::asio::ip::make_address(ipAddressString, err);
+    auto address = boost::asio::ip::address::from_string(ipAddressString, err);
     if(err) {
       PARACUBER_LOG(m_logger, LocalError)
         << "Could not parse given IP Broadcast Address \"" << ipAddressString
@@ -542,7 +542,7 @@ class Communicator::UDPServer
     auto ipAddressString =
       std::string(m_communicator->m_config->getString(Config::IPAddress));
     boost::system::error_code err;
-    auto address = boost::asio::ip::make_address(ipAddressString, err);
+    auto address = boost::asio::ip::address::from_string(ipAddressString, err);
     if(err) {
       PARACUBER_LOG(m_logger, LocalError)
         << "Could not parse given IP Address \"" << ipAddressString
