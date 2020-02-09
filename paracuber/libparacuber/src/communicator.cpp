@@ -203,7 +203,7 @@ class Communicator::UDPServer
       startReceive();
     } else {
       PARACUBER_LOG(m_logger, LocalError)
-        << "Error receiving data from UDP socket. Error: " << error;
+        << "Error receiving data from UDP socket. Error: " << error.message();
     }
   }
 
@@ -867,7 +867,7 @@ class Communicator::TCPServer
           if(bytes != expectedBytes) {
             PARACUBER_LOG(m_logger, LocalError)
               << "Did not read expected " << expectedBytes << " bytes, but "
-              << bytes << " bytes of Job Description! Error: " << error;
+              << bytes << " bytes of Job Description! Error: " << error.message();
             return;
           }
           messages::JobDescription jd;
