@@ -9,7 +9,7 @@ pipeline {
 	    steps {
             ircNotify notifyOnStart:true, extraMessage: "Starting Build of ParaCuber."
             sh 'mkdir -p build/third_party/cadical-out/build/ && touch build/third_party/cadical-out/build/libcadical.a'
-            cmakeBuild buildType: 'Release', buildDir: 'build', cleanBuild: true, installation: 'InSearchPath', generator: 'Ninja', steps: [[withCmake: true]]
+            cmakeBuild buildType: 'Release', buildDir: 'build', cleanBuild: true, installation: 'InSearchPath', steps: [[withCmake: true]]
 	    }
 	}
 	stage('Test') {
