@@ -20,7 +20,7 @@ pipeline {
 	stage('Package') {
 	    steps {
             cpack arguments: '-DBUILD_NUMBER=${currentBuild.number}', installation: 'InSearchPath', workingDir: 'build'
-            archiveArtifacts packages: 'build/packages/*.deb', fingerprint: true
+            archiveArtifacts artifacts: 'build/packages/*.deb', fingerprint: true
 	    }
 	}
     }
