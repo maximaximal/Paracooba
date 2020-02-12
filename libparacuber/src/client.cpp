@@ -73,7 +73,9 @@ Client::solve()
   m_communicator->getRunner()->push(std::move(task),
                                     m_config->getInt64(Config::Id));
   finishedSignal.connect([this](const TaskResult& result) {
-    m_status = result.getStatus();
+    if(m_status == TaskResult::Unknown) {
+      m_status = result.getStatus();
+    }
     if(m_status != TaskResult::Parsed) {
       PARACUBER_LOG(m_logger, Fatal)
         << "Could not parse DIMACS source file! Status: " << result.getStatus()
@@ -122,9 +124,11 @@ Client::solve()
       m_communicator->getRunner()->push(std::move(task),
                                         m_config->getInt64(Config::Id));
       finishedSignal.connect([this](const TaskResult& result) {
-        // Finished solving using client CaDiCaL!
-        m_status = result.getStatus();
-        m_communicator->exit();
+        if(m_status == TaskResult::Unknown || m_status == TaskResult::Parsed) {
+          m_status = result.getStatus();
+          // Finished solving using client CaDiCaL!
+          m_communicator->exit();
+        }
       });
     }
 
@@ -132,4 +136,4 @@ Client::solve()
       0, TaskFactory::CubeOrSolve, m_config->getInt64(Config::Id));
   });
 }
-}
+}// namespace paracuber

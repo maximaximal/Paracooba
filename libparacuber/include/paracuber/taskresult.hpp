@@ -30,7 +30,8 @@ class TaskResult
     Satisfiable,
     Unsolved,
     Unsatisfiable,
-    Parsed
+    Parsed,
+    Unknown
   };
 
   /** @brief Create a task result with an assigned status. */

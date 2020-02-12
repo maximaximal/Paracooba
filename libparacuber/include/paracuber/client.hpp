@@ -57,7 +57,7 @@ class Client
   LogPtr m_log;
   Logger m_logger;
   std::shared_ptr<Communicator> m_communicator;
-  TaskResult::Status m_status;
+  TaskResult::Status m_status = TaskResult::Unknown;
   std::shared_ptr<CNF> m_rootCNF;
   uint32_t m_cnfVarCount = 0;
   std::unique_ptr<TaskFactory> m_taskFactory;
