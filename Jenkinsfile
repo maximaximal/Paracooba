@@ -47,7 +47,7 @@ pipeline {
                     stopProcessingIfError: true
                 )]
             )
+            ircNotify()
 	    }
-        ircNotify()
     }
 }
