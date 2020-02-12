@@ -21,7 +21,7 @@ ExternalProject_Add_Step (
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/cadical-out/build/)
 if(${CMAKE_VERSION} VERSION_LESS "3.12.4")
-    message(WARNING "Please first touch the required cadical file, your CMake version is too old to do this automatically.")
+    message(WARNING "Please first touch the required cadical file, your CMake version is too old to do this automatically. To do this, execute the following command: `mkdir -p third_party/cadical-out/build/libcadical.a && touch third_party/cadical/cadical-out/build/libcadical.a`")
 else()
     # This is not recognized by older CMake versions.
     file(TOUCH ${CMAKE_CURRENT_BINARY_DIR}/cadical-out/build/${CMAKE_STATIC_LIBRARY_PREFIX}cadical${CMAKE_STATIC_LIBRARY_SUFFIX})
