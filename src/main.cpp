@@ -51,13 +51,13 @@ main(int argc, char* argv[])
 
     switch(status) {
       case TaskResult::Unsolved:
-        PARACUBER_LOG(logger, Info) << "Unsolved!";
+        std::cout << "unknown" << std::endl;
         break;
       case TaskResult::Satisfiable:
-        PARACUBER_LOG(logger, Info) << "Satisfied!";
+        std::cout << "sat" << std::endl;
         break;
       case TaskResult::Unsatisfiable:
-        PARACUBER_LOG(logger, Info) << "Unsatisfiable!";
+        std::cout << "unsat" << std::endl;
         break;
     }
   }
