@@ -20,6 +20,8 @@ Daemon::Context::Context(std::shared_ptr<CNF> rootCNF,
   , m_statisticsNode(statsNode)
   , m_taskFactory(
       std::make_unique<TaskFactory>(daemon->m_config, daemon->m_log, rootCNF))
+  , m_nodeOfflineSignalConnection(statsNode.getNodeOfflineSignal().connect(
+      std::bind(&Daemon::Context::nodeOffline, this, std::placeholders::_1)))
 {
   PARACUBER_LOG(m_logger, Trace)
     << "Create new context with origin " << m_originatorID << ".";
@@ -30,6 +32,7 @@ Daemon::Context::~Context()
   PARACUBER_LOG(m_logger, Trace)
     << "Destroy context with origin " << m_originatorID;
   m_rootCNF->setTaskFactory(nullptr);
+  m_nodeOfflineSignalConnection.disconnect();
 }
 
 void
@@ -100,6 +103,16 @@ uint64_t
 Daemon::Context::getFactoryQueueSize() const
 {
   return m_taskFactory->getSize();
+}
+
+void
+Daemon::Context::nodeOffline(const std::string& reason)
+{
+  PARACUBER_LOG(m_logger, Trace)
+    << "Node " << m_statisticsNode.getName()
+    << "(ID: " << m_statisticsNode.getId() << ") offline! Reason: " << reason
+    << ". Context with originator: " << m_originatorID << " will be destroyed.";
+  m_daemon->forgetAboutContext(m_originatorID);
 }
 
 Daemon::Daemon(ConfigPtr config,

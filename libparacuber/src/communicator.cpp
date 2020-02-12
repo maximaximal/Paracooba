@@ -264,9 +264,9 @@ class Communicator::UDPServer
     const messages::OfflineAnnouncement& offlineAnnouncement =
       msg.getOfflineAnnouncement();
 
-    m_clusterStatistics->removeNode(msg.getOrigin());
+    m_clusterStatistics->removeNode(msg.getOrigin(),
+                                    offlineAnnouncement.getReason());
 
-    PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
     m_communicator->checkAndTransmitClusterStatisticsChanges();
   }
   void handleAnnouncementRequest(const messages::Message& msg)
@@ -283,8 +283,6 @@ class Communicator::UDPServer
     applyMessageNodeToStatsNode(requester, statisticsNode);
 
     networkStatisticsNode(statisticsNode);
-
-    PARACUBER_LOG(m_logger, Info) << *m_clusterStatistics;
 
     if(!m_communicator->m_config->isDaemonMode()) {
       if(requester.getDaemonMode()) {
@@ -692,25 +690,31 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
     PARACUBER_LOG(m_logger, Trace)
       << "Transmit job description with size " << sizeOfArchive;
 
-    boost::asio::async_write(m_socket,
+    boost::asio::async_write(
+      m_socket,
       m_sendStreambuf.data(),
       boost::bind(&TCPClient::transmissionFinished,
                   shared_from_this(),
                   boost::asio::placeholders::error,
-                  boost::asio::placeholders::bytes_transferred, sizeOfArchive));
+                  boost::asio::placeholders::bytes_transferred,
+                  sizeOfArchive));
   }
 
   void transmissionFinished(const boost::system::error_code& error,
-                            std::size_t bytes, uint32_t bytesToBeSent)
+                            std::size_t bytes,
+                            uint32_t bytesToBeSent)
   {
     if(bytes != bytesToBeSent) {
-      PARACUBER_LOG(m_logger, LocalError) << "Bytes sent are not equal to bytes to be sent! " << bytes << " != " << bytesToBeSent;
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Bytes sent are not equal to bytes to be sent! " << bytes
+        << " != " << bytesToBeSent;
     }
 
     if(error.value() == boost::system::errc::success) {
       m_finishedCB();
     } else {
-      PARACUBER_LOG(m_logger, LocalError) << "Transmission failed with error: " << error.message();
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Transmission failed with error: " << error.message();
     }
   }
 
@@ -873,7 +877,8 @@ class Communicator::TCPServer
           if(bytes != expectedBytes) {
             PARACUBER_LOG(m_logger, LocalError)
               << "Did not read expected " << expectedBytes << " bytes, but "
-              << bytes << " bytes of Job Description! Error: " << error.message();
+              << bytes
+              << " bytes of Job Description! Error: " << error.message();
             return;
           }
           messages::JobDescription jd;
@@ -1256,6 +1261,7 @@ Communicator::tick()
 {
   m_runner->checkTaskFactories();
 
+  assert(m_clusterStatistics);
   m_clusterStatistics->tick();
 
   // Update workQueueSize

@@ -50,6 +50,8 @@ class Daemon
     private:
     friend class Daemon;
 
+    void nodeOffline(const std::string& reason);
+
     std::shared_ptr<CNF> m_rootCNF;
     std::unique_ptr<TaskFactory> m_taskFactory;
     int64_t m_originatorID = 0;
@@ -62,6 +64,8 @@ class Daemon
     std::mutex m_contextMutex;
 
     ClusterStatistics::Node& m_statisticsNode;
+
+    boost::signals2::connection m_nodeOfflineSignalConnection;
   };
 
   /** @brief Constructor
@@ -84,7 +88,6 @@ class Daemon
   void forgetAboutContext(int64_t id);
 
   private:
-
   std::shared_ptr<Config> m_config;
   ContextMap m_contextMap;
   std::shared_mutex m_contextMapMutex;

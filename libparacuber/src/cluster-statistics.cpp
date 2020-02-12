@@ -9,6 +9,7 @@
 #include "../include/paracuber/task_factory.hpp"
 #include <algorithm>
 #include <boost/iterator/filter_iterator.hpp>
+#include <string>
 
 namespace paracuber {
 
@@ -99,15 +100,15 @@ ClusterStatistics::initLocalNode()
   thisNode.setTcpListenPort(m_config->getUint16(Config::TCPListenPort));
   thisNode.setUdpListenPort(m_config->getUint16(Config::UDPListenPort));
   thisNode.setName(m_config->getString(Config::LocalName));
-  addNode(std::move(thisNode));
-  m_thisNode = &getNode(m_config->getInt64(Config::Id));
+  m_thisNode = &addNode(std::move(thisNode));
 }
 
-ClusterStatistics::Node&
+const ClusterStatistics::Node&
 ClusterStatistics::getNode(int64_t id)
 {
-  auto it = m_nodeMap.find(id);
-  assert(it != m_nodeMap.end());
+  auto [map, lock] = getNodeMap();
+  auto it = map.find(id);
+  assert(it != map.end());
   return it->second;
 }
 
@@ -119,15 +120,35 @@ ClusterStatistics::getOrCreateNode(int64_t id)
   return { it->second, inserted };
 }
 
-void
+ClusterStatistics::Node&
 ClusterStatistics::addNode(Node&& node)
 {
-  m_nodeMap.emplace(node.m_id, std::move(node));
+  auto [map, lock] = getUniqueNodeMap();
+  return map.emplace(node.m_id, std::move(node)).first->second;
 }
+
 void
-ClusterStatistics::removeNode(int64_t id)
+ClusterStatistics::removeNode(int64_t id, const std::string& reason)
 {
-  m_nodeMap.erase(id);
+  auto [map, lock] = getUniqueNodeMap();
+  unsafeRemoveNode(id, reason);
+}
+
+void
+ClusterStatistics::unsafeRemoveNode(int64_t id, const std::string& reason)
+{
+  assert(m_thisNode);
+  if(id == m_thisNode->m_id)
+    return;
+
+  PARACUBER_LOG(m_logger, Trace)
+    << "Remove cluster statistics node with id: " << id
+    << " becase of reason: " << reason;
+  auto it = m_nodeMap.find(id);
+  if(it != m_nodeMap.end()) {
+    it->second.m_nodeOfflineSignal(reason);
+    m_nodeMap.erase(id);
+  }
 }
 
 ConstSharedLockView<ClusterStatistics::NodeMap>
@@ -252,9 +273,17 @@ void
 ClusterStatistics::tick()
 {
   auto [map, lock] = getUniqueNodeMap();
+
+  m_thisNode->statusReceived();
+
   for(auto& it : map) {
     auto& statNode = it.second;
-    statNode.getMeanDurationSinceLastStatus();
+    auto lastStatus = statNode.getDurationSinceLastStatus();
+    auto mean = statNode.getMeanDurationSinceLastStatus();
+    if(lastStatus > mean * 3) {
+      std::string message = "Last status update was too long ago.";
+      unsafeRemoveNode(it.first, message);
+    }
   }
 }
 }

@@ -16,6 +16,7 @@
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/rolling_mean.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
+#include <boost/signals2/signal.hpp>
 
 namespace paracuber {
 
@@ -226,6 +227,9 @@ class ClusterStatistics
     using TaskFactoryVector = std::vector<TaskFactory*>;
     void applyTaskFactoryVector(const TaskFactoryVector& v);
 
+    using NodeOfflineSignal = boost::signals2::signal<void(const std::string&)>;
+    NodeOfflineSignal& getNodeOfflineSignal() { return m_nodeOfflineSignal; }
+
     private:
     friend class ClusterStatistics;
 
@@ -248,6 +252,8 @@ class ClusterStatistics
     bool m_fullyKnown = false;
     bool m_daemon = false;
     uint8_t m_distance = 2;
+
+    NodeOfflineSignal m_nodeOfflineSignal;
 
     mutable std::shared_mutex m_contextsMutex;
     ContextMap m_contexts;
@@ -296,7 +302,7 @@ class ClusterStatistics
 
   void initLocalNode();
 
-  ClusterStatistics::Node& getNode(int64_t id);
+  const ClusterStatistics::Node& getNode(int64_t id);
 
   std::pair<ClusterStatistics::Node&, bool> getOrCreateNode(int64_t id);
 
@@ -359,13 +365,15 @@ class ClusterStatistics
 
   protected:
   friend class Communicator;
-  void addNode(Node&& node);
-  void removeNode(int64_t id);
+  ClusterStatistics::Node& addNode(Node&& node);
+  void removeNode(int64_t id, const std::string& reason);
 
   private:
   NodeMap m_nodeMap;
   Node* m_thisNode;
   bool m_changed = false;
+
+  void unsafeRemoveNode(int64_t id, const std::string& reason);
 
   ConfigPtr m_config;
   Logger m_logger;
