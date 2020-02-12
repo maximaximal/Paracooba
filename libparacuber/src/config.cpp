@@ -74,7 +74,7 @@ Config::Config()
      po::value<std::string>()->default_value(boost::asio::ip::address_v4().to_string())->value_name("string"),
          "IP address to use for network communication")
     (GetConfigNameFromEnum(Config::IPBroadcastAddress),
-     po::value<std::string>()->default_value(boost::asio::ip::address_v4().to_string())->value_name("string"),
+     po::value<std::string>()->default_value(boost::asio::ip::address_v4().broadcast().to_string())->value_name("string"),
          "IP broadcast address to use for network communication")
     (GetConfigNameFromEnum(Config::Id),
          po::value<int64_t>()->default_value(dist_mac(rng))->value_name("int"),
