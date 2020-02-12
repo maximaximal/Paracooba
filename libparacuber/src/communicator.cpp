@@ -692,19 +692,25 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
     PARACUBER_LOG(m_logger, Trace)
       << "Transmit job description with size " << sizeOfArchive;
 
-    m_socket.async_send(
+    boost::asio::async_write(m_socket,
       m_sendStreambuf.data(),
       boost::bind(&TCPClient::transmissionFinished,
                   shared_from_this(),
                   boost::asio::placeholders::error,
-                  boost::asio::placeholders::bytes_transferred));
+                  boost::asio::placeholders::bytes_transferred, sizeOfArchive));
   }
 
   void transmissionFinished(const boost::system::error_code& error,
-                            std::size_t bytes)
+                            std::size_t bytes, uint32_t bytesToBeSent)
   {
-    if(error == boost::asio::error::eof) {
+    if(bytes != bytesToBeSent) {
+      PARACUBER_LOG(m_logger, LocalError) << "Bytes sent are not equal to bytes to be sent! " << bytes << " != " << bytesToBeSent;
+    }
+
+    if(error.value() == boost::system::errc::success) {
       m_finishedCB();
+    } else {
+      PARACUBER_LOG(m_logger, LocalError) << "Transmission failed with error: " << error.message();
     }
   }
 
@@ -922,7 +928,7 @@ class Communicator::TCPServer
         auto buffer = m_streambuf.prepare(bytes);
 
         if(readSome) {
-          m_socket.async_read_some(buffer,
+          m_socket.async_read_some(std::move(buffer),
                                    boost::bind(&TCPServerClient::handshake,
                                                shared_from_this(),
                                                placeholders::error,
@@ -931,7 +937,7 @@ class Communicator::TCPServer
                                                bytes));
         } else {
           async_read(m_socket,
-                     buffer,
+                     std::move(buffer),
                      boost::bind(&TCPServerClient::handshake,
                                  shared_from_this(),
                                  placeholders::error,
