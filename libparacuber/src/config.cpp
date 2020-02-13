@@ -4,6 +4,7 @@
 #include "../include/paracuber/runner.hpp"
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/exception/diagnostic_information.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <cstddef>
@@ -122,12 +123,18 @@ Config::parseParameters(int argc, char** argv)
   po::options_description cliGroup;
   cliGroup.add(m_optionsCommon).add(m_optionsCLI);
   po::variables_map vm;
-  po::store(po::command_line_parser(argc, argv)
-              .options(cliGroup)
-              .positional(positionalOptions)
-              .run(),
-            vm);
-  po::notify(vm);
+  try {
+    po::store(po::command_line_parser(argc, argv)
+                .options(cliGroup)
+                .positional(positionalOptions)
+                .run(),
+              vm);
+    po::notify(vm);
+  } catch(const std::exception& e) {
+    std::cout << "Could not parse CLI Parameters! Error: " << e.what()
+              << std::endl;
+    return false;
+  }
 
   if(vm.count("help")) {
     std::cout << m_optionsCLI << std::endl;
