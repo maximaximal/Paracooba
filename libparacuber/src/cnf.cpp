@@ -387,6 +387,9 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
     case TaskResult::Unsatisfiable:
       res.state = CNFTree::UNSAT;
       break;
+    case TaskResult::Unsolved:
+      res.state = CNFTree::Unknown;
+      break;
     default:
       // Other results are not handled here.
       PARACUBER_LOG(m_logger, LocalError)
@@ -399,12 +402,12 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
 
   if(res.state == CNFTree::SAT || res.state == CNFTree::UNSAT ||
      res.state == CNFTree::Unknown) {
-    {
-      std::unique_lock lock(m_resultsMutex);
-      m_results.insert(std::make_pair(p, std::move(res)));
-    }
-
     if(res.state != CNFTree::Unknown) {
+      {
+        std::unique_lock lock(m_resultsMutex);
+        m_results.insert(std::make_pair(p, std::move(res)));
+      }
+
       std::unique_lock lock(m_cnfTreeMutex);
       m_cnfTree->setState(p, res.state);
     }

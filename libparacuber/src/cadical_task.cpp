@@ -200,6 +200,9 @@ CaDiCaLTask::execute()
       case 20:
         status = TaskResult::Unsatisfiable;
         break;
+      default:
+        status = TaskResult::Unsolved;
+        break;
     }
   }
 

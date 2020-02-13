@@ -127,6 +127,8 @@ Client::solve()
       finishedSignal.connect([this](const TaskResult& result) {
         if(m_status == TaskResult::Unknown || m_status == TaskResult::Parsed) {
           m_status = result.getStatus();
+          PARACUBER_LOG(m_logger, Trace)
+            << "Solution found via client solver, this was faster than CnC.";
           // Finished solving using client CaDiCaL!
           m_communicator->exit();
         }

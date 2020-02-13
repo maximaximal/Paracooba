@@ -137,7 +137,7 @@ class Config
   /** @brief Check if STDOUT should be used for logging instead of CLOG. */
   inline bool useSTDOUTForLogging() { return m_useSTDOUTForLogging; }
   /** @brief Check if direct client-side solving via CaDiCaL is enabled. */
-  inline bool isClientCaDiCaLEnabled() { return !m_disableClientCaDiCaL; }
+  inline bool isClientCaDiCaLEnabled() { return m_enableClientCaDiCaL; }
   /** @brief Check if internal webserver is enabled. */
   inline bool isInternalWebserverEnabled() { return m_enableInternalWebserver; }
 
@@ -183,7 +183,7 @@ class Config
   bool m_debugMode = false;
   bool m_infoMode = false;
   bool m_daemonMode = false;
-  bool m_disableClientCaDiCaL = false;
+  bool m_enableClientCaDiCaL = false;
   bool m_useSTDOUTForLogging = false;
 #ifdef ENABLE_INTERNAL_WEBSERVER
   bool m_enableInternalWebserver = true;
