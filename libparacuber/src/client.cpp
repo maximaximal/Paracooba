@@ -111,6 +111,7 @@ Client::solve()
     // parallel.
     m_taskFactory = std::make_unique<TaskFactory>(m_config, m_log, m_rootCNF);
     m_taskFactory->setRootTask(m_rootCNF->getRootTask());
+    m_rootCNF->setTaskFactory(m_taskFactory.get());
 
     // If local solving is enabled, create a new task to solve the parsed
     // formula.
