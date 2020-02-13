@@ -31,6 +31,7 @@ Daemon::Context::~Context()
 {
   PARACUBER_LOG(m_logger, Trace)
     << "Destroy context with origin " << m_originatorID;
+  m_taskFactory.reset();
   m_rootCNF->setTaskFactory(nullptr);
   m_nodeOfflineSignalConnection.disconnect();
 }

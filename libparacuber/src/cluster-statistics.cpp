@@ -150,11 +150,12 @@ ClusterStatistics::unsafeRemoveNode(int64_t id, const std::string& reason)
   if(id == m_thisNode->m_id)
     return;
 
-  PARACUBER_LOG(m_logger, Trace)
-    << "Remove cluster statistics node with id: " << id
-    << " becase of reason: " << reason;
   auto it = m_nodeMap.find(id);
   if(it != m_nodeMap.end()) {
+    PARACUBER_LOG(m_logger, Trace)
+      << "Remove cluster statistics node with id: " << id
+      << " becase of reason: " << reason;
+
     it->second.m_nodeOfflineSignal(reason);
     m_nodeMap.erase(id);
   }

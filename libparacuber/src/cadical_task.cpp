@@ -213,12 +213,18 @@ CaDiCaLTask::execute()
 void
 CaDiCaLTask::terminate()
 {
+  // Terminating resets the cadical manager, as it no longer exists at this
+  // point.
+  m_cadicalMgr = nullptr;
+
   m_terminate = true;
 }
 void
 CaDiCaLTask::releaseSolver()
 {
-  assert(m_cadicalMgr);
+  m_solver->disconnect_terminator();
+  if(!m_cadicalMgr)
+    return;
   m_cadicalMgr->returnSolverFromWorker(std::move(m_solver), m_workerId);
 }
 

@@ -88,13 +88,15 @@ Runner::deregisterTaskFactory(TaskFactory* f)
   // Then all already produced tasks are removed. Afterwards, already running
   // tasks are terminated.
 
+  std::unique_lock taskQueueMutex(m_taskQueue->getMutex());
   {
     std::unique_lock lock(m_taskFactoriesMutex);
     m_taskFactories.erase(
       std::find(m_taskFactories.begin(), m_taskFactories.end(), f));
   }
 
-  m_taskQueue->removeMatching([f](auto& e) { return e && e->factory == f; });
+  m_taskQueue->removeMatchingNoLock(
+    [f](auto& e) { return e && e->factory == f; });
 
   for(Task* task : m_currentlyRunningTasks) {
     if(task) {
