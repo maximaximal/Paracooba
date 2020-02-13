@@ -141,4 +141,57 @@ TaskFactory::produceSolveTask(std::unique_ptr<TaskSkeleton> skel)
   task->applyPathFromCNFTreeDeferred(skel->p, m_rootCNF->getCNFTree());
   return { std::move(task), skel->originator, skel->getPriority() };
 }
+
+void
+TaskFactory::addExternallyProcessingTask(int64_t originator,
+                                         CNFTree::Path p,
+                                         ClusterStatistics::Node& node)
+{
+  std::unique_lock lock(m_externalTasksSetMapMutex);
+
+  auto it = m_externalTasksSetMap.find(node.getId());
+  if(it == m_externalTasksSetMap.end()) {
+    ExternalTasksSet exSet{ node };
+    auto [insertedIt, inserted] = m_externalTasksSetMap.insert(
+      std::make_pair(node.getId(), std::move(exSet)));
+    assert(inserted);
+    it = insertedIt;
+
+    ExternalTasksSet& set = it->second;
+
+    set.nodeOfflineSignalConnection = node.getNodeOfflineSignal().connect(
+      std::bind(&TaskFactory::readdExternalTasks, this, set.node.getId()));
+  }
+  ExternalTasksSet& set = it->second;
+  set.addTask(TaskSkeleton{ CubeOrSolve, originator, p });
+}
+void
+TaskFactory::removeExternallyProcessedTask(CNFTree::Path p, int64_t id)
+{
+  std::unique_lock lock(m_externalTasksSetMapMutex);
+
+  auto it = m_externalTasksSetMap.find(id);
+  if(it != m_externalTasksSetMap.end()) {
+    ExternalTasksSet& set = it->second;
+    set.removeTask(p);
+  }
+}
+
+void
+TaskFactory::readdExternalTasks(int64_t id)
+{
+  std::unique_lock lock(m_externalTasksSetMapMutex);
+
+  auto it = m_externalTasksSetMap.find(id);
+  if(it != m_externalTasksSetMap.end()) {
+    ExternalTasksSet& set = it->second;
+    size_t count = set.readdTasks(this);
+    m_externalTasksSetMap.erase(it);
+
+    PARACUBER_LOG(m_logger, Trace)
+      << "Re-Added " << count << " to local factory for task with originator "
+      << m_rootCNF->getOriginId() << " which were previously sent to node "
+      << id;
+  }
+}
 }

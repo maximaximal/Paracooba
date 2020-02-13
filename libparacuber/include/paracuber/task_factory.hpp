@@ -1,8 +1,10 @@
 #ifndef PARACUBER_TASKFACTORY_HPP
 #define PARACUBER_TASKFACTORY_HPP
 
+#include <boost/signals2/connection.hpp>
 #include <queue>
 
+#include "cluster-statistics.hpp"
 #include "cnftree.hpp"
 #include "log.hpp"
 #include "paracuber/priority_queue_lock_semantics.hpp"
@@ -57,6 +59,11 @@ class TaskFactory
     {
       return getPriority() < b.getPriority();
     }
+
+    inline bool operator=(TaskSkeleton const& b) const
+    {
+      return mode == b.mode && originator == b.originator && p == b.p;
+    }
   };
 
   struct ProducedTask
@@ -73,6 +80,13 @@ class TaskFactory
 
   TaskSkeleton produceTaskSkeleton();
   TaskSkeleton produceTaskSkeletonBackwards();
+
+  void addExternallyProcessingTask(int64_t originator,
+                                   CNFTree::Path p,
+                                   ClusterStatistics::Node& node);
+
+  void removeExternallyProcessedTask(CNFTree::Path p, int64_t id);
+  void readdExternalTasks(int64_t id);
 
   inline bool canProduceTask() const { return !m_skeletons.empty(); }
   inline uint64_t getSize() const { return m_skeletons.size(); }
@@ -92,11 +106,40 @@ class TaskFactory
   }
 
   private:
+  struct ExternalTasksSet
+  {
+    ClusterStatistics::Node& node;
+    boost::signals2::scoped_connection nodeOfflineSignalConnection;
+    std::set<TaskSkeleton> tasks;
+
+    size_t readdTasks(TaskFactory* factory)
+    {
+      assert(factory);
+      for(TaskSkeleton skel : tasks) {
+        factory->addPath(skel.p, skel.mode, skel.originator);
+      }
+      size_t count = tasks.size();
+      tasks.clear();
+      return count;
+    }
+    void addTask(TaskSkeleton&& skel) { tasks.insert(std::move(skel)); }
+    void removeTask(CNFTree::Path p)
+    {
+      std::remove_if(tasks.begin(), tasks.end(), [p](const TaskSkeleton& skel) {
+        return skel.p == p;
+      });
+    }
+  };
+  using ExternalTasksSetMap = std::map<int64_t, ExternalTasksSet>;
+
   ConfigPtr m_config;
   LoggerMT m_logger;
   PriorityQueueLockSemanticsUniquePtr<TaskSkeleton> m_skeletons;
+  ExternalTasksSetMap m_externalTasksSetMap;
   std::shared_ptr<CNF> m_rootCNF;
   std::unique_ptr<CaDiCaLMgr> m_cadicalMgr;
+
+  std::mutex m_externalTasksSetMapMutex;
 };
 }
 

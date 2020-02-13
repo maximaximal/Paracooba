@@ -8,7 +8,9 @@
 #include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <map>
 #include <memory>
+#include <set>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
@@ -302,7 +304,8 @@ class ClusterStatistics
 
   void initLocalNode();
 
-  const ClusterStatistics::Node& getNode(int64_t id);
+  const ClusterStatistics::Node& getNode(int64_t id) const;
+  ClusterStatistics::Node& getNode(int64_t id);
 
   std::pair<ClusterStatistics::Node&, bool> getOrCreateNode(int64_t id);
 
@@ -324,7 +327,8 @@ class ClusterStatistics
 
   using NodeMap = std::map<int64_t, Node>;
 
-  ConstSharedLockView<NodeMap> getNodeMap();
+  SharedLockView<NodeMap&> getNodeMap();
+  ConstSharedLockView<NodeMap> getNodeMap() const;
   UniqueLockView<NodeMap&> getUniqueNodeMap();
 
   /** @brief Determine if the next decision should be offloaded to another
@@ -333,17 +337,17 @@ class ClusterStatistics
    * @returns nullptr if the decision is better done locally, remote node
    * otherwise.
    */
-  const Node* getTargetComputeNodeForNewDecision(CNFTree::Path p,
-                                                 int64_t originator);
+  Node* getTargetComputeNodeForNewDecision(CNFTree::Path p, int64_t originator);
   bool clearChanged();
 
   Node& getThisNode() { return *m_thisNode; }
 
-  void handlePathOnNode(const Node* node,
+  void handlePathOnNode(int64_t originator,
+                        Node& node,
                         std::shared_ptr<CNF> rootCNF,
                         CNFTree::Path p);
 
-  const Node* getFittestNodeForNewWork(int originator);
+  Node* getFittestNodeForNewWork(int originator);
 
   /** @brief Start rebalancing of work to other nodes.
    *
@@ -377,7 +381,7 @@ class ClusterStatistics
 
   ConfigPtr m_config;
   Logger m_logger;
-  std::shared_mutex m_nodeMapMutex;
+  mutable std::shared_mutex m_nodeMapMutex;
 };
 }
 

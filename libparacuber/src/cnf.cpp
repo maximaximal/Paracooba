@@ -237,6 +237,9 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
       Result res;
       res.p = jr.getPath();
       res.state = jrStateToCNFTreeState(jr.getState());
+
+      m_taskFactory->removeExternallyProcessedTask(res.p, sentFromID);
+
       if(res.state == CNFTree::SAT) {
         res.size = jr.getDataVec().size();
         res.encodedAssignment =

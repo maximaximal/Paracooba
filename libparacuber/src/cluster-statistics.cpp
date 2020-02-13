@@ -104,6 +104,15 @@ ClusterStatistics::initLocalNode()
 }
 
 const ClusterStatistics::Node&
+ClusterStatistics::getNode(int64_t id) const
+{
+  auto [map, lock] = getNodeMap();
+  auto it = map.find(id);
+  assert(it != map.end());
+  return it->second;
+}
+
+ClusterStatistics::Node&
 ClusterStatistics::getNode(int64_t id)
 {
   auto [map, lock] = getNodeMap();
@@ -151,8 +160,14 @@ ClusterStatistics::unsafeRemoveNode(int64_t id, const std::string& reason)
   }
 }
 
-ConstSharedLockView<ClusterStatistics::NodeMap>
+SharedLockView<ClusterStatistics::NodeMap&>
 ClusterStatistics::getNodeMap()
+{
+  std::shared_lock lock(m_nodeMapMutex);
+  return { m_nodeMap, std::move(lock) };
+}
+ConstSharedLockView<ClusterStatistics::NodeMap>
+ClusterStatistics::getNodeMap() const
 {
   std::shared_lock lock(m_nodeMapMutex);
   return { m_nodeMap, std::move(lock) };
@@ -165,7 +180,7 @@ ClusterStatistics::getUniqueNodeMap()
   return { m_nodeMap, std::move(lock) };
 }
 
-const ClusterStatistics::Node*
+ClusterStatistics::Node*
 ClusterStatistics::getTargetComputeNodeForNewDecision(CNFTree::Path p,
                                                       int64_t originator)
 {
@@ -176,7 +191,7 @@ ClusterStatistics::getTargetComputeNodeForNewDecision(CNFTree::Path p,
   return getFittestNodeForNewWork(originator);
 }
 
-const ClusterStatistics::Node*
+ClusterStatistics::Node*
 ClusterStatistics::getFittestNodeForNewWork(int originator)
 {
   auto [map, lock] = getNodeMap();
@@ -210,20 +225,23 @@ ClusterStatistics::getFittestNodeForNewWork(int originator)
 }
 
 void
-ClusterStatistics::handlePathOnNode(const Node* node,
+ClusterStatistics::handlePathOnNode(int64_t originator,
+                                    Node& node,
                                     std::shared_ptr<CNF> rootCNF,
                                     CNFTree::Path p)
 {
-  assert(node);
-
   Communicator* comm = m_config->getCommunicator();
 
   // Local node should be handled externally, without using this function.
-  assert(node != m_thisNode);
+  assert(&node != m_thisNode);
+
+  TaskFactory* taskFactory = rootCNF->getTaskFactory();
+  assert(taskFactory);
+  taskFactory->addExternallyProcessingTask(originator, p, node);
 
   // This path should be handled on another compute node. This means, the
   // other compute node requires a Cube-Beam from the Communicator class.
-  rootCNF->sendPath(node->getNetworkedNode(), p, []() {});
+  rootCNF->sendPath(node.getNetworkedNode(), p, []() {});
 }
 
 bool
@@ -252,7 +270,7 @@ ClusterStatistics::rebalance(int originator, TaskFactory& factory)
         i < mostFitNode->getSlotsLeft() + 1 && factory.canProduceTask();
         ++i) {
       auto skel = factory.produceTaskSkeleton();
-      handlePathOnNode(mostFitNode, factory.getRootCNF(), skel.p);
+      handlePathOnNode(originator, *mostFitNode, factory.getRootCNF(), skel.p);
     }
   }
 }

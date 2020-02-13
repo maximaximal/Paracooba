@@ -133,6 +133,7 @@ class CNF
   void requestInfoGlobally(CNFTree::Path p, int64_t handle = 0);
 
   void setTaskFactory(TaskFactory* f) { m_taskFactory = f; }
+  TaskFactory* getTaskFactory() const { return m_taskFactory; }
 
   void solverFinishedSlot(const TaskResult& result, CNFTree::Path path);
 

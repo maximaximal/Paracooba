@@ -61,6 +61,12 @@ class PriorityQueueLockSemantics
     return popBackNoLock();
   }
 
+  template<class Predicate>
+  void removeMatching(Predicate p) {
+    std::unique_lock lock(m_mutex);
+    std::remove_if(m_queue.begin(), m_queue.end(), p);
+  }
+
   inline bool empty() const { return m_size == 0; }
 
   inline int64_t size() const { return m_size; }

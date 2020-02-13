@@ -63,12 +63,13 @@ DecisionTask::execute()
       CNFTree::Path p = CNFTree::getNextRightPath(m_path);
       cnfTree.setDecisionAndState(p, 0, CNFTree::Unvisited);
 
-      const ClusterStatistics::Node* target =
+      ClusterStatistics::Node* target =
         clusterStatistics->getTargetComputeNodeForNewDecision(p, m_originator);
       if(!target) {
         m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
       } else {
-        clusterStatistics->handlePathOnNode(target, m_rootCNF, p);
+        ClusterStatistics::Node& n = *target;
+        clusterStatistics->handlePathOnNode(m_originator, n, m_rootCNF, p);
       }
     }
 
