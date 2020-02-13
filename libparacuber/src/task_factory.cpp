@@ -32,9 +32,14 @@ void
 TaskFactory::addPath(CNFTree::Path p, Mode mode, int64_t originator)
 {
   auto ptr = std::make_unique<TaskSkeleton>(mode, originator, p);
+  /*
+    For debugging task insertion. Can throw segfaults because of library
+inconsistencies.
+
   PARACUBER_LOG(m_logger, Trace)
     << "Pushing path " << CNFTree::pathToStrNoAlloc(p) << " with priority "
     << ptr->getPriority();
+  */
   m_skeletons.push(std::move(ptr));
 }
 
