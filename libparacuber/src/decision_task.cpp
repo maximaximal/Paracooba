@@ -49,13 +49,13 @@ DecisionTask::execute()
     // available and the generated decision must be set into the path.
     m_rootCNF->getCNFTree().setDecisionAndState(m_path, var, CNFTree::Split);
 
+    // Both paths are added to the factory, the rebalance mechanism takes care
+    // of distribution to other compute nodes.
     {
       // LEFT
       CNFTree::Path p = CNFTree::getNextLeftPath(m_path);
       cnfTree.setDecisionAndState(p, 0, CNFTree::Unvisited);
 
-      // One branch is always done locally, as there must already be a working
-      // execution thread.
       m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
     }
     {
@@ -63,14 +63,7 @@ DecisionTask::execute()
       CNFTree::Path p = CNFTree::getNextRightPath(m_path);
       cnfTree.setDecisionAndState(p, 0, CNFTree::Unvisited);
 
-      ClusterStatistics::Node* target =
-        clusterStatistics->getTargetComputeNodeForNewDecision(p, m_originator);
-      if(!target) {
-        m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
-      } else {
-        ClusterStatistics::Node& n = *target;
-        clusterStatistics->handlePathOnNode(m_originator, n, m_rootCNF, p);
-      }
+      m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
     }
 
     return std::make_unique<TaskResult>(TaskResult::DecisionMade);
