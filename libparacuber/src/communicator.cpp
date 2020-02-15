@@ -20,6 +20,7 @@
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/address_v4.hpp>
+#include <boost/asio/ip/udp.hpp>
 #include <boost/asio/socket_base.hpp>
 #include <boost/bind.hpp>
 #include <boost/system/error_code.hpp>
@@ -102,13 +103,19 @@ class Communicator::UDPServer
             boost::asio::io_service& ioService,
             uint16_t port)
     : m_communicator(comm)
-    , m_socket(ioService, udp::endpoint(udp::v4(), port))
+    , m_socket(ioService)
     , m_logger(log->createLogger("UDPServer"))
     , m_port(port)
     , m_clusterStatistics(comm->getClusterStatistics())
   {
     m_ipAddress = generateIPAddress();
     m_broadcastAddress = generateBroadcastAddress();
+    auto endpoint = udp::endpoint(m_ipAddress, port);
+
+    m_socket.open(endpoint.protocol());
+    m_socket.set_option(boost::asio::socket_base::reuse_address(true));
+    m_socket.set_option(boost::asio::socket_base::broadcast(true));
+    m_socket.bind(endpoint);
     startReceive();
     PARACUBER_LOG(m_logger, Trace)
       << "UDPServer started at " << m_socket.local_endpoint();
@@ -124,8 +131,6 @@ class Communicator::UDPServer
 
   void startReceive()
   {
-    m_socket.set_option(boost::asio::socket_base::broadcast(true));
-
     m_recStreambuf.consume(m_recStreambuf.size() + 1);
 
     m_socket.async_receive_from(
@@ -157,49 +162,56 @@ class Communicator::UDPServer
         return;
       }
 
-      switch(msg.getType()) {
-        case messages::Type::OnlineAnnouncement:
-          PARACUBER_LOG(m_logger, Trace)
-            << "  -> Online Announcement from " << m_remoteEndpoint
-            << " (ID: " << msg.getOrigin() << ")";
-          handleOnlineAnnouncement(msg);
-          break;
-        case messages::Type::OfflineAnnouncement:
-          PARACUBER_LOG(m_logger, Trace)
-            << "  -> Offline Announcement from " << m_remoteEndpoint
-            << " (ID: " << msg.getOrigin() << ")";
-          handleOfflineAnnouncement(msg);
-          break;
-        case messages::Type::AnnouncementRequest:
-          PARACUBER_LOG(m_logger, Trace)
-            << "  -> Announcement Request from " << m_remoteEndpoint
-            << " (ID: " << msg.getOrigin() << ")";
-          handleAnnouncementRequest(msg);
-          break;
-        case messages::Type::NodeStatus:
-          /*
-          // These logging messages are not required most of the time and only
-          // waste processor time.
+      // Ignore message if not targeted at this compute node.
+      if(msg.getTarget() != 0 &&
+         msg.getTarget() != m_communicator->m_config->getInt64(Config::Id)) {
+        PARACUBER_LOG(m_logger, Trace) << "Message dropped";
+      } else {
+        switch(msg.getType()) {
+          case messages::Type::OnlineAnnouncement:
+            PARACUBER_LOG(m_logger, Trace)
+              << "  -> Online Announcement from " << m_remoteEndpoint
+              << " (ID: " << msg.getOrigin() << ")";
+            handleOnlineAnnouncement(msg);
+            break;
+          case messages::Type::OfflineAnnouncement:
+            PARACUBER_LOG(m_logger, Trace)
+              << "  -> Offline Announcement from " << m_remoteEndpoint
+              << " (ID: " << msg.getOrigin() << ")";
+            handleOfflineAnnouncement(msg);
+            break;
+          case messages::Type::AnnouncementRequest:
+            PARACUBER_LOG(m_logger, Trace)
+              << "  -> Announcement Request from " << m_remoteEndpoint
+              << " (ID: " << msg.getOrigin() << ")";
+            handleAnnouncementRequest(msg);
+            break;
+          case messages::Type::NodeStatus:
+            /*
+            // These logging messages are not required most of the time and only
+            // waste processor time.
 
-          PARACUBER_LOG(m_logger, Trace)
-            << "  -> Node Status from " << m_remoteEndpoint
-            << " (ID: " << msg.getOrigin() << ")";
-          */
-          handleNodeStatus(msg);
-          break;
-        case messages::Type::CNFTreeNodeStatusRequest:
-          PARACUBER_LOG(m_logger, Trace)
-            << "  -> CNFTree Node Status Request from " << m_remoteEndpoint
-            << " (ID: " << msg.getOrigin() << ")";
-          handleCNFTreeNodeStatusRequest(msg);
-          break;
-        case messages::Type::CNFTreeNodeStatusReply:
-          PARACUBER_LOG(m_logger, Trace)
-            << "  -> CNFTree Node Status Reply from " << m_remoteEndpoint
-            << " (ID: " << msg.getOrigin() << ")";
-          handleCNFTreeNodeStatusReply(msg);
-          break;
+            PARACUBER_LOG(m_logger, Trace)
+              << "  -> Node Status from " << m_remoteEndpoint
+              << " (ID: " << msg.getOrigin() << ")";
+            */
+            handleNodeStatus(msg);
+            break;
+          case messages::Type::CNFTreeNodeStatusRequest:
+            PARACUBER_LOG(m_logger, Trace)
+              << "  -> CNFTree Node Status Request from " << m_remoteEndpoint
+              << " (ID: " << msg.getOrigin() << ")";
+            handleCNFTreeNodeStatusRequest(msg);
+            break;
+          case messages::Type::CNFTreeNodeStatusReply:
+            PARACUBER_LOG(m_logger, Trace)
+              << "  -> CNFTree Node Status Reply from " << m_remoteEndpoint
+              << " (ID: " << msg.getOrigin() << ")";
+            handleCNFTreeNodeStatusReply(msg);
+            break;
+        }
       }
+
       startReceive();
     } else {
       PARACUBER_LOG(m_logger, LocalError)
@@ -213,7 +225,7 @@ class Communicator::UDPServer
     if(!nn) {
       std::unique_ptr<NetworkedNode> networkedNode =
         std::make_unique<NetworkedNode>(m_remoteEndpoint, node.getId());
-      networkedNode->setUdpPort(node.getUdpListenPort());
+      networkedNode->setUdpPort(m_remoteEndpoint.port());
       networkedNode->setTcpPort(node.getTcpListenPort());
       node.setNetworkedNode(std::move(networkedNode));
       nn = node.getNetworkedNode();
@@ -221,6 +233,7 @@ class Communicator::UDPServer
 
     if(!node.getFullyKnown() &&
        node.getId() != m_communicator->m_config->getInt64(Config::Id)) {
+      assert(nn->getRemoteUdpEndpoint().port() != 0);
       m_communicator->m_ioService.post(
         std::bind(&Communicator::task_requestAnnounce,
                   m_communicator,
@@ -329,6 +342,10 @@ class Communicator::UDPServer
     statisticsNode.statusReceived();
     applyMessageNodeStatusToStatsNode(
       nodeStatus, statisticsNode, *m_communicator->m_config);
+
+    // Extract all available UDP endpoint information so messages can be sent.
+    statisticsNode.setUdpListenPort(m_remoteEndpoint.port());
+    statisticsNode.setHost(m_remoteEndpoint.address().to_string());
 
     networkStatisticsNode(statisticsNode);
 
@@ -459,11 +476,12 @@ class Communicator::UDPServer
     }
   }
 
-  messages::Message buildMessage()
+  messages::Message buildMessage(int64_t targetId = 0)
   {
     assert(m_communicator);
     assert(m_communicator->m_config);
-    return messages::Message(m_communicator->m_config->getInt64(Config::Id));
+    return messages::Message(m_communicator->m_config->getInt64(Config::Id),
+                             targetId);
   }
 
   void sendMessage(boost::asio::ip::udp::endpoint endpoint,
@@ -535,17 +553,17 @@ class Communicator::UDPServer
   private:
   boost::asio::ip::address generateBroadcastAddress()
   {
-    auto ipAddressString = std::string(
-      m_communicator->m_config->getString(Config::IPBroadcastAddress));
+    auto netmaskString = std::string(
+      m_communicator->m_config->getString(Config::IPBroadcastNetmask));
     boost::system::error_code err;
-    auto address = boost::asio::ip::address::from_string(ipAddressString, err);
+    auto netmask = boost::asio::ip::address::from_string(netmaskString, err);
     if(err) {
       PARACUBER_LOG(m_logger, LocalError)
-        << "Could not parse given IP Broadcast Address \"" << ipAddressString
+        << "Could not parse given IP Broadcast Address \"" << netmaskString
         << "\". Error: " << err;
-      address = boost::asio::ip::address_v4::broadcast();
+      return boost::asio::ip::address_v4::broadcast();
     }
-    return address;
+    return boost::asio::ip::address_v4::broadcast(getIPAddress().to_v4(), netmask.to_v4());
   }
 
   boost::asio::ip::address generateIPAddress()
@@ -760,7 +778,7 @@ class Communicator::TCPServer
     , m_ioService(ioService)
     , m_acceptor(
         ioService,
-        boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port))
+        boost::asio::ip::tcp::endpoint(comm->m_udpServer->getIPAddress(), port))
   {
     startAccept();
     PARACUBER_LOG(m_logger, Trace)
@@ -1282,7 +1300,7 @@ Communicator::sendCNFTreeNodeStatusRequest(int64_t targetId,
   auto& statNode = m_clusterStatistics->getNode(targetId);
   auto* nn = statNode.getNetworkedNode();
   messages::CNFTreeNodeStatusRequest request(handle, p, cnfId);
-  auto msg = m_udpServer->buildMessage();
+  auto msg = m_udpServer->buildMessage(targetId);
   msg.insert(std::move(request));
   m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);
 }

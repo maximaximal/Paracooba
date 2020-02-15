@@ -64,7 +64,8 @@ class Node
   template<class Archive>
   void serialize(Archive& ar)
   {
-    ar(CEREAL_NVP(id),
+    ar(CEREAL_NVP(name),
+       CEREAL_NVP(id),
        CEREAL_NVP(availableWorkers),
        CEREAL_NVP(workQueueCapacity),
        CEREAL_NVP(workQueueSize),

@@ -104,7 +104,8 @@ class ClusterStatistics
     {
       CLUSTERSTATISTICS_NODE_CHANGED(m_daemon, daemon)
     }
-    void setDistance(uint8_t distance){
+    void setDistance(uint8_t distance)
+    {
       CLUSTERSTATISTICS_NODE_CHANGED(m_distance, distance)
     }
 
@@ -286,7 +287,8 @@ class ClusterStatistics
         << "\"readyForWork\": " << n.getReadyForWork() << ","
         << "\"fullyKnown\": " << n.m_fullyKnown << ","
         << "\"daemon\": " << n.m_daemon << ","
-        << "\"highlighted\": false"
+        << "\"highlighted\": false,"
+        << "\"fitnessForNewAssignment\": " << n.getFitnessForNewAssignment()
         << ","
         << "\"aggregatedContextSize\": " << n.getAggregatedContextSize() << ","
         << "\"workQueueSize\": " << n.m_workQueueSize;
@@ -314,10 +316,11 @@ class ClusterStatistics
     o << "{ \"type\": \"clusterstatistics\", \"ClusterStatistics\": [";
     for(auto& it : c.m_nodeMap) {
       auto& node = it.second;
-      o << "{" << node << "}";
-      if(first && c.m_nodeMap.size() > 1) {
-        o << ",";
+      if(first) {
+        o << "{" << node << "}";
         first = false;
+      } else {
+        o << ",{" << node << "}";
       }
     }
     o << "]}";

@@ -16,11 +16,11 @@ class NetworkedNode
   {}
   ~NetworkedNode() {}
 
-  boost::asio::ip::udp::endpoint getRemoteUdpEndpoint()
+  const boost::asio::ip::udp::endpoint& getRemoteUdpEndpoint() const
   {
     return m_remoteUdpEndoint;
   }
-  boost::asio::ip::tcp::endpoint getRemoteTcpEndpoint()
+  const boost::asio::ip::tcp::endpoint& getRemoteTcpEndpoint() const
   {
     return m_remoteTcpEndoint;
   }

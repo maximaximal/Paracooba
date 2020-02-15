@@ -68,7 +68,7 @@
 				<div class="card" v-bind:class="{'text-white bg-info': stat.highlighted}" v-for="stat in clusterstatistics">
 				    <div class="card-body">
 					<h4 class="card-title">{{ stat.name }}</h4>
-					<table>
+					<table style="table-layout: fixed; width: 100%">
 					    <thead>
 						<tr>
 						    <th>Property</th>
@@ -78,7 +78,7 @@
 					    <tbody>
 						<tr>
 						    <td>Name</td>
-						    <td>{{ stat.name }}</td>
+						    <td style="word-wrap: break-word">{{ stat.name }}</td>
 						</tr>
 						<tr>
 						    <td>Id</td>
@@ -103,6 +103,10 @@
 						<tr>
 						    <td>Aggregated Context Size</td>
 						    <td>{{ stat.aggregatedContextSize }}</td>
+						</tr>
+						<tr>
+						    <td>Fitness for new Assignment</td>
+						    <td>{{ stat.fitnessForNewAssignment }}</td>
 						</tr>
 						<tr>
 						    <td>Ready For Work</td>

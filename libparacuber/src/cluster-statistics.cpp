@@ -9,6 +9,7 @@
 #include "../include/paracuber/task_factory.hpp"
 #include <algorithm>
 #include <boost/iterator/filter_iterator.hpp>
+#include <limits>
 #include <string>
 
 namespace paracuber {
@@ -200,42 +201,28 @@ ClusterStatistics::getFittestNodeForNewWork(int originator)
 {
   auto [map, lock] = getNodeMap();
 
-  int64_t localId = m_config->getInt64(Config::Id);
-  auto filterFunc = [originator, localId](auto& e) {
-    auto& n = e.second;
-    return n.getFullyKnown() && n.getReadyForWork();
-  };
+  ClusterStatistics::Node* target = m_thisNode;
 
-  // Filter to only contain nodes that can be worked with.
-  auto filteredMap =
-    boost::make_filter_iterator(filterFunc, map.begin(), map.end());
-  auto filteredMapEnd =
-    boost::make_filter_iterator(filterFunc, map.end(), map.end());
+  float min_fitness = std::numeric_limits<float>::max();
+  for(auto it = map.begin(); it != map.end(); ++it) {
+    auto& n = it->second;
+    if(!n.getFullyKnown() || !n.getReadyForWork())
+      continue;
 
-  auto& min = std::min(
-    filteredMap, filteredMapEnd, [&filteredMapEnd](auto& l, auto& r) -> bool {
-      if(l != filteredMapEnd && r == filteredMapEnd)
-        return true;
-      if(l == filteredMapEnd && r != filteredMapEnd)
-        return false;
-      if(l == filteredMapEnd && r == filteredMapEnd)
-        return false;
-      return l->second.getFitnessForNewAssignment() <
-             r->second.getFitnessForNewAssignment();
-    });
-
-  if(min == filteredMapEnd) {
-    PARACUBER_LOG(m_logger, Trace) << "End of map returned!";
-    return nullptr;
+    float fitness = n.getFitnessForNewAssignment();
+    if(fitness < min_fitness) {
+      target = &n;
+      min_fitness = fitness;
+    }
   }
 
-  auto target = &min->second;
+  if(target == nullptr) {
+    return nullptr;
+  }
 
   if(target == m_thisNode) {
     // The local compute node is the best one currently, so no rebalancing
     // required!
-    PARACUBER_LOG(m_logger, Trace) << "Current node is best one! Fitness: "
-                                   << target->getFitnessForNewAssignment();
     return nullptr;
   }
 

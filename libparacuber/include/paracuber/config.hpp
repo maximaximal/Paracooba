@@ -38,7 +38,7 @@ class Config
     TCPTargetPort,
     TCPListenPort,
     IPAddress,
-    IPBroadcastAddress,
+    IPBroadcastNetmask,
     Id,
     DaemonHost,
     WorkQueueCapacity,
@@ -238,8 +238,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "log-to-stdout";
     case Config::IPAddress:
       return "ip-address";
-    case Config::IPBroadcastAddress:
-      return "ip-broadcast-address";
+    case Config::IPBroadcastNetmask:
+      return "ip-broadcast-netmask";
     default:
       return "";
   }

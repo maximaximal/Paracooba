@@ -43,8 +43,9 @@ class Message
 {
   public:
   Message() {}
-  Message(int64_t origin)
+  Message(int64_t origin, int64_t target = 0)
     : origin(origin)
+    , target(target)
   {}
   virtual ~Message() {}
 
@@ -81,16 +82,19 @@ class Message
                                           CNFTreeNodeStatusRequest,
                                           CNFTreeNodeStatusReply>;
 
+  int64_t getTarget() const { return target; }
+
   private:
   friend class cereal::access;
 
   int64_t origin;
   MessageBodyVariant body;
+  int64_t target = 0;
 
   template<class Archive>
   void serialize(Archive& ar)
   {
-    ar(CEREAL_NVP(origin), CEREAL_NVP(body));
+    ar(CEREAL_NVP(origin), CEREAL_NVP(target), CEREAL_NVP(body));
   }
 };
 
