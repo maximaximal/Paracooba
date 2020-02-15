@@ -114,15 +114,7 @@ class TaskFactory
 
     size_t readdTasks(TaskFactory* factory);
     void addTask(TaskSkeleton&& skel) { tasks.insert(std::move(skel)); }
-    void removeTask(CNFTree::Path p)
-    {
-      for(auto it = tasks.begin(); it != tasks.end();) {
-        if(it->p == p)
-          it = tasks.erase(it);
-        else
-          ++it;
-      }
-    }
+    void removeTask(CNFTree::Path p);
   };
   using ExternalTasksSetMap = std::map<int64_t, ExternalTasksSet>;
 

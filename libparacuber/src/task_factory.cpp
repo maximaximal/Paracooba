@@ -197,6 +197,18 @@ TaskFactory::ExternalTasksSet::readdTasks(TaskFactory* factory)
 }
 
 void
+TaskFactory::ExternalTasksSet::removeTask(CNFTree::Path p)
+{
+  for(auto it = tasks.begin(); it != tasks.end();) {
+    if(CNFTree::getDepthShiftedPath(CNFTree::setDepth(
+         it->p, CNFTree::getDepth(p))) == CNFTree::getDepthShiftedPath(p))
+      it = tasks.erase(it);
+    else
+      ++it;
+  }
+}
+
+void
 TaskFactory::readdExternalTasks(int64_t id)
 {
   std::unique_lock lock(m_externalTasksSetMapMutex);
