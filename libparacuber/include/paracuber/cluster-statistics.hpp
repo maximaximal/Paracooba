@@ -135,9 +135,8 @@ class ClusterStatistics
      */
     float getFitnessForNewAssignment() const
     {
-      // This addition determines the weight local decisions have. A greater
-      // value makes local decisions more unlikely.
-      return getUtilization() + m_distance;
+      // TODO: Ping should be considered.
+      return getUtilization();
     }
     UniqueLockView<ContextMap&> getContextMap()
     {

@@ -97,6 +97,9 @@ ClusterStatistics::initLocalNode()
   thisNode.setUptime(0);
   thisNode.setWorkQueueCapacity(m_config->getUint64(Config::WorkQueueCapacity));
   thisNode.setWorkQueueSize(0);
+  thisNode.setAvailableWorkers(m_config->getUint32(Config::ThreadCount));
+  thisNode.setContextState(m_config->getInt64(Config::Id),
+                           Daemon::Context::WaitingForWork);
   thisNode.setTcpListenPort(m_config->getUint16(Config::TCPListenPort));
   thisNode.setUdpListenPort(m_config->getUint16(Config::UDPListenPort));
   thisNode.setName(m_config->getString(Config::LocalName));
@@ -200,7 +203,7 @@ ClusterStatistics::getFittestNodeForNewWork(int originator)
   int64_t localId = m_config->getInt64(Config::Id);
   auto filterFunc = [originator, localId](auto& e) {
     auto& n = e.second;
-    return n.getFullyKnown() && n.getReadyForWork() && n.getId() != localId;
+    return n.getFullyKnown() && n.getReadyForWork();
   };
 
   // Filter to only contain nodes that can be worked with.
@@ -209,16 +212,32 @@ ClusterStatistics::getFittestNodeForNewWork(int originator)
   auto filteredMapEnd =
     boost::make_filter_iterator(filterFunc, map.end(), map.end());
 
-  if(filteredMap == filteredMapEnd) {
+  auto& min = std::min(
+    filteredMap, filteredMapEnd, [&filteredMapEnd](auto& l, auto& r) -> bool {
+      if(l != filteredMapEnd && r == filteredMapEnd)
+        return true;
+      if(l == filteredMapEnd && r != filteredMapEnd)
+        return false;
+      if(l == filteredMapEnd && r == filteredMapEnd)
+        return false;
+      return l->second.getFitnessForNewAssignment() <
+             r->second.getFitnessForNewAssignment();
+    });
+
+  if(min == filteredMapEnd) {
+    PARACUBER_LOG(m_logger, Trace) << "End of map returned!";
     return nullptr;
   }
 
-  auto& min = std::min(filteredMap, filteredMapEnd, [](auto& l, auto& r) {
-    return l->second.getFitnessForNewAssignment() <
-           r->second.getFitnessForNewAssignment();
-  });
-
   auto target = &min->second;
+
+  if(target == m_thisNode) {
+    // The local compute node is the best one currently, so no rebalancing
+    // required!
+    PARACUBER_LOG(m_logger, Trace) << "Current node is best one! Fitness: "
+                                   << target->getFitnessForNewAssignment();
+    return nullptr;
+  }
 
   // No limit for max node utilisation! Just send the node to the best fitting
   // place.
@@ -260,16 +279,14 @@ ClusterStatistics::rebalance(int originator, TaskFactory& factory)
   auto mostFitNode = getFittestNodeForNewWork(originator);
   if(mostFitNode && !mostFitNode->isFullyUtilized() &&
      factory.canProduceTask()) {
+    assert(mostFitNode);
     PARACUBER_LOG(m_logger, Trace)
-      << "Rebalance " << mostFitNode->getSlotsLeft() + 1
-      << " tasks for work with origin " << originator << " to node "
+      << "Rebalance 1 task for work with origin " << originator << " to node "
       << mostFitNode->getName() << " (" << mostFitNode->getId() << ")";
 
     // Send as much work over there as that node has space left, but always at
     // least 1.
-    for(size_t i = 0;
-        i < mostFitNode->getSlotsLeft() + 1 && factory.canProduceTask();
-        ++i) {
+    {
       auto skel = factory.produceTaskSkeleton();
       handlePathOnNode(originator, *mostFitNode, factory.getRootCNF(), skel.p);
     }
@@ -284,8 +301,10 @@ ClusterStatistics::rebalance()
       rebalance(ctx.second->getOriginatorId(), *ctx.second->getTaskFactory());
     }
   } else {
-    rebalance(m_config->getInt64(Config::Id),
-              *m_config->getClient()->getTaskFactory());
+    assert(m_config);
+    TaskFactory* taskFactory = m_config->getClient()->getTaskFactory();
+    assert(taskFactory);
+    rebalance(m_config->getInt64(Config::Id), *taskFactory);
   }
 }
 void
@@ -302,7 +321,7 @@ ClusterStatistics::tick()
     if(lastStatus > mean * 3) {
       std::string message = "Last status update was too long ago.";
       unsafeRemoveNode(it.first, message);
-      break;
+      return;
     }
   }
 }

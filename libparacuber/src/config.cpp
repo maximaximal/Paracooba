@@ -45,13 +45,15 @@ Config::Config()
   /* COMMON OPTIONS
    * --------------------------------------- */
   // clang-format off
+  uint32_t threadCount = std::thread::hardware_concurrency();
+
   m_optionsCommon.add_options()
     (GetConfigNameFromEnum(Config::LocalName),
          po::value<std::string>()->default_value(m_generatedLocalName)->value_name("string"), "local name of this solver node")
     (GetConfigNameFromEnum(Config::InputFile),
          po::value<std::string>()->default_value("")->value_name("string"), "input file (problem) to parse")
     (GetConfigNameFromEnum(Config::ThreadCount),
-         po::value<uint32_t>()->default_value(std::thread::hardware_concurrency())->value_name("int"),
+         po::value<uint32_t>()->default_value(threadCount)->value_name("int"),
          "number of worker threads to execute tasks on")
     (GetConfigNameFromEnum(Config::UDPListenPort),
          po::value<uint16_t>()->default_value(18001)->value_name("int"),
@@ -81,7 +83,7 @@ Config::Config()
          po::value<int64_t>()->default_value(dist_mac(rng))->value_name("int"),
          "Unique Number (only 48 Bit) (can be MAC address)")
     (GetConfigNameFromEnum(Config::WorkQueueCapacity),
-         po::value<uint64_t>()->default_value(100)->value_name("int"),
+         po::value<uint64_t>()->default_value(threadCount)->value_name("int"),
          "Capacity of the internal work queue. Should be high on daemons and low on clients.")
     (GetConfigNameFromEnum(Config::TickMilliseconds),
          po::value<uint64_t>()->default_value(500)->value_name("int"),
