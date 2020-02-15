@@ -302,6 +302,7 @@ ClusterStatistics::tick()
     if(lastStatus > mean * 3) {
       std::string message = "Last status update was too long ago.";
       unsafeRemoveNode(it.first, message);
+      break;
     }
   }
 }

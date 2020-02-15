@@ -461,6 +461,8 @@ class Communicator::UDPServer
 
   messages::Message buildMessage()
   {
+    assert(m_communicator);
+    assert(m_communicator->m_config);
     return messages::Message(m_communicator->m_config->getInt64(Config::Id));
   }
 
@@ -491,18 +493,31 @@ class Communicator::UDPServer
       size_t bytesToSend = m_sendStreambuf.size();
 
       if(async) {
-        m_socket.async_send_to(
-          m_sendStreambuf.data(),
-          endpoint,
-          boost::bind(&UDPServer::handleSend,
-                      this,
-                      boost::asio::placeholders::error,
-                      boost::asio::placeholders::bytes_transferred,
-                      &m_sendBufMutex,
-                      &m_sendStreambuf,
-                      bytesToSend));
+        try {
+          m_socket.async_send_to(
+            m_sendStreambuf.data(),
+            endpoint,
+            boost::bind(&UDPServer::handleSend,
+                        this,
+                        boost::asio::placeholders::error,
+                        boost::asio::placeholders::bytes_transferred,
+                        &m_sendBufMutex,
+                        &m_sendStreambuf,
+                        bytesToSend));
+        } catch(const std::exception& e) {
+          PARACUBER_LOG(m_logger, LocalError)
+            << "Exception encountered when sending async message to endpoint "
+            << endpoint << "! Message: " << e.what();
+        }
       } else {
-        size_t bytes = m_socket.send_to(m_sendStreambuf.data(), endpoint);
+        size_t bytes;
+        try {
+          bytes = m_socket.send_to(m_sendStreambuf.data(), endpoint);
+        } catch(const std::exception& e) {
+          PARACUBER_LOG(m_logger, LocalError)
+            << "Exception encountered when sending message to endpoint "
+            << endpoint << "! Message: " << e.what();
+        }
         if(bytes != bytesToSend) {
           PARACUBER_LOG(m_logger, LocalError)
             << "Only (synchronously) sent " << bytes << " of target "
@@ -1040,6 +1055,11 @@ Communicator::run()
   // First, init the local node in cluster statistics with all set variables.
   m_clusterStatistics->initLocalNode();
 
+  if(!listenForIncomingUDP(m_config->getUint16(Config::UDPListenPort)))
+    return;
+  if(!listenForIncomingTCP(m_config->getUint16(Config::TCPListenPort)))
+    return;
+
   if(!m_runner) {
     m_runner = std::make_shared<Runner>(this, m_config, m_log);
   }
@@ -1047,8 +1067,6 @@ Communicator::run()
     m_runner->start();
   }
 
-  listenForIncomingUDP(m_config->getUint16(Config::UDPListenPort));
-  listenForIncomingTCP(m_config->getUint16(Config::TCPListenPort));
   m_ioService.post(
     std::bind(&Communicator::task_requestAnnounce, this, 0, "", nullptr));
 
@@ -1064,7 +1082,16 @@ Communicator::run()
   m_tickTimer.async_wait(std::bind(&Communicator::tick, this));
 
   PARACUBER_LOG(m_logger, Trace) << "Communicator io_service started.";
-  m_ioService.run();
+  bool ioServiceRunningWithoutException = true;
+  while(ioServiceRunningWithoutException) {
+    try {
+      m_ioService.run();
+      ioServiceRunningWithoutException = false;
+    } catch(const std::exception& e) {
+      PARACUBER_LOG(m_logger, LocalError)
+        << "Exception encountered from ioService! Message: " << e.what();
+    }
+  }
   PARACUBER_LOG(m_logger, Trace) << "Communicator io_service ended.";
   m_runner->stop();
 }
@@ -1135,29 +1162,33 @@ Communicator::checkAndTransmitClusterStatisticsChanges(bool force)
   }
 }
 
-void
+bool
 Communicator::listenForIncomingUDP(uint16_t port)
 {
   using namespace boost::asio;
   try {
     m_udpServer = std::make_unique<UDPServer>(this, m_log, m_ioService, port);
+    return true;
   } catch(std::exception& e) {
     PARACUBER_LOG(m_logger, LocalError)
       << "Could not initialize server for incoming UDP connections on port "
       << port << "! Error: " << e.what();
+    return false;
   }
 }
 
-void
+bool
 Communicator::listenForIncomingTCP(uint16_t port)
 {
   using namespace boost::asio;
   try {
     m_tcpServer = std::make_unique<TCPServer>(this, m_log, m_ioService, port);
+    return true;
   } catch(std::exception& e) {
     PARACUBER_LOG(m_logger, LocalError)
       << "Could not initialize server for incoming TCP connections on port "
       << port << "! Error: " << e.what();
+    return false;
   }
 }
 
@@ -1259,6 +1290,10 @@ Communicator::sendCNFTreeNodeStatusRequest(int64_t targetId,
 void
 Communicator::tick()
 {
+  assert(m_runner);
+  assert(m_udpServer);
+  assert(m_clusterStatistics);
+
   m_runner->checkTaskFactories();
 
   assert(m_clusterStatistics);

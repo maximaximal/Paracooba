@@ -84,8 +84,4 @@ DecisionTask::execute()
     return std::make_unique<TaskResult>(TaskResult::NoDecisionMade);
   }
 }
-
-void
-DecisionTask::terminate()
-{}
 }

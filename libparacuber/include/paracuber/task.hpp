@@ -32,7 +32,11 @@ class Task
    * */
   virtual TaskResultPtr execute() = 0;
 
-  virtual void terminate() = 0;
+  virtual void terminate()
+  {
+    m_finishedSignal.disconnect_all_slots();
+    m_terminated = true;
+  };
 
   virtual const std::string& name() { return m_name; };
 
@@ -53,6 +57,8 @@ class Task
 
   FinishedSignal m_finishedSignal;
   void finish(const TaskResult& result);
+
+  bool m_terminated = false;
 
   /// Id of the worker that is running this task. Guaranteed to be available in
   /// execute().

@@ -17,13 +17,19 @@ Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
       std::make_unique<PriorityQueueLockSemanticsUniquePtr<QueueEntry>>(
         config->getUint64(Config::WorkQueueCapacity)))
 {}
-Runner::~Runner() {}
+Runner::~Runner()
+{
+  stop();
+  PARACUBER_LOG(m_logger, Trace) << "Destruct Runner.";
+}
 
 void
 Runner::start()
 {
   uint32_t i = 0, threadCount = m_config->getUint32(Config::ThreadCount);
   m_currentlyRunningTasks.assign(threadCount, nullptr);
+
+  PARACUBER_LOG(m_logger, Trace) << "Starting Runner";
 
   try {
     m_running = true;
@@ -40,6 +46,8 @@ Runner::start()
 void
 Runner::stop()
 {
+  PARACUBER_LOG(m_logger, Trace) << "Stopping Runner";
+
   m_running = false;
   m_newTasks.notify_all();
   std::for_each(m_currentlyRunningTasks.begin(),
@@ -88,15 +96,14 @@ Runner::deregisterTaskFactory(TaskFactory* f)
   // Then all already produced tasks are removed. Afterwards, already running
   // tasks are terminated.
 
-  std::unique_lock taskQueueMutex(m_taskQueue->getMutex());
   {
     std::unique_lock lock(m_taskFactoriesMutex);
     m_taskFactories.erase(
       std::find(m_taskFactories.begin(), m_taskFactories.end(), f));
   }
 
-  m_taskQueue->removeMatchingNoLock(
-    [f](auto& e) { return e && e->factory == f; });
+  m_taskQueue->removeMatching(
+    [f](const auto& e) { return e && e->factory == f; });
 
   for(Task* task : m_currentlyRunningTasks) {
     if(task) {

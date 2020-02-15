@@ -213,10 +213,10 @@ CaDiCaLTask::execute()
 void
 CaDiCaLTask::terminate()
 {
+  Task::terminate();
   // Terminating resets the cadical manager, as it no longer exists at this
   // point.
   m_cadicalMgr = nullptr;
-
   m_terminate = true;
 }
 void

@@ -353,6 +353,7 @@ void
 CNFTree::setCNFResult(Path p, State state, Path source)
 {
   std::shared_ptr<CNF> rootCNF = GetRootCNF(m_config.get(), m_originCNFId);
+  assert(rootCNF);
   rootCNF->insertResult(p, state, source);
   signalIfRootStateChanged(p, state);
 }

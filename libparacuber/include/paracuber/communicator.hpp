@@ -135,8 +135,8 @@ class Communicator
   void checkAndTransmitClusterStatisticsChanges(bool force = false);
 
   // Listeners
-  void listenForIncomingUDP(uint16_t port);
-  void listenForIncomingTCP(uint16_t port);
+  bool listenForIncomingUDP(uint16_t port);
+  bool listenForIncomingTCP(uint16_t port);
 
   std::unique_ptr<UDPServer> m_udpServer;
   std::unique_ptr<TCPServer> m_tcpServer;

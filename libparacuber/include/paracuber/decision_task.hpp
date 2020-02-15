@@ -21,7 +21,6 @@ class DecisionTask : public Task
   virtual ~DecisionTask();
 
   virtual TaskResultPtr execute();
-  virtual void terminate();
 
   CNFTree::Path getPath() const { return m_path; }
 
