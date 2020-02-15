@@ -57,7 +57,7 @@ class TaskFactory
 
     inline bool operator<(TaskSkeleton const& b) const
     {
-      return getPriority() < b.getPriority();
+      return getPriority() > b.getPriority();
     }
 
     inline bool operator==(const TaskSkeleton& b) const

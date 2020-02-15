@@ -14,8 +14,7 @@ Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
   , m_communicator(communicator)
   , m_numberOfRunningTasks(0)
   , m_taskQueue(
-      std::make_unique<PriorityQueueLockSemanticsUniquePtr<QueueEntry>>(
-        config->getUint64(Config::WorkQueueCapacity)))
+      std::make_unique<PriorityQueueLockSemanticsUniquePtr<QueueEntry>>())
 {}
 Runner::~Runner()
 {

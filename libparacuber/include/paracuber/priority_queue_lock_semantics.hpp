@@ -3,27 +3,25 @@
 
 #include <algorithm>
 #include <atomic>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <type_traits>
-#include <vector>
 
 namespace paracuber {
 template<typename T, class C = std::less<T>>
 class PriorityQueueLockSemantics
 {
   public:
-  PriorityQueueLockSemantics(size_t size = 0, C compare = C())
-    : m_queue(size)
-    , m_compare(compare)
+  PriorityQueueLockSemantics(C compare = C())
+    : m_compare(compare)
   {}
   ~PriorityQueueLockSemantics() {}
 
   void pushNoLock(T obj)
   {
-    ++m_size;
     m_queue.push_back(std::move(obj));
-    std::push_heap(m_queue.begin(), m_queue.end(), m_compare);
+    std::sort(m_queue.begin(), m_queue.end(), m_compare);
   }
 
   void push(T obj)
@@ -34,10 +32,8 @@ class PriorityQueueLockSemantics
 
   T popNoLock()
   {
-    --m_size;
     auto result = std::move(m_queue.front());
-    std::pop_heap(m_queue.begin(), m_queue.end(), m_compare);
-    m_queue.pop_back();
+    m_queue.pop_front();
     return result;
   }
 
@@ -49,8 +45,7 @@ class PriorityQueueLockSemantics
 
   T popBackNoLock()
   {
-    --m_size;
-    auto result = std::move(*(m_queue.begin() + m_size));
+    auto result = std::move(m_queue.back());
     m_queue.pop_back();
     return result;
   }
@@ -65,7 +60,6 @@ class PriorityQueueLockSemantics
   void removeMatchingNoLock(Predicate p)
   {
     auto toBeRemoved = std::remove_if(m_queue.begin(), m_queue.end(), p);
-    m_size -= std::distance(toBeRemoved, m_queue.end());
     m_queue.erase(toBeRemoved, m_queue.end());
   }
 
@@ -76,15 +70,14 @@ class PriorityQueueLockSemantics
     removeMatchingNoLock(p);
   }
 
-  inline bool empty() const { return m_size == 0; }
+  inline bool empty() const { return m_queue.empty(); }
 
-  inline int64_t size() const { return m_size; }
+  inline int64_t size() const { return m_queue.size(); }
 
   inline std::mutex& getMutex() { return m_mutex; }
 
   private:
-  std::vector<T> m_queue;
-  std::atomic_int64_t m_size = 0;
+  std::deque<T> m_queue;
   std::mutex m_mutex;
   C m_compare;
 };
@@ -92,8 +85,8 @@ class PriorityQueueLockSemantics
 template<typename T>
 struct unique_ptr_less
 {
-  inline bool operator()(const std::unique_ptr<T>& l,
-                         const std::unique_ptr<T>& r)
+  inline int operator()(const std::unique_ptr<T>& l,
+                        const std::unique_ptr<T>& r)
   {
     if(l && !r)
       return 0;

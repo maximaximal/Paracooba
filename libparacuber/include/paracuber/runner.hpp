@@ -104,7 +104,7 @@ class Runner
 
     inline bool operator<(QueueEntry const& b) const
     {
-      return priority < b.priority;
+      return priority > b.priority;
     }
   };
 
