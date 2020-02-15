@@ -76,9 +76,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::IPAddress),
      po::value<std::string>()->default_value(boost::asio::ip::address_v4().to_string())->value_name("string"),
          "IP address to use for network communication")
-    (GetConfigNameFromEnum(Config::IPBroadcastNetmask),
-     po::value<std::string>()->default_value("0.0.0.0")->value_name("string"),
-         "IP broadcast netmask to use for network communication")
+    (GetConfigNameFromEnum(Config::IPBroadcastAddress),
+     po::value<std::string>()->default_value(boost::asio::ip::address_v4().broadcast().to_string())->value_name("string"),
+         "IP broadcast address to use for network communication")
     (GetConfigNameFromEnum(Config::Id),
          po::value<int64_t>()->default_value(dist_mac(rng))->value_name("int"),
          "Unique Number (only 48 Bit) (can be MAC address)")
@@ -221,7 +221,7 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::IPAddress);
   conditionallySetConfigOptionToArray<std::string>(
-    vm, m_config.data(), Config::IPBroadcastNetmask);
+    vm, m_config.data(), Config::IPBroadcastAddress);
 
   if(vm.count(GetConfigNameFromEnum(Id))) {
     m_config[Id] = generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());

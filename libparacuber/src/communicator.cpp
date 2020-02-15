@@ -162,56 +162,49 @@ class Communicator::UDPServer
         return;
       }
 
-      // Ignore message if not targeted at this compute node.
-      if(msg.getTarget() != 0 &&
-         msg.getTarget() != m_communicator->m_config->getInt64(Config::Id)) {
-        PARACUBER_LOG(m_logger, Trace) << "Message dropped";
-      } else {
-        switch(msg.getType()) {
-          case messages::Type::OnlineAnnouncement:
-            PARACUBER_LOG(m_logger, Trace)
-              << "  -> Online Announcement from " << m_remoteEndpoint
-              << " (ID: " << msg.getOrigin() << ")";
-            handleOnlineAnnouncement(msg);
-            break;
-          case messages::Type::OfflineAnnouncement:
-            PARACUBER_LOG(m_logger, Trace)
-              << "  -> Offline Announcement from " << m_remoteEndpoint
-              << " (ID: " << msg.getOrigin() << ")";
-            handleOfflineAnnouncement(msg);
-            break;
-          case messages::Type::AnnouncementRequest:
-            PARACUBER_LOG(m_logger, Trace)
-              << "  -> Announcement Request from " << m_remoteEndpoint
-              << " (ID: " << msg.getOrigin() << ")";
-            handleAnnouncementRequest(msg);
-            break;
-          case messages::Type::NodeStatus:
-            /*
-            // These logging messages are not required most of the time and only
-            // waste processor time.
+      switch(msg.getType()) {
+        case messages::Type::OnlineAnnouncement:
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> Online Announcement from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
+          handleOnlineAnnouncement(msg);
+          break;
+        case messages::Type::OfflineAnnouncement:
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> Offline Announcement from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
+          handleOfflineAnnouncement(msg);
+          break;
+        case messages::Type::AnnouncementRequest:
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> Announcement Request from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
+          handleAnnouncementRequest(msg);
+          break;
+        case messages::Type::NodeStatus:
+          /*
+          // These logging messages are not required most of the time and only
+          // waste processor time.
 
-            PARACUBER_LOG(m_logger, Trace)
-              << "  -> Node Status from " << m_remoteEndpoint
-              << " (ID: " << msg.getOrigin() << ")";
-            */
-            handleNodeStatus(msg);
-            break;
-          case messages::Type::CNFTreeNodeStatusRequest:
-            PARACUBER_LOG(m_logger, Trace)
-              << "  -> CNFTree Node Status Request from " << m_remoteEndpoint
-              << " (ID: " << msg.getOrigin() << ")";
-            handleCNFTreeNodeStatusRequest(msg);
-            break;
-          case messages::Type::CNFTreeNodeStatusReply:
-            PARACUBER_LOG(m_logger, Trace)
-              << "  -> CNFTree Node Status Reply from " << m_remoteEndpoint
-              << " (ID: " << msg.getOrigin() << ")";
-            handleCNFTreeNodeStatusReply(msg);
-            break;
-        }
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> Node Status from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
+          */
+          handleNodeStatus(msg);
+          break;
+        case messages::Type::CNFTreeNodeStatusRequest:
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> CNFTree Node Status Request from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
+          handleCNFTreeNodeStatusRequest(msg);
+          break;
+        case messages::Type::CNFTreeNodeStatusReply:
+          PARACUBER_LOG(m_logger, Trace)
+            << "  -> CNFTree Node Status Reply from " << m_remoteEndpoint
+            << " (ID: " << msg.getOrigin() << ")";
+          handleCNFTreeNodeStatusReply(msg);
+          break;
       }
-
       startReceive();
     } else {
       PARACUBER_LOG(m_logger, LocalError)
@@ -553,17 +546,17 @@ class Communicator::UDPServer
   private:
   boost::asio::ip::address generateBroadcastAddress()
   {
-    auto netmaskString = std::string(
-      m_communicator->m_config->getString(Config::IPBroadcastNetmask));
+    auto ipAddressString = std::string(
+      m_communicator->m_config->getString(Config::IPBroadcastAddress));
     boost::system::error_code err;
-    auto netmask = boost::asio::ip::address::from_string(netmaskString, err);
+    auto address = boost::asio::ip::address::from_string(ipAddressString, err);
     if(err) {
       PARACUBER_LOG(m_logger, LocalError)
-        << "Could not parse given IP Broadcast Address \"" << netmaskString
+        << "Could not parse given IP Broadcast Address \"" << ipAddressString
         << "\". Error: " << err;
-      return boost::asio::ip::address_v4::broadcast();
+      address = boost::asio::ip::address_v4::broadcast();
     }
-    return boost::asio::ip::address_v4::broadcast(getIPAddress().to_v4(), netmask.to_v4());
+    return address;
   }
 
   boost::asio::ip::address generateIPAddress()
@@ -778,7 +771,7 @@ class Communicator::TCPServer
     , m_ioService(ioService)
     , m_acceptor(
         ioService,
-        boost::asio::ip::tcp::endpoint(comm->m_udpServer->getIPAddress(), port))
+        boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port))
   {
     startAccept();
     PARACUBER_LOG(m_logger, Trace)
