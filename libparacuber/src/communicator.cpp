@@ -1354,7 +1354,7 @@ Communicator::tick()
     if(node.getId() != m_config->getInt64(Config::Id)) {
       auto nn = node.getNetworkedNode();
       if(node.getFullyKnown() && nn) {
-        m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false, true);
+        m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false, false);
       }
     }
   }
