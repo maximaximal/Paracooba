@@ -170,6 +170,7 @@ TaskFactory::addExternallyProcessingTask(int64_t originator,
   ExternalTasksSet& set = it->second;
   set.addTask(TaskSkeleton{ CubeOrSolve, originator, p });
 }
+
 void
 TaskFactory::removeExternallyProcessedTask(CNFTree::Path p, int64_t id)
 {
@@ -180,6 +181,19 @@ TaskFactory::removeExternallyProcessedTask(CNFTree::Path p, int64_t id)
     ExternalTasksSet& set = it->second;
     set.removeTask(p);
   }
+}
+
+size_t
+TaskFactory::ExternalTasksSet::readdTasks(TaskFactory* factory)
+{
+  assert(factory);
+  for(TaskSkeleton skel : tasks) {
+    factory->getRootCNF()->getCNFTree().setState(skel.p, CNFTree::Unvisited);
+    factory->addPath(skel.p, skel.mode, skel.originator);
+  }
+  size_t count = tasks.size();
+  tasks.clear();
+  return count;
 }
 
 void
@@ -194,7 +208,8 @@ TaskFactory::readdExternalTasks(int64_t id)
     m_externalTasksSetMap.erase(it);
 
     PARACUBER_LOG(m_logger, Trace)
-      << "Re-Added " << count << " to local factory for task with originator "
+      << "Re-Added " << count
+      << " tasks to local factory for task with originator "
       << m_rootCNF->getOriginId() << " which were previously sent to node "
       << id;
   }

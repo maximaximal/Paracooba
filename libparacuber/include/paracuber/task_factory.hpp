@@ -60,7 +60,7 @@ class TaskFactory
       return getPriority() < b.getPriority();
     }
 
-    inline bool operator=(TaskSkeleton const& b) const
+    inline bool operator==(const TaskSkeleton& b) const
     {
       return mode == b.mode && originator == b.originator && p == b.p;
     }
@@ -112,22 +112,16 @@ class TaskFactory
     boost::signals2::scoped_connection nodeOfflineSignalConnection;
     std::set<TaskSkeleton> tasks;
 
-    size_t readdTasks(TaskFactory* factory)
-    {
-      assert(factory);
-      for(TaskSkeleton skel : tasks) {
-        factory->addPath(skel.p, skel.mode, skel.originator);
-      }
-      size_t count = tasks.size();
-      tasks.clear();
-      return count;
-    }
+    size_t readdTasks(TaskFactory* factory);
     void addTask(TaskSkeleton&& skel) { tasks.insert(std::move(skel)); }
     void removeTask(CNFTree::Path p)
     {
-      std::remove_if(tasks.begin(), tasks.end(), [p](const TaskSkeleton& skel) {
-        return skel.p == p;
-      });
+      for(auto it = tasks.begin(); it != tasks.end();) {
+        if(it->p == p)
+          it = tasks.erase(it);
+        else
+          ++it;
+      }
     }
   };
   using ExternalTasksSetMap = std::map<int64_t, ExternalTasksSet>;
