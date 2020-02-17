@@ -295,7 +295,7 @@ class Communicator::UDPServer
 
     auto [statisticsNode, inserted] = m_clusterStatistics->getOrCreateNode(id);
 
-    inserted = statisticsNode.getFullyKnown();
+    inserted = !statisticsNode.getFullyKnown();
 
     applyMessageNodeToStatsNode(messageNode, statisticsNode);
 
