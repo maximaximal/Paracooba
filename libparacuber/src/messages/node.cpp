@@ -25,7 +25,7 @@ Node::addKnownPeerFromNetworkedNode(NetworkedNode* nn)
   if(ip.is_v4()) {
     auto ipv4 = ip.to_v4();
     addKnownPeer(
-      ipv4.to_uint(), nn->getRemoteUdpEndpoint().port(), nn->getId());
+      ipv4.to_ulong(), nn->getRemoteUdpEndpoint().port(), nn->getId());
   }
   if(ip.is_v6()) {
     auto ipv6 = ip.to_v6();
@@ -42,7 +42,7 @@ Node::peerLocallyReachable(NetworkedNode* from, const KnownPeer& to)
 
   if(ip.is_v4()) {
     auto ipv4 = ip.to_v4();
-    uint32_t netmask = boost::asio::ip::address_v4::netmask(ipv4).to_uint();
+    uint32_t netmask = boost::asio::ip::address_v4::netmask(ipv4).to_ulong();
     uint32_t targetAddress = to.ipAddress[1];
     return (targetAddress & netmask) == netmask;
   }
