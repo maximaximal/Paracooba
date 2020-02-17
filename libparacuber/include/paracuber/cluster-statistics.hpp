@@ -104,8 +104,7 @@ class ClusterStatistics
     {
       CLUSTERSTATISTICS_NODE_CHANGED(m_daemon, daemon)
     }
-    void setDistance(uint8_t distance)
-    {
+    void setDistance(uint8_t distance){
       CLUSTERSTATISTICS_NODE_CHANGED(m_distance, distance)
     }
 
@@ -348,6 +347,8 @@ class ClusterStatistics
                         Node& node,
                         std::shared_ptr<CNF> rootCNF,
                         CNFTree::Path p);
+
+  bool hasNode(int64_t id);
 
   Node* getFittestNodeForNewWork(int originator);
 

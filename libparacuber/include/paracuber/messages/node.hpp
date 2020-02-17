@@ -3,11 +3,15 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <cereal/access.hpp>
 #include <cereal/types/string.hpp>
+#include <cereal/types/vector.hpp>
 
 namespace paracuber {
+class NetworkedNode;
+
 namespace messages {
 class Node
 {
@@ -36,6 +40,20 @@ class Node
   {}
   virtual ~Node() {}
 
+  struct KnownPeer
+  {
+    uint64_t ipAddress[2];
+    uint16_t port;
+    int64_t id;
+
+    template<class Archive>
+    void serialize(Archive& ar)
+    {
+      ar(ipAddress[0], ipAddress[1], CEREAL_NVP(port), CEREAL_NVP(id));
+    }
+  };
+  using KnownPeersVector = std::vector<KnownPeer>;
+
   const std::string& getName() const { return name; };
   int64_t getId() const { return id; }
   uint32_t getAvailableWorkers() const { return availableWorkers; }
@@ -46,6 +64,20 @@ class Node
   uint16_t getUdpListenPort() const { return udpListenPort; }
   uint16_t getTcpListenPort() const { return tcpListenPort; }
   bool getDaemonMode() const { return daemonMode; }
+  const KnownPeersVector& getKnownPeers() const { return knownPeers; }
+
+  void addKnownPeer(uint32_t ipAddress, uint16_t port, int64_t id)
+  {
+    knownPeers.push_back(KnownPeer{ { 0, ipAddress }, port, id });
+  }
+  void addKnownPeer(uint64_t ipAddress[2], uint16_t port, int64_t id)
+  {
+    knownPeers.push_back(KnownPeer{ { ipAddress[0], ipAddress[1] }, port, id });
+  }
+
+  void addKnownPeerFromNetworkedNode(NetworkedNode* nn);
+
+  static bool peerLocallyReachable(NetworkedNode* from, const KnownPeer& b);
 
   private:
   friend class cereal::access;
@@ -61,6 +93,8 @@ class Node
   bool daemonMode;
   std::string name;
 
+  KnownPeersVector knownPeers;
+
   template<class Archive>
   void serialize(Archive& ar)
   {
@@ -73,7 +107,8 @@ class Node
        CEREAL_NVP(uptime),
        CEREAL_NVP(udpListenPort),
        CEREAL_NVP(tcpListenPort),
-       CEREAL_NVP(daemonMode));
+       CEREAL_NVP(daemonMode),
+       CEREAL_NVP(knownPeers));
   }
 };
 }

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <boost/iterator/filter_iterator.hpp>
 #include <limits>
+#include <memory>
 #include <string>
 
 namespace paracuber {
@@ -249,6 +250,12 @@ ClusterStatistics::handlePathOnNode(int64_t originator,
   // This path should be handled on another compute node. This means, the
   // other compute node requires a Cube-Beam from the Communicator class.
   rootCNF->sendPath(node.getNetworkedNode(), p, []() {});
+}
+bool
+ClusterStatistics::hasNode(int64_t id)
+{
+  auto [map, lock] = getNodeMap();
+  return map.find(id) != map.end();
 }
 
 bool

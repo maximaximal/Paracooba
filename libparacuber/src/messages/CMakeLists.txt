@@ -1,3 +1,4 @@
 set(MESSAGES_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/job_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/node.cpp
     PARENT_SCOPE)
