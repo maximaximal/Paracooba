@@ -3,7 +3,6 @@ add_subdirectory(webserver)
 add_subdirectory(messages)
 
 set(PARACUBER_SRCS
-    ${CMAKE_CURRENT_SOURCE_DIR}/orchestrator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/communicator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cluster-statistics.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/runner.cpp
