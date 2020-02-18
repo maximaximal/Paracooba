@@ -80,6 +80,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::IPBroadcastAddress),
      po::value<std::string>()->default_value(boost::asio::ip::address_v4().broadcast().to_string())->value_name("string"),
          "IP broadcast address to use for network communication")
+    (GetConfigNameFromEnum(Config::AutoShutdown),
+     po::value<int32_t>()->default_value(-1)->value_name("int"),
+         "automatically shutdown n seconds after no tasks are running anymore. -1 means disabled.")
     (GetConfigNameFromEnum(Config::Id),
          po::value<int64_t>()->default_value(dist_mac(rng))->value_name("int"),
          "Unique Number (only 48 Bit) (can be MAC address)")
@@ -209,6 +212,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::HTTPListenPort);
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::HTTPDocRoot);
+  conditionallySetConfigOptionToArray<int32_t>(
+    vm, m_config.data(), Config::AutoShutdown);
   conditionallySetConfigOptionToArray<uint64_t>(
     vm, m_config.data(), Config::WorkQueueCapacity);
   conditionallySetConfigOptionToArray<uint64_t>(

@@ -47,13 +47,14 @@ class Config
     HTTPListenPort,
     HTTPDocRoot,
     LogToSTDOUT,
+    AutoShutdown,
 
     FreqCuberCutoff,
 
     _KEY_COUNT
   };
-  using ConfigVariant =
-    std::variant<uint16_t, uint32_t, uint64_t, int64_t, float, std::string>;
+  using ConfigVariant = std::
+    variant<uint16_t, uint32_t, uint64_t, int64_t, int32_t, float, std::string>;
 
   /** @brief Constructor
    */
@@ -102,9 +103,12 @@ class Config
   /** @brief Get an uint64 configuration variable.
    */
   inline uint64_t getUint64(Key key) { return get<uint64_t>(key); }
+  /** @brief Get an int32 configuration variable.
+   */
+  inline int32_t getInt32(Key key) { return get<int32_t>(key); }
   /** @brief Get an int64 configuration variable.
    */
-  inline uint64_t getInt64(Key key) { return get<int64_t>(key); }
+  inline int64_t getInt64(Key key) { return get<int64_t>(key); }
   /** @brief Get a float configuration variable.
    */
   inline float getFloat(Key key) { return get<float>(key); }
@@ -240,6 +244,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "ip-address";
     case Config::IPBroadcastAddress:
       return "ip-broadcast-address";
+    case Config::AutoShutdown:
+      return "auto-shutdown";
     default:
       return "";
   }

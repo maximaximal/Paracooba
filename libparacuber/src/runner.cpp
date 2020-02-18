@@ -1,10 +1,12 @@
 #include "../include/paracuber/runner.hpp"
+#include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/task.hpp"
 #include "../include/paracuber/task_factory.hpp"
 #include <boost/log/attributes/constant.hpp>
 
 #include <algorithm>
+#include <chrono>
 
 namespace paracuber {
 Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
@@ -15,6 +17,7 @@ Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
   , m_numberOfRunningTasks(0)
   , m_taskQueue(
       std::make_unique<PriorityQueueLockSemanticsUniquePtr<QueueEntry>>())
+  , m_autoShutdownTimer(communicator->getIOService())
 {}
 Runner::~Runner()
 {
@@ -122,6 +125,7 @@ Runner::worker(uint32_t workerId)
     std::unique_ptr<QueueEntry> entry = nullptr;
     {
       checkTaskFactories();
+      conditionallySetAutoShutdownTimer();
       std::unique_lock<std::mutex> lock(m_taskQueue->getMutex());
       while(m_running && !m_newTasksVerifier && m_taskQueue->size() == 0) {
         PARACUBER_LOG(logger, Trace)
@@ -136,6 +140,8 @@ Runner::worker(uint32_t workerId)
     }
 
     if(entry) {
+      resetAutoShutdownTimer();
+
       if(entry->task) {
         PARACUBER_LOG(logger, Trace)
           << "Worker " << workerId
@@ -196,5 +202,41 @@ Runner::checkTaskFactories()
       }
     }
   }
+}
+void
+Runner::conditionallySetAutoShutdownTimer()
+{
+  int32_t seconds = m_config->getInt32(Config::AutoShutdown);
+  if(seconds < 0 || m_numberOfRunningTasks > 0 || m_autoShutdownArmed ||
+     m_taskQueue->size() > 0)
+    return;
+
+  std::unique_lock lock(m_autoShutdownTimerMutex);
+  if(m_autoShutdownArmed)
+    return;
+
+  m_autoShutdownArmed = true;
+
+  PARACUBER_LOG(m_logger, LocalWarning) << "Starting automatic shutdown timer!";
+
+  m_autoShutdownTimer.expires_after(std::chrono::seconds(seconds));
+
+  m_autoShutdownTimer.async_wait([this](const boost::system::error_code& errc) {
+    if(errc != boost::asio::error::operation_aborted)
+      m_communicator->exit();
+  });
+}
+void
+Runner::resetAutoShutdownTimer()
+{
+  if(!m_autoShutdownArmed)
+    return;
+
+  std::unique_lock lock(m_autoShutdownTimerMutex);
+
+  m_autoShutdownArmed = false;
+
+  PARACUBER_LOG(m_logger, LocalWarning) << "Auto-Shutdown Canceled.";
+  m_autoShutdownTimer.cancel();
 }
 }

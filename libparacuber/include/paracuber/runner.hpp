@@ -3,6 +3,7 @@
 
 #include "log.hpp"
 #include <atomic>
+#include <boost/asio/high_resolution_timer.hpp>
 #include <condition_variable>
 #include <future>
 #include <mutex>
@@ -82,6 +83,7 @@ class Runner
   Logger m_logger;
   Communicator* m_communicator;
   std::atomic<bool> m_running = true;
+  std::atomic<bool> m_autoShutdownArmed = false;
 
   std::vector<std::thread> m_pool;
 
@@ -121,6 +123,12 @@ class Runner
 
   std::shared_mutex m_taskFactoriesMutex;
   TaskFactoryVector m_taskFactories;
+
+  boost::asio::high_resolution_timer m_autoShutdownTimer;
+
+  void conditionallySetAutoShutdownTimer();
+  void resetAutoShutdownTimer();
+  std::mutex m_autoShutdownTimerMutex;
 
   void checkTaskFactories();
 };
