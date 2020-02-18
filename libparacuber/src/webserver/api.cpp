@@ -138,23 +138,22 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
     std::shared_ptr<CNF> cnf;
 
     if(m_config->isDaemonMode()) {
-      // TODO: Implement Daemon specific handling for web-debugging.
-      assert(false);
+      // Daemons only show cluster stats.
+    } else {
+      cnf = m_config->getClient()->getRootCNF();
+
+      // First, wait for the allowance map to be ready.
+      cnf->rootTaskReady.callWhenReady([this, cnf, socket](CaDiCaLTask& ptr) {
+        // Registry is only initialised after the root task arrived.
+        cnf->getCuberRegistry().allowanceMapWaiter.callWhenReady(
+          [this, cnf, socket](cuber::Registry::AllowanceMap& map) {
+            m_config->getCommunicator()->requestCNFPathInfo(
+              CNFTree::buildPath(0, 0), reinterpret_cast<int64_t>(socket));
+            m_config->getCommunicator()
+              ->checkAndTransmitClusterStatisticsChanges(true);
+          });
+      });
     }
-
-    cnf = m_config->getClient()->getRootCNF();
-
-    // First, wait for the allowance map to be ready.
-    cnf->rootTaskReady.callWhenReady([this, cnf, socket](CaDiCaLTask& ptr) {
-      // Registry is only initialised after the root task arrived.
-      cnf->getCuberRegistry().allowanceMapWaiter.callWhenReady(
-        [this, cnf, socket](cuber::Registry::AllowanceMap& map) {
-          m_config->getCommunicator()->requestCNFPathInfo(
-            CNFTree::buildPath(0, 0), reinterpret_cast<int64_t>(socket));
-          m_config->getCommunicator()->checkAndTransmitClusterStatisticsChanges(
-            true);
-        });
-    });
   }
   assert(it->second);
   WSData& data = *it->second;

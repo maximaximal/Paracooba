@@ -350,7 +350,7 @@ class ClusterStatistics
 
   bool hasNode(int64_t id);
 
-  Node* getFittestNodeForNewWork(int originator);
+  Node* getFittestNodeForNewWork(int originator, int64_t rootCNFIDID = 0);
 
   /** @brief Start rebalancing of work to other nodes.
    *

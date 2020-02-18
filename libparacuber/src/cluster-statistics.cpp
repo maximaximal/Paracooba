@@ -198,7 +198,7 @@ ClusterStatistics::getTargetComputeNodeForNewDecision(CNFTree::Path p,
 }
 
 ClusterStatistics::Node*
-ClusterStatistics::getFittestNodeForNewWork(int originator)
+ClusterStatistics::getFittestNodeForNewWork(int originator, int64_t rootCNFID)
 {
   auto [map, lock] = getNodeMap();
 
@@ -207,7 +207,7 @@ ClusterStatistics::getFittestNodeForNewWork(int originator)
   float min_fitness = std::numeric_limits<float>::max();
   for(auto it = map.begin(); it != map.end(); ++it) {
     auto& n = it->second;
-    if(!n.getFullyKnown() || !n.getReadyForWork())
+    if(!n.getFullyKnown() || !n.getReadyForWork(rootCNFID))
       continue;
 
     float fitness = n.getFitnessForNewAssignment();
@@ -270,7 +270,8 @@ void
 ClusterStatistics::rebalance(int originator, TaskFactory& factory)
 {
   // Rebalancing must be done once for every context.
-  auto mostFitNode = getFittestNodeForNewWork(originator);
+  auto mostFitNode =
+    getFittestNodeForNewWork(originator, factory.getRootCNF()->getOriginId());
   if(mostFitNode && !mostFitNode->isFullyUtilized() &&
      factory.canProduceTask()) {
     assert(mostFitNode);

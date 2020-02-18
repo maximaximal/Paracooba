@@ -911,7 +911,9 @@ class Communicator::TCPServer
                 << "Received unknown TCPMode! Mode: " << m_mode;
               return;
           }
-
+          break;
+        }
+        case HandshakePhase::ReadBody: {
           if(m_comm->m_config->isDaemonMode()) {
             auto [context, inserted] =
               m_comm->m_config->getDaemon()->getOrCreateContext(m_senderID);
@@ -919,10 +921,10 @@ class Communicator::TCPServer
             m_cnf = m_context->getRootCNF();
           } else {
             m_cnf = m_comm->m_config->getClient()->getRootCNF();
+            PARACUBER_LOG(m_logger, LocalWarning)
+              << "ReadBody should only ever be called on a daemon!";
           }
-          break;
-        }
-        case HandshakePhase::ReadBody: {
+
           m_streambuf.commit(bytes);
           std::stringstream ssOut;
           boost::asio::streambuf::const_buffers_type constBuffer =
@@ -968,6 +970,17 @@ class Communicator::TCPServer
               << e.what();
             return;
           }
+
+          if(m_comm->m_config->isDaemonMode()) {
+            auto [context, inserted] =
+              m_comm->m_config->getDaemon()->getOrCreateContext(
+                jd.getOriginatorID());
+            m_context = &context;
+            m_cnf = m_context->getRootCNF();
+          } else {
+            m_cnf = m_comm->m_config->getClient()->getRootCNF();
+          }
+
           m_cnf->receiveJobDescription(m_senderID, std::move(jd));
 
           if(m_context) {
