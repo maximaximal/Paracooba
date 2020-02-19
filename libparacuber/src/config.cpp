@@ -169,10 +169,12 @@ Config::getKeyAsString(Key key)
     case 2:
       return std::to_string(std::get<uint64_t>(v));
     case 3:
-      return std::to_string(std::get<int64_t>(v));
+      return std::to_string(std::get<int32_t>(v));
     case 4:
-      return std::to_string(std::get<float>(v));
+      return std::to_string(std::get<int64_t>(v));
     case 5:
+      return std::to_string(std::get<float>(v));
+    case 6:
       return std::get<std::string>(v);
     default:
       return "Unknown Type!";

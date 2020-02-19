@@ -54,7 +54,7 @@ class Config
     _KEY_COUNT
   };
   using ConfigVariant = std::
-    variant<uint16_t, uint32_t, uint64_t, int64_t, int32_t, float, std::string>;
+    variant<uint16_t, uint32_t, uint64_t, int32_t, int64_t, float, std::string>;
 
   /** @brief Constructor
    */

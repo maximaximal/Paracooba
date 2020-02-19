@@ -275,13 +275,19 @@ ClusterStatistics::rebalance(int originator, TaskFactory& factory)
   if(mostFitNode && !mostFitNode->isFullyUtilized() &&
      factory.canProduceTask()) {
     assert(mostFitNode);
-    PARACUBER_LOG(m_logger, Trace)
-      << "Rebalance 1 task for work with origin " << originator << " to node "
-      << mostFitNode->getName() << " (" << mostFitNode->getId() << ")";
 
-    // Send as much work over there as that node has space left, but always at
-    // least 1.
-    {
+    // Three layers make 8 tasks to work on, this should produce enough work for
+    // machines with more cores.
+    size_t numberOfTasksToSend =
+      std::max(1, mostFitNode->getAvailableWorkers() / 8);
+
+    PARACUBER_LOG(m_logger, Trace)
+      << "Rebalance " << numberOfTasksToSend << " tasks for work with origin "
+      << originator << " to node " << mostFitNode->getName() << " ("
+      << mostFitNode->getId() << ")";
+
+    for(size_t i = 0; i < numberOfTasksToSend && factory.canProduceTask();
+        ++i) {
       auto skel = factory.produceTaskSkeleton();
       handlePathOnNode(originator, *mostFitNode, factory.getRootCNF(), skel.p);
     }

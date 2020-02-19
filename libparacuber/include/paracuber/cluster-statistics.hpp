@@ -191,6 +191,7 @@ class ClusterStatistics
              std::min(m_workQueueSize,
                       static_cast<uint64_t>(m_availableWorkers));
     }
+    uint16_t getAvailableWorkers() const { return m_availableWorkers; }
 
     void statusReceived()
     {
