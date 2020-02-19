@@ -4,6 +4,7 @@
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/cuber/registry.hpp"
+#include "../include/paracuber/decision_task.hpp"
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task_factory.hpp"
 #include "paracuber/messages/job_initiator.hpp"
@@ -227,8 +228,16 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
           CNFTree::setDepth(jp.getPath(), i), var, sentFromID);
       }
       m_cnfTree->setDecisionAndState(jp.getPath(), 0, CNFTree::Unvisited);
-      m_taskFactory->addPath(
-        jp.getPath(), TaskFactory::CubeOrSolve, jd.getOriginatorID());
+      // Immediately realise task, so the chain of distributing tasks cannot be
+      // broken by offloading the task directly after it was inserted into the
+      // factory.
+      std::unique_ptr<DecisionTask> task =
+        std::make_unique<DecisionTask>(shared_from_this(), jp.getPath());
+      m_config->getCommunicator()->getRunner()->push(
+        std::move(task),
+        sentFromID,
+        TaskFactory::getTaskPriority(TaskFactory::CubeOrSolve, jp.getPath()),
+        m_taskFactory);
       break;
     }
     case messages::JobDescription::Kind::Result: {

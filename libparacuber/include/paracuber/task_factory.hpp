@@ -37,6 +37,12 @@ class TaskFactory
     Solve
   };
 
+  static inline int getTaskPriority(Mode mode, CNFTree::Path p)
+  {
+    return (CNFTree::maxPathDepth - CNFTree::getDepth(p)) +
+           (mode != Solve ? 100 : 0);
+  }
+
   struct TaskSkeleton
   {
     Mode mode;
@@ -49,11 +55,7 @@ class TaskFactory
       , p(p)
     {}
 
-    inline int getPriority() const
-    {
-      return (CNFTree::maxPathDepth - CNFTree::getDepth(p)) +
-             (mode != Solve ? 100 : 0);
-    }
+    inline int getPriority() const { return getTaskPriority(mode, p); }
 
     inline bool operator<(TaskSkeleton const& b) const
     {
