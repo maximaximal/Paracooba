@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <paracuber/client.hpp>
+#include <paracuber/cnf.hpp>
 #include <paracuber/communicator.hpp>
 #include <paracuber/config.hpp>
 #include <paracuber/daemon.hpp>
@@ -48,6 +49,17 @@ main(int argc, char* argv[])
   if(!config->isDaemonMode()) {
     // Client mode. There should be some action.
     TaskResult::Status status = client->getStatus();
+
+    try {
+      std::string_view dumpTree = config->getString(Config::DumpTreeAtExit);
+      if(dumpTree != "") {
+        PARACUBER_LOG(logger, Trace) << "Dump CNF Tree to file " << dumpTree;
+        client->getRootCNF()->getCNFTree().dumpTreeToFile(dumpTree);
+      }
+    } catch(const std::exception& e) {
+      PARACUBER_LOG(logger, LocalError)
+        << "Dump CNF Tree to file failed! Error: " << e.what();
+    }
 
     switch(status) {
       case TaskResult::Unsolved:

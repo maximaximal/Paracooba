@@ -4,6 +4,7 @@
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/util.hpp"
 #include <cassert>
+#include <fstream>
 #include <iostream>
 
 namespace paracuber {
@@ -320,6 +321,40 @@ CNFTree::pathToStdString(Path p)
   pathToStr(p, str);
   return (std::string(str, getDepth(p)) + " (" + std::to_string(getDepth(p)) +
           ")");
+}
+
+static void
+dumpTreeNode(std::ostream& o, CNFTree::Path p, const CNFTree::Node& n)
+{
+  std::string pStr = "n";
+  pStr += CNFTree::pathToStrNoAlloc(p);
+
+  o << pStr << " [label=\"" << pStr << ":" << n.decision << "(" << n.state
+    << ") @" << n.remote << "\"];" << std::endl;
+
+  if(CNFTree::getDepth(p) > 0) {
+    std::string parentStr = "n";
+    parentStr += CNFTree::pathToStrNoAlloc(CNFTree::getParent(p));
+    o << parentStr << " -> " << pStr << ";" << std::endl;
+  }
+
+  if(n.left)
+    dumpTreeNode(o, CNFTree::getNextLeftPath(p), *n.left);
+  if(n.right)
+    dumpTreeNode(o, CNFTree::getNextRightPath(p), *n.right);
+}
+
+void
+CNFTree::dumpTreeToFile(const std::string_view& file)
+{
+  std::ofstream outFile;
+  outFile.open(std::string(file));
+  if(outFile.is_open()) {
+    outFile << "digraph ParaCuberTree {";
+    dumpTreeNode(outFile, 0, m_root);
+    outFile << "}" << std::endl;
+    outFile.close();
+  }
 }
 
 bool

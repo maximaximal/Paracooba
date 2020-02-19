@@ -70,7 +70,10 @@ CNF::CNF(const CNF& o)
   connectToCNFTreeSignal();
 }
 
-CNF::~CNF() {}
+CNF::~CNF()
+{
+  PARACUBER_LOG(m_logger, Trace) << "Destruct CNF from " << m_dimacsFile;
+}
 
 void
 CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
@@ -262,10 +265,7 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
         std::unique_lock lock(m_resultsMutex);
         m_results.insert(std::make_pair(jr.getPath(), std::move(res)));
       }
-      {
-        std::unique_lock lock(m_cnfTreeMutex);
-        m_cnfTree->setState(res.p, res.state, true);
-      }
+      handleFinishedResultReceived(res);
       break;
     }
     case messages::JobDescription::Kind::Initiator: {
@@ -294,23 +294,23 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
 void
 CNF::connectToCNFTreeSignal()
 {
-  m_cnfTree->getRootStateChangedSignal().connect(
-    [this](CNFTree::Path p, CNFTree::State state) {
-      PARACUBER_LOG(m_logger, Info) << "CNF: Found a result and send to all "
-                                       "subscribers of signals! End Result: "
-                                    << state;
+  m_cnfTree->getRootStateChangedSignal().connect([this](CNFTree::Path p,
+                                                        CNFTree::State state) {
+    PARACUBER_LOG(m_logger, Info) << "CNF: Found a result and send to all "
+                                     "subscribers of signals! End Result: "
+                                  << state;
 
-      std::shared_lock lock(m_resultsMutex);
-      Result* result = &m_results[0];
-      assert(result);
+    std::shared_lock lock(m_resultsMutex);
+    Result* result = &m_results[0];
+    assert(result);
 
-      if(result->state == CNFTree::SAT) {
-        // The result must contain the assignment if it is satisfiable.
-        result->decodeAssignment();
-      }
+    if(result->state == CNFTree::SAT) {
+      // The result must contain the assignment if it is satisfiable.
+      result->decodeAssignment();
+    }
 
-      m_resultSignal(result);
-    });
+    m_resultSignal(result);
+  });
 }
 
 void

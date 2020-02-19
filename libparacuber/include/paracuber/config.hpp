@@ -48,6 +48,7 @@ class Config
     HTTPDocRoot,
     LogToSTDOUT,
     AutoShutdown,
+    DumpTreeAtExit,
 
     FreqCuberCutoff,
 
@@ -246,6 +247,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "ip-broadcast-address";
     case Config::AutoShutdown:
       return "auto-shutdown";
+    case Config::DumpTreeAtExit:
+      return "dump-tree-at-exit";
     default:
       return "";
   }

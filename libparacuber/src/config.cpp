@@ -80,6 +80,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::IPBroadcastAddress),
      po::value<std::string>()->default_value(boost::asio::ip::address_v4().broadcast().to_string())->value_name("string"),
          "IP broadcast address to use for network communication")
+    (GetConfigNameFromEnum(Config::DumpTreeAtExit),
+     po::value<std::string>()->default_value("")->value_name("string"),
+         "Dump binary tree to file at exit. Empty string disables dump.")
     (GetConfigNameFromEnum(Config::AutoShutdown),
      po::value<int32_t>()->default_value(-1)->value_name("int"),
          "automatically shutdown n seconds after no tasks are running anymore. -1 means disabled.")
@@ -230,6 +233,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::IPAddress);
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::IPBroadcastAddress);
+  conditionallySetConfigOptionToArray<std::string>(
+    vm, m_config.data(), Config::DumpTreeAtExit);
 
   if(vm.count(GetConfigNameFromEnum(Id))) {
     m_config[Id] = generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());

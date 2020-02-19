@@ -112,6 +112,8 @@ class CNFTree
     return depth == getDepth(p);
   }
 
+  void dumpTreeToFile(const std::string_view& targetFile);
+
   bool isLocal(Path p);
 
   /** @brief Assigns a literal to the internal tree.

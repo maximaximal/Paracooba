@@ -15,7 +15,6 @@
 
 #include "cnftree.hpp"
 #include "log.hpp"
-#include "paracuber/messages/job_initiator.hpp"
 #include "readywaiter.hpp"
 #include "taskresult.hpp"
 
