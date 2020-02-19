@@ -1077,8 +1077,6 @@ class Communicator::TCPServer
     newConn->socket().non_blocking(true);
     newConn->start();
 
-    PARACUBER_LOG(m_logger, Trace) << "New TCP connection started!";
-
     startAccept();
   }
 
