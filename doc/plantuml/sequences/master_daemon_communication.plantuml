@@ -1,21 +1,23 @@
 @startuml
-Master --> Daemon: (UDP) Announcement Request
-Master --> Daemon_n: (UDP) Announcement Request
-Master <-- Daemon: (UDP) Online Announcement
-Master <-- Daemon_n: (UDP) Online Announcement
+skinparam monochrome true
+Master --> Master: Work
+Master --> "Daemon 1": (UDP) Announcement Request
+Master --> "Daemon 2": (UDP) Announcement Request
+Master <-- "Daemon 1": (UDP) Online Announcement
+Master <-- "Daemon 2": (UDP) Online Announcement
 
-Master -> Daemon: (TCP) CNF Formula in DIMACS Format
-Master -> Daemon_n: (TCP) CNF Formula in DIMACS Format
-Master -> Daemon: (TCP) JobDescription { JobInitiator }
-Master -> Daemon_n: (TCP) JobDescription { JobInitiator }
+Master -> "Daemon 1": (TCP) CNF Formula in DIMACS Format
+Master -> "Daemon 2": (TCP) CNF Formula in DIMACS Format
+Master -> "Daemon 1": (TCP) JobInitiator
+Master -> "Daemon 2": (TCP) JobInitiator
 
-Master -> Daemon: (TCP) JobPath
-Daemon -> Daemon_n: (TCP) JobPath
+Master -> "Daemon 1": (TCP) JobPath
+"Daemon 1" -> "Daemon 2": (TCP) JobPath
 
-Daemon_n --> Daemon_n: Work
+"Daemon 2" --> "Daemon 2": Work
 
-Daemon --> Daemon: Work
+"Daemon 1" --> "Daemon 1": Work
 
-Daemon_n -> Daemon: (TCP) JobResult
-Daemon -> Master: (TCP) JobResult
+"Daemon 2" -> "Daemon 1": (TCP) JobResult
+"Daemon 1" -> Master: (TCP) JobResult
 @enduml
