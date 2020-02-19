@@ -122,7 +122,7 @@ class ClusterStatistics
      * readyness for the client ID. In daemon mode, returns the state for the
      * specified ID.*/
     bool getReadyForWork(int64_t id = 0) const;
-    bool getDaemon() const { return m_daemon; }
+    bool isDaemon() const { return m_daemon; }
     uint16_t getUdpListenPort() const { return m_udpListenPort; }
     uint16_t getTcpListenPort() const { return m_tcpListenPort; }
     uint64_t getWorkQueueSize() const { return m_workQueueSize; }

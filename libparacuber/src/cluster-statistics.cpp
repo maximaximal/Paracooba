@@ -207,7 +207,8 @@ ClusterStatistics::getFittestNodeForNewWork(int originator, int64_t rootCNFID)
   float min_fitness = std::numeric_limits<float>::max();
   for(auto it = map.begin(); it != map.end(); ++it) {
     auto& n = it->second;
-    if(!n.getFullyKnown() || !n.getReadyForWork(rootCNFID))
+    if(!n.getFullyKnown() || !n.getReadyForWork(rootCNFID) ||
+       (!n.isDaemon() && n.getId() != rootCNFID))
       continue;
 
     float fitness = n.getFitnessForNewAssignment();

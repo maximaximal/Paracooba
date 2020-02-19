@@ -309,9 +309,11 @@ class Communicator::UDPServer
                   m_communicator,
                   statisticsNode.getNetworkedNode()));
 
-      m_communicator->sendCNFToNode(
-        m_communicator->m_config->getClient()->getRootCNF(),
-        statisticsNode.getNetworkedNode());
+      if(statisticsNode.isDaemon()) {
+        m_communicator->sendCNFToNode(
+          m_communicator->m_config->getClient()->getRootCNF(),
+          statisticsNode.getNetworkedNode());
+      }
     }
 
     analyseKnownPeersOfNode(messageNode);
