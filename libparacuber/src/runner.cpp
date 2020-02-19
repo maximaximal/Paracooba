@@ -219,7 +219,7 @@ Runner::conditionallySetAutoShutdownTimer()
 
   PARACUBER_LOG(m_logger, LocalWarning) << "Starting automatic shutdown timer!";
 
-  m_autoShutdownTimer.expires_after(std::chrono::seconds(seconds));
+  m_autoShutdownTimer.expires_from_now(std::chrono::seconds(seconds));
 
   m_autoShutdownTimer.async_wait([this](const boost::system::error_code& errc) {
     if(errc != boost::asio::error::operation_aborted)
