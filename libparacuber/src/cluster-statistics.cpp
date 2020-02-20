@@ -11,6 +11,7 @@
 #include <boost/iterator/filter_iterator.hpp>
 #include <limits>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 namespace paracuber {
@@ -113,7 +114,10 @@ ClusterStatistics::getNode(int64_t id) const
 {
   auto [map, lock] = getNodeMap();
   auto it = map.find(id);
-  assert(it != map.end());
+  if(it == map.end()) {
+    throw std::invalid_argument("Could not find node with id " +
+                                std::to_string(id) + "!");
+  }
   return it->second;
 }
 
@@ -122,7 +126,10 @@ ClusterStatistics::getNode(int64_t id)
 {
   auto [map, lock] = getNodeMap();
   auto it = map.find(id);
-  assert(it != map.end());
+  if(it == map.end()) {
+    throw std::invalid_argument("Could not find node with id " +
+                                std::to_string(id) + "!");
+  }
   return it->second;
 }
 

@@ -43,7 +43,13 @@ main(int argc, char* argv[])
     client->solve();
   }
 
-  communicator->run();
+  try {
+    communicator->run();
+  } catch(std::exception& e) {
+    PARACUBER_LOG(logger, LocalError)
+      << "Encountered exception which was not catched until main()! Message: "
+      << e.what();
+  }
 
   if(!config->isDaemonMode()) {
     // Client mode. There should be some action.

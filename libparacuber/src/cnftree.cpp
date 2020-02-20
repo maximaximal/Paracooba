@@ -6,6 +6,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 
 namespace paracuber {
 const size_t CNFTree::maxPathDepth = sizeof(CNFTree::Path) * 8 - 6;
@@ -382,15 +383,22 @@ CNFTree::isLocal(Path p)
   return isLocal;
 }
 
-void
+bool
 CNFTree::sendPathToRemote(Path p, Node* n)
 {
   assert(n);
   std::shared_ptr<CNF> rootCNF = GetRootCNF(m_config.get(), m_originCNFId);
   assert(rootCNF);
-  auto& statNode =
-    m_config->getCommunicator()->getClusterStatistics()->getNode(n->remote);
-  rootCNF->sendResult(statNode.getNetworkedNode(), p, []() {});
+  try {
+    auto& statNode =
+      m_config->getCommunicator()->getClusterStatistics()->getNode(n->remote);
+    rootCNF->sendResult(statNode.getNetworkedNode(), p, []() {});
+  } catch(const std::invalid_argument& e) {
+    // This case should be handled by other compute nodes detecting the offline
+    // node. They re-insert missed tasks.
+    return false;
+  }
+  return true;
 }
 
 void

@@ -5,9 +5,9 @@
 #include "../include/paracuber/config.hpp"
 #include "../include/paracuber/cuber/registry.hpp"
 #include "../include/paracuber/decision_task.hpp"
+#include "../include/paracuber/networked_node.hpp"
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task_factory.hpp"
-#include "../include/paracuber/networked_node.hpp"
 #include "paracuber/messages/job_initiator.hpp"
 #include "paracuber/messages/job_path.hpp"
 #include "paracuber/messages/job_result.hpp"
@@ -235,6 +235,9 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
         m_cnfTree->setDecision(
           CNFTree::setDepth(jp.getPath(), i), var, sentFromID);
       }
+      // The remote of the direct parent MUST be the one who sent this task!
+      // Else, later submissions could have invalid parents.
+      m_cnfTree->setRemote(CNFTree::getParent(jp.getPath()), sentFromID);
       m_cnfTree->setDecisionAndState(jp.getPath(), 0, CNFTree::Unvisited);
       // Immediately realise task, so the chain of distributing tasks cannot be
       // broken by offloading the task directly after it was inserted into the

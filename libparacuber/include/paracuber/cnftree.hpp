@@ -282,7 +282,7 @@ class CNFTree
   int64_t m_originCNFId;
   StateChangedSignal m_rootStateChangedSignal;
 
-  void sendPathToRemote(Path p, Node* n);
+  bool sendPathToRemote(Path p, Node* n);
   void setCNFResult(Path p, State state, Path source);
 
   inline void signalIfRootStateChanged(Path p, State s)

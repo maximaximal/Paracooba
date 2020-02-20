@@ -156,12 +156,22 @@ Runner::worker(uint32_t workerId)
 
         m_currentlyRunningTasks[workerId] = entry->task.get();
         ++m_numberOfRunningTasks;
-        auto result = std::move(entry->task->execute());
+        TaskResultPtr result;
+        try {
+          result = std::move(entry->task->execute());
+        } catch(const std::exception& e) {
+          PARACUBER_LOG(logger, LocalError)
+            << "Exception encountered during task execution! Exception: "
+            << e.what();
+          result = nullptr;
+        }
         --m_numberOfRunningTasks;
         m_currentlyRunningTasks[workerId] = nullptr;
-        result->setTask(std::move(entry->task));
-        result->getTask().finish(*result);
-        entry->result.set_value(std::move(result));
+        if(result) {
+          result->setTask(std::move(entry->task));
+          result->getTask().finish(*result);
+          entry->result.set_value(std::move(result));
+        }
       } else {
         PARACUBER_LOG(logger, LocalError)
           << "Worker " << workerId
