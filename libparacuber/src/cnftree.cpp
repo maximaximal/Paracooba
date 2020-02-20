@@ -197,8 +197,9 @@ CNFTree::setState(Path p, State state, bool keepLocal)
               setCNFResult(getParent(p), UNSAT, p);
               sendPathToRemote(getParent(p), lastNode);
             } else {
-              // Not handled in this context, once the sibling finishes, this
-              // will come from the other side.
+              // Already propagate result upwards anyways, to guard against
+              // eventual race conditions over the network and show progress.
+              sendPathToRemote(p, lastNode);
             }
           } else {
             // Case 4
