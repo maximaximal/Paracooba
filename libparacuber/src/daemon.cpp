@@ -6,7 +6,7 @@
 #include "../include/paracuber/log.hpp"
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task_factory.hpp"
-#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <shared_mutex>
 
 namespace paracuber {
@@ -137,7 +137,7 @@ Daemon::~Daemon()
     if(dumpTree != "") {
       PARACUBER_LOG(m_logger, Trace)
         << "Try to dump trees before destroying daemon.";
-      std::filesystem::create_directory(dumpTree);
+      boost::filesystem::create_directory(dumpTree);
       auto [map, lock] = getContextMap();
       for(const auto& it : map) {
         const auto& ctx = it.second;
