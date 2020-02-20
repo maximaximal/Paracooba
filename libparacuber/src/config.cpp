@@ -110,6 +110,7 @@ Config::Config()
     ("enable-client-cadical", po::bool_switch(&m_enableClientCaDiCaL)->default_value(false)->value_name("bool"), "direct solving via CaDiCaL on client")
     ("enable-internal-webserver", po::bool_switch(&m_enableInternalWebserver)->default_value(false)->value_name("bool"), "enable internal webserver to see debugging, diagnostics and status information")
     (GetConfigNameFromEnum(Config::LogToSTDOUT), po::bool_switch(&m_useSTDOUTForLogging)->default_value(false)->value_name("bool"), "use stdout for logging")
+    (GetConfigNameFromEnum(Config::LimitedTreeDump), po::bool_switch(&m_limitedTreeDump)->default_value(true)->value_name("bool"), "Limit tree dumping to only contain unvisited and unknown nodes, do not further explore known results.")
     ;
   // clang-format on
 }

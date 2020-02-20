@@ -324,13 +324,16 @@ CNFTree::pathToStdString(Path p)
 }
 
 static void
-dumpTreeNode(std::ostream& o, CNFTree::Path p, const CNFTree::Node& n)
+dumpTreeNode(std::ostream& o,
+             CNFTree::Path p,
+             const CNFTree::Node& n,
+             bool limitedTreeDump)
 {
   std::string pStr = "n";
   pStr += CNFTree::pathToStrNoAlloc(p);
 
   o << pStr << " [label=\"" << pStr << ":" << n.decision << "(" << n.state
-    << ") @" << n.remote << "\"];" << std::endl;
+    << ") @" << n.remote << "\" shape=box];" << std::endl;
 
   if(CNFTree::getDepth(p) > 0) {
     std::string parentStr = "n";
@@ -338,10 +341,16 @@ dumpTreeNode(std::ostream& o, CNFTree::Path p, const CNFTree::Node& n)
     o << parentStr << " -> " << pStr << ";" << std::endl;
   }
 
-  if(n.left)
-    dumpTreeNode(o, CNFTree::getNextLeftPath(p), *n.left);
-  if(n.right)
-    dumpTreeNode(o, CNFTree::getNextRightPath(p), *n.right);
+  bool cont = true;
+
+  if(limitedTreeDump) {
+    cont = !(n.state == CNFTree::SAT || n.state == CNFTree::UNSAT);
+  }
+
+  if(cont && n.left)
+    dumpTreeNode(o, CNFTree::getNextLeftPath(p), *n.left, limitedTreeDump);
+  if(cont && n.right)
+    dumpTreeNode(o, CNFTree::getNextRightPath(p), *n.right, limitedTreeDump);
 }
 
 void
@@ -351,7 +360,7 @@ CNFTree::dumpTreeToFile(const std::string_view& file)
   outFile.open(std::string(file));
   if(outFile.is_open()) {
     outFile << "digraph ParaCuberTree {";
-    dumpTreeNode(outFile, 0, m_root);
+    dumpTreeNode(outFile, 0, m_root, m_config->isLimitedTreeDumpActive());
     outFile << "}" << std::endl;
     outFile.close();
   }

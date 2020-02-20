@@ -49,6 +49,7 @@ class Config
     LogToSTDOUT,
     AutoShutdown,
     DumpTreeAtExit,
+    LimitedTreeDump,
 
     FreqCuberCutoff,
 
@@ -145,6 +146,8 @@ class Config
   inline bool isClientCaDiCaLEnabled() { return m_enableClientCaDiCaL; }
   /** @brief Check if internal webserver is enabled. */
   inline bool isInternalWebserverEnabled() { return m_enableInternalWebserver; }
+  /** @brief Check if limited tree dump is set. */
+  inline bool isLimitedTreeDumpActive() { return m_limitedTreeDump; }
 
   int64_t generateId(int64_t uniqueNumber);
 
@@ -190,6 +193,7 @@ class Config
   bool m_daemonMode = false;
   bool m_enableClientCaDiCaL = false;
   bool m_useSTDOUTForLogging = false;
+  bool m_limitedTreeDump = true;
 #ifdef ENABLE_INTERNAL_WEBSERVER
   bool m_enableInternalWebserver = true;
 #else
@@ -249,6 +253,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "auto-shutdown";
     case Config::DumpTreeAtExit:
       return "dump-tree-at-exit";
+    case Config::LimitedTreeDump:
+      return "limited-tree-dump";
     default:
       return "";
   }
