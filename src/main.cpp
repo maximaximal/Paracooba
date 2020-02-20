@@ -1,5 +1,5 @@
-#include <boost/log/trivial.hpp>
 #include <boost/program_options.hpp>
+#include <filesystem>
 #include <iostream>
 
 #include <paracuber/client.hpp>
@@ -71,6 +71,25 @@ main(int argc, char* argv[])
       case TaskResult::Unsatisfiable:
         std::cout << "unsat" << std::endl;
         break;
+    }
+  } else {
+    try {
+      std::string dumpTree(config->getString(Config::DumpTreeAtExit));
+      if(dumpTree != "") {
+        std::filesystem::create_directory(dumpTree);
+        auto [map, lock] = daemon->getContextMap();
+        for(const auto& it : map) {
+          const auto& ctx = it.second;
+          if(ctx->getReadyForWork()) {
+            const auto& rootCNF = ctx->getRootCNF();
+            rootCNF->getCNFTree().dumpTreeToFile(
+              dumpTree + "/" + std::string(rootCNF->getDimacsFile()) + ".dot");
+          }
+        }
+      }
+    } catch(const std::exception& e) {
+      PARACUBER_LOG(logger, LocalError)
+        << "Dump CNF Tree to dir failed! Error: " << e.what();
     }
   }
 
