@@ -94,8 +94,10 @@ Daemon::Context::start(State change)
   if(m_state & FormulaParsed && m_state & AllowanceMapReceived &&
      change != FormulaReceived) {
     // Ready to start receiving cubes!
-    m_state = m_state | WaitingForWork;
-    PARACUBER_LOG(m_logger, Trace) << "Ready for Work!";
+    if(!(m_state & WaitingForWork)) {
+      m_state = m_state | WaitingForWork;
+      PARACUBER_LOG(m_logger, Trace) << "Ready for Work!";
+    }
   }
 
   m_statisticsNode.setContextState(m_originatorID, m_state);
