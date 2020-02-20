@@ -191,7 +191,7 @@ CNFTree::setState(Path p, State state, bool keepLocal)
           //   The parent (remote) must know about this result, as the sibling
           //   is also remote and will send its result to the mutual parent.
           //   This means, this result must directly be sent to the parent.
-          if(sibling->isLocal()) {
+          if(sibling->isLocal() && n->isLocal()) {
             // Case 3
             if(sibling->state == UNSAT) {
               // Derive new CNF result for parent path!
@@ -200,6 +200,7 @@ CNFTree::setState(Path p, State state, bool keepLocal)
             } else {
               // Not handled in this context, once the sibling finishes, this
               // will come from the other side.
+              std::cerr << "CNFTREE: WAITING FOR SIBLING ON PATH " << pathToStdString(p) << std::endl;
             }
           } else {
             // Case 4
