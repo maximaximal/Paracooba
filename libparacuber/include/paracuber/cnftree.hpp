@@ -305,6 +305,10 @@ CNFTreeStateToStr(CNFTree::StateEnum s)
       return "SAT";
     case CNFTree::StateEnum::UNSAT:
       return "UNSAT";
+    case CNFTree::StateEnum::Solving:
+      return "Solving";
+    case CNFTree::StateEnum::Split:
+      return "Split";
     case CNFTree::StateEnum::Dropped:
       return "Dropped";
     case CNFTree::StateEnum::Unknown:
