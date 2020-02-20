@@ -7,6 +7,7 @@
 #include "../include/paracuber/decision_task.hpp"
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task_factory.hpp"
+#include "../include/paracuber/networked_node.hpp"
 #include "paracuber/messages/job_initiator.hpp"
 #include "paracuber/messages/job_path.hpp"
 #include "paracuber/messages/job_result.hpp"
@@ -148,10 +149,14 @@ CNF::sendPath(NetworkedNode* nn, CNFTree::Path p, SendFinishedCB finishedCB)
 
   messages::JobPath jp(p);
 
-  jp.getTrace().reserve(CNFTree::getDepth(p) - 1);
-  std::shared_lock lock(m_cnfTreeMutex);
-  m_cnfTree->writePathToLiteralContainer(
-    jp.getTrace(), CNFTree::setDepth(p, CNFTree::getDepth(p) - 1));
+  {
+    std::unique_lock lock(m_cnfTreeMutex);
+    m_cnfTree->setRemote(p, nn->getId());
+
+    jp.getTrace().reserve(CNFTree::getDepth(p) - 1);
+    m_cnfTree->writePathToLiteralContainer(
+      jp.getTrace(), CNFTree::setDepth(p, CNFTree::getDepth(p) - 1));
+  }
 
   messages::JobDescription jd(m_originId);
   jd.insert(jp);
@@ -294,23 +299,23 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
 void
 CNF::connectToCNFTreeSignal()
 {
-  m_cnfTree->getRootStateChangedSignal().connect([this](CNFTree::Path p,
-                                                        CNFTree::State state) {
-    PARACUBER_LOG(m_logger, Info) << "CNF: Found a result and send to all "
-                                     "subscribers of signals! End Result: "
-                                  << state;
+  m_cnfTree->getRootStateChangedSignal().connect(
+    [this](CNFTree::Path p, CNFTree::State state) {
+      PARACUBER_LOG(m_logger, Info) << "CNF: Found a result and send to all "
+                                       "subscribers of signals! End Result: "
+                                    << state;
 
-    std::shared_lock lock(m_resultsMutex);
-    Result* result = &m_results[0];
-    assert(result);
+      std::shared_lock lock(m_resultsMutex);
+      Result* result = &m_results[0];
+      assert(result);
 
-    if(result->state == CNFTree::SAT) {
-      // The result must contain the assignment if it is satisfiable.
-      result->decodeAssignment();
-    }
+      if(result->state == CNFTree::SAT) {
+        // The result must contain the assignment if it is satisfiable.
+        result->decodeAssignment();
+      }
 
-    m_resultSignal(result);
-  });
+      m_resultSignal(result);
+    });
 }
 
 void
