@@ -6,6 +6,7 @@
 #include "../include/paracuber/log.hpp"
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task_factory.hpp"
+#include <filesystem>
 #include <shared_mutex>
 
 namespace paracuber {
@@ -96,6 +97,7 @@ Daemon::Context::start(State change)
     // Ready to start receiving cubes!
     if(!(m_state & WaitingForWork)) {
       m_state = m_state | WaitingForWork;
+      m_readyForWork = true;
       PARACUBER_LOG(m_logger, Trace) << "Ready for Work!";
     }
   }
@@ -124,12 +126,36 @@ Daemon::Daemon(ConfigPtr config,
   : m_config(config)
   , m_log(log)
   , m_communicator(communicator)
+  , m_logger(log->createLogger("Daemon"))
 {
   m_config->m_daemon = this;
 }
 Daemon::~Daemon()
 {
+  try {
+    std::string dumpTree(m_config->getString(Config::DumpTreeAtExit));
+    if(dumpTree != "") {
+      PARACUBER_LOG(m_logger, Trace)
+        << "Try to dump trees before destroying daemon.";
+      std::filesystem::create_directory(dumpTree);
+      auto [map, lock] = getContextMap();
+      for(const auto& it : map) {
+        const auto& ctx = it.second;
+        if(ctx->getReadyForWork()) {
+          const auto& rootCNF = ctx->getRootCNF();
+          PARACUBER_LOG(m_logger, Trace)
+            << "Dump cube tree for formula from " << rootCNF->getOriginId();
+          rootCNF->getCNFTree().dumpTreeToFile(
+            dumpTree + "/" + std::to_string(rootCNF->getOriginId()) + ".dot");
+        }
+      }
+    }
+  } catch(const std::exception& e) {
+    PARACUBER_LOG(m_logger, LocalError)
+      << "Dump CNF Tree to dir failed! Error: " << e.what();
+  }
   m_config->m_daemon = nullptr;
+  PARACUBER_LOG(m_logger, Trace) << "Destroy daemon.";
 }
 
 std::pair<const Daemon::ContextMap&, std::shared_lock<std::shared_mutex>>

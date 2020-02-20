@@ -92,6 +92,7 @@ class Daemon
   ContextMap m_contextMap;
   std::shared_mutex m_contextMapMutex;
   LogPtr m_log;
+  Logger m_logger;
   std::shared_ptr<Communicator> m_communicator;
 };
 
