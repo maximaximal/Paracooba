@@ -102,8 +102,7 @@ class Communicator
   void injectCNFTreeNodeInfo(int64_t cnfId,
                              int64_t handle,
                              CNFTree::Path p,
-                             CNFTree::CubeVar v,
-                             CNFTree::StateEnum state,
+                             CNFTree::State state,
                              int64_t remote);
 
   void sendCNFTreeNodeStatusRequest(int64_t targetId,

@@ -15,7 +15,6 @@ class JobPath
 {
   public:
   using Path = int64_t;
-  using TraceVector = std::vector<int>;
 
   JobPath() {}
   JobPath(Path path)
@@ -29,21 +28,17 @@ class JobPath
    */
   Path getPath() const { return path; };
 
-  TraceVector& getTrace() { return trace; }
-  const TraceVector& getTrace() const { return trace; }
-
   std::string tagline() const;
 
   private:
   friend class cereal::access;
 
   Path path = 0;
-  TraceVector trace;
 
   template<class Archive>
   void serialize(Archive& ar)
   {
-    ar(CEREAL_NVP(path), CEREAL_NVP(trace));
+    ar(CEREAL_NVP(path));
   }
 };
 }

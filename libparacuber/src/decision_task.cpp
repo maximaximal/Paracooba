@@ -33,36 +33,26 @@ DecisionTask::execute()
   auto& cnfTree = m_rootCNF->getCNFTree();
   auto clusterStatistics = m_config->getCommunicator()->getClusterStatistics();
 
-  CNFTree::State state;
-  assert(cnfTree.getState(m_path, state));
-  PARACUBER_LOG(*m_logger, Trace)
-    << "State for path " << CNFTree::pathToStrNoAlloc(m_path) << ":" << state;
-  assert(state == CNFTree::Unvisited);
+  CNFTree::State state = cnfTree.getState(m_path);
+  assert((state == CNFTree::Unvisited || state == CNFTree::UnknownPath));
 
-  m_rootCNF->getCNFTree().setState(m_path, CNFTree::Working);
+  cnfTree.setStateFromLocal(m_path, CNFTree::Working);
 
-  CNFTree::CubeVar var = 0;
-  if(m_rootCNF->getCuberRegistry().generateCube(m_path, var)) {
-    assert(var != 0);
-
-    // New cube generated! This means, the TRUE and FALSE branches are now
+  if(m_rootCNF->getCuberRegistry().shouldGenerateTreeSplit(m_path)) {
+    // New split generated! This means, the TRUE and FALSE branches are now
     // available and the generated decision must be set into the path.
-    m_rootCNF->getCNFTree().setDecisionAndState(m_path, var, CNFTree::Split);
+    cnfTree.setStateFromLocal(m_path, CNFTree::Split);
 
     // Both paths are added to the factory, the rebalance mechanism takes care
     // of distribution to other compute nodes.
     {
       // LEFT
       CNFTree::Path p = CNFTree::getNextLeftPath(m_path);
-      cnfTree.setDecisionAndState(p, 0, CNFTree::Unvisited);
-
       m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
     }
     {
       // RIGHT
       CNFTree::Path p = CNFTree::getNextRightPath(m_path);
-      cnfTree.setDecisionAndState(p, 0, CNFTree::Unvisited);
-
       m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
     }
 
@@ -70,7 +60,6 @@ DecisionTask::execute()
   } else {
     PARACUBER_LOG(*m_logger, Trace)
       << "No decision made for path " << CNFTree::pathToStrNoAlloc(m_path);
-    cnfTree.setState(m_path, CNFTree::Solving);
 
     m_factory->addPath(m_path, TaskFactory::Solve, m_originator);
 

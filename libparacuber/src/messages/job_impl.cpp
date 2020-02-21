@@ -33,7 +33,8 @@ JobInitiator::realise(const std::vector<int>& flatCubeArr)
       cubeVar = FastAbsolute(var);
       assert(cubeVar != 0);
 
-      auto [currVar, _] = map.insert(std::make_pair(p, cubeVar));
+      auto [currVar, _] =
+        map.insert(std::make_pair(CNFTree::cleanupPath(p), cubeVar));
       if(currVar->second != cubeVar) {
         // Existing path has different value at this position! This breaks the
         // binary tree property.

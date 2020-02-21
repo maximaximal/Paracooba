@@ -7,7 +7,10 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <map>
 #include <memory>
+#include <mutex>
+#include <set>
 
 namespace paracuber {
 class Config;
@@ -18,7 +21,9 @@ class CNF;
 class CNFTree
 {
   public:
-  explicit CNFTree(std::shared_ptr<Config> config, int64_t originCNFId);
+  explicit CNFTree(CNF& rootCNF,
+                   std::shared_ptr<Config> config,
+                   int64_t originCNFId);
   ~CNFTree();
 
   using Path = uint64_t;
@@ -26,7 +31,7 @@ class CNFTree
 
   static const Path DefaultUninitiatedPath = std::numeric_limits<Path>::max();
 
-  enum StateEnum
+  enum State
   {
     Unvisited,
     Working,
@@ -36,10 +41,29 @@ class CNFTree
     UNSAT,
     Dropped,
     Unknown,
+    UnknownPath,
     _STATE_COUNT
   };
-  using State = StateEnum;
-  using StateChangedSignal = boost::signals2::signal<void(Path, StateEnum)>;
+
+  using LiteralVector = std::vector<CubeVar>;
+
+  /** @brief A single node on the virtual cubing binary tree.
+   */
+  struct Node
+  {
+    State state = Unvisited;
+
+    int64_t receivedFrom = 0;
+    int64_t offloadedTo = 0;
+
+    inline bool isOffloaded() const { return offloadedTo != 0; }
+    inline bool isLocal() const { return offloadedTo == 0; }
+    inline bool requiresRemoteUpdate() const { return receivedFrom != 0; }
+  };
+
+  using StateChangedSignal = boost::signals2::signal<void(Path, State)>;
+  using NodePtr = std::unique_ptr<Node>;
+  using NodeMap = std::map<Path, NodePtr>;
 
   /** @brief Visitor function for traversing a CNF tree.
    *
@@ -51,156 +75,70 @@ class CNFTree
    * state, int64_t remote)>;
    */
 
-  /** @brief A single node on the cubing binary tree.
-   *
-   * A leaf (as given by isLeaf()) has no valid decision literal. All other
-   * nodes have valid decision literals, except for remote ones, where remote !=
-   * 0.
-   *
-   * Remote nodes are leaves where the decision is != 0. These nodes are
-   * materialised on other compute nodes.
-   */
-  struct Node
-  {
-    CubeVar decision = 0;
-    State state = Unvisited;
-    int64_t remote = 0;
-    std::unique_ptr<Node> left;
-    std::unique_ptr<Node> right;
-
-    inline bool isLeaf() const { return (!left) && (!right); }
-    inline bool isRemote() const { return remote != 0; }
-    inline bool isLocal() const { return !isRemote(); }
-  };
-
   /** @brief Visit the tree and call the provided visitor function.
    *
    * @return False if the path is not known, true otherwise.
    */
   template<class Visitor>
-  bool visit(Path p, Visitor visitor) const
+  bool visit(Path startPath, Path endPath, Visitor visitor) const
   {
-    assert(getDepth(p) < maxPathDepth);
+    std::lock_guard lock(m_nodeMapMutex);
 
-    const Node* n = &m_root;
-    uint8_t depth = 0;
-    bool end = false;
+    assert(getDepth(endPath) < maxPathDepth);
 
-    while(!end) {
-      bool assignment = getAssignment(p, depth + 1);
-      CubeVar decision = n->decision;
-      const std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+    for(size_t depth = getDepth(startPath); depth <= getDepth(endPath);
+        ++depth) {
+      const Node* currentNode = getNode(setDepth(endPath, depth));
 
-      if(!assignment) {
-        // A left path is an inversed literal, this is a bottom assignment.
-        decision = -decision;
-      }
+      // If no node was found, the visitor does not need to be called! Follow
+      // the path until the end.
+      if(!currentNode)
+        continue;
 
-      if(n->isLeaf()) {
-        end = true;
-      } else {
-        end = visitor(decision, depth, n->state, n->remote);
-      }
-
-      if(nextPtr && depth < getDepth(p) && !n->isLeaf()) {
-        n = nextPtr.get();
-        ++depth;
-      } else {
-        end = true;
+      if(visitor(setDepth(endPath, depth), *currentNode)) {
+        break;
       }
     }
-    return depth == getDepth(p);
+    return true;
   }
 
+  using PathSet = std::set<Path>;
+
   void dumpTreeToFile(const std::string_view& targetFile);
-
-  bool isLocal(Path p);
-
-  /** @brief Assigns a literal to the internal tree.
-   *
-   * The path must exist up to depth - 1 inside of this tree beforehand.
-   *
-   * @return False if the path does not exist yet, true if assignment was
-   * successful.
-   */
-  bool setDecision(Path p, CubeVar decision, int64_t originator = 0);
+  void dumpNode(Path p,
+                const Node* n,
+                PathSet& visitedPaths,
+                std::ostream& o,
+                bool limitedDump,
+                const std::string& parentPath);
 
   /** @brief Get the state for a given path.
    *
-   * The node at the path must already exist.
-   *
    * @return False if the path does not exist yet, true if assignment was
    * successful.
    */
-  bool getState(Path p, State& state) const;
+  State getState(Path p) const;
 
-  /** @brief Get the decision for a given path.
-   *
-   * The node at the path must already exist.
-   *
-   * @return False if the path does not exist yet, true if assignment was
-   * successful.
-   */
-  bool getDecision(Path p, CubeVar& var) const;
+  inline bool isPathKnown(Path p) const { return getNode(p) != nullptr; }
 
-  /** @brief Set the state for a given path.
-   *
-   * The node at the path must already exist.
-   *
-   * By keeping a state change local, no network call is made.
-   *
-   * @return False if the path does not exist yet, true if assignment was
-   * successful.
-   */
-  bool setState(Path p, State state, bool keepLocal = false);
+  /** @brief Only called when locally setting states. */
+  void setStateFromLocal(Path p, State state);
+  /** @brief Only called when receiving results. */
+  void setStateFromRemote(Path p, State state, int64_t remoteId);
+  /** @brief Only called when receiving paths. */
+  void insertNodeFromRemote(Path p, int64_t remoteId);
+  /** @brief Only called when rebalancing. Does not send anything. */
+  void offloadNodeToRemote(Path p, int64_t remoteId);
+  /** @brief Only called when resetting a node in case of re-adding tasks. */
+  void resetNode(Path p);
 
-  /** @brief Set the remote for a given path.
-   *
-   * The node at the path must already exist.
-   *
-   * @return False if the path does not exist yet, true if assignment was
-   * successful.
-   */
-  bool setRemote(Path p, int64_t remote);
-
-  /** @brief Bulk-set a node.
-   *
-   * @return False if the path does not exist yet, true if assignment was
-   * successful.
-   */
-  bool setDecisionAndState(Path p, CubeVar decision, State state);
+  Path getTopmostAvailableParent(Path p) const;
 
   /** @brief This signal is called when the root state changes.
    */
   StateChangedSignal& getRootStateChangedSignal()
   {
     return m_rootStateChangedSignal;
-  }
-
-  /** @brief Traverse the decision tree and write the specified path to a given
-   * container.
-   */
-  template<class Container>
-  bool writePathToLiteralContainer(Container& container, Path p)
-  {
-    return visit(
-      p,
-      [&container](
-        CubeVar decision, uint8_t depth, CNFTree::State state, int64_t remote) {
-        container.push_back(decision);
-        return false;
-      });
-  }
-  template<class Container>
-  bool writePathToLiteralAndStateContainer(Container& container, Path p)
-  {
-    return visit(
-      p,
-      [&container](
-        CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
-        container.push_back({ p, state });
-        return false;
-      });
   }
 
   static const size_t maxPathDepth;
@@ -262,6 +200,11 @@ class CNFTree
            (static_cast<Path>(val) << ((sizeof(Path) * 8) - 1 - (depth - 1)));
   }
 
+  static inline Path getSiblingPath(Path p)
+  {
+    return setAssignment(p, getDepth(p), !getAssignment(p, getDepth(p)));
+  }
+
   static inline Path getNextLeftPath(Path p)
   {
     uint8_t depth = getDepth(p) + 1;
@@ -276,50 +219,75 @@ class CNFTree
   static inline Path down(Path p) { return setDepth(p, getDepth(p) + 1); }
   static inline Path up(Path p) { return setDepth(p, getDepth(p) - 1); }
 
+  static inline Path cleanupPath(Path p)
+  {
+    return setDepth((p & ~(0xFFFFFFFF'FFFFFFFFu >> getDepth(p))), getDepth(p));
+  }
+
   private:
-  Node m_root;
+  const Node* getNode(Path p) const
+  {
+    const auto node = m_nodeMap.find(cleanupPath(p));
+    if(node != m_nodeMap.end()) {
+      return node->second.get();
+    }
+    return nullptr;
+  }
+  Node* getNode(Path p)
+  {
+    auto node = m_nodeMap.find(cleanupPath(p));
+    if(node != m_nodeMap.end()) {
+      return node->second.get();
+    }
+    return nullptr;
+  }
+  Node* getRootNode() { return getNode(0); }
+  const Node* getRootNode() const { return getNode(0); }
+  Path getTopmostAvailableParentInner(Path p) const;
+
+  CNF& m_rootCNF;
   std::shared_ptr<Config> m_config;
   int64_t m_originCNFId;
   StateChangedSignal m_rootStateChangedSignal;
+  NodeMap m_nodeMap;
+  mutable std::mutex m_nodeMapMutex;
 
-  bool sendPathToRemote(Path p, Node* n);
   void setCNFResult(Path p, State state, Path source);
 
-  inline void signalIfRootStateChanged(Path p, State s)
-  {
-    if(m_root.state != s && getDepth(p) == 0 &&
-       (s == SAT || s == UNSAT || s == Unknown))
-      m_rootStateChangedSignal(p, s);
-  }
+  void propagateUpwardsFrom(Path p, Path sourcePath = DefaultUninitiatedPath);
+
+  void sendNodeResultToSender(Path p, const Node& node);
 };
 
 constexpr const char*
-CNFTreeStateToStr(CNFTree::StateEnum s)
+CNFTreeStateToStr(CNFTree::State s)
 {
   switch(s) {
-    case CNFTree::StateEnum::Unvisited:
+    case CNFTree::State::Unvisited:
       return "Unvisited";
-    case CNFTree::StateEnum::Working:
+    case CNFTree::State::Working:
       return "Working";
-    case CNFTree::StateEnum::SAT:
+    case CNFTree::State::SAT:
       return "SAT";
-    case CNFTree::StateEnum::UNSAT:
+    case CNFTree::State::UNSAT:
       return "UNSAT";
-    case CNFTree::StateEnum::Solving:
+    case CNFTree::State::Solving:
       return "Solving";
-    case CNFTree::StateEnum::Split:
+    case CNFTree::State::Split:
       return "Split";
-    case CNFTree::StateEnum::Dropped:
+    case CNFTree::State::Dropped:
       return "Dropped";
-    case CNFTree::StateEnum::Unknown:
+    case CNFTree::State::Unknown:
       return "Unknown";
+    case CNFTree::State::UnknownPath:
+      return "Unknown Path";
     default:
       return "Unknown State";
   }
 }
 
 std::ostream&
-operator<<(std::ostream& o, CNFTree::StateEnum s);
+operator<<(std::ostream& o, CNFTree::State s);
 
 template<>
 inline CNFTree::Path

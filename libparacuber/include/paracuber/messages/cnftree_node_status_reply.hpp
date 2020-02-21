@@ -23,8 +23,8 @@ class CNFTreeNodeStatusReply
 
   struct Node
   {
+    int64_t path;
     uint8_t state;
-    int32_t literal;
 
     private:
     friend class cereal::access;
@@ -32,7 +32,7 @@ class CNFTreeNodeStatusReply
     template<class Archive>
     void serialize(Archive& ar)
     {
-      ar(state, literal);
+      ar(path, state);
     }
   };
 
@@ -43,9 +43,9 @@ class CNFTreeNodeStatusReply
   int64_t getCnfId() const { return cnfId; }
   const NodeVector& getNodes() const { return nodes; }
 
-  void addNode(uint8_t state, int32_t literal)
+  void addNode(int64_t path, uint8_t state)
   {
-    nodes.push_back({ state, literal });
+    nodes.push_back({ path, state });
   }
 
   size_t getNodeSize() const { return nodes.size(); }

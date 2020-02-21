@@ -4,6 +4,7 @@
 #include "../include/paracuber/cnf.hpp"
 #include "../include/paracuber/communicator.hpp"
 #include "../include/paracuber/config.hpp"
+#include "../include/paracuber/cuber/registry.hpp"
 #include "../include/paracuber/decision_task.hpp"
 #include "../include/paracuber/runner.hpp"
 #include "../include/paracuber/task.hpp"
@@ -143,7 +144,7 @@ TaskFactory::produceSolveTask(std::unique_ptr<TaskSkeleton> skel)
   std::unique_ptr<CaDiCaLTask> task = std::make_unique<CaDiCaLTask>(*rootTask);
   task->setMode(CaDiCaLTask::Solve);
   task->setCaDiCaLMgr(m_cadicalMgr.get());
-  task->applyPathFromCNFTreeDeferred(skel->p, m_rootCNF->getCNFTree());
+  task->applyCubeFromCuberDeferred(skel->p, m_rootCNF->getCuberRegistry());
   return { std::move(task), skel->originator, skel->getPriority() };
 }
 
@@ -188,7 +189,7 @@ TaskFactory::ExternalTasksSet::readdTasks(TaskFactory* factory)
 {
   assert(factory);
   for(TaskSkeleton skel : tasks) {
-    factory->getRootCNF()->getCNFTree().setState(skel.p, CNFTree::Unvisited);
+    factory->getRootCNF()->getCNFTree().resetNode(skel.p);
     factory->addPath(skel.p, skel.mode, skel.originator);
   }
   size_t count = tasks.size();

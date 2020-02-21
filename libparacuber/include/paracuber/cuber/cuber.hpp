@@ -39,18 +39,12 @@ class Cuber
   };
   using LiteralOccurenceMap = std::vector<LiteralOccurence>;
 
-  /** @brief Generates the next cube on a given path.
-   *
-   * Required method for implementing cubing algorithms.
-   *
-   * @param path The path to the current position to be decided. This position
-   * must be a leaf node.
-   * @param var A reference to a decision variable that is going to be
-   * overwritten in this function.
-   * @return True if cubing was successful, false if no other cube should be
-   * done.
+  /** @brief Checks if a tree split should be generated.
    */
-  virtual bool generateCube(CNFTree::Path path, CNFTree::CubeVar& var) = 0;
+  virtual bool shouldGenerateTreeSplit(CNFTree::Path path) = 0;
+  /** @brief Returns the full cube for a path.
+   */
+  virtual void getCube(CNFTree::Path path, std::vector<int>& literals) = 0;
 
   static inline uint64_t getModuloComponent(CNFTree::Path p)
   {

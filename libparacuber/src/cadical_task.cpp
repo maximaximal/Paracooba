@@ -88,24 +88,27 @@ CaDiCaLTask::copyFromCaDiCaLTask(const CaDiCaLTask& other)
 }
 
 void
-CaDiCaLTask::applyPathFromCNFTreeDeferred(CNFTree::Path p, const CNFTree& tree)
+CaDiCaLTask::applyCubeFromCuberDeferred(CNFTree::Path p, cuber::Cuber& cuber)
 {
   m_name = "Solver Task for Path " + CNFTree::pathToStdString(p);
   m_path = p;
+  m_cuber = &cuber;
 }
 
 void
-CaDiCaLTask::applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree)
+CaDiCaLTask::applyCubeFromCuber(CNFTree::Path p, cuber::Cuber& cuber)
 {
   provideSolver();
 
-  tree.visit(
-    CNFTree::getParent(p),
-    [this](
-      CNFTree::CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
-      m_solver->assume(p);
-      return false;
-    });
+  assert(p != CNFTree::DefaultUninitiatedPath);
+
+  std::vector<int> literals;
+  literals.reserve(CNFTree::getDepth(p));
+  cuber.getCube(p, literals);
+
+  for(int lit : literals) {
+    m_solver->assume(lit);
+  }
 
   // This means, that the task was assigned from a factory, a callback must be
   // given.
@@ -144,7 +147,8 @@ CaDiCaLTask::execute()
     m_mode = Parse;
     readDIMACSFile(m_cnf->getDimacsFile());
   } else if(m_path != CNFTree::DefaultUninitiatedPath) {
-    applyPathFromCNFTree(m_path, m_cnf->getCNFTree());
+    assert(m_cuber);
+    applyCubeFromCuber(m_path, *m_cuber);
   }
 
   TaskResult::Status status;

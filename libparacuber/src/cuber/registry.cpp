@@ -7,10 +7,8 @@
 namespace paracuber {
 namespace cuber {
 Registry::Registry(ConfigPtr config, LogPtr log, CNF& rootCNF)
-  : m_config(config)
-  , m_log(log)
+  : Cuber(config, log, rootCNF)
   , m_logger(log->createLogger("Registry"))
-  , m_rootCNF(rootCNF)
 {}
 Registry::~Registry() {}
 
@@ -57,11 +55,14 @@ Registry::getActiveCuber() const
 }
 
 bool
-Registry::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
+Registry::shouldGenerateTreeSplit(CNFTree::Path path)
 {
-  bool success = getActiveCuber().generateCube(path, var);
-  assert(var != 0 || !success);
-  return success;
+  return getActiveCuber().shouldGenerateTreeSplit(path);
+}
+void
+Registry::getCube(CNFTree::Path path, std::vector<int>& literals)
+{
+  return getActiveCuber().getCube(path, literals);
 }
 }
 }

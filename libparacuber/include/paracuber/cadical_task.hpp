@@ -3,6 +3,7 @@
 
 #include "cnftree.hpp"
 #include "task.hpp"
+#include "cuber/cuber.hpp"
 #include <memory>
 
 namespace CaDiCaL {
@@ -62,11 +63,7 @@ class CaDiCaLTask : public Task
    */
   void copyFromCaDiCaLTask(const CaDiCaLTask& other);
 
-  /** @brief Apply the given path to the internal solver as assumptions.
-   *
-   * Runs once the execute() function is called.
-   */
-  void applyPathFromCNFTreeDeferred(CNFTree::Path p, const CNFTree& tree);
+  void applyCubeFromCuberDeferred(CNFTree::Path p, cuber::Cuber& cuber);
 
   /** @brief Queue parsing a DIMACS file into the internal solver instance.
    *
@@ -109,15 +106,14 @@ class CaDiCaLTask : public Task
   private:
   void provideSolver();
 
-  /** @brief Apply the given path to the internal solver as assumptions.
-   */
-  void applyPathFromCNFTree(CNFTree::Path p, const CNFTree& tree);
+  void applyCubeFromCuber(CNFTree::Path p, cuber::Cuber& cuber);
 
   friend class Terminator;
   std::unique_ptr<Terminator> m_terminator;
   std::shared_ptr<CNF> m_cnf;
   Mode m_mode = ParseAndSolve;
   CNFTree::Path m_path = CNFTree::DefaultUninitiatedPath;
+  cuber::Cuber* m_cuber = nullptr;
   std::vector<int> m_pregeneratedCubes;
 
   std::unique_ptr<CaDiCaL::Solver> m_solver;

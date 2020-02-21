@@ -38,8 +38,7 @@ class API
 
   void injectCNFTreeNode(int64_t handle,
                          CNFTree::Path p,
-                         CNFTree::CubeVar var,
-                         CNFTree::StateEnum state,
+                         CNFTree::State state,
                          int64_t remote);
 
   void injectClusterStatisticsUpdate(ClusterStatistics& stats);
@@ -83,8 +82,7 @@ class API
 
   bool handleInjectedCNFTreeNode(WSData& d,
                                  CNFTree::Path p,
-                                 CNFTree::CubeVar var,
-                                 CNFTree::StateEnum state,
+                                 CNFTree::State state,
                                  int64_t remote);
 
   bool sendError(WSData& d, const std::string& str);

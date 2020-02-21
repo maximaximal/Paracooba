@@ -52,7 +52,7 @@ var cytoscape_main = cytoscape({
 	{
 	    selector: 'node',
 	    style: {
-		'label': 'data(literal)',
+		'label': 'data(state)',
 		'text-valign': 'top',
 		'text-halign': 'left'
 	    }
@@ -209,14 +209,14 @@ class CNFTree {
 
 	if(rootQuery.length == 0) {
 	    // Add root node, it does not exist yet.
-	    this.cy.add({ group: "nodes", data: { id: "root", literal: Math.abs(msg.literal), path: '', remote: msg.remote }});
+	    this.cy.add({ group: "nodes", data: { id: "root", path: '', remote: msg.remote }});
 	    rootQuery = this.cy.$('node[id="root"]');
 	}
 	root = rootQuery[0];
 
 	if(msg.path == "") {
 	    // This is the root node! Apply it to there.
-	    root.data.literal = msg.literal;
+	    root.data.state = msg.state;
 	} else {
 	    let source = msg.path.substr(0, msg.path.length - 1);
 	    if(source == '')
@@ -229,11 +229,11 @@ class CNFTree {
 	    let node = this.cy.$("node[path=\"" + msg.path + "\"]");
 	    if(node.length == 0) {
 		this.cy.add({ group: "nodes", position: pos, data: {
-		    id: msg.path, literal: Math.abs(msg.literal), path: msg.path, remote: msg.remote }});
+		    id: msg.path, path: msg.path, remote: msg.remote }});
 		this.cy.add({ group: "edges", data: {
 		    id: msg.path + "e", source: source, target: msg.path, assignment: assignment }});
 	    } else {
-		node[0].data("literal", Math.abs(msg.literal));
+		node[0].data("state", msg.state);
 	    }
 	}
 	this.cy.layout({ name: 'dagre', options: dagre_options }).run();

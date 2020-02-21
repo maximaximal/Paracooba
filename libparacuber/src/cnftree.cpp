@@ -6,295 +6,201 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <stdexcept>
 
 namespace paracuber {
 const size_t CNFTree::maxPathDepth = sizeof(CNFTree::Path) * 8 - 6;
 
-CNFTree::CNFTree(std::shared_ptr<Config> config, int64_t originCNFId)
-  : m_config(config)
+CNFTree::CNFTree(CNF& rootCNF,
+                 std::shared_ptr<Config> config,
+                 int64_t originCNFId)
+  : m_rootCNF(rootCNF)
+  , m_config(config)
   , m_originCNFId(originCNFId)
 {}
 CNFTree::~CNFTree() {}
 
-bool
-CNFTree::setDecision(Path p, CubeVar decision, int64_t originator)
+CNFTree::State
+CNFTree::getState(Path p) const
 {
+  std::lock_guard lock(m_nodeMapMutex);
   assert(getDepth(p) < maxPathDepth);
+  const Node* node = getNode(p);
+  if(node)
+    return node->state;
+  return State::UnknownPath;
+}
 
-  Node* n = &m_root;
-  uint8_t depth = 0;
-  bool end = false;
+void
+CNFTree::setStateFromLocal(Path p, State state)
+{
+  std::lock_guard lock(m_nodeMapMutex);
+  Node* node = getNode(p);
+  if(!node) {
+    node =
+      m_nodeMap.insert(std::make_pair(cleanupPath(p), std::make_unique<Node>()))
+        .first->second.get();
+  }
 
-  while(!end) {
-    if(depth == getDepth(p)) {
-      // New value needs to be applied.
-      n->decision = decision;
-      if(n->isLeaf()) {
-        // Create left and right branches as leaves. They have invalid decisions
-        // but are required to mark the current node to have a valid decision.
-        n->left = std::make_unique<Node>();
-        n->left->remote = originator;
-        n->right = std::make_unique<Node>();
-        n->right->remote = originator;
-        return true;
+  State stateBefore = node->state;
+  node->state = state;
+
+  if(getDepth(p) == 0 && node->state != stateBefore) {
+    m_rootStateChangedSignal(p, state);
+    return;
+  }
+
+  propagateUpwardsFrom(p);
+}
+void
+CNFTree::setStateFromRemote(Path p, State state, int64_t remoteId)
+{
+  std::lock_guard lock(m_nodeMapMutex);
+  Node* node = getNode(p);
+  assert(node);
+  assert(node->offloadedTo == remoteId);
+  node->state = state;
+
+  propagateUpwardsFrom(p);
+}
+void
+CNFTree::insertNodeFromRemote(Path p, int64_t remoteId)
+{
+  std::lock_guard lock(m_nodeMapMutex);
+  auto [it, inserted] =
+    m_nodeMap.insert(std::make_pair(cleanupPath(p), std::make_unique<Node>()));
+  assert(inserted);
+  Node* node = it->second.get();
+  node->receivedFrom = remoteId;
+}
+void
+CNFTree::offloadNodeToRemote(Path p, int64_t remoteId)
+{
+  std::lock_guard lock(m_nodeMapMutex);
+  Node* node = getNode(p);
+  if(!node) {
+    node =
+      m_nodeMap.insert(std::make_pair(cleanupPath(p), std::make_unique<Node>()))
+        .first->second.get();
+  }
+  assert(!node->isOffloaded());
+
+  node->offloadedTo = remoteId;
+  node->state = Working;
+}
+void
+CNFTree::resetNode(Path p)
+{
+  std::lock_guard lock(m_nodeMapMutex);
+  Node* node = getNode(p);
+  assert(node);
+  assert(node->isOffloaded());
+  node->offloadedTo = 0;
+  node->state = Unvisited;
+}
+
+CNFTree::Path
+CNFTree::getTopmostAvailableParent(Path p) const
+{
+  std::lock_guard lock(m_nodeMapMutex);
+  return getTopmostAvailableParentInner(p);
+}
+CNFTree::Path
+CNFTree::getTopmostAvailableParentInner(Path p) const
+{
+  const Node* n = getNode(p);
+  if(!n) return DefaultUninitiatedPath;
+
+  if(getDepth(p) == 0)
+    return p;
+
+  Path parentPath = getParent(p);
+  const Node* parentNode = getNode(parentPath);
+  if(parentNode->requiresRemoteUpdate()) {
+    return parentPath;
+  }
+  return getTopmostAvailableParentInner(parentPath);
+}
+
+void
+CNFTree::propagateUpwardsFrom(Path p, Path sourcePath)
+{
+  // Starts at a node, but must immediately go to parent if called with invalid
+  // source path. This is only the first call, from functions above.
+  if(sourcePath == DefaultUninitiatedPath) {
+    if(getDepth(p) == 0)
+      return;
+
+    {
+      // The node that has received an update could directly require sending it
+      // to the remote!
+      Node* node = getNode(p);
+      if(node->requiresRemoteUpdate() &&
+         (node->state == SAT || node->state == UNSAT)) {
+        sendNodeResultToSender(p, *node);
       }
-
-      break;
     }
 
-    bool assignment = getAssignment(p, depth + 1);
-    std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
+    sourcePath = p;
+    p = getParent(p);
+  }
 
-    if(!nextPtr) {
-      nextPtr = std::make_unique<Node>();
-      nextPtr->remote = originator;
+  Node* node = getNode(p);
+  if(!node) {
+    assert(getDepth(p) < maxPathDepth);
+    // The node must always exist, except work was directly offloaded.
+    assert(
+      (getNode(sourcePath) && getNode(sourcePath)->requiresRemoteUpdate()));
+    return;
+  }
+
+  bool changed = false;
+
+  const Node* leftChild = getNode(getNextLeftPath(p));
+  const Node* rightChild = getNode(getNextRightPath(p));
+
+  if(leftChild && rightChild) {
+    if(leftChild->state == UNSAT && rightChild->state == UNSAT) {
+      node->state = UNSAT;
+      changed = true;
     }
 
-    n = nextPtr.get();
-    ++depth;
+    if(leftChild->state == SAT || rightChild->state == SAT) {
+      node->state = SAT;
+      changed = true;
+    }
   }
 
-  if(depth == getDepth(p)) {
-    return true;
+  if(changed) {
+    setCNFResult(cleanupPath(p), node->state, sourcePath);
+
+    if(getDepth(p) == 0) {
+      m_rootStateChangedSignal(cleanupPath(p), node->state);
+      return;
+    }
+
+    if(node->requiresRemoteUpdate()) {
+      sendNodeResultToSender(p, *node);
+    } else {
+      propagateUpwardsFrom(getParent(p), p);
+    }
   }
-  return false;
 }
 
-bool
-CNFTree::getState(Path p, State& state) const
+void
+CNFTree::sendNodeResultToSender(Path p, const Node& node)
 {
-  assert(getDepth(p) < maxPathDepth);
-
-  const Node* n = &m_root;
-  uint8_t depth = 0;
-  bool end = false;
-
-  while(!end) {
-    if(!n) {
-      return false;
-    }
-
-    if(depth == getDepth(p)) {
-      state = n->state;
-      return true;
-    }
-
-    bool assignment = getAssignment(p, depth + 1);
-    const std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
-
-    n = nextPtr.get();
-    ++depth;
+  assert(node.requiresRemoteUpdate());
+  try {
+    auto& statNode =
+      m_config->getCommunicator()->getClusterStatistics()->getNode(
+        node.receivedFrom);
+    m_rootCNF.sendResult(statNode.getNetworkedNode(), cleanupPath(p), []() {});
+  } catch(const std::invalid_argument& e) {
+    // This case should be handled by other compute nodes detecting the
+    // offline node. They re-insert missed tasks.
   }
-  return false;
-}
-bool
-CNFTree::getDecision(Path p, CubeVar& var) const
-{
-  assert(getDepth(p) < maxPathDepth);
-
-  const Node* n = &m_root;
-  uint8_t depth = 0;
-  bool end = false;
-
-  while(!end) {
-    if(!n) {
-      return false;
-    }
-
-    if(depth == getDepth(p)) {
-      var = n->decision;
-      return true;
-    }
-
-    bool assignment = getAssignment(p, depth + 1);
-    const std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
-
-    n = nextPtr.get();
-    ++depth;
-  }
-  return false;
-}
-
-bool
-CNFTree::setState(Path p, State state, bool keepLocal)
-{
-  assert(getDepth(p) < maxPathDepth);
-
-  Node *n = &m_root, *sibling = nullptr, *lastNode = nullptr;
-  uint8_t depth = 0;
-  bool end = false;
-
-  while(!end) {
-    if(!n) {
-      return false;
-    }
-
-    if(depth == getDepth(p)) {
-      n->state = state;
-      break;
-    }
-
-    bool assignment = getAssignment(p, depth + 1);
-    std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
-    std::unique_ptr<Node>& siblingPtr = !assignment ? n->left : n->right;
-
-    lastNode = n;
-    sibling = siblingPtr.get();
-    n = nextPtr.get();
-    ++depth;
-  }
-
-  if(getDepth(p) > 0) {
-    assert(sibling);
-
-    switch(state) {
-      case SAT:
-        // A SAT assignment must directly be propagated upwards this depends on
-        // the parent being remote or not. If the parent is remote, send the
-        // result to the parent. If not, keep it directly local.
-        setCNFResult(getParent(p), SAT, p);
-        if(lastNode->isLocal()) {
-          setState(getParent(p), SAT);
-        } else {
-          sendPathToRemote(getParent(p), lastNode);
-        }
-        break;
-      case UNSAT: {
-        if(lastNode->isLocal()) {
-          // This applies to cases 1 and 2.
-          //
-          // Case 1:
-          //   The parent (local) will receive the UNSAT result once both
-          //   sibling nodes set their states.
-          //
-          // Case 2:
-          //   The parent (local) will get the UNSAT result, once the sibling
-          //   sends the result over the network and lands in the sibling
-          //   node. The sibling setState() call then propagates the result
-          //   upwards.
-          if(sibling->state == UNSAT) {
-            // Derive new CNF result for parent path!
-            setCNFResult(getParent(p), UNSAT, p);
-            setState(getParent(p), UNSAT);
-          }
-        } else {
-          // This applies to cases 3 and 4.
-          //
-          // Case 3:
-          //   The parent (remote) must know about this UNSAT result only if the
-          //   sibling is also UNSAT. This node collects the result from both
-          //   siblings and only sends the finished notification once both are
-          //   UNSAT.
-          //
-          // Case 4:
-          //   The parent (remote) must know about this result, as the sibling
-          //   is also remote and will send its result to the mutual parent.
-          //   This means, this result must directly be sent to the parent.
-          if(sibling->isLocal() && n->isLocal()) {
-            // Case 3
-            if(sibling->state == UNSAT) {
-              // Derive new CNF result for parent path!
-              setCNFResult(getParent(p), UNSAT, p);
-              sendPathToRemote(getParent(p), lastNode);
-            } else {
-              // Not handled in this context, once the sibling finishes, this
-              // will come from the other side.
-              std::cerr << "CNFTREE: WAITING FOR SIBLING ON PATH " << pathToStdString(p) << std::endl;
-            }
-          } else {
-            // Case 4
-            sendPathToRemote(p, lastNode);
-          }
-        }
-        break;
-      }
-      default:
-        // No other cases covered.
-        break;
-    }
-  }
-
-  if(depth == getDepth(p)) {
-    return true;
-  }
-  return false;
-}
-
-bool
-CNFTree::setRemote(Path p, int64_t remote)
-{
-  assert(getDepth(p) < maxPathDepth);
-
-  Node* n = &m_root;
-  uint8_t depth = 0;
-  bool end = false;
-
-  while(!end) {
-    if(!n) {
-      return false;
-    }
-
-    if(depth == getDepth(p)) {
-      n->remote = remote;
-      return true;
-    }
-
-    bool assignment = getAssignment(p, depth + 1);
-    std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
-
-    n = nextPtr.get();
-    ++depth;
-  }
-  return false;
-}
-
-bool
-CNFTree::setDecisionAndState(Path p, CubeVar decision, State state)
-{
-  assert(getDepth(p) < maxPathDepth);
-
-  Node* n = &m_root;
-  uint8_t depth = 0;
-  bool end = false;
-
-  while(!end) {
-    if(depth == getDepth(p)) {
-      n->decision = decision;
-      n->state = state;
-      if(n->isLeaf()) {
-        // New value needs to be applied.
-
-        // Create left and right branches as leaves. They have invalid decisions
-        // but are required to mark the current node to have a valid decision.
-        if(!n->left) {
-          n->left = std::make_unique<Node>();
-        }
-        if(!n->right) {
-          n->right = std::make_unique<Node>();
-        }
-        return true;
-      }
-
-      break;
-    }
-
-    bool assignment = getAssignment(p, depth + 1);
-    std::unique_ptr<Node>& nextPtr = assignment ? n->left : n->right;
-
-    if(!nextPtr) {
-      nextPtr = std::make_unique<Node>();
-    }
-
-    n = nextPtr.get();
-    ++depth;
-  }
-
-  if(depth == getDepth(p)) {
-    n->decision = decision;
-    return true;
-  }
-  return false;
 }
 
 void
@@ -325,36 +231,6 @@ CNFTree::pathToStdString(Path p)
           ")");
 }
 
-static void
-dumpTreeNode(std::ostream& o,
-             CNFTree::Path p,
-             const CNFTree::Node& n,
-             bool limitedTreeDump)
-{
-  std::string pStr = "n";
-  pStr += CNFTree::pathToStrNoAlloc(p);
-
-  o << pStr << " [label=\"" << pStr << ":" << n.decision << "(" << n.state
-    << ") @" << n.remote << "\" shape=box];" << std::endl;
-
-  if(CNFTree::getDepth(p) > 0) {
-    std::string parentStr = "n";
-    parentStr += CNFTree::pathToStrNoAlloc(CNFTree::getParent(p));
-    o << parentStr << " -> " << pStr << ";" << std::endl;
-  }
-
-  bool cont = true;
-
-  if(limitedTreeDump) {
-    cont = !(n.state == CNFTree::SAT || n.state == CNFTree::UNSAT);
-  }
-
-  if(cont && n.left)
-    dumpTreeNode(o, CNFTree::getNextLeftPath(p), *n.left, limitedTreeDump);
-  if(cont && n.right)
-    dumpTreeNode(o, CNFTree::getNextRightPath(p), *n.right, limitedTreeDump);
-}
-
 void
 CNFTree::dumpTreeToFile(const std::string_view& file)
 {
@@ -362,44 +238,53 @@ CNFTree::dumpTreeToFile(const std::string_view& file)
   outFile.open(std::string(file));
   if(outFile.is_open()) {
     outFile << "digraph ParaCuberTree {";
-    dumpTreeNode(outFile, 0, m_root, m_config->isLimitedTreeDumpActive());
+    bool limitedDump = m_config->isLimitedTreeDumpActive();
+    std::string rootParentPath = "";
+    std::set<Path> visitedPaths;
+    for(const auto& it : m_nodeMap) {
+      dumpNode(it.first,
+               it.second.get(),
+               visitedPaths,
+               outFile,
+               limitedDump,
+               rootParentPath);
+    }
     outFile << "}" << std::endl;
     outFile.close();
   }
 }
-
-bool
-CNFTree::isLocal(Path p)
+void
+CNFTree::dumpNode(Path p,
+                  const Node* n,
+                  PathSet& visitedPaths,
+                  std::ostream& o,
+                  bool limitedDump,
+                  const std::string& parentPath)
 {
-  bool isLocal = true;
-  visit(
-    p,
-    [&isLocal](CubeVar p, uint8_t depth, CNFTree::State state, int64_t remote) {
-      if(remote != 0) {
-        isLocal = false;
-        return true;
-      }
-      return false;
-    });
-  return isLocal;
-}
+  if(!n || !visitedPaths.insert(cleanupPath(p)).second)
+    return;
 
-bool
-CNFTree::sendPathToRemote(Path p, Node* n)
-{
-  assert(n);
-  std::shared_ptr<CNF> rootCNF = GetRootCNF(m_config.get(), m_originCNFId);
-  assert(rootCNF);
-  try {
-    auto& statNode =
-      m_config->getCommunicator()->getClusterStatistics()->getNode(n->remote);
-    rootCNF->sendResult(statNode.getNetworkedNode(), p, []() {});
-  } catch(const std::invalid_argument& e) {
-    // This case should be handled by other compute nodes detecting the offline
-    // node. They re-insert missed tasks.
-    return false;
+  if(limitedDump && (n->state == SAT || n->state == UNSAT))
+    return;
+
+  std::string pStr = "n";
+  pStr += CNFTree::pathToStrNoAlloc(p);
+  o << pStr << " [label=\"" << pStr << "(" << n->state << ") >"
+    << n->receivedFrom << ">" << n->offloadedTo << "\" shape=box];"
+    << std::endl;
+
+  if(parentPath != "") {
+    o << parentPath << " -> " << pStr << ";" << std::endl;
   }
-  return true;
+
+  {
+    Path left = getNextLeftPath(p);
+    dumpNode(left, getNode(left), visitedPaths, o, limitedDump, pStr);
+  }
+  {
+    Path right = getNextRightPath(p);
+    dumpNode(right, getNode(right), visitedPaths, o, limitedDump, pStr);
+  }
 }
 
 void
@@ -408,8 +293,7 @@ CNFTree::setCNFResult(Path p, State state, Path source)
   std::shared_ptr<CNF> rootCNF = GetRootCNF(m_config.get(), m_originCNFId);
   if(!rootCNF)
     return;
-  rootCNF->insertResult(p, state, source);
-  signalIfRootStateChanged(p, state);
+  rootCNF->insertResult(cleanupPath(p), state, cleanupPath(source));
 }
 
 CNFTree::Path
@@ -426,7 +310,7 @@ CNFTree::strToPath(const char* str, size_t len)
   return p;
 }
 std::ostream&
-operator<<(std::ostream& o, CNFTree::StateEnum s)
+operator<<(std::ostream& o, CNFTree::State s)
 {
   o << CNFTreeStateToStr(s);
   return o;

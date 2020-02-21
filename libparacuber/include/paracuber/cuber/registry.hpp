@@ -4,6 +4,7 @@
 #include "../cnftree.hpp"
 #include "../log.hpp"
 #include "../readywaiter.hpp"
+#include "cuber.hpp"
 #include <memory>
 #include <optional>
 #include <queue>
@@ -17,9 +18,7 @@ class JobInitiator;
 }
 
 namespace cuber {
-class Cuber;
-
-class Registry
+class Registry : public Cuber
 {
   public:
   explicit Registry(ConfigPtr config, LogPtr log, CNF& rootCNF);
@@ -46,12 +45,12 @@ class Registry
 
   ReadyWaiter<AllowanceMap> allowanceMapWaiter;
 
+  virtual bool shouldGenerateTreeSplit(CNFTree::Path path);
+  virtual void getCube(CNFTree::Path path, std::vector<int>& literals);
+
   private:
-  ConfigPtr m_config;
-  LogPtr m_log;
   Logger m_logger;
   CuberVector m_cubers;
-  CNF& m_rootCNF;
 
   AllowanceMap m_allowanceMap;
   Mode m_mode = LiteralFrequency;

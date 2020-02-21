@@ -136,7 +136,7 @@ class CNF
 
   void solverFinishedSlot(const TaskResult& result, CNFTree::Path path);
 
-  void handleFinishedResultReceived(Result& result);
+  void handleFinishedResultReceived(Result& result, int64_t sentFromId);
 
   ResultFoundSignal& getResultFoundSignal() { return m_resultSignal; }
 
@@ -183,7 +183,6 @@ class CNF
 
   std::unique_ptr<cuber::Registry> m_cuberRegistry;
   std::unique_ptr<CNFTree> m_cnfTree;
-  std::shared_mutex m_cnfTreeMutex;
   std::shared_mutex m_resultsMutex;
 
   std::map<CNFTree::Path, Result> m_results;

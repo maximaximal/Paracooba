@@ -40,7 +40,7 @@ CNF::CNF(ConfigPtr config,
   , m_dimacsFile(dimacsFile)
   , m_log(log)
   , m_logger(log->createLogger("CNF"))
-  , m_cnfTree(std::make_unique<CNFTree>(config, originId))
+  , m_cnfTree(std::make_unique<CNFTree>(*this, config, originId))
 {
   if(dimacsFile != "") {
     struct stat statbuf;
@@ -65,7 +65,7 @@ CNF::CNF(const CNF& o)
   , m_dimacsFile(o.m_dimacsFile)
   , m_log(o.m_log)
   , m_logger(o.m_log->createLogger("CNF"))
-  , m_cnfTree(std::make_unique<CNFTree>(o.m_config, o.m_originId))
+  , m_cnfTree(std::make_unique<CNFTree>(*this, o.m_config, o.m_originId))
   , m_jobDescriptionTransmitter(o.m_jobDescriptionTransmitter)
 {
   connectToCNFTreeSignal();
@@ -147,17 +147,9 @@ CNF::sendPath(NetworkedNode* nn, CNFTree::Path p, SendFinishedCB finishedCB)
   assert(CNFTree::getDepth(p) > 0);
   assert(rootTaskReady.isReady());
 
+  m_cnfTree->offloadNodeToRemote(p, nn->getId());
+
   messages::JobPath jp(p);
-
-  {
-    std::unique_lock lock(m_cnfTreeMutex);
-    m_cnfTree->setRemote(p, nn->getId());
-
-    jp.getTrace().reserve(CNFTree::getDepth(p) - 1);
-    m_cnfTree->writePathToLiteralContainer(
-      jp.getTrace(), CNFTree::setDepth(p, CNFTree::getDepth(p) - 1));
-  }
-
   messages::JobDescription jd(m_originId);
   jd.insert(jp);
   m_jobDescriptionTransmitter->transmitJobDescription(
@@ -228,26 +220,18 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
   switch(jd.getKind()) {
     case messages::JobDescription::Kind::Path: {
       const auto jp = jd.getJobPath();
-      std::unique_lock lock(m_cnfTreeMutex);
-      auto trace = jp.getTrace();
-      for(uint8_t i = 0; i < trace.size(); ++i) {
-        int var = FastAbsolute(trace[i]);
-        m_cnfTree->setDecision(
-          CNFTree::setDepth(jp.getPath(), i), var, sentFromID);
-      }
-      // The remote of the direct parent MUST be the one who sent this task!
-      // Else, later submissions could have invalid parents.
-      m_cnfTree->setRemote(CNFTree::getParent(jp.getPath()), sentFromID);
-      m_cnfTree->setDecisionAndState(jp.getPath(), 0, CNFTree::Unvisited);
+      auto p = CNFTree::cleanupPath(jp.getPath());
+      m_cnfTree->insertNodeFromRemote(p, sentFromID);
+
       // Immediately realise task, so the chain of distributing tasks cannot be
       // broken by offloading the task directly after it was inserted into the
       // factory.
       std::unique_ptr<DecisionTask> task =
-        std::make_unique<DecisionTask>(shared_from_this(), jp.getPath());
+        std::make_unique<DecisionTask>(shared_from_this(), p);
       m_config->getCommunicator()->getRunner()->push(
         std::move(task),
         sentFromID,
-        TaskFactory::getTaskPriority(TaskFactory::CubeOrSolve, jp.getPath()),
+        TaskFactory::getTaskPriority(TaskFactory::CubeOrSolve, p),
         m_taskFactory);
       break;
     }
@@ -271,9 +255,10 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
 
       {
         std::unique_lock lock(m_resultsMutex);
-        m_results.insert(std::make_pair(jr.getPath(), std::move(res)));
+        m_results.insert(
+          std::make_pair(CNFTree::cleanupPath(jr.getPath()), std::move(res)));
       }
-      handleFinishedResultReceived(res);
+      handleFinishedResultReceived(res, sentFromID);
       break;
     }
     case messages::JobDescription::Kind::Initiator: {
@@ -304,6 +289,9 @@ CNF::connectToCNFTreeSignal()
 {
   m_cnfTree->getRootStateChangedSignal().connect(
     [this](CNFTree::Path p, CNFTree::State state) {
+      if(state != CNFTree::SAT && state != CNFTree::UNSAT)
+        return;
+
       PARACUBER_LOG(m_logger, Info) << "CNF: Found a result and send to all "
                                        "subscribers of signals! End Result: "
                                     << state;
@@ -345,28 +333,19 @@ CNF::readyToBeStarted() const
 }
 
 void
-CNF::requestInfoGlobally(CNFTree::Path p, int64_t handle)
+CNF::requestInfoGlobally(CNFTree::Path path, int64_t handle)
 {
   Communicator* comm = m_config->getCommunicator();
-  std::shared_lock lock(m_cnfTreeMutex);
   m_cnfTree->visit(
-    p,
-    [this, handle, comm, p](CNFTree::CubeVar var,
-                            uint8_t depth,
-                            CNFTree::State state,
-                            int64_t remote) {
-      if(remote == 0) {
-        if(depth == CNFTree::getDepth(p)) {
-          comm->injectCNFTreeNodeInfo(m_originId,
-                                      handle,
-                                      CNFTree::setDepth(p, depth),
-                                      var,
-                                      state,
-                                      remote);
-          return true;
-        }
-      } else {
-        comm->sendCNFTreeNodeStatusRequest(remote, m_originId, p, handle);
+    m_cnfTree->getTopmostAvailableParent(path),
+    path,
+    [this, handle, comm, path](CNFTree::Path p, const CNFTree::Node& n) {
+      if(CNFTree::getDepth(p) == CNFTree::getDepth(path)) {
+        comm->injectCNFTreeNodeInfo(m_originId, handle, p, n.state, 0);
+        return true;
+      } else if(n.isOffloaded()) {
+        comm->sendCNFTreeNodeStatusRequest(
+          n.offloadedTo, m_originId, p, handle);
         return true;
       }
       return false;
@@ -422,11 +401,10 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
     if(res.state != CNFTree::Unknown) {
       {
         std::unique_lock lock(m_resultsMutex);
-        m_results.insert(std::make_pair(p, std::move(res)));
+        m_results.insert(
+          std::make_pair(CNFTree::cleanupPath(p), std::move(res)));
       }
-
-      std::unique_lock lock(m_cnfTreeMutex);
-      m_cnfTree->setState(p, res.state);
+      m_cnfTree->setStateFromLocal(p, res.state);
     }
   }
 }
@@ -562,7 +540,7 @@ CNF::getRootTask()
 }
 
 void
-CNF::handleFinishedResultReceived(Result& result)
+CNF::handleFinishedResultReceived(Result& result, int64_t sentFromId)
 {
   PARACUBER_LOG(m_logger, Trace)
     << "Finished result received! State: " << result.state << " on path "
@@ -570,13 +548,14 @@ CNF::handleFinishedResultReceived(Result& result)
 
   // Insert result into local CNF Tree. The state change should only stay local,
   // no propagate to the node that sent this change.
-  std::unique_lock lock(m_cnfTreeMutex);
-  m_cnfTree->setState(result.p, result.state, true);
+  m_cnfTree->setStateFromRemote(result.p, result.state, sentFromId);
 }
 
 void
 CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
 {
+  p = CNFTree::cleanupPath(p);
+  source = CNFTree::cleanupPath(source);
   Result res = { 0 };
   res.p = p;
   res.state = state;
@@ -590,8 +569,9 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
   if(CNFTree::getDepth(p) == 0)
     p = 0;
 
+  std::unique_lock unique_lock(m_resultsMutex);
+
   if(source != CNFTree::DefaultUninitiatedPath) {
-    std::unique_lock shared_lock(m_resultsMutex);
     // Reference old result.
     auto resultIt = m_results.find(source);
     if(resultIt == m_results.end()) {
@@ -599,6 +579,7 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
         << "Could not find result reference of " << CNFTree::pathToStrNoAlloc(p)
         << " to " << CNFTree::pathToStrNoAlloc(source)
         << "! Not inserting result.";
+      assert(false);
       return;
     }
     const Result& oldResult = resultIt->second;
@@ -608,7 +589,6 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
     res.decodedAssignment = oldResult.decodedAssignment;
   }
 
-  std::unique_lock unique_lock(m_resultsMutex);
   m_results.insert(std::make_pair(p, std::move(res)));
 }
 

@@ -436,15 +436,14 @@ class Communicator::UDPServer
                                            cnfTreeNodeStatusRequest.getPath(),
                                            cnfId);
 
-    cnf->getCNFTree().visit(cnfTreeNodeStatusRequest.getPath(),
-                            [this, path, &reply](CNFTree::CubeVar var,
-                                                 uint8_t depth,
-                                                 CNFTree::State state,
-                                                 int64_t remote) {
-                              var = FastAbsolute(var);
-                              reply.addNode(state, var);
-                              return false;
-                            });
+    auto& cnfTree = cnf->getCNFTree();
+    cnfTree.visit(
+      cnfTree.getTopmostAvailableParent(cnfTreeNodeStatusRequest.getPath()),
+      cnfTreeNodeStatusRequest.getPath(),
+      [this, path, &reply](CNFTree::Path p, const CNFTree::Node& n) {
+        reply.addNode(p, n.state);
+        return false;
+      });
 
     if(reply.getNodeSize() != CNFTree::getDepth(path) + 1) {
       // Not enough local information for a reply.
@@ -488,14 +487,14 @@ class Communicator::UDPServer
       // Only the very last entry is required for viewing. The rest can be used
       // for load balancing purposes.
 
-      auto lastEntry = nodes.begin() + (nodes.size() - 1);
-      m_communicator->injectCNFTreeNodeInfo(
-        cnfId,
-        handle,
-        path,
-        lastEntry->literal,
-        static_cast<CNFTree::StateEnum>(lastEntry->state),
-        originId);
+      for(auto& nodeIt : nodes) {
+        m_communicator->injectCNFTreeNodeInfo(
+          cnfId,
+          handle,
+          nodeIt.path,
+          static_cast<CNFTree::State>(nodeIt.state),
+          originId);
+      }
     }
   }
 
@@ -1332,8 +1331,7 @@ void
 Communicator::injectCNFTreeNodeInfo(int64_t cnfId,
                                     int64_t handle,
                                     CNFTree::Path p,
-                                    CNFTree::CubeVar v,
-                                    CNFTree::StateEnum state,
+                                    CNFTree::State state,
                                     int64_t remote)
 {
 #ifdef ENABLE_INTERNAL_WEBSERVER
@@ -1343,7 +1341,7 @@ Communicator::injectCNFTreeNodeInfo(int64_t cnfId,
       << "Cannot inject CNFTreeNodeInfo into uninitialised webserver::API!";
     return;
   }
-  api->injectCNFTreeNode(handle, p, v, state, remote);
+  api->injectCNFTreeNode(handle, p, state, remote);
 #endif
 }
 

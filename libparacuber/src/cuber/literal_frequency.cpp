@@ -75,7 +75,7 @@ LiteralFrequency::init()
 }
 
 bool
-LiteralFrequency::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
+LiteralFrequency::shouldGenerateTreeSplit(CNFTree::Path path)
 {
   assert(m_literalFrequency);
   assert(m_literalFrequency->size() > 0);
@@ -101,8 +101,30 @@ LiteralFrequency::generateCube(CNFTree::Path path, CNFTree::CubeVar& var)
     return false;
   }
 
-  var = (*m_literalFrequency)[dec];
   return true;
+}
+
+void
+LiteralFrequency::getCube(CNFTree::Path path, std::vector<int>& literals)
+{
+  assert(m_literalFrequency);
+  assert(m_literalFrequency->size() > 0);
+
+  literals.clear();
+  literals.reserve(CNFTree::getDepth(path));
+
+  for(size_t depth = 1; depth <= CNFTree::getDepth(path); ++depth) {
+    CNFTree::Path currPath = CNFTree::setDepth(path, depth);
+
+    auto additionComponent = getAdditionComponent(currPath);
+    auto moduloComponent = getModuloComponent(currPath);
+    auto dec = additionComponent + (moduloComponent - 1);
+
+    auto lit = (*m_literalFrequency)[dec];
+    assert(lit != 0);
+
+    literals.push_back(lit);
+  }
 }
 }
 }

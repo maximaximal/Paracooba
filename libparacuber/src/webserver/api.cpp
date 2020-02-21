@@ -28,8 +28,7 @@ API::~API() {}
 void
 API::injectCNFTreeNode(int64_t handle,
                        CNFTree::Path p,
-                       CNFTree::CubeVar var,
-                       CNFTree::StateEnum state,
+                       CNFTree::State state,
                        int64_t remote)
 {
   auto socket = reinterpret_cast<const boost::asio::ip::tcp::socket*>(handle);
@@ -42,7 +41,7 @@ API::injectCNFTreeNode(int64_t handle,
   WSData& data = *it->second;
 
   conditionalEraseConn(socket,
-                       handleInjectedCNFTreeNode(data, p, var, state, remote));
+                       handleInjectedCNFTreeNode(data, p, state, remote));
 }
 void
 API::injectClusterStatisticsUpdate(ClusterStatistics& stats)
@@ -212,8 +211,7 @@ API::sendError(WSData& d, const std::string& str)
 bool
 API::handleInjectedCNFTreeNode(WSData& d,
                                CNFTree::Path p,
-                               CNFTree::CubeVar var,
-                               CNFTree::StateEnum state,
+                               CNFTree::State state,
                                int64_t remote)
 {
   char strPath[CNFTree::maxPathDepth + 1];
@@ -222,7 +220,6 @@ API::handleInjectedCNFTreeNode(WSData& d,
   a.clear();
   a.put("type", "cnftree-update");
   a.put("path", std::string(strPath, CNFTree::getDepth(p)));
-  a.put("literal", var);
   a.put("state", CNFTreeStateToStr(state));
   a.put("remote", std::to_string(remote));
   return d.cb(d.session, a);
