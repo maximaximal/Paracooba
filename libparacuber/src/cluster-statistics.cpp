@@ -312,7 +312,8 @@ ClusterStatistics::rebalance()
   } else {
     assert(m_config);
     TaskFactory* taskFactory = m_config->getClient()->getTaskFactory();
-    assert(taskFactory);
+    if(!taskFactory) 
+      return;
     rebalance(m_config->getInt64(Config::Id), *taskFactory);
   }
 }
