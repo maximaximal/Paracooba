@@ -305,6 +305,8 @@ class ClusterStatistics
 
   void initLocalNode();
 
+  using HandledNodesSet = std::set<Node*>;
+
   const ClusterStatistics::Node& getNode(int64_t id) const;
   ClusterStatistics::Node& getNode(int64_t id);
 
@@ -333,13 +335,6 @@ class ClusterStatistics
   ConstSharedLockView<NodeMap> getNodeMap() const;
   UniqueLockView<NodeMap&> getUniqueNodeMap();
 
-  /** @brief Determine if the next decision should be offloaded to another
-   * compute node.
-   *
-   * @returns nullptr if the decision is better done locally, remote node
-   * otherwise.
-   */
-  Node* getTargetComputeNodeForNewDecision(CNFTree::Path p, int64_t originator);
   bool clearChanged();
 
   Node& getThisNode() { return *m_thisNode; }
@@ -351,7 +346,9 @@ class ClusterStatistics
 
   bool hasNode(int64_t id);
 
-  Node* getFittestNodeForNewWork(int originator, int64_t rootCNFIDID = 0);
+  Node* getFittestNodeForNewWork(int originator,
+                                 const HandledNodesSet& handledNodes,
+                                 int64_t rootCNFIDID = 0);
 
   /** @brief Start rebalancing of work to other nodes.
    *
