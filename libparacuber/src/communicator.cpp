@@ -651,17 +651,18 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   TCPClient(Communicator* comm,
             LogPtr log,
             boost::asio::io_service& ioService,
-            boost::asio::ip::tcp::endpoint endpoint,
+            NetworkedNode* nn,
             TCPMode mode,
             std::shared_ptr<CNF> cnf = nullptr)
     : m_comm(comm)
     , m_cnf(cnf)
     , m_mode(mode)
-    , m_endpoint(endpoint)
+    , m_nn(nn)
+    , m_endpoint(nn->getRemoteTcpEndpoint())
     , m_socket(ioService)
     , m_log(log)
     , m_logger(log->createLoggerMT("TCPClient",
-                                   "(0)|" + endpoint.address().to_string()))
+                                   "(0)|" + m_endpoint.address().to_string()))
   {}
   virtual ~TCPClient()
   {
@@ -695,6 +696,15 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
       PARACUBER_LOG(m_logger, LocalError)
         << "Could not connect to remote endpoint " << m_endpoint
         << " over TCP! Error: " << err;
+
+      if(m_jobDescription.has_value()) {
+        PARACUBER_LOG(m_logger, Trace)
+          << "This client should transmit a JobDescription, so the client will "
+             "be started again.";
+        auto jd = std::move(m_jobDescription.value());
+        m_jobDescription.reset();
+        m_comm->transmitJobDescription(std::move(jd), m_nn, m_finishedCB);
+      }
       return;
     }
 
@@ -747,7 +757,8 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
 
     // Let the sending be handled by the CNF itself.
     m_cnf->send(&m_socket, [this, ptr]() {
-      // Finished sending CNF!
+      // Finished sending CNF! This should never result in an error and if it
+      // would, the remote would never be initialised.
     });
   }
 
@@ -791,7 +802,11 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
       m_finishedCB();
     } else {
       PARACUBER_LOG(m_logger, LocalError)
-        << "Transmission failed with error: " << error.message();
+        << "Transmission failed with error: " << error.message()
+        << " - Restarting TCPClient with same body.";
+      auto jd = std::move(m_jobDescription.value());
+      m_jobDescription.reset();
+      m_comm->transmitJobDescription(std::move(jd), m_nn, m_finishedCB);
     }
   }
 
@@ -802,6 +817,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   Communicator* m_comm;
   std::shared_ptr<CNF> m_cnf;
   boost::asio::ip::tcp::socket m_socket;
+  NetworkedNode* m_nn;
   boost::asio::ip::tcp::endpoint m_endpoint;
   TCPMode m_mode;
   std::optional<messages::JobDescription> m_jobDescription;
@@ -1271,12 +1287,8 @@ Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn)
   assert(nn);
   // This indirection is required to make this work from worker threads.
   m_ioService.post([this, cnf, nn]() {
-    auto client = std::make_shared<TCPClient>(this,
-                                              m_log,
-                                              m_ioService,
-                                              nn->getRemoteTcpEndpoint(),
-                                              TCPMode::TransmitCNF,
-                                              cnf);
+    auto client = std::make_shared<TCPClient>(
+      this, m_log, m_ioService, nn, TCPMode::TransmitCNF, cnf);
     client->connect();
   });
 
@@ -1290,11 +1302,8 @@ Communicator::transmitJobDescription(messages::JobDescription&& jd,
                                      std::function<void()> sendFinishedCB)
 {
   m_ioService.post([this, nn, jd{ std::move(jd) }, sendFinishedCB]() mutable {
-    auto client = std::make_shared<TCPClient>(this,
-                                              m_log,
-                                              m_ioService,
-                                              nn->getRemoteTcpEndpoint(),
-                                              TCPMode::TransmitJobDescription);
+    auto client = std::make_shared<TCPClient>(
+      this, m_log, m_ioService, nn, TCPMode::TransmitJobDescription);
     client->insertJobDescription(std::move(jd), sendFinishedCB);
     client->connect();
   });
