@@ -54,6 +54,8 @@ CNFTree::setStateFromLocal(Path p, State state)
     return;
   }
 
+  m_rootCNF.insertResult(cleanupPath(p), state, DefaultUninitiatedPath);
+
   propagateUpwardsFrom(p);
 }
 void
@@ -231,6 +233,8 @@ CNFTree::pathToStr(Path p, char* str)
 const char*
 CNFTree::pathToStrNoAlloc(Path p)
 {
+  if(p == DefaultUninitiatedPath)
+    return "(nowhere)";
   if(getDepth(p) > maxPathDepth)
     return "INVALID PATH";
   static thread_local char arr[maxPathDepth];

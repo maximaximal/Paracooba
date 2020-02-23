@@ -30,13 +30,15 @@ class JobInitiator
   JobInitiator() {}
   ~JobInitiator() {}
 
+  struct PregeneratedCubesTag
+  {};
+
   using AllowanceMap = std::vector<int>;
-  using CubeMap = std::map<uint64_t, int>;
-  using DataVariant = std::variant<AllowanceMap, CubeMap>;
+  using DataVariant = std::variant<AllowanceMap, PregeneratedCubesTag>;
 
   CubingKind getCubingKind() const
   {
-    if(std::holds_alternative<CubeMap>(body))
+    if(std::holds_alternative<PregeneratedCubesTag>(body))
       return PregeneratedCubes;
     if(std::holds_alternative<AllowanceMap>(body))
       return LiteralFrequency;
@@ -59,37 +61,8 @@ class JobInitiator
     assert(getCubingKind() == LiteralFrequency);
     return std::get<AllowanceMap>(body);
   }
-  CubeMap& initCubeMap()
-  {
-    body = std::move(CubeMap());
-    return getCubeMap();
-  }
-  CubeMap& getCubeMap()
-  {
-    assert(getCubingKind() == PregeneratedCubes);
-    return std::get<CubeMap>(body);
-  }
-  const CubeMap& getCubeMap() const
-  {
-    assert(getCubingKind() == PregeneratedCubes);
-    return std::get<CubeMap>(body);
-  }
-  size_t getCubeCount() const { return getCubeMap().size(); }
 
-  /** @brief Create cube map for
-   * CubingKind::PregeneratedCubes mode.
-   *
-   * Can be used with getDecisionOnPath().
-   * */
-  size_t realise(const std::vector<int>& flatCubeArr);
-
-  int getDecisionOnPath(int64_t path) const
-  {
-    assert(getCubingKind() == PregeneratedCubes);
-    auto map = getCubeMap();
-    auto it = map.find(path);
-    return it == map.end() ? 0 : it->second;
-  }
+  void initAsPregenCubes() { body = PregeneratedCubesTag{}; }
 
   std::string tagline() const;
 
