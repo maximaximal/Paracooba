@@ -31,7 +31,6 @@ JobInitiator::realise(const std::vector<int>& flatCubeArr)
       // Inside cube.
 
       cubeVar = FastAbsolute(var);
-      assert(cubeVar != 0);
 
       auto [currVar, _] =
         map.insert(std::make_pair(CNFTree::cleanupPath(p), cubeVar));
