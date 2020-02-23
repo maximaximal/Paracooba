@@ -32,7 +32,7 @@ Pregenerated::getCube(CNFTree::Path path, std::vector<int>& literals)
   literals.clear();
   literals.reserve(CNFTree::getDepth(path));
 
-  for(size_t depth = 1; depth < CNFTree::getDepth(path); ++depth) {
+  for(size_t depth = 0; depth < CNFTree::getDepth(path); ++depth) {
     CNFTree::Path currPath = CNFTree::setDepth(path, depth);
     auto lit = m_ji.getDecisionOnPath(CNFTree::cleanupPath(currPath));
     assert(lit != 0);
