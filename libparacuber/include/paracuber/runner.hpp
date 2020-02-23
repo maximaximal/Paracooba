@@ -110,6 +110,8 @@ class Runner
     }
   };
 
+  size_t getNumberOfCurrentlyOffloadedJobs() const;
+
   std::unique_ptr<PriorityQueueLockSemanticsUniquePtr<QueueEntry>> m_taskQueue;
 
   std::condition_variable m_newTasks;
@@ -121,7 +123,7 @@ class Runner
   std::vector<Task*> m_currentlyRunningTasks;
   std::atomic<uint32_t> m_numberOfRunningTasks;
 
-  std::shared_mutex m_taskFactoriesMutex;
+  mutable std::shared_mutex m_taskFactoriesMutex;
   TaskFactoryVector m_taskFactories;
 
   boost::asio::high_resolution_timer m_autoShutdownTimer;

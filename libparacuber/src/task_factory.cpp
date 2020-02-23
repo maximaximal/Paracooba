@@ -148,6 +148,18 @@ TaskFactory::produceSolveTask(std::unique_ptr<TaskSkeleton> skel)
   return { std::move(task), skel->originator, skel->getPriority() };
 }
 
+size_t
+TaskFactory::getNumberOfOffloadedTasks() const
+{
+  std::shared_lock lock(m_externalTasksSetMapMutex);
+  size_t size = 0;
+  for(const auto& it : m_externalTasksSetMap) {
+    const ExternalTasksSet& exSet = it.second;
+    size += exSet.tasks.size();
+  }
+  return size;
+}
+
 void
 TaskFactory::addExternallyProcessingTask(int64_t originator,
                                          CNFTree::Path p,

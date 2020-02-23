@@ -9,7 +9,7 @@
 #include "log.hpp"
 #include "paracuber/priority_queue_lock_semantics.hpp"
 #include <atomic>
-#include <mutex>
+#include <shared_mutex>
 
 namespace paracuber {
 class Task;
@@ -101,6 +101,8 @@ class TaskFactory
   ProducedTask produceCubeOrSolveTask(std::unique_ptr<TaskSkeleton> skel);
   ProducedTask produceSolveTask(std::unique_ptr<TaskSkeleton> skel);
 
+  size_t getNumberOfOffloadedTasks() const;
+
   CaDiCaLMgr* getCaDiCaLMgr()
   {
     assert(m_cadicalMgr);
@@ -127,7 +129,7 @@ class TaskFactory
   std::shared_ptr<CNF> m_rootCNF;
   std::unique_ptr<CaDiCaLMgr> m_cadicalMgr;
 
-  std::mutex m_externalTasksSetMapMutex;
+  mutable std::shared_mutex m_externalTasksSetMapMutex;
 };
 }
 
