@@ -40,7 +40,7 @@ CNF::CNF(ConfigPtr config,
   , m_dimacsFile(dimacsFile)
   , m_log(log)
   , m_logger(log->createLogger("CNF"))
-  , m_cnfTree(std::make_unique<CNFTree>(*this, config, originId))
+  , m_cnfTree(std::make_unique<CNFTree>(m_log, *this, config, originId))
 {
   if(dimacsFile != "") {
     struct stat statbuf;
@@ -65,7 +65,7 @@ CNF::CNF(const CNF& o)
   , m_dimacsFile(o.m_dimacsFile)
   , m_log(o.m_log)
   , m_logger(o.m_log->createLogger("CNF"))
-  , m_cnfTree(std::make_unique<CNFTree>(*this, o.m_config, o.m_originId))
+  , m_cnfTree(std::make_unique<CNFTree>(m_log, *this, o.m_config, o.m_originId))
   , m_jobDescriptionTransmitter(o.m_jobDescriptionTransmitter)
 {
   connectToCNFTreeSignal();

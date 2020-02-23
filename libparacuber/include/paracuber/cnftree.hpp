@@ -12,6 +12,8 @@
 #include <mutex>
 #include <set>
 
+#include "log.hpp"
+
 namespace paracuber {
 class Config;
 class CNF;
@@ -21,7 +23,8 @@ class CNF;
 class CNFTree
 {
   public:
-  explicit CNFTree(CNF& rootCNF,
+  explicit CNFTree(LogPtr log,
+                   CNF& rootCNF,
                    std::shared_ptr<Config> config,
                    int64_t originCNFId);
   ~CNFTree();
@@ -250,6 +253,7 @@ class CNFTree
   int64_t m_originCNFId;
   StateChangedSignal m_rootStateChangedSignal;
   NodeMap m_nodeMap;
+  LoggerMT m_logger;
   mutable std::mutex m_nodeMapMutex;
 
   void setCNFResult(Path p, State state, Path source);
