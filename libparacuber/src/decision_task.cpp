@@ -34,7 +34,17 @@ DecisionTask::execute()
   auto clusterStatistics = m_config->getCommunicator()->getClusterStatistics();
 
   CNFTree::State state = cnfTree.getState(m_path);
-  assert((state == CNFTree::Unvisited || state == CNFTree::UnknownPath));
+  if(state != CNFTree::Unvisited && state != CNFTree::UnknownPath) {
+    PARACUBER_LOG((*m_logger), GlobalError)
+      << "Processing decision task on path "
+      << CNFTree::pathToStrNoAlloc(m_path)
+      << " that is not completely fresh and was visited before! State of node "
+         "on this path: "
+      << state
+      << ". This task ends immediately without further action and returns a "
+         "TaskResult::PathAlreadyVisitedError result.";
+    return std::make_unique<TaskResult>(TaskResult::PathAlreadyVisitedError);
+  }
 
   cnfTree.setStateFromLocal(m_path, CNFTree::Working);
 

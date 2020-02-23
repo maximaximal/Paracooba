@@ -26,6 +26,7 @@ class TaskResult
     CreatedCaDiCaLTask,
     MissingInputs,
     ParsingError,
+    PathAlreadyVisitedError,
 
     Satisfiable,
     Unsolved,
