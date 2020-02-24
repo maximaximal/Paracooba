@@ -218,7 +218,8 @@ Runner::conditionallySetAutoShutdownTimer()
 {
   int32_t seconds = m_config->getInt32(Config::AutoShutdown);
   if(seconds < 0 || m_numberOfRunningTasks > 0 || m_autoShutdownArmed ||
-     m_taskQueue->size() > 0 || getNumberOfCurrentlyOffloadedJobs() > 0)
+     m_taskQueue->size() > 0 || getNumberOfCurrentlyOffloadedJobs() > 0 ||
+     !m_config->isDaemonMode())
     return;
 
   std::unique_lock lock(m_autoShutdownTimerMutex);
