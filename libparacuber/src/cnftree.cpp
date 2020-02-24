@@ -12,12 +12,15 @@
 namespace paracuber {
 const size_t CNFTree::maxPathDepth = sizeof(CNFTree::Path) * 8 - 6;
 
-CNFTree::CNFTree(CNF& rootCNF,
+CNFTree::CNFTree(LogPtr log,
+                 CNF& rootCNF,
                  std::shared_ptr<Config> config,
                  int64_t originCNFId)
   : m_rootCNF(rootCNF)
   , m_config(config)
   , m_originCNFId(originCNFId)
+  , m_logger(log->createLoggerMT(
+      ("CNFTree of formula " + std::to_string(rootCNF.getOriginId()))))
 {}
 CNFTree::~CNFTree() {}
 
@@ -51,6 +54,8 @@ CNFTree::setStateFromLocal(Path p, State state)
     return;
   }
 
+  m_rootCNF.insertResult(cleanupPath(p), state, DefaultUninitiatedPath);
+
   propagateUpwardsFrom(p);
 }
 void
@@ -70,8 +75,20 @@ CNFTree::insertNodeFromRemote(Path p, int64_t remoteId)
   std::lock_guard lock(m_nodeMapMutex);
   auto [it, inserted] =
     m_nodeMap.insert(std::make_pair(cleanupPath(p), std::make_unique<Node>()));
-  assert(inserted);
   Node* node = it->second.get();
+  if(!inserted) {
+    // Node is offloaded again to the same remote node. This can basically only
+    // happen if a node went offline, sent a status update, went online again
+    // immediately and received the same job as before. If this event is just
+    // silently ignored and the receivedFrom field replaced, the result will
+    // still be propagated upwards correctly.
+    PARACUBER_LOG(m_logger, GlobalWarning)
+      << "Receive path " << pathToStrNoAlloc(p)
+      << " that was inserted previously from remote " << node->receivedFrom
+      << " again! This time from " << remoteId
+      << ". Setting receivedFrom to new remote and ignore this network-related "
+         "error.";
+  }
   node->receivedFrom = remoteId;
 }
 void
@@ -110,7 +127,8 @@ CNFTree::Path
 CNFTree::getTopmostAvailableParentInner(Path p) const
 {
   const Node* n = getNode(p);
-  if(!n) return DefaultUninitiatedPath;
+  if(!n)
+    return DefaultUninitiatedPath;
 
   if(getDepth(p) == 0)
     return p;
@@ -215,6 +233,8 @@ CNFTree::pathToStr(Path p, char* str)
 const char*
 CNFTree::pathToStrNoAlloc(Path p)
 {
+  if(p == DefaultUninitiatedPath)
+    return "(nowhere)";
   if(getDepth(p) > maxPathDepth)
     return "INVALID PATH";
   static thread_local char arr[maxPathDepth];

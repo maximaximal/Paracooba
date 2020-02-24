@@ -37,6 +37,9 @@ Registry::init(Mode mode, const messages::JobInitiator* ji)
       assert(ji);
       auto pregeneratedCubesPtr =
         std::make_unique<cuber::Pregenerated>(m_config, m_log, m_rootCNF, *ji);
+      if(!pregeneratedCubesPtr->init()) {
+        return false;
+      }
       m_jobInitiator = &pregeneratedCubesPtr->getJobInitiator();
       m_cubers.push_back(std::move(pregeneratedCubesPtr));
       break;
@@ -59,7 +62,7 @@ Registry::shouldGenerateTreeSplit(CNFTree::Path path)
 {
   return getActiveCuber().shouldGenerateTreeSplit(path);
 }
-void
+bool
 Registry::getCube(CNFTree::Path path, std::vector<int>& literals)
 {
   return getActiveCuber().getCube(path, literals);

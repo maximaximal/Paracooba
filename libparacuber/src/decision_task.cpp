@@ -34,7 +34,17 @@ DecisionTask::execute()
   auto clusterStatistics = m_config->getCommunicator()->getClusterStatistics();
 
   CNFTree::State state = cnfTree.getState(m_path);
-  assert((state == CNFTree::Unvisited || state == CNFTree::UnknownPath));
+  if(state != CNFTree::Unvisited && state != CNFTree::UnknownPath) {
+    PARACUBER_LOG((*m_logger), GlobalError)
+      << "Processing decision task on path "
+      << CNFTree::pathToStrNoAlloc(m_path)
+      << " that is not completely fresh and was visited before! State of node "
+         "on this path: "
+      << state
+      << ". This task ends immediately without further action and returns a "
+         "TaskResult::PathAlreadyVisitedError result.";
+    return std::make_unique<TaskResult>(TaskResult::PathAlreadyVisitedError);
+  }
 
   cnfTree.setStateFromLocal(m_path, CNFTree::Working);
 
@@ -43,17 +53,28 @@ DecisionTask::execute()
     // available and the generated decision must be set into the path.
     cnfTree.setStateFromLocal(m_path, CNFTree::Split);
 
+    auto& cuberRegistry = m_rootCNF->getCuberRegistry();
+    std::vector<int> testLiterals;
+
     // Both paths are added to the factory, the rebalance mechanism takes care
     // of distribution to other compute nodes.
     {
       // LEFT
       CNFTree::Path p = CNFTree::getNextLeftPath(m_path);
-      m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
+      if(cuberRegistry.getCube(p, testLiterals)) {
+        m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
+      } else {
+        cnfTree.setStateFromLocal(p, CNFTree::UNSAT);
+      }
     }
     {
       // RIGHT
       CNFTree::Path p = CNFTree::getNextRightPath(m_path);
-      m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
+      if(cuberRegistry.getCube(p, testLiterals)) {
+        m_factory->addPath(p, TaskFactory::CubeOrSolve, m_originator);
+      } else {
+        cnfTree.setStateFromLocal(p, CNFTree::UNSAT);
+      }
     }
 
     return std::make_unique<TaskResult>(TaskResult::DecisionMade);

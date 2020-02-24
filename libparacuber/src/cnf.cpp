@@ -40,7 +40,7 @@ CNF::CNF(ConfigPtr config,
   , m_dimacsFile(dimacsFile)
   , m_log(log)
   , m_logger(log->createLogger("CNF"))
-  , m_cnfTree(std::make_unique<CNFTree>(*this, config, originId))
+  , m_cnfTree(std::make_unique<CNFTree>(m_log, *this, config, originId))
 {
   if(dimacsFile != "") {
     struct stat statbuf;
@@ -65,7 +65,7 @@ CNF::CNF(const CNF& o)
   , m_dimacsFile(o.m_dimacsFile)
   , m_log(o.m_log)
   , m_logger(o.m_log->createLogger("CNF"))
-  , m_cnfTree(std::make_unique<CNFTree>(*this, o.m_config, o.m_originId))
+  , m_cnfTree(std::make_unique<CNFTree>(m_log, *this, o.m_config, o.m_originId))
   , m_jobDescriptionTransmitter(o.m_jobDescriptionTransmitter)
 {
   connectToCNFTreeSignal();
@@ -262,23 +262,24 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
       break;
     }
     case messages::JobDescription::Kind::Initiator: {
-      const auto ji = jd.getJobInitiator();
+      rootTaskReady.callWhenReady(
+        [this, jd{ std::move(jd) }](CaDiCaLTask& ptr) {
+          const auto ji = jd.getJobInitiator();
 
-      if(!m_cuberRegistry)
-        m_cuberRegistry =
-          std::make_unique<cuber::Registry>(m_config, m_log, *this);
+          if(!m_cuberRegistry)
+            m_cuberRegistry =
+              std::make_unique<cuber::Registry>(m_config, m_log, *this);
 
-      switch(ji.getCubingKind()) {
-        case messages::JobInitiator::PregeneratedCubes:
-          m_cuberRegistry->init(cuber::Registry::PregeneratedCubes, &ji);
-          break;
-        case messages::JobInitiator::LiteralFrequency:
-          m_cuberRegistry->init(cuber::Registry::LiteralFrequency, &ji);
-          m_cuberRegistry->getAllowanceMap() = ji.getAllowanceMap();
-          break;
-      }
-
-      rootTaskReady.setReady(m_rootTask.get());
+          switch(ji.getCubingKind()) {
+            case messages::JobInitiator::PregeneratedCubes:
+              m_cuberRegistry->init(cuber::Registry::PregeneratedCubes, &ji);
+              break;
+            case messages::JobInitiator::LiteralFrequency:
+              m_cuberRegistry->init(cuber::Registry::LiteralFrequency, &ji);
+              m_cuberRegistry->getAllowanceMap() = ji.getAllowanceMap();
+              break;
+          }
+        });
       break;
     }
   }
@@ -506,13 +507,7 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
     if(pregenCubes.size() > 0) {
-      size_t realised = ji.realise(pregenCubes);
-      if(realised != 0) {
-        PARACUBER_LOG(m_logger, LocalError)
-          << "Could not parse provided cubes into binary tree format! Error at "
-             "cube "
-          << realised;
-      }
+      ji.initAsPregenCubes();
     }
 
     // The cuber registry may already have been created if this is a daemon
@@ -529,9 +524,7 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     }
   }
 
-  if(!m_config->isDaemonMode()) {
-    rootTaskReady.setReady(m_rootTask.get());
-  }
+  rootTaskReady.setReady(m_rootTask.get());
 }
 CaDiCaLTask*
 CNF::getRootTask()
@@ -555,23 +548,32 @@ void
 CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
 {
   p = CNFTree::cleanupPath(p);
-  source = CNFTree::cleanupPath(source);
-  Result res = { 0 };
-  res.p = p;
-  res.state = state;
 
-  PARACUBER_LOG(m_logger, Trace)
-    << "Insert result " << state << " for path " << CNFTree::pathToStrNoAlloc(p)
-    << " from source path " << CNFTree::pathToStrNoAlloc(source);
+  std::unique_lock unique_lock(m_resultsMutex);
+
+  Result* res = [this, p, source, state]() {
+    auto resIt = m_results.find(p);
+    if(resIt != m_results.end()) {
+      return &resIt->second;
+    } else {
+      PARACUBER_LOG(m_logger, Trace)
+        << "Insert result " << state << " for path "
+        << CNFTree::pathToStrNoAlloc(p) << " from source path "
+        << CNFTree::pathToStrNoAlloc(source);
+      return &m_results.insert(std::make_pair(p, Result{ 0 })).first->second;
+    }
+  }();
+
+  res->p = p;
+  res->state = state;
 
   // Assign the path directly to 0 to make referencing it easier, if this is the
   // root path.
   if(CNFTree::getDepth(p) == 0)
     p = 0;
 
-  std::unique_lock unique_lock(m_resultsMutex);
-
   if(source != CNFTree::DefaultUninitiatedPath) {
+    source = CNFTree::cleanupPath(source);
     // Reference old result.
     auto resultIt = m_results.find(source);
     if(resultIt == m_results.end()) {
@@ -583,13 +585,11 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
       return;
     }
     const Result& oldResult = resultIt->second;
-    res.task = oldResult.task;
-    res.size = oldResult.size;
-    res.encodedAssignment = oldResult.encodedAssignment;
-    res.decodedAssignment = oldResult.decodedAssignment;
+    res->task = oldResult.task;
+    res->size = oldResult.size;
+    res->encodedAssignment = oldResult.encodedAssignment;
+    res->decodedAssignment = oldResult.decodedAssignment;
   }
-
-  m_results.insert(std::make_pair(p, std::move(res)));
 }
 
 void

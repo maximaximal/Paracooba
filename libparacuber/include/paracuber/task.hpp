@@ -11,6 +11,10 @@ class Communicator;
 class Config;
 class TaskFactory;
 
+namespace cuber {
+class Cuber;
+}
+
 /** @brief Environment for tasks anywhere in the distributed system.
  *
  * This must be sub-classed by actual tasks to be run.

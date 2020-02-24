@@ -104,7 +104,7 @@ LiteralFrequency::shouldGenerateTreeSplit(CNFTree::Path path)
   return true;
 }
 
-void
+bool
 LiteralFrequency::getCube(CNFTree::Path path, std::vector<int>& literals)
 {
   assert(m_literalFrequency);
@@ -125,6 +125,8 @@ LiteralFrequency::getCube(CNFTree::Path path, std::vector<int>& literals)
 
     literals.push_back(lit * (CNFTree::getAssignment(path, depth) ? 1 : -1));
   }
+
+  return true;
 }
 }
 }

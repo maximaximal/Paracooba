@@ -218,7 +218,7 @@ Runner::conditionallySetAutoShutdownTimer()
 {
   int32_t seconds = m_config->getInt32(Config::AutoShutdown);
   if(seconds < 0 || m_numberOfRunningTasks > 0 || m_autoShutdownArmed ||
-     m_taskQueue->size() > 0)
+     m_taskQueue->size() > 0 || getNumberOfCurrentlyOffloadedJobs() > 0)
     return;
 
   std::unique_lock lock(m_autoShutdownTimerMutex);
@@ -248,5 +248,16 @@ Runner::resetAutoShutdownTimer()
 
   PARACUBER_LOG(m_logger, LocalWarning) << "Auto-Shutdown Canceled.";
   m_autoShutdownTimer.cancel();
+}
+
+size_t
+Runner::getNumberOfCurrentlyOffloadedJobs() const
+{
+  std::shared_lock lock(m_taskFactoriesMutex);
+  size_t number = 0;
+  for(const auto& factory : m_taskFactories) {
+    number += factory->getNumberOfOffloadedTasks();
+  }
+  return number;
 }
 }

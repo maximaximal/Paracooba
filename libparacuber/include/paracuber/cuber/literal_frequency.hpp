@@ -24,7 +24,7 @@ class LiteralFrequency : public Cuber
   bool init();
 
   virtual bool shouldGenerateTreeSplit(CNFTree::Path path);
-  virtual void getCube(CNFTree::Path path, std::vector<int>& literals);
+  virtual bool getCube(CNFTree::Path path, std::vector<int>& literals);
 
   Cuber::LiteralMap* getLiteralFrequency() { return m_literalFrequency; }
 

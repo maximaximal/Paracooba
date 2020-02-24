@@ -46,7 +46,7 @@ class Registry : public Cuber
   ReadyWaiter<AllowanceMap> allowanceMapWaiter;
 
   virtual bool shouldGenerateTreeSplit(CNFTree::Path path);
-  virtual void getCube(CNFTree::Path path, std::vector<int>& literals);
+  virtual bool getCube(CNFTree::Path path, std::vector<int>& literals);
 
   private:
   Logger m_logger;

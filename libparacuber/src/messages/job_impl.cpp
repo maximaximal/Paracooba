@@ -13,43 +13,6 @@ JobInitiator::tagline() const
   return "JobInitiator{" +
          std::to_string(static_cast<CNF::CubingKind>(getCubingKind())) + "}";
 }
-size_t
-JobInitiator::realise(const std::vector<int>& flatCubeArr)
-{
-  auto& map = initCubeMap();
-  size_t i = 0;
-
-  CNFTree::Path p = 0, lastPath = 0;
-  int cubeVar = 0;
-  for(auto var : flatCubeArr) {
-    if(var == 0) {
-      // Cube finished.
-      p = 0;
-      ++i;
-      continue;
-    } else {
-      // Inside cube.
-
-      cubeVar = FastAbsolute(var);
-      assert(cubeVar != 0);
-
-      auto [currVar, _] =
-        map.insert(std::make_pair(CNFTree::cleanupPath(p), cubeVar));
-      if(currVar->second != cubeVar) {
-        // Existing path has different value at this position! This breaks the
-        // binary tree property.
-        return i;
-      }
-
-      if(var > 0) {
-        p = CNFTree::getNextRightPath(p);
-      } else {
-        p = CNFTree::getNextLeftPath(p);
-      }
-    }
-  }
-  return 0;
-}
 
 std::string
 JobPath::tagline() const

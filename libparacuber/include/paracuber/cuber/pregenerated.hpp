@@ -21,11 +21,15 @@ class Pregenerated : public Cuber
   const messages::JobInitiator& getJobInitiator() { return m_ji; }
 
   virtual bool shouldGenerateTreeSplit(CNFTree::Path path);
-  virtual void getCube(CNFTree::Path path, std::vector<int>& literals);
+  virtual bool getCube(CNFTree::Path path, std::vector<int>& literals);
 
   private:
   size_t m_counter = 0;
   messages::JobInitiator m_ji;
+
+  const std::vector<int> *m_cubesFlatVector;
+  std::vector<size_t> m_cubesJumpList;
+  size_t m_normalizedPathLength = 0;
 };
 }
 }

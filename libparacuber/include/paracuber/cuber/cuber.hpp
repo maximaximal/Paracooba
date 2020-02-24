@@ -42,9 +42,10 @@ class Cuber
   /** @brief Checks if a tree split should be generated.
    */
   virtual bool shouldGenerateTreeSplit(CNFTree::Path path) = 0;
-  /** @brief Returns the full cube for a path.
+  /** @brief Returns the full cube for a path. Return false means the cube does
+   * not need to be solved and is UNSAT.
    */
-  virtual void getCube(CNFTree::Path path, std::vector<int>& literals) = 0;
+  virtual bool getCube(CNFTree::Path path, std::vector<int>& literals) = 0;
 
   static inline uint64_t getModuloComponent(CNFTree::Path p)
   {

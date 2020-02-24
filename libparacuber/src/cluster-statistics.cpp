@@ -194,18 +194,9 @@ ClusterStatistics::getUniqueNodeMap()
 }
 
 ClusterStatistics::Node*
-ClusterStatistics::getTargetComputeNodeForNewDecision(CNFTree::Path p,
-                                                      int64_t originator)
-{
-  if(CNFTree::getDepth(p) < 1) {
-    return nullptr;
-  }
-
-  return getFittestNodeForNewWork(originator);
-}
-
-ClusterStatistics::Node*
-ClusterStatistics::getFittestNodeForNewWork(int originator, int64_t rootCNFID)
+ClusterStatistics::getFittestNodeForNewWork(int originator,
+                                            const HandledNodesSet& handledNodes,
+                                            int64_t rootCNFID)
 {
   auto [map, lock] = getNodeMap();
 
@@ -215,7 +206,7 @@ ClusterStatistics::getFittestNodeForNewWork(int originator, int64_t rootCNFID)
   for(auto it = map.begin(); it != map.end(); ++it) {
     auto& n = it->second;
     if(!n.getFullyKnown() || !n.getReadyForWork(rootCNFID) ||
-       (!n.isDaemon() && n.getId() != rootCNFID))
+       handledNodes.count(&n) || (!n.isDaemon() && n.getId() != rootCNFID))
       continue;
 
     float fitness = n.getFitnessForNewAssignment();
@@ -278,26 +269,39 @@ void
 ClusterStatistics::rebalance(int originator, TaskFactory& factory)
 {
   // Rebalancing must be done once for every context.
-  auto mostFitNode =
-    getFittestNodeForNewWork(originator, factory.getRootCNF()->getOriginId());
-  if(mostFitNode && !mostFitNode->isFullyUtilized() &&
-     factory.canProduceTask()) {
-    assert(mostFitNode);
+  size_t remotes = m_nodeMap.size();
 
-    // Three layers make 8 tasks to work on, this should produce enough work for
-    // machines with more cores.
-    size_t numberOfTasksToSend =
-      std::max(1, mostFitNode->getAvailableWorkers() / 8);
+  HandledNodesSet handledNodes;
 
-    PARACUBER_LOG(m_logger, Trace)
-      << "Rebalance " << numberOfTasksToSend << " tasks for work with origin "
-      << originator << " to node " << mostFitNode->getName() << " ("
-      << mostFitNode->getId() << ")";
+  // Try to rebalance as much as possible, limited by the number of remotes.
+  // This should help with initial offloading in large cluster setups.
+  for(size_t i = 0; i < remotes && factory.canProduceTask(); ++i) {
+    auto mostFitNode = getFittestNodeForNewWork(
+      originator, handledNodes, factory.getRootCNF()->getOriginId());
+    if(mostFitNode && !mostFitNode->isFullyUtilized() &&
+       factory.canProduceTask()) {
+      assert(mostFitNode);
 
-    for(size_t i = 0; i < numberOfTasksToSend && factory.canProduceTask();
-        ++i) {
-      auto skel = factory.produceTaskSkeleton();
-      handlePathOnNode(originator, *mostFitNode, factory.getRootCNF(), skel.p);
+      handledNodes.insert(mostFitNode);
+
+      // Three layers make 8 tasks to work on, this should produce enough work
+      // for machines with more cores.
+      size_t numberOfTasksToSend =
+        std::max(1, mostFitNode->getAvailableWorkers() / 8);
+
+      PARACUBER_LOG(m_logger, Trace)
+        << "Rebalance " << numberOfTasksToSend << " tasks for work with origin "
+        << originator << " to node " << mostFitNode->getName() << " ("
+        << mostFitNode->getId() << ")";
+
+      for(size_t i = 0; i < numberOfTasksToSend && factory.canProduceTask();
+          ++i) {
+        auto skel = factory.produceTaskSkeleton();
+        handlePathOnNode(
+          originator, *mostFitNode, factory.getRootCNF(), skel.p);
+      }
+    } else {
+      break;
     }
   }
 }
@@ -312,7 +316,7 @@ ClusterStatistics::rebalance()
   } else {
     assert(m_config);
     TaskFactory* taskFactory = m_config->getClient()->getTaskFactory();
-    if(!taskFactory) 
+    if(!taskFactory)
       return;
     rebalance(m_config->getInt64(Config::Id), *taskFactory);
   }
