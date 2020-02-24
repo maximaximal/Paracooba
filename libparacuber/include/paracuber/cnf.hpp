@@ -158,6 +158,10 @@ class CNF
     std::vector<CNFTree::CubeVar> decisions;
   };
 
+  ConfigPtr m_config;
+  LogPtr m_log;
+  Logger m_logger;
+
   void connectToCNFTreeSignal();
 
   void sendCB(SendDataStruct* data, boost::asio::ip::tcp::socket* socket);
@@ -187,9 +191,6 @@ class CNF
 
   std::map<CNFTree::Path, Result> m_results;
 
-  ConfigPtr m_config;
-  LogPtr m_log;
-  Logger m_logger;
   TaskFactory* m_taskFactory = nullptr;
   ResultFoundSignal m_resultSignal;
 };

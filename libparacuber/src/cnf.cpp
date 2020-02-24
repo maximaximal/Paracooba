@@ -40,7 +40,7 @@ CNF::CNF(ConfigPtr config,
   , m_dimacsFile(dimacsFile)
   , m_log(log)
   , m_logger(log->createLogger("CNF"))
-  , m_cnfTree(std::make_unique<CNFTree>(m_log, *this, config, originId))
+  , m_cnfTree(std::make_unique<CNFTree>(log, *this, config, originId))
 {
   if(dimacsFile != "") {
     struct stat statbuf;
@@ -101,6 +101,8 @@ CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
   if(ret == -1) {
     std::cerr << "ERROR DURING SENDFILE: " << strerror(errno) << std::endl;
     m_sendData.erase(socket);
+
+    return;
   }
 
   socket->async_write_some(boost::asio::null_buffers(),
