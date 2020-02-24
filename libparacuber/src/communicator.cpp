@@ -18,11 +18,13 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/buffer.hpp>
+#include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/address_v4.hpp>
 #include <boost/asio/ip/udp.hpp>
 #include <boost/asio/socket_base.hpp>
 #include <boost/bind.hpp>
+#include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <boost/system/error_code.hpp>
 #include <cassert>
 #include <chrono>
@@ -661,6 +663,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
     , m_socket(ioService)
     , m_id(id)
     , m_log(log)
+    , m_deadlineTimer(ioService)
     , m_logger(log->createLoggerMT("TCPClient", "(0)|" + std::to_string(id)))
   {
     //  Receive networked node for specified ID, if it still exists.
@@ -821,9 +824,18 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
       PARACUBER_LOG(m_logger, LocalError)
         << "Transmission failed with error: " << error.message()
         << " - Restarting TCPClient with same body.";
-      auto jd = std::move(m_jobDescription.value());
-      m_jobDescription.reset();
-      m_comm->transmitJobDescription(std::move(jd), m_id, m_finishedCB);
+
+      auto ptr = shared_from_this();
+
+      m_deadlineTimer.expires_from_now(boost::posix_time::milliseconds(420));
+      m_deadlineTimer.async_wait(
+        [ptr, this](const boost::system::error_code& e) {
+          if(e != boost::asio::error::operation_aborted) {
+            auto jd = std::move(m_jobDescription.value());
+            m_jobDescription.reset();
+            m_comm->transmitJobDescription(std::move(jd), m_id, m_finishedCB);
+          }
+        });
     }
   }
 
@@ -840,6 +852,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   TCPMode m_mode;
   std::optional<messages::JobDescription> m_jobDescription;
   std::function<void(bool)> m_finishedCB;
+  boost::asio::deadline_timer m_deadlineTimer;
 };
 
 class Communicator::TCPServer
