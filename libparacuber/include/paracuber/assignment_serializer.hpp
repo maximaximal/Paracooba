@@ -41,10 +41,10 @@ SerializeAssignment(AssignmentVector& target,
       PC_SHIFT_CASE(3)
       PC_SHIFT_CASE(2)
       PC_SHIFT_CASE(1)
+      target[pos] = b;
       default:
         break;
     }
-    target[pos] = b;
   } else {
     // It is very unlikely this ever happens, there should be some variables.
     // No error handling is done here though, this should be handled from
@@ -78,8 +78,8 @@ SerializeAssignmentFromSolver(AssignmentVector& target,
 template<typename AssignmentVector, typename SourceArray>
 inline void
 SerializeAssignmentFromArray(AssignmentVector& target,
-                              const int varCount,
-                              const SourceArray& source)
+                             const int varCount,
+                             const SourceArray& source)
 {
   SerializeAssignment(target, varCount, [&source](int i) { return source[i]; });
 }
