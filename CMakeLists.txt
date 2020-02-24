@@ -8,6 +8,8 @@ set(BUILD_URL "" CACHE STRING "Unique URL to identify this build.")
 
 set(VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}+${BUILD_NUMBER})
 
+option(DEBUG_ENABLE_ADDRESS_SANITIZER "enable address sanitizer (GCC)" OFF)
+
 # Libraries
 find_package(Threads)
 
@@ -36,6 +38,12 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/catch/Catch2-2.9.2/contrib/Catch
 enable_testing()
 
 add_subdirectory(third_party)
+
+# Address Sanitizer for Debug Builds
+if(DEBUG_ENABLE_ADDRESS_SANITIZERN)
+    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+endif()
 
 add_subdirectory(libparacuber)
 
