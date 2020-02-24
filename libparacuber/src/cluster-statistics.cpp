@@ -324,6 +324,8 @@ ClusterStatistics::rebalance()
 void
 ClusterStatistics::tick()
 {
+  using namespace std::literals::chrono_literals;
+
   auto [map, lock] = getUniqueNodeMap();
 
   m_thisNode->statusReceived();
@@ -331,8 +333,9 @@ ClusterStatistics::tick()
   for(auto& it : map) {
     auto& statNode = it.second;
     auto lastStatus = statNode.getDurationSinceLastStatus();
-    auto mean = statNode.getMeanDurationSinceLastStatus();
-    if(lastStatus > mean * 3) {
+    auto timeout = std::max(statNode.getMeanDurationSinceLastStatus() * 5,
+                            std::chrono::duration<double>(10s));
+    if(lastStatus > timeout) {
       std::string message = "Last status update was too long ago";
       unsafeRemoveNode(it.first, message);
       return;
