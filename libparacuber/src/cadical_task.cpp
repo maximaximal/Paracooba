@@ -113,7 +113,6 @@ CaDiCaLTask::applyCubeFromCuber(CNFTree::Path p, cuber::Cuber& cuber)
   for(int lit : literals) {
     m_solver->assume(lit);
   }
-  PARACUBER_LOG((*m_logger), Trace) << std::endl;
 
   // This means, that the task was assigned from a factory, a callback must be
   // given.

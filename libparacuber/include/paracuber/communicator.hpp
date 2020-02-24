@@ -95,7 +95,7 @@ class Communicator
     Unknown
   };
 
-  void sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn);
+  void sendCNFToNode(std::shared_ptr<CNF> cnf, int64_t targetID);
 
   void requestCNFPathInfo(CNFTree::Path p, int64_t handle, int64_t cnfId = 0);
 
@@ -111,8 +111,8 @@ class Communicator
                                     int64_t handle);
 
   virtual void transmitJobDescription(messages::JobDescription&& jd,
-                                      NetworkedNode* nn,
-                                      std::function<void()> sendFinishedCB);
+                                      int64_t id,
+                                      std::function<void(bool)> sendFinishedCB);
 
   private:
   friend class webserver::API;

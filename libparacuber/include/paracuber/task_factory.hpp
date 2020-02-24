@@ -87,7 +87,9 @@ class TaskFactory
                                    CNFTree::Path p,
                                    ClusterStatistics::Node& node);
 
-  void removeExternallyProcessedTask(CNFTree::Path p, int64_t id);
+  void removeExternallyProcessedTask(CNFTree::Path p,
+                                     int64_t id,
+                                     bool reset = false);
   void readdExternalTasks(int64_t id);
 
   inline bool canProduceTask() const { return !m_skeletons.empty(); }
@@ -118,7 +120,7 @@ class TaskFactory
 
     size_t readdTasks(TaskFactory* factory);
     void addTask(TaskSkeleton&& skel) { tasks.insert(std::move(skel)); }
-    void removeTask(CNFTree::Path p);
+    TaskSkeleton removeTask(CNFTree::Path p);
   };
   using ExternalTasksSetMap = std::map<int64_t, ExternalTasksSet>;
 

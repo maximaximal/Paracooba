@@ -164,6 +164,17 @@ ClusterStatistics::unsafeRemoveNode(int64_t id, const std::string& reason)
 
   auto it = m_nodeMap.find(id);
   if(it != m_nodeMap.end()) {
+    auto& node = it->second;
+
+    // Nodes must only be deleted after all TCP Clients are gone.
+    NetworkedNode* nn = node.getNetworkedNode();
+    if(nn) {
+      if(nn->hasActiveTCPClients()) {
+        nn->requestDeletion();
+        return;
+      }
+    }
+
     PARACUBER_LOG(m_logger, Trace)
       << "Remove cluster statistics node with id: " << id
       << " becase of reason: " << reason;
@@ -248,7 +259,7 @@ ClusterStatistics::handlePathOnNode(int64_t originator,
 
   // This path should be handled on another compute node. This means, the
   // other compute node requires a Cube-Beam from the Communicator class.
-  rootCNF->sendPath(node.getNetworkedNode(), p, []() {});
+  rootCNF->sendPath(node.getId(), p, []() {});
 }
 bool
 ClusterStatistics::hasNode(int64_t id)

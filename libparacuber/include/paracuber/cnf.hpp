@@ -97,13 +97,11 @@ class CNF
             SendFinishedCB finishedCallback,
             bool first = true);
 
-  void sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCB);
+  void sendAllowanceMap(int64_t id, SendFinishedCB finishedCB);
 
-  void sendPath(NetworkedNode* nn, CNFTree::Path p, SendFinishedCB finishedCB);
+  void sendPath(int64_t id, CNFTree::Path p, SendFinishedCB finishedCB);
 
-  void sendResult(NetworkedNode* nn,
-                  CNFTree::Path p,
-                  SendFinishedCB finishedCallback);
+  void sendResult(int64_t id, CNFTree::Path p, SendFinishedCB finishedCallback);
 
   /** @brief Receive DIMACS file.
    *

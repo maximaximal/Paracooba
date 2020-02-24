@@ -1,6 +1,7 @@
 #ifndef PARACUBER_NETWORKED_NODE_HPP
 #define PARACUBER_NETWORKED_NODE_HPP
 
+#include <atomic>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/udp.hpp>
 
@@ -40,10 +41,19 @@ class NetworkedNode
 
   inline std::ostream& operator<<(std::ostream& o) { return o << getId(); }
 
+  void addActiveTCPClient() { ++m_activeTCPClients; }
+  void removeActiveTCPClient() { --m_activeTCPClients; }
+  bool hasActiveTCPClients() { return m_activeTCPClients > 0; }
+  bool deletionRequested() { return m_deletionRequested; }
+  void requestDeletion() { m_deletionRequested = true; }
+
   private:
   boost::asio::ip::udp::endpoint m_remoteUdpEndoint;
   boost::asio::ip::tcp::endpoint m_remoteTcpEndoint;
   int64_t m_id;
+
+  std::atomic_size_t m_activeTCPClients = 0;
+  std::atomic_bool m_deletionRequested = false;
 };
 }
 

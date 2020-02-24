@@ -185,14 +185,20 @@ TaskFactory::addExternallyProcessingTask(int64_t originator,
 }
 
 void
-TaskFactory::removeExternallyProcessedTask(CNFTree::Path p, int64_t id)
+TaskFactory::removeExternallyProcessedTask(CNFTree::Path p,
+                                           int64_t id,
+                                           bool reset)
 {
   std::unique_lock lock(m_externalTasksSetMapMutex);
 
   auto it = m_externalTasksSetMap.find(id);
   if(it != m_externalTasksSetMap.end()) {
     ExternalTasksSet& set = it->second;
-    set.removeTask(p);
+    auto skel = set.removeTask(p);
+    if(skel.p != CNFTree::DefaultUninitiatedPath && reset) {
+      this->getRootCNF()->getCNFTree().resetNode(skel.p);
+      this->addPath(skel.p, skel.mode, skel.originator);
+    }
   }
 }
 
@@ -209,16 +215,20 @@ TaskFactory::ExternalTasksSet::readdTasks(TaskFactory* factory)
   return count;
 }
 
-void
+TaskFactory::TaskSkeleton
 TaskFactory::ExternalTasksSet::removeTask(CNFTree::Path p)
 {
   for(auto it = tasks.begin(); it != tasks.end();) {
-    if(CNFTree::getDepthShiftedPath(CNFTree::setDepth(
-         it->p, CNFTree::getDepth(p))) == CNFTree::getDepthShiftedPath(p))
+    if(it->p == p) {
+      TaskSkeleton s = std::move(*it);
       it = tasks.erase(it);
-    else
+      return std::move(s);
+    } else
       ++it;
   }
+
+  return std::move(
+    TaskSkeleton{ CubeOrSolve, 0, CNFTree::DefaultUninitiatedPath });
 }
 
 void

@@ -110,13 +110,13 @@ CNF::send(boost::asio::ip::tcp::socket* socket, SendFinishedCB cb, bool first)
 }
 
 void
-CNF::sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCallback)
+CNF::sendAllowanceMap(int64_t id, SendFinishedCB finishedCallback)
 {
   // First, wait for the allowance map to be ready.
-  rootTaskReady.callWhenReady([this, nn, finishedCallback](CaDiCaLTask& ptr) {
+  rootTaskReady.callWhenReady([this, id, finishedCallback](CaDiCaLTask& ptr) {
     // Registry is only initialised after the root task arrived.
     getCuberRegistry().allowanceMapWaiter.callWhenReady(
-      [this, nn, finishedCallback](cuber::Registry::AllowanceMap& map) {
+      [this, id, finishedCallback](cuber::Registry::AllowanceMap& map) {
         // This indirection is required to make this work from worker threads.
         // The allowance map may take a while to generate.
         messages::JobDescription jd(m_originId);
@@ -138,30 +138,45 @@ CNF::sendAllowanceMap(NetworkedNode* nn, SendFinishedCB finishedCallback)
         }
 
         m_jobDescriptionTransmitter->transmitJobDescription(
-          std::move(jd), nn, finishedCallback);
+          std::move(jd), id, [this, id, finishedCallback](bool success) {
+            if(success) {
+              finishedCallback();
+            } else {
+              PARACUBER_LOG(m_logger, GlobalError)
+                << "Could not send JobInitiator to " << id << "! VERY BAD!";
+            }
+          });
       });
   });
 }
 
 void
-CNF::sendPath(NetworkedNode* nn, CNFTree::Path p, SendFinishedCB finishedCB)
+CNF::sendPath(int64_t id, CNFTree::Path p, SendFinishedCB finishedCB)
 {
   assert(CNFTree::getDepth(p) > 0);
   assert(rootTaskReady.isReady());
 
-  m_cnfTree->offloadNodeToRemote(p, nn->getId());
+  m_cnfTree->offloadNodeToRemote(p, id);
 
   messages::JobPath jp(p);
   messages::JobDescription jd(m_originId);
   jd.insert(jp);
   m_jobDescriptionTransmitter->transmitJobDescription(
-    std::move(jd), nn, finishedCB);
+    std::move(jd), id, [this, p, id, finishedCB](bool success) {
+      if(success) {
+        finishedCB();
+      } else {
+        PARACUBER_LOG(m_logger, GlobalError)
+          << "Could not send path " << CNFTree::pathToStrNoAlloc(p) << " to "
+          << id << "! Re-Add to local factory.";
+        // Reset the task, so it is processed again!
+        m_taskFactory->removeExternallyProcessedTask(p, id, true);
+      }
+    });
 }
 
 void
-CNF::sendResult(NetworkedNode* nn,
-                CNFTree::Path p,
-                SendFinishedCB finishedCallback)
+CNF::sendResult(int64_t id, CNFTree::Path p, SendFinishedCB finishedCallback)
 {
   assert(rootTaskReady.isReady());
 
@@ -198,7 +213,15 @@ CNF::sendResult(NetworkedNode* nn,
   jd.insert(jobResult);
 
   m_jobDescriptionTransmitter->transmitJobDescription(
-    std::move(jd), nn, finishedCallback);
+    std::move(jd), id, [this, finishedCallback, p, id](bool success) {
+      if(success) {
+        finishedCallback();
+      } else {
+        PARACUBER_LOG(m_logger, GlobalError)
+          << "Could not send result for path " << CNFTree::pathToStrNoAlloc(p)
+          << " back to " << id << "!";
+      }
+    });
 }
 
 static CNFTree::State
@@ -219,6 +242,8 @@ jrStateToCNFTreeState(messages::JobResult::State s)
 void
 CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
 {
+  PARACUBER_LOG(m_logger, Trace)
+    << "Received " << jd.tagline() << " from " << sentFromID;
   switch(jd.getKind()) {
     case messages::JobDescription::Kind::Path: {
       const auto jp = jd.getJobPath();
@@ -539,7 +564,7 @@ CNF::handleFinishedResultReceived(Result& result, int64_t sentFromId)
 {
   PARACUBER_LOG(m_logger, Trace)
     << "Finished result received! State: " << result.state << " on path "
-    << CNFTree::pathToStrNoAlloc(result.p);
+    << CNFTree::pathToStrNoAlloc(result.p) << " from id " << sentFromId;
 
   // Insert result into local CNF Tree. The state change should only stay local,
   // no propagate to the node that sent this change.

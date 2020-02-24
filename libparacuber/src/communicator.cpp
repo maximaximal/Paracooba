@@ -32,6 +32,7 @@
 #include <sstream>
 
 #include <cereal/archives/binary.hpp>
+#include <stdexcept>
 
 #ifdef ENABLE_INTERNAL_WEBSERVER
 #include "../include/paracuber/webserver/api.hpp"
@@ -312,7 +313,7 @@ class Communicator::UDPServer
       if(statisticsNode.isDaemon()) {
         m_communicator->sendCNFToNode(
           m_communicator->m_config->getClient()->getRootCNF(),
-          statisticsNode.getNetworkedNode());
+          statisticsNode.getId());
       }
     }
 
@@ -347,7 +348,7 @@ class Communicator::UDPServer
       if(requester.getDaemonMode()) {
         m_communicator->sendCNFToNode(
           m_communicator->m_config->getClient()->getRootCNF(),
-          statisticsNode.getNetworkedNode());
+          statisticsNode.getId());
       }
     }
 
@@ -651,26 +652,42 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   TCPClient(Communicator* comm,
             LogPtr log,
             boost::asio::io_service& ioService,
-            NetworkedNode* nn,
+            int64_t id,
             TCPMode mode,
             std::shared_ptr<CNF> cnf = nullptr)
     : m_comm(comm)
     , m_cnf(cnf)
     , m_mode(mode)
-    , m_nn(nn)
-    , m_endpoint(nn->getRemoteTcpEndpoint())
     , m_socket(ioService)
+    , m_id(id)
     , m_log(log)
-    , m_logger(log->createLoggerMT("TCPClient",
-                                   "(0)|" + m_endpoint.address().to_string()))
-  {}
+    , m_logger(log->createLoggerMT("TCPClient", "(0)|" + std::to_string(id)))
+  {
+    //  Receive networked node for specified ID, if it still exists.
+    auto& node = m_comm->getClusterStatistics()->getNode(id);
+    m_nn = node.getNetworkedNode();
+    if(m_nn->deletionRequested()) {
+      throw std::invalid_argument("Remote node was requested for deletion!");
+    }
+    if(m_nn->getRemoteTcpEndpoint().port() == 0) {
+      throw std::invalid_argument("NetworkedNode with port 0 encountered!");
+    }
+    m_nn->addActiveTCPClient();
+    m_endpoint = m_nn->getRemoteTcpEndpoint();
+    m_logger = log->createLoggerMT("TCPClient",
+                                   "(0)|" + std::to_string(m_id) + "@" +
+                                     m_endpoint.address().to_string());
+  }
   virtual ~TCPClient()
   {
+    if(m_nn) {
+      m_nn->removeActiveTCPClient();
+    }
     PARACUBER_LOG(m_logger, Trace) << "Destroy TCPClient to " << m_endpoint;
   }
 
   void insertJobDescription(messages::JobDescription&& jd,
-                            std::function<void()> finishedCB)
+                            std::function<void(bool)> finishedCB)
   {
     m_jobDescription = std::move(jd);
     m_finishedCB = finishedCB;
@@ -694,8 +711,8 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   {
     if(err) {
       PARACUBER_LOG(m_logger, LocalError)
-        << "Could not connect to remote endpoint " << m_endpoint
-        << " over TCP! Error: " << err;
+        << "Could not connect to remote endpoint " << m_endpoint << " (id "
+        << m_id << ") over TCP! Error: " << err;
 
       if(m_jobDescription.has_value()) {
         PARACUBER_LOG(m_logger, Trace)
@@ -703,7 +720,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
              "be started again.";
         auto jd = std::move(m_jobDescription.value());
         m_jobDescription.reset();
-        m_comm->transmitJobDescription(std::move(jd), m_nn, m_finishedCB);
+        m_comm->transmitJobDescription(std::move(jd), m_id, m_finishedCB);
       }
       return;
     }
@@ -799,14 +816,14 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
     }
 
     if(error.value() == boost::system::errc::success) {
-      m_finishedCB();
+      m_finishedCB(true);
     } else {
       PARACUBER_LOG(m_logger, LocalError)
         << "Transmission failed with error: " << error.message()
         << " - Restarting TCPClient with same body.";
       auto jd = std::move(m_jobDescription.value());
       m_jobDescription.reset();
-      m_comm->transmitJobDescription(std::move(jd), m_nn, m_finishedCB);
+      m_comm->transmitJobDescription(std::move(jd), m_id, m_finishedCB);
     }
   }
 
@@ -817,11 +834,12 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   Communicator* m_comm;
   std::shared_ptr<CNF> m_cnf;
   boost::asio::ip::tcp::socket m_socket;
-  NetworkedNode* m_nn;
+  int64_t m_id;
+  NetworkedNode* m_nn = nullptr;
   boost::asio::ip::tcp::endpoint m_endpoint;
   TCPMode m_mode;
   std::optional<messages::JobDescription> m_jobDescription;
-  std::function<void()> m_finishedCB;
+  std::function<void(bool)> m_finishedCB;
 };
 
 class Communicator::TCPServer
@@ -1282,31 +1300,42 @@ Communicator::listenForIncomingTCP(uint16_t port)
 }
 
 void
-Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf, NetworkedNode* nn)
+Communicator::sendCNFToNode(std::shared_ptr<CNF> cnf, int64_t targetID)
 {
-  assert(nn);
   // This indirection is required to make this work from worker threads.
-  m_ioService.post([this, cnf, nn]() {
-    auto client = std::make_shared<TCPClient>(
-      this, m_log, m_ioService, nn, TCPMode::TransmitCNF, cnf);
-    client->connect();
+  m_ioService.post([this, cnf, targetID]() {
+    try {
+      auto client = std::make_shared<TCPClient>(
+        this, m_log, m_ioService, targetID, TCPMode::TransmitCNF, cnf);
+      client->connect();
+    } catch(const std::exception& e) {
+      PARACUBER_LOG(m_logger, LocalWarning)
+        << "TCPClient to " << targetID << " exited! Reason: " << e.what();
+    }
   });
 
   // Also send the allowance map to a CNF, if this transmits the root formula.
-  cnf->sendAllowanceMap(nn, []() {});
+  cnf->sendAllowanceMap(targetID, []() {});
 }
 
 void
 Communicator::transmitJobDescription(messages::JobDescription&& jd,
-                                     NetworkedNode* nn,
-                                     std::function<void()> sendFinishedCB)
+                                     int64_t targetID,
+                                     std::function<void(bool)> sendFinishedCB)
 {
-  m_ioService.post([this, nn, jd{ std::move(jd) }, sendFinishedCB]() mutable {
-    auto client = std::make_shared<TCPClient>(
-      this, m_log, m_ioService, nn, TCPMode::TransmitJobDescription);
-    client->insertJobDescription(std::move(jd), sendFinishedCB);
-    client->connect();
-  });
+  m_ioService.post(
+    [this, targetID, jd{ std::move(jd) }, sendFinishedCB]() mutable {
+      try {
+        auto client = std::make_shared<TCPClient>(
+          this, m_log, m_ioService, targetID, TCPMode::TransmitJobDescription);
+        client->insertJobDescription(std::move(jd), sendFinishedCB);
+        client->connect();
+      } catch(const std::exception& e) {
+        PARACUBER_LOG(m_logger, LocalWarning)
+          << "TCPClient to " << targetID << " exited! Reason: " << e.what();
+        sendFinishedCB(false);
+      }
+    });
 }
 
 void

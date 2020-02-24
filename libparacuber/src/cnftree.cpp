@@ -191,6 +191,10 @@ CNFTree::propagateUpwardsFrom(Path p, Path sourcePath)
   }
 
   if(changed) {
+    PARACUBER_LOG(m_logger, Trace)
+      << "Deduce " << node->state << " for path " << pathToStrNoAlloc(p)
+      << " when applying path " << pathToStrNoAlloc(sourcePath);
+
     setCNFResult(cleanupPath(p), node->state, sourcePath);
 
     if(getDepth(p) == 0) {
@@ -210,15 +214,7 @@ void
 CNFTree::sendNodeResultToSender(Path p, const Node& node)
 {
   assert(node.requiresRemoteUpdate());
-  try {
-    auto& statNode =
-      m_config->getCommunicator()->getClusterStatistics()->getNode(
-        node.receivedFrom);
-    m_rootCNF.sendResult(statNode.getNetworkedNode(), cleanupPath(p), []() {});
-  } catch(const std::invalid_argument& e) {
-    // This case should be handled by other compute nodes detecting the
-    // offline node. They re-insert missed tasks.
-  }
+  m_rootCNF.sendResult(node.receivedFrom, cleanupPath(p), []() {});
 }
 
 void
