@@ -1032,6 +1032,8 @@ class Communicator::TCPServer
                 break;
             }
           }
+
+          m_comm->getRunner()->conditionallySetAutoShutdownTimer();
           return;
         }
 
