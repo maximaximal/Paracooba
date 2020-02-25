@@ -298,11 +298,18 @@ class Communicator::UDPServer
 
     auto [statisticsNode, inserted] = m_clusterStatistics->getOrCreateNode(id);
 
-    inserted = !statisticsNode.getFullyKnown();
-
     applyMessageNodeToStatsNode(messageNode, statisticsNode);
 
     networkStatisticsNode(statisticsNode);
+
+    NetworkedNode* nn = statisticsNode.getNetworkedNode();
+
+    // TCP Listen Ports must not change during execution.
+    assert((nn->getRemoteTcpEndpoint().port() == 0 ||
+            (nn->getRemoteTcpEndpoint().port() ==
+             statisticsNode.getTcpListenPort())));
+
+    nn->setTcpPort(statisticsNode.getTcpListenPort());
 
     if(inserted && !m_communicator->m_config->isDaemonMode()) {
       // Send announcement of this client to the other node before transferring
