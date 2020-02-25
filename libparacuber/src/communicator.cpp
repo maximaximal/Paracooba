@@ -730,9 +730,17 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
         PARACUBER_LOG(m_logger, Trace)
           << "This client should transmit a JobDescription, so the client will "
              "be started again.";
-        auto jd = std::move(m_jobDescription.value());
-        m_jobDescription.reset();
-        m_comm->transmitJobDescription(std::move(jd), m_id, m_finishedCB);
+
+        auto ptr = shared_from_this();
+
+        m_timer.expires_from_now(std::chrono::milliseconds(500));
+        m_timer.async_wait([ptr, this](const boost::system::error_code& e) {
+          if(e != boost::asio::error::operation_aborted) {
+            auto jd = std::move(m_jobDescription.value());
+            m_jobDescription.reset();
+            m_comm->transmitJobDescription(std::move(jd), m_id, m_finishedCB);
+          }
+        });
       }
       return;
     }
