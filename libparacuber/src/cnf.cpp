@@ -191,6 +191,8 @@ CNF::sendResult(int64_t id, CNFTree::Path p, SendFinishedCB finishedCallback)
   }
   auto& result = resultIt->second;
 
+  assert(result.state != CNFTree::Unknown);
+
   messages::JobResult::State jobResultState = [&result]() {
     switch(result.state) {
       case CNFTree::SAT:
