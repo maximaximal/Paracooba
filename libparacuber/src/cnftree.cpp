@@ -248,8 +248,7 @@ CNFTree::pathToStrNoAlloc(Path p)
 std::string
 CNFTree::pathToStdString(Path p)
 {
-  char str[maxPathDepth + 1];
-  pathToStr(p, str);
+  const char* str = pathToStrNoAlloc(p);
   return (std::string(str, getDepth(p)) + " (" + std::to_string(getDepth(p)) +
           ")");
 }
