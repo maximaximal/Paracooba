@@ -275,9 +275,19 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
       std::unique_lock lock(m_resultsMutex);
       auto [resIt, inserted] = m_results.insert(
         std::make_pair(CNFTree::cleanupPath(jr.getPath()), Result{}));
-      assert(inserted);
 
       Result& res = resIt->second;
+
+      if(!inserted) {
+        std::unique_lock loggerLock(m_loggerMutex);
+        PARACUBER_LOG(m_logger, GlobalWarning)
+          << "Result for path " << CNFTree::pathToStrNoAlloc(jr.getPath())
+          << " received from " << sentFromID
+          << " already inserted into results previously! Previous result "
+             "state: "
+          << res.state
+          << ", new state: " << jrStateToCNFTreeState(jr.getState());
+      }
 
       res.p = jr.getPath();
       res.state = jrStateToCNFTreeState(jr.getState());
