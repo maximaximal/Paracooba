@@ -272,39 +272,44 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
     case messages::JobDescription::Kind::Result: {
       const auto jr = jd.getJobResult();
 
-      std::unique_lock lock(m_resultsMutex);
-      auto [resIt, inserted] = m_results.insert(
-        std::make_pair(CNFTree::cleanupPath(jr.getPath()), Result{}));
+      Result* res = nullptr;
 
-      Result& res = resIt->second;
+      {
+        std::unique_lock lock(m_resultsMutex);
 
-      if(!inserted) {
-        std::unique_lock loggerLock(m_loggerMutex);
-        PARACUBER_LOG(m_logger, GlobalWarning)
-          << "Result for path " << CNFTree::pathToStrNoAlloc(jr.getPath())
-          << " received from " << sentFromID
-          << " already inserted into results previously! Previous result "
-             "state: "
-          << res.state
-          << ", new state: " << jrStateToCNFTreeState(jr.getState());
+        auto [resIt, inserted] = m_results.insert(
+          std::make_pair(CNFTree::cleanupPath(jr.getPath()), Result{}));
+
+        res = &resIt->second;
+
+        if(!inserted) {
+          std::unique_lock loggerLock(m_loggerMutex);
+          PARACUBER_LOG(m_logger, GlobalWarning)
+            << "Result for path " << CNFTree::pathToStrNoAlloc(jr.getPath())
+            << " received from " << sentFromID
+            << " already inserted into results previously! Previous result "
+               "state: "
+            << res->state
+            << ", new state: " << jrStateToCNFTreeState(jr.getState());
+        }
+
+        res->p = jr.getPath();
+        res->state = jrStateToCNFTreeState(jr.getState());
+        assert(res->state != CNFTree::Unknown);
+
+        m_taskFactory->removeExternallyProcessedTask(res->p, sentFromID);
+
+        if(res->state == CNFTree::SAT) {
+          res->size = jr.getDataVec().size();
+          res->encodedAssignment =
+            std::make_shared<AssignmentVector>(std::move(jr.getDataVec()));
+        } else {
+          res->size = 0;
+        }
+        res->finished = true;
       }
 
-      res.p = jr.getPath();
-      res.state = jrStateToCNFTreeState(jr.getState());
-      assert(res.state != CNFTree::Unknown);
-
-      m_taskFactory->removeExternallyProcessedTask(res.p, sentFromID);
-
-      if(res.state == CNFTree::SAT) {
-        res.size = jr.getDataVec().size();
-        res.encodedAssignment =
-          std::make_shared<AssignmentVector>(std::move(jr.getDataVec()));
-      } else {
-        res.size = 0;
-      }
-      res.finished = true;
-
-      handleFinishedResultReceived(res, sentFromID);
+      handleFinishedResultReceived(*res, sentFromID);
       break;
     }
     case messages::JobDescription::Kind::Initiator: {
@@ -583,7 +588,7 @@ CNF::getRootTask()
 }
 
 void
-CNF::handleFinishedResultReceived(Result& result, int64_t sentFromId)
+CNF::handleFinishedResultReceived(const Result& result, int64_t sentFromId)
 {
   {
     std::unique_lock loggerLock(m_loggerMutex);

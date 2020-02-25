@@ -106,9 +106,8 @@ CaDiCaLTask::applyCubeFromCuber(CNFTree::Path p, cuber::Cuber& cuber)
   literals.reserve(CNFTree::getDepth(p));
   cuber.getCube(p, literals);
 
-  PARACUBER_LOG((*m_logger), Trace) << "Applying from cube "
-                                    << CNFTree::pathToStrNoAlloc(m_path)
-				    << " ";
+  PARACUBER_LOG((*m_logger), Trace)
+    << "Applying from cube " << CNFTree::pathToStrNoAlloc(m_path) << " ";
 
   for(int lit : literals) {
     m_solver->assume(lit);
@@ -194,9 +193,12 @@ CaDiCaLTask::execute()
     PARACUBER_LOG((*m_logger), Trace)
       << "Start solving CNF formula using CaDiCaL CNF solver.";
     int solveResult = m_solver->solve();
-    PARACUBER_LOG((*m_logger), Trace)
-      << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
-      << " solved.";
+
+    if(!m_terminate) {
+      PARACUBER_LOG((*m_logger), Trace)
+        << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
+        << " solved.";
+    }
 
     switch(solveResult) {
       case 0:

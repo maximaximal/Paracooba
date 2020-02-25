@@ -134,7 +134,7 @@ class CNF
 
   void solverFinishedSlot(const TaskResult& result, CNFTree::Path path);
 
-  void handleFinishedResultReceived(Result& result, int64_t sentFromId);
+  void handleFinishedResultReceived(const Result& result, int64_t sentFromId);
 
   ResultFoundSignal& getResultFoundSignal() { return m_resultSignal; }
 

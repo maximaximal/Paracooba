@@ -1041,9 +1041,20 @@ class Communicator::TCPServer
           if(m_context) {
             switch(jd.getKind()) {
               case messages::JobDescription::Kind::Path:
+                if(!m_context->getReadyForWork()) {
+                  m_socket.shutdown(
+                    boost::asio::ip::tcp::socket::shutdown_both);
+                  m_socket.close();
+                }
                 break;
               case messages::JobDescription::Kind::Result:
-                m_context->start(Daemon::Context::State::ResultReceived);
+                if(!m_context->getReadyForWork()) {
+                  m_socket.shutdown(
+                    boost::asio::ip::tcp::socket::shutdown_both);
+                  m_socket.close();
+                } else {
+                  m_context->start(Daemon::Context::State::ResultReceived);
+                }
                 break;
               case messages::JobDescription::Kind::Unknown:
                 break;
