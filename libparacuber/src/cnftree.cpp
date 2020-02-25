@@ -198,8 +198,8 @@ CNFTree::propagateUpwardsFrom(Path p, Path sourcePath)
     {
       std::unique_lock loggerLock(m_logMutex);
       PARACUBER_LOG(m_logger, Trace)
-        << "Deduce " << node->state << " for path " << pathToStrNoAlloc(p)
-        << " when applying path " << pathToStrNoAlloc(sourcePath);
+        << "Deduce " << node->state << " for path " << pathToStdString(p)
+        << " when applying path " << pathToStdString(sourcePath);
     }
 
     setCNFResult(cleanupPath(p), node->state, sourcePath);

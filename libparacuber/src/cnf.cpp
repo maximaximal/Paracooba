@@ -617,8 +617,8 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
       std::unique_lock loggerLock(m_loggerMutex);
       PARACUBER_LOG(m_logger, Trace)
         << "Insert result " << state << " for path "
-        << CNFTree::pathToStrNoAlloc(p) << " from source path "
-        << CNFTree::pathToStrNoAlloc(source);
+        << CNFTree::pathToStdString(p) << " from source path "
+        << CNFTree::pathToStdString(source);
       return &m_results.insert(std::make_pair(p, Result{ 0 })).first->second;
     }
   }();
@@ -637,8 +637,8 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
     auto resultIt = m_results.find(source);
     if(resultIt == m_results.end()) {
       PARACUBER_LOG(m_logger, LocalError)
-        << "Could not find result reference of " << CNFTree::pathToStrNoAlloc(p)
-        << " to " << CNFTree::pathToStrNoAlloc(source)
+        << "Could not find result reference of " << CNFTree::pathToStdString(p)
+        << " to " << CNFTree::pathToStdString(source)
         << "! Not inserting result.";
       assert(false);
       return;
