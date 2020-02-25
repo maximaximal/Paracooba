@@ -272,9 +272,16 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
     case messages::JobDescription::Kind::Result: {
       const auto jr = jd.getJobResult();
 
-      Result res;
+      std::unique_lock lock(m_resultsMutex);
+      auto [resIt, inserted] = m_results.insert(
+        std::make_pair(CNFTree::cleanupPath(jr.getPath()), Result{}));
+      assert(inserted);
+
+      Result& res = resIt->second;
+
       res.p = jr.getPath();
       res.state = jrStateToCNFTreeState(jr.getState());
+      assert(res.state != CNFTree::Unknown);
 
       m_taskFactory->removeExternallyProcessedTask(res.p, sentFromID);
 
@@ -287,11 +294,6 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
       }
       res.finished = true;
 
-      {
-        std::unique_lock lock(m_resultsMutex);
-        m_results.insert(
-          std::make_pair(CNFTree::cleanupPath(jr.getPath()), res));
-      }
       handleFinishedResultReceived(res, sentFromID);
       break;
     }
