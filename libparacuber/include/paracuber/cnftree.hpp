@@ -253,8 +253,10 @@ class CNFTree
   int64_t m_originCNFId;
   StateChangedSignal m_rootStateChangedSignal;
   NodeMap m_nodeMap;
-  LoggerMT m_logger;
+  Logger m_logger;
+
   mutable std::mutex m_nodeMapMutex;
+  mutable std::mutex m_logMutex;
 
   void setCNFResult(Path p, State state, Path source);
 

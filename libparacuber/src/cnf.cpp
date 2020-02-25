@@ -182,7 +182,7 @@ CNF::sendResult(int64_t id, CNFTree::Path p, SendFinishedCB finishedCallback)
 
   std::shared_lock lock(m_resultsMutex);
 
-  auto resultIt = m_results.find(p);
+  auto resultIt = m_results.find(CNFTree::cleanupPath(p));
   if(resultIt == m_results.end()) {
     PARACUBER_LOG(m_logger, LocalError)
       << "Could not find result for path " << CNFTree::pathToStrNoAlloc(p)
@@ -201,6 +201,8 @@ CNF::sendResult(int64_t id, CNFTree::Path p, SendFinishedCB finishedCallback)
         return messages::JobResult::State::UNKNOWN;
     }
   }();
+
+  assert(jobResultState != messages::JobResult::State::UNKNOWN);
 
   auto jobResult = messages::JobResult(result.p, jobResultState);
 
@@ -283,7 +285,7 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
       {
         std::unique_lock lock(m_resultsMutex);
         m_results.insert(
-          std::make_pair(CNFTree::cleanupPath(jr.getPath()), std::move(res)));
+          std::make_pair(CNFTree::cleanupPath(jr.getPath()), res));
       }
       handleFinishedResultReceived(res, sentFromID);
       break;

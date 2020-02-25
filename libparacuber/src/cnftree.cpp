@@ -19,7 +19,7 @@ CNFTree::CNFTree(LogPtr log,
   : m_rootCNF(rootCNF)
   , m_config(config)
   , m_originCNFId(originCNFId)
-  , m_logger(log->createLoggerMT(
+  , m_logger(log->createLogger(
       ("CNFTree of formula " + std::to_string(rootCNF.getOriginId()))))
 {}
 CNFTree::~CNFTree() {}
@@ -82,12 +82,16 @@ CNFTree::insertNodeFromRemote(Path p, int64_t remoteId)
     // immediately and received the same job as before. If this event is just
     // silently ignored and the receivedFrom field replaced, the result will
     // still be propagated upwards correctly.
-    PARACUBER_LOG(m_logger, GlobalWarning)
-      << "Receive path " << pathToStrNoAlloc(p)
-      << " that was inserted previously from remote " << node->receivedFrom
-      << " again! This time from " << remoteId
-      << ". Setting receivedFrom to new remote and ignore this network-related "
-         "error.";
+    {
+      std::unique_lock loggerLock(m_logMutex);
+      PARACUBER_LOG(m_logger, GlobalWarning)
+        << "Receive path " << pathToStrNoAlloc(p)
+        << " that was inserted previously from remote " << node->receivedFrom
+        << " again! This time from " << remoteId
+        << ". Setting receivedFrom to new remote and ignore this "
+           "network-related "
+           "error.";
+    }
   }
   node->receivedFrom = remoteId;
 }
@@ -191,9 +195,12 @@ CNFTree::propagateUpwardsFrom(Path p, Path sourcePath)
   }
 
   if(changed) {
-    PARACUBER_LOG(m_logger, Trace)
-      << "Deduce " << node->state << " for path " << pathToStrNoAlloc(p)
-      << " when applying path " << pathToStrNoAlloc(sourcePath);
+    {
+      std::unique_lock loggerLock(m_logMutex);
+      PARACUBER_LOG(m_logger, Trace)
+        << "Deduce " << node->state << " for path " << pathToStrNoAlloc(p)
+        << " when applying path " << pathToStrNoAlloc(sourcePath);
+    }
 
     setCNFResult(cleanupPath(p), node->state, sourcePath);
 
