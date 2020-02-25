@@ -196,8 +196,6 @@ Runner::QueueEntry::~QueueEntry() {}
 void
 Runner::checkTaskFactories()
 {
-  static int i = 0;
-
   std::shared_lock lock(m_taskFactoriesMutex);
   for(auto factory : m_taskFactories) {
     // Check if more tasks should be requested for every factory and if new
