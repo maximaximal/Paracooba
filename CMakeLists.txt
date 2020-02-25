@@ -40,9 +40,10 @@ enable_testing()
 add_subdirectory(third_party)
 
 # Address Sanitizer for Debug Builds
-if(DEBUG_ENABLE_ADDRESS_SANITIZERN)
-    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-    set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+if(DEBUG_ENABLE_ADDRESS_SANITIZER)
+    set(CMAKE_BUILD_TYPE Debug)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 endif()
 
 add_subdirectory(libparacuber)
