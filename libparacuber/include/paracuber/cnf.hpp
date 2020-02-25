@@ -159,6 +159,7 @@ class CNF
   ConfigPtr m_config;
   LogPtr m_log;
   Logger m_logger;
+  std::mutex m_loggerMutex;
 
   void connectToCNFTreeSignal();
 

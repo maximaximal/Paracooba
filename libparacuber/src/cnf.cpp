@@ -246,8 +246,11 @@ jrStateToCNFTreeState(messages::JobResult::State s)
 void
 CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
 {
-  PARACUBER_LOG(m_logger, Trace)
-    << "Received " << jd.tagline() << " from " << sentFromID;
+  {
+    std::unique_lock loggerLock(m_loggerMutex);
+    PARACUBER_LOG(m_logger, Trace)
+      << "Received " << jd.tagline() << " from " << sentFromID;
+  }
   switch(jd.getKind()) {
     case messages::JobDescription::Kind::Path: {
       const auto jp = jd.getJobPath();
@@ -403,26 +406,30 @@ CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
   res.size = res.task->getVarCount();
 
   switch(result.getStatus()) {
-    case TaskResult::Satisfiable:
+    case TaskResult::Satisfiable: {
       res.state = CNFTree::SAT;
 
       // Satisfiable results must be directly wrapped in the result array, as
       // the solver instances are shared between solver tasks.
+      std::unique_lock loggerLock(m_loggerMutex);
       PARACUBER_LOG(m_logger, Trace)
         << "Encode Assignment because SAT encountered!";
       res.encodeAssignment();
       break;
+    }
     case TaskResult::Unsatisfiable:
       res.state = CNFTree::UNSAT;
       break;
     case TaskResult::Unsolved:
       res.state = CNFTree::Unknown;
       break;
-    default:
+    default: {
       // Other results are not handled here.
+      std::unique_lock loggerLock(m_loggerMutex);
       PARACUBER_LOG(m_logger, LocalError)
         << "Invalid status received for finished solver task: "
         << result.getStatus();
+    }
   }
 
   // Give back the solver handle from the result after it was fully processed.
@@ -566,9 +573,12 @@ CNF::getRootTask()
 void
 CNF::handleFinishedResultReceived(Result& result, int64_t sentFromId)
 {
-  PARACUBER_LOG(m_logger, Trace)
-    << "Finished result received! State: " << result.state << " on path "
-    << CNFTree::pathToStrNoAlloc(result.p) << " from id " << sentFromId;
+  {
+    std::unique_lock loggerLock(m_loggerMutex);
+    PARACUBER_LOG(m_logger, Trace)
+      << "Finished result received! State: " << result.state << " on path "
+      << CNFTree::pathToStrNoAlloc(result.p) << " from id " << sentFromId;
+  }
 
   // Insert result into local CNF Tree. The state change should only stay local,
   // no propagate to the node that sent this change.
@@ -587,6 +597,7 @@ CNF::insertResult(CNFTree::Path p, CNFTree::State state, CNFTree::Path source)
     if(resIt != m_results.end()) {
       return &resIt->second;
     } else {
+      std::unique_lock loggerLock(m_loggerMutex);
       PARACUBER_LOG(m_logger, Trace)
         << "Insert result " << state << " for path "
         << CNFTree::pathToStrNoAlloc(p) << " from source path "
