@@ -19,6 +19,7 @@
 #include <boost/asio.hpp>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/deadline_timer.hpp>
+#include <boost/asio/high_resolution_timer.hpp>
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/address_v4.hpp>
 #include <boost/asio/ip/udp.hpp>
@@ -835,7 +836,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
 
       auto ptr = shared_from_this();
 
-      m_timer.expires_from_now(std::chrono::seconds(1));
+      m_timer.expires_from_now(std::chrono::milliseconds(500));
       m_timer.async_wait([ptr, this](const boost::system::error_code& e) {
         if(e != boost::asio::error::operation_aborted) {
           auto jd = std::move(m_jobDescription.value());
@@ -859,7 +860,7 @@ class Communicator::TCPClient : public std::enable_shared_from_this<TCPClient>
   TCPMode m_mode;
   std::optional<messages::JobDescription> m_jobDescription;
   std::function<void(bool)> m_finishedCB;
-  boost::asio::steady_timer m_timer;
+  boost::asio::high_resolution_timer m_timer;
 };
 
 class Communicator::TCPServer
