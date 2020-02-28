@@ -1,4 +1,4 @@
-#include "paracuber/messages/online_announcement.hpp"
+#include "paracooba/messages/online_announcement.hpp"
 #include <catch2/catch.hpp>
 #include <initializer_list>
 
@@ -6,10 +6,10 @@
 #include <boost/bind.hpp>
 #include <cereal/archives/binary.hpp>
 #include <iostream>
-#include <paracuber/messages/message.hpp>
+#include <paracooba/messages/message.hpp>
 
 using namespace boost;
-using namespace paracuber::messages;
+using namespace paracooba::messages;
 
 void
 noop()

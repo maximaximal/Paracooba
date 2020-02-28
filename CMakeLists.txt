@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(paracuber
+project(paracooba
     VERSION 0.1.0)
 
 
@@ -46,7 +46,7 @@ if(DEBUG_ENABLE_ADDRESS_SANITIZER)
     set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 endif()
 
-add_subdirectory(libparacuber)
+add_subdirectory(libparacooba)
 
 # Files
 add_subdirectory(src)
@@ -74,10 +74,10 @@ endfunction()
 add_executable(parac ${SRCS})
 set_property(TARGET parac PROPERTY CXX_STANDARD 17)
 
-define_file_basename_for_sources(paracuber)
+define_file_basename_for_sources(paracooba)
 define_file_basename_for_sources(parac)
 
-target_link_libraries(parac PUBLIC paracuber)
+target_link_libraries(parac PUBLIC paracooba)
 target_link_libraries(parac PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(parac PUBLIC Boost::log Boost::program_options)
 target_include_directories(parac PUBLIC ${libcadical_INCLUDE_DIRS})
@@ -110,7 +110,7 @@ set(CPACK_GENERATOR "DEB")
 
 set(CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Distributed SAT Solver based on CaDiCaL")
-set(CPACK_PACKAGE_NAME "ParaCuber")
+set(CPACK_PACKAGE_NAME "Paracooba")
 set(CPACK_PACKAGE_VENDOR "FMV")
 set(CPACK_PACKAGE_VERSION ${VERSION})
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})

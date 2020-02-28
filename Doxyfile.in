@@ -32,7 +32,7 @@ DOXYFILE_ENCODING      = UTF-8
 # title of most generated pages and in a few other places.
 # The default value is: My Project.
 
-PROJECT_NAME           = "ParaCuber"
+PROJECT_NAME           = "Paracooba"
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. This
 # could be handy for archiving the generated documentation or if some version
@@ -815,11 +815,11 @@ WARN_LOGFILE           =
 
 INPUT                  = "@CMAKE_CURRENT_SOURCE_DIR@/doc/pages/" \
                          "@CMAKE_CURRENT_SOURCE_DIR@/src" \
-			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacuber/include/paracuber" \
-			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacuber/include/paracuber/cuber" \
-			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacuber/include/paracuber/messages" \
-			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacuber/include/paracuber/webserver" \
-			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacuber/src"
+			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacooba/include/paracooba" \
+			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacooba/include/paracooba/cuber" \
+			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacooba/include/paracooba/messages" \
+			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacooba/include/paracooba/webserver" \
+			 "@CMAKE_CURRENT_SOURCE_DIR@/libparacooba/src"
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses

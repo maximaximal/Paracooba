@@ -1,12 +1,12 @@
-#include "paracuber/task_factory.hpp"
-#include "paracuber/util.hpp"
+#include "paracooba/task_factory.hpp"
+#include "paracooba/util.hpp"
 #include <catch2/catch.hpp>
-#include <paracuber/cnftree.hpp>
-#include <paracuber/config.hpp>
-#include <paracuber/decision_task.hpp>
-#include <paracuber/log.hpp>
+#include <paracooba/cnftree.hpp>
+#include <paracooba/config.hpp>
+#include <paracooba/decision_task.hpp>
+#include <paracooba/log.hpp>
 
-using namespace paracuber;
+using namespace paracooba;
 
 TEST_CASE("TaskFactory Manipulation")
 {

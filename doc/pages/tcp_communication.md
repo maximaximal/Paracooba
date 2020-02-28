@@ -28,7 +28,7 @@ The transmission type maps into these cases:
 | Byte | Name                                                               |
 |------|--------------------------------------------------------------------|
 | 0-4  | Size of JobDescription to receive.                                 |
-| 4-m  | paracuber::messages::JobDescription (binary serialised via Cereal) |
+| 4-m  | paracooba::messages::JobDescription (binary serialised via Cereal) |
 
 Meta Network Link
 -----------------

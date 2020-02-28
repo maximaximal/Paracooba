@@ -1,8 +1,8 @@
 #include <catch2/catch.hpp>
 #include <initializer_list>
-#include <paracuber/assignment_serializer.hpp>
+#include <paracooba/assignment_serializer.hpp>
 
-using namespace paracuber;
+using namespace paracooba;
 
 struct Solver
 {

@@ -11,8 +11,8 @@ left, a `1` to the right. The following graphic visualises such a tree.
 
 The whole tree will never be completely materialised on all compute nodes, instead
 each compute node has its own version of the tree in the form of a disjoint sub-tree. The tree is
-represented by the paracuber::CNFTree class, which also implements the visitor to walk over
-any given decision procedure defined by a paracuber::CNFTree::Path variable.
+represented by the paracooba::CNFTree class, which also implements the visitor to walk over
+any given decision procedure defined by a paracooba::CNFTree::Path variable.
 
 Root Formula
 ------------
@@ -27,12 +27,12 @@ Cubes
 Cubes branch off of the root formula and go down into the tree. No single cube is manifested directly - instead,
 cubes are calculated while traversing the tree. They are then applied to the SAT solver by stepping through the tree.
 
-Applying Cubes to a solver inside a paracuber::CaDiCaLTask
+Applying Cubes to a solver inside a paracooba::CaDiCaLTask
 ----------------------------------------------------------
 
 To apply a cube to a solver, the previous solver is copied and the new cube is applied. This
 prevents the solver from re-parsing the entire tree and only changes need to be applied. Every
-branch can also be parallelised. This step happens in paracuber::CaDiCaLTask::readCNF.
+branch can also be parallelised. This step happens in paracooba::CaDiCaLTask::readCNF.
 
 A cube can only be applied to a solver that already has all previous
 cubes applied to it, which means to apply a new cube to an existing solver instance, the depths
@@ -54,7 +54,7 @@ in the CNF Tree. These cases are:
   3. Remote Parent & Local Sibling
   4. Remote Parent & Remote Sibling
 
-These situations are differentiated in paracuber::CNFTree::setState.
+These situations are differentiated in paracooba::CNFTree::setState.
 
 Additionally, only UNSAT results need to be handled with care. SAT results
 can always just be sent upwards.

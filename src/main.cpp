@@ -1,16 +1,16 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 
-#include <paracuber/client.hpp>
-#include <paracuber/cnf.hpp>
-#include <paracuber/communicator.hpp>
-#include <paracuber/config.hpp>
-#include <paracuber/daemon.hpp>
-#include <paracuber/log.hpp>
-#include <paracuber/util.hpp>
+#include <paracooba/client.hpp>
+#include <paracooba/cnf.hpp>
+#include <paracooba/communicator.hpp>
+#include <paracooba/config.hpp>
+#include <paracooba/daemon.hpp>
+#include <paracooba/log.hpp>
+#include <paracooba/util.hpp>
 
 namespace po = boost::program_options;
-using namespace paracuber;
+using namespace paracooba;
 
 int
 main(int argc, char* argv[])
@@ -25,8 +25,8 @@ main(int argc, char* argv[])
   std::shared_ptr<Log> log = std::make_shared<Log>(config);
   auto logger = log->createLogger("main");
 
-  PARACUBER_LOG(logger, Trace)
-    << "Starting paracuber \"" << config->getString(Config::LocalName)
+  PARACOOBA_LOG(logger, Trace)
+    << "Starting paracooba \"" << config->getString(Config::LocalName)
     << "\" in " << (config->isDaemonMode() ? "daemon mode" : "client mode");
 
   CommunicatorPtr communicator = std::make_shared<Communicator>(config, log);
@@ -46,7 +46,7 @@ main(int argc, char* argv[])
   try {
     communicator->run();
   } catch(std::exception& e) {
-    PARACUBER_LOG(logger, LocalError)
+    PARACOOBA_LOG(logger, LocalError)
       << "Encountered exception which was not catched until main()! Message: "
       << e.what();
   }
@@ -58,11 +58,11 @@ main(int argc, char* argv[])
     try {
       std::string_view dumpTree = config->getString(Config::DumpTreeAtExit);
       if(dumpTree != "") {
-        PARACUBER_LOG(logger, Trace) << "Dump CNF Tree to file " << dumpTree;
+        PARACOOBA_LOG(logger, Trace) << "Dump CNF Tree to file " << dumpTree;
         client->getRootCNF()->getCNFTree().dumpTreeToFile(dumpTree);
       }
     } catch(const std::exception& e) {
-      PARACUBER_LOG(logger, LocalError)
+      PARACOOBA_LOG(logger, LocalError)
         << "Dump CNF Tree to file failed! Error: " << e.what();
     }
 
@@ -80,6 +80,6 @@ main(int argc, char* argv[])
   } else {
   }
 
-  PARACUBER_LOG(logger, Trace) << "Ending paracuber.";
+  PARACOOBA_LOG(logger, Trace) << "Ending paracooba.";
   return EXIT_SUCCESS;
 }

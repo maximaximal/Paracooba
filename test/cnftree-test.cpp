@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
-#include <paracuber/cnftree.hpp>
+#include <paracooba/cnftree.hpp>
 
-using namespace paracuber;
+using namespace paracooba;
 
 TEST_CASE("CNFTree::Path manipulation")
 {

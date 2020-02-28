@@ -1,8 +1,8 @@
 #include <catch2/catch.hpp>
-#include <paracuber/cuber/cuber.hpp>
+#include <paracooba/cuber/cuber.hpp>
 
-using namespace paracuber;
-using namespace paracuber::cuber;
+using namespace paracooba;
+using namespace paracooba::cuber;
 
 TEST_CASE("Cuber initialise and transform LiteralOccurenceMap to LiteralMap")
 {
