@@ -219,6 +219,16 @@ CNF::sendResult(int64_t id, CNFTree::Path p, SendFinishedCB finishedCallback)
   m_jobDescriptionTransmitter->transmitJobDescription(
     std::move(jd), id, [this, finishedCallback, p, id](bool success) {
       if(success) {
+        // A result has been sent
+        if(m_numberOfUnansweredRemoteWork > 0) {
+          --m_numberOfUnansweredRemoteWork;
+        } else {
+          std::unique_lock loggerLock(m_loggerMutex);
+          PARACUBER_LOG(m_logger, LocalWarning)
+            << "The number of unanswered remote work is already 0 and should "
+               "be "
+               "decreased again. This should not happen!";
+        }
         finishedCallback();
       } else {
         PARACUBER_LOG(m_logger, GlobalError)
@@ -256,6 +266,11 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
       const auto jp = jd.getJobPath();
       auto p = CNFTree::cleanupPath(jp.getPath());
       m_cnfTree->insertNodeFromRemote(p, sentFromID);
+
+      // As a new path has been received, the number of unanswered remote work
+      // increases. It is decreased again once a result is sent. This is
+      // especially important for auto shutdown.
+      ++m_numberOfUnansweredRemoteWork;
 
       // Immediately realise task, so the chain of distributing tasks cannot be
       // broken by offloading the task directly after it was inserted into the

@@ -1,6 +1,7 @@
 #ifndef PARACUBER_CNF_HPP
 #define PARACUBER_CNF_HPP
 
+#include <atomic>
 #include <boost/signals2/signal.hpp>
 #include <fstream>
 #include <functional>
@@ -142,6 +143,11 @@ class CNF
                     CNFTree::State state,
                     CNFTree::Path source);
 
+  size_t getNumberOfUnansweredRemoteWork() const
+  {
+    return m_numberOfUnansweredRemoteWork;
+  }
+
   enum CubingKind
   {
     LiteralFrequency,
@@ -192,6 +198,8 @@ class CNF
 
   TaskFactory* m_taskFactory = nullptr;
   ResultFoundSignal m_resultSignal;
+
+  std::atomic_size_t m_numberOfUnansweredRemoteWork = 0;
 };
 
 std::ostream&

@@ -104,6 +104,7 @@ class TaskFactory
   ProducedTask produceSolveTask(std::unique_ptr<TaskSkeleton> skel);
 
   size_t getNumberOfOffloadedTasks() const;
+  size_t getNumberOfUnansweredRemoteWork() const;
 
   CaDiCaLMgr* getCaDiCaLMgr()
   {

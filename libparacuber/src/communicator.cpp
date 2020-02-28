@@ -1072,8 +1072,6 @@ class Communicator::TCPServer
                 break;
             }
           }
-
-          m_comm->getRunner()->conditionallySetAutoShutdownTimer();
           return;
         }
 
@@ -1370,7 +1368,16 @@ Communicator::transmitJobDescription(messages::JobDescription&& jd,
       try {
         auto client = std::make_shared<TCPClient>(
           this, m_log, m_ioService, targetID, TCPMode::TransmitJobDescription);
-        client->insertJobDescription(std::move(jd), sendFinishedCB);
+        client->insertJobDescription(
+          std::move(jd), [this, sendFinishedCB](bool success) {
+            sendFinishedCB(success);
+            if(success) {
+              // The auto shutdown timer can be checked against again
+              // now, that the
+              // TCPClient was sent.
+              getRunner()->conditionallySetAutoShutdownTimer();
+            }
+          });
         client->connect();
       } catch(const std::exception& e) {
         PARACUBER_LOG(m_logger, LocalWarning)

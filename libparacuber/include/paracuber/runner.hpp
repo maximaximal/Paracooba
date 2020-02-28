@@ -111,6 +111,7 @@ class Runner
   };
 
   size_t getNumberOfCurrentlyOffloadedJobs() const;
+  size_t getNumberOfUnansweredRemoteWork() const;
 
   std::unique_ptr<PriorityQueueLockSemanticsUniquePtr<QueueEntry>> m_taskQueue;
 

@@ -216,8 +216,8 @@ Runner::conditionallySetAutoShutdownTimer()
 {
   int32_t seconds = m_config->getInt32(Config::AutoShutdown);
   if(seconds < 0 || m_numberOfRunningTasks > 0 || m_autoShutdownArmed ||
-     m_taskQueue->size() > 0 || getNumberOfCurrentlyOffloadedJobs() > 0 ||
-     !m_config->isDaemonMode())
+     m_taskQueue->size() > 0 || getNumberOfUnansweredRemoteWork() > 0 ||
+     getNumberOfCurrentlyOffloadedJobs() > 0 || !m_config->isDaemonMode())
     return;
 
   std::unique_lock lock(m_autoShutdownTimerMutex);
@@ -256,6 +256,16 @@ Runner::getNumberOfCurrentlyOffloadedJobs() const
   size_t number = 0;
   for(const auto& factory : m_taskFactories) {
     number += factory->getNumberOfOffloadedTasks();
+  }
+  return number;
+}
+size_t
+Runner::getNumberOfUnansweredRemoteWork() const
+{
+  std::shared_lock lock(m_taskFactoriesMutex);
+  size_t number = 0;
+  for(const auto& factory : m_taskFactories) {
+    number += factory->getNumberOfUnansweredRemoteWork();
   }
   return number;
 }

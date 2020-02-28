@@ -160,6 +160,12 @@ TaskFactory::getNumberOfOffloadedTasks() const
   return size;
 }
 
+size_t
+TaskFactory::getNumberOfUnansweredRemoteWork() const
+{
+  return m_rootCNF->getNumberOfUnansweredRemoteWork();
+}
+
 void
 TaskFactory::addExternallyProcessingTask(int64_t originator,
                                          CNFTree::Path p,
