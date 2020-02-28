@@ -400,26 +400,6 @@ CNF::readyToBeStarted() const
 }
 
 void
-CNF::requestInfoGlobally(CNFTree::Path path, int64_t handle)
-{
-  Communicator* comm = m_config->getCommunicator();
-  m_cnfTree->visit(
-    m_cnfTree->getTopmostAvailableParent(path),
-    path,
-    [this, handle, comm, path](CNFTree::Path p, const CNFTree::Node& n) {
-      if(CNFTree::getDepth(p) == CNFTree::getDepth(path)) {
-        comm->injectCNFTreeNodeInfo(m_originId, handle, p, n.state, 0);
-        return true;
-      } else if(n.isOffloaded()) {
-        comm->sendCNFTreeNodeStatusRequest(
-          n.offloadedTo, m_originId, p, handle);
-        return true;
-      }
-      return false;
-    });
-}
-
-void
 CNF::solverFinishedSlot(const TaskResult& result, CNFTree::Path p)
 {
   Result res;

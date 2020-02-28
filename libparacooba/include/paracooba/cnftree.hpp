@@ -134,6 +134,9 @@ class CNFTree
   void offloadNodeToRemote(Path p, int64_t remoteId);
   /** @brief Only called when resetting a node in case of re-adding tasks. */
   void resetNode(Path p);
+  /** @brief Get the node a path was offloaded to. If the path is handled
+   * locally, returns 0. If the path does not exist, returns -1. */
+  int64_t getOffloadTargetNodeID(Path p);
 
   Path getTopmostAvailableParent(Path p) const;
 

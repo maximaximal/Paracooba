@@ -6,6 +6,8 @@
 #include "../../include/paracooba/config.hpp"
 #include "../../include/paracooba/cuber/registry.hpp"
 #include "../../include/paracooba/webserver/webserver.hpp"
+
+#include "../../include/paracooba/messages/cnftree_node_status_request.hpp"
 #include <cassert>
 #include <regex>
 #include <sstream>
@@ -129,25 +131,32 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
   }
   auto it = m_wsData.find(socket);
   if(it == m_wsData.end()) {
-    it =
-      m_wsData
-        .insert(WSPair(socket, std::make_unique<WSData>(session, cb, dataCB)))
-        .first;
-
     std::shared_ptr<CNF> cnf;
+
+    int64_t cnfId = 0;
+    if(!m_config->isDaemonMode()) {
+      cnf = m_config->getClient()->getRootCNF();
+      cnfId = cnf->getOriginId();
+    }
+
+    it = m_wsData
+           .insert(WSPair(socket,
+                          std::make_unique<WSData>(session, cb, dataCB, cnfId)))
+           .first;
 
     if(m_config->isDaemonMode()) {
       // Daemons only show cluster stats.
     } else {
-      cnf = m_config->getClient()->getRootCNF();
-
       // First, wait for the allowance map to be ready.
       cnf->rootTaskReady.callWhenReady([this, cnf, socket](CaDiCaLTask& ptr) {
         // Registry is only initialised after the root task arrived.
         cnf->getCuberRegistry().allowanceMapWaiter.callWhenReady(
           [this, cnf, socket](cuber::Registry::AllowanceMap& map) {
-            m_config->getCommunicator()->requestCNFPathInfo(
-              CNFTree::buildPath(0, 0), reinterpret_cast<int64_t>(socket));
+            m_config->getCommunicator()->requestCNFTreePathInfo(
+              messages::CNFTreeNodeStatusRequest(
+                reinterpret_cast<int64_t>(socket),
+                CNFTree::buildPath(0, 0),
+                cnf->getOriginId()));
             m_config->getCommunicator()
               ->checkAndTransmitClusterStatisticsChanges(true);
           });
@@ -170,17 +179,23 @@ API::handleWebSocketRequest(const boost::asio::ip::tcp::socket* socket,
     }
 
     CNFTree::Path p = CNFTree::strToPath(strPath.data(), strPath.length());
-    m_config->getCommunicator()->requestCNFPathInfo(
-      p, reinterpret_cast<int64_t>(socket));
+    m_config->getCommunicator()->requestCNFTreePathInfo(
+      messages::CNFTreeNodeStatusRequest(
+        reinterpret_cast<int64_t>(socket), p, data.cnfId));
     if(next) {
-      m_config->getCommunicator()->requestCNFPathInfo(
-        CNFTree::getNextLeftPath(p), reinterpret_cast<int64_t>(socket));
+      m_config->getCommunicator()->requestCNFTreePathInfo(
+        messages::CNFTreeNodeStatusRequest(reinterpret_cast<int64_t>(socket),
+                                           CNFTree::getNextLeftPath(p),
+                                           data.cnfId));
 
-      m_config->getCommunicator()->requestCNFPathInfo(
-        CNFTree::getNextRightPath(p), reinterpret_cast<int64_t>(socket));
+      m_config->getCommunicator()->requestCNFTreePathInfo(
+        messages::CNFTreeNodeStatusRequest(reinterpret_cast<int64_t>(socket),
+                                           CNFTree::getNextRightPath(p),
+                                           data.cnfId));
     } else {
-      m_config->getCommunicator()->requestCNFPathInfo(
-        p, reinterpret_cast<int64_t>(socket));
+      m_config->getCommunicator()->requestCNFTreePathInfo(
+        messages::CNFTreeNodeStatusRequest(
+          reinterpret_cast<int64_t>(socket), p, data.cnfId));
     }
 
   } else if(type == "ping") {

@@ -442,30 +442,7 @@ class Communicator::UDPServer
       return;
     }
 
-    // Build answer message.
-    messages::Message replyMsg;
-    messages::CNFTreeNodeStatusReply reply(cnfTreeNodeStatusRequest.getHandle(),
-                                           cnfTreeNodeStatusRequest.getPath(),
-                                           cnfId);
-
-    auto& cnfTree = cnf->getCNFTree();
-    cnfTree.visit(
-      cnfTree.getTopmostAvailableParent(cnfTreeNodeStatusRequest.getPath()),
-      cnfTreeNodeStatusRequest.getPath(),
-      [this, path, &reply](CNFTree::Path p, const CNFTree::Node& n) {
-        reply.addNode(p, n.state);
-        return false;
-      });
-
-    if(reply.getNodeSize() != CNFTree::getDepth(path) + 1) {
-      // Not enough local information for a reply.
-      PARACOOBA_LOG(m_logger, LocalError)
-        << "No reply to request for path " << CNFTree::pathToStrNoAlloc(path);
-      return;
-    }
-
-    replyMsg.insertCNFTreeNodeStatusReply(std::move(reply));
-    sendMessage(m_remoteEndpoint, replyMsg, false);
+    m_communicator->requestCNFTreePathInfo(cnfTreeNodeStatusRequest);
   }
   void handleCNFTreeNodeStatusReply(const messages::Message& msg)
   {
@@ -473,8 +450,8 @@ class Communicator::UDPServer
       msg.getCNFTreeNodeStatusReply();
     int64_t originId = msg.getOrigin();
     int64_t cnfId = cnfTreeNodeStatusReply.getCnfId();
-    int64_t handle = cnfTreeNodeStatusReply.getHandle();
     uint64_t path = cnfTreeNodeStatusReply.getPath();
+    auto& handleStack = cnfTreeNodeStatusReply.getHandleStack();
 
     // Depending on the handle, this is sent to the internal CNFTree handling
     // mechanism (handle == 0) or to the webserver for viewing (handle != 0).
@@ -493,20 +470,23 @@ class Communicator::UDPServer
     PARACOOBA_LOG(m_logger, Trace)
       << "Receive CNFTree info for path " << CNFTree::pathToStrNoAlloc(path);
 
-    if(handle == 0) {
-
-    } else {
-      // Only the very last entry is required for viewing. The rest can be used
-      // for load balancing purposes.
-
+    if(handleStack.size() == 1) {
+      // This reply arrived at the original sender! Inject all available
+      // information.
       for(auto& nodeIt : nodes) {
         m_communicator->injectCNFTreeNodeInfo(
           cnfId,
-          handle,
+          handleStack.top(),
           nodeIt.path,
           static_cast<CNFTree::State>(nodeIt.state),
           originId);
       }
+    } else {
+      // Forward the reply to the next hop. Stack is implicitly popped.
+      messages::Message replyMsg;
+      messages::CNFTreeNodeStatusReply reply(cnfTreeNodeStatusReply);
+      replyMsg.insertCNFTreeNodeStatusReply(std::move(reply));
+      sendMessage(cnfTreeNodeStatusReply.getHandle(), replyMsg, false);
     }
   }
 
@@ -540,7 +520,28 @@ class Communicator::UDPServer
                              targetId);
   }
 
-  void sendMessage(boost::asio::ip::udp::endpoint endpoint,
+  /** @brief Tries to send a message to the given target node (by ID) if that
+   * target exists. If it does not exist, this method returns false, else, it
+   * returns true. */
+  bool sendMessage(int64_t targetNode,
+                   const messages::Message& msg,
+                   bool fromRunner = true,
+                   bool async = false)
+  {
+    if(!m_clusterStatistics->hasNode(targetNode)) {
+      return false;
+    }
+    NetworkedNode* nn =
+      m_clusterStatistics->getNode(targetNode).getNetworkedNode();
+    if(!nn) {
+      return false;
+    }
+
+    return sendMessage(nn->getRemoteUdpEndpoint(), msg, fromRunner, async);
+  }
+
+  /** Sends a message to the given endpoint. Always returns true. */
+  bool sendMessage(boost::asio::ip::udp::endpoint endpoint,
                    const messages::Message& msg,
                    bool fromRunner = true,
                    bool async = false)
@@ -604,6 +605,7 @@ class Communicator::UDPServer
         }
       }
     }
+    return true;
   }
 
   private:
@@ -1388,33 +1390,6 @@ Communicator::transmitJobDescription(messages::JobDescription&& jd,
 }
 
 void
-Communicator::requestCNFPathInfo(CNFTree::Path p, int64_t handle, int64_t cnfId)
-{
-  std::shared_ptr<CNF> rootCNF;
-
-  if(m_config->isDaemonMode()) {
-    if(cnfId == 0) {
-      PARACOOBA_LOG(m_logger, LocalError)
-        << "Cannot request status on daemon node without ID!";
-      return;
-    }
-
-    // TODO
-    assert(false);
-  } else {
-    rootCNF = m_config->getClient()->getRootCNF();
-  }
-
-  if(!rootCNF) {
-    PARACOOBA_LOG(m_logger, LocalError)
-      << "Cannot answer CNFTree path request without CNF instance!";
-    return;
-  }
-
-  rootCNF->requestInfoGlobally(p, handle);
-}
-
-void
 Communicator::injectCNFTreeNodeInfo(int64_t cnfId,
                                     int64_t handle,
                                     CNFTree::Path p,
@@ -1433,17 +1408,48 @@ Communicator::injectCNFTreeNodeInfo(int64_t cnfId,
 }
 
 void
-Communicator::sendCNFTreeNodeStatusRequest(int64_t targetId,
-                                           int64_t cnfId,
-                                           CNFTree::Path p,
-                                           int64_t handle)
+Communicator::requestCNFTreePathInfo(
+  const messages::CNFTreeNodeStatusRequest& request)
 {
-  auto& statNode = m_clusterStatistics->getNode(targetId);
-  auto* nn = statNode.getNetworkedNode();
-  messages::CNFTreeNodeStatusRequest request(handle, p, cnfId);
-  auto msg = m_udpServer->buildMessage(targetId);
-  msg.insert(std::move(request));
-  m_udpServer->sendMessage(nn->getRemoteUdpEndpoint(), msg, false);
+  std::shared_ptr<CNF> cnf = GetRootCNF(m_config.get(), request.getCnfId());
+  if(!cnf)
+    return;
+  CNFTree& cnfTree = cnf->getCNFTree();
+
+  CNFTree::Path p = request.getPath();
+
+  int64_t targetNode = cnfTree.getOffloadTargetNodeID(p);
+
+  if(targetNode == -1) {
+    // No reply possible as the path is not known!
+    return;
+  } else if(targetNode == 0) {
+    // Handled locally, can directly insert local information, if this should be
+    // sent to a remote or inserted into local info if requested locally.
+
+    if(request.getHandleStack().size() == 1) {
+      // Handle this request locally.
+      injectCNFTreeNodeInfo(request.getCnfId(),
+                            request.getHandle(),
+                            p,
+                            cnfTree.getState(p),
+                            m_config->getInt64(Config::Id));
+    } else {
+      // Build answer message.
+      messages::Message replyMsg;
+      messages::CNFTreeNodeStatusReply reply(m_config->getInt64(Config::Id),
+                                             request);
+      reply.addNode(request.getPath(), cnfTree.getState(request.getPath()));
+      replyMsg.insertCNFTreeNodeStatusReply(std::move(reply));
+      m_udpServer->sendMessage(request.getHandle(), replyMsg, false);
+    }
+  } else {
+    messages::Message requestMsg;
+    messages::CNFTreeNodeStatusRequest request(m_config->getInt64(Config::Id),
+                                               request);
+    requestMsg.insert(std::move(request));
+    m_udpServer->sendMessage(targetNode, requestMsg, false);
+  }
 }
 
 void

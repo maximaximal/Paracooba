@@ -25,6 +25,10 @@ class error_code;
 
 namespace paracooba {
 
+namespace messages {
+class CNFTreeNodeStatusRequest;
+}
+
 class Runner;
 class CNF;
 class NetworkedNode;
@@ -97,18 +101,14 @@ class Communicator
 
   void sendCNFToNode(std::shared_ptr<CNF> cnf, int64_t targetID);
 
-  void requestCNFPathInfo(CNFTree::Path p, int64_t handle, int64_t cnfId = 0);
-
   void injectCNFTreeNodeInfo(int64_t cnfId,
                              int64_t handle,
                              CNFTree::Path p,
                              CNFTree::State state,
                              int64_t remote);
 
-  void sendCNFTreeNodeStatusRequest(int64_t targetId,
-                                    int64_t cnfId,
-                                    CNFTree::Path p,
-                                    int64_t handle);
+  void requestCNFTreePathInfo(
+    const messages::CNFTreeNodeStatusRequest& request);
 
   virtual void transmitJobDescription(messages::JobDescription&& jd,
                                       int64_t id,

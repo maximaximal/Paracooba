@@ -63,16 +63,19 @@ class API
   {
     explicit WSData(std::weak_ptr<Webserver::HTTPSession> session,
                     WebSocketCB cb,
-                    WebSocketCBData dataCB)
+                    WebSocketCBData dataCB,
+                    int64_t cnfId)
       : session(session)
       , cb(cb)
       , dataCB(dataCB)
       , answer()
+      , cnfId(cnfId)
     {}
     std::weak_ptr<Webserver::HTTPSession> session;
     WebSocketCB cb;
     WebSocketCBData dataCB;
     boost::property_tree::ptree answer;
+    int64_t cnfId;
   };
   using WSPair =
     std::pair<const boost::asio::ip::tcp::socket*, std::unique_ptr<WSData>>;

@@ -121,6 +121,20 @@ CNFTree::resetNode(Path p)
   node->state = Unvisited;
 }
 
+int64_t
+CNFTree::getOffloadTargetNodeID(Path p)
+{
+  std::lock_guard lock(m_nodeMapMutex);
+  Node* node = getNode(p);
+  if(!node) {
+    return -1;
+  }
+  if(node->isOffloaded()) {
+    return node->offloadedTo;
+  }
+  return 0;
+}
+
 CNFTree::Path
 CNFTree::getTopmostAvailableParent(Path p) const
 {
