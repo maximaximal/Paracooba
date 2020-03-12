@@ -222,11 +222,10 @@ Daemon::duplicateContextWithNewId(int64_t oldId, int64_t currId, CNFTree::Path p
 
   auto cnf {*it->second->getRootCNF().get()};
   auto rootCNF = std::make_shared<CNF>(cnf);
+  cnf.sendAllowanceMap(currId, [](){});
 
   assert(p != CNFTree::DefaultUninitiatedPath);
 
-  std::vector<int> literals;
-  literals.reserve(CNFTree::getDepth(p));
 
   PARACOOBA_LOG(m_logger, Trace)
     << "Declaring assumption from cube " << CNFTree::pathToStrNoAlloc(p) << " ";
@@ -243,8 +242,8 @@ Daemon::duplicateContextWithNewId(int64_t oldId, int64_t currId, CNFTree::Path p
   auto pw =
     std::make_pair(currId, std::make_unique<Context>(rootCNF, currId, this,
       statsNode));
-  inserted = true; auto [contextIt, contextInserted] =
-  m_contextMap.insert(std::move(pw));
+  inserted = true;
+  auto [contextIt, contextInserted] = m_contextMap.insert(std::move(pw));
 
   assert(contextInserted);
 }
