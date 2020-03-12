@@ -87,6 +87,10 @@ class Daemon
 
   void forgetAboutContext(int64_t id);
 
+  /// duplicates an already exsisting context and makes it
+  /// a new context
+  void duplicateContextWithNewId(int64_t oldId, int64_t currId, CNFTree::Path p);
+
   private:
   ConfigPtr m_config;
   ContextMap m_contextMap;

@@ -63,29 +63,37 @@ class CaDiCaLTask : public Task
    */
   void copyFromCaDiCaLTask(const CaDiCaLTask& other);
 
-  void applyCubeFromCuberDeferred(CNFTree::Path p, cuber::Cuber& cuber);
+ void applyCubeFromCuberDeferred(CNFTree::Path p, cuber::Cuber& cuber);
 
-  /** @brief Queue parsing a DIMACS file into the internal solver instance.
+
+  /*** @brief add the cube as assumption to the CNF.
    *
-   * This returns immediately and the file is only parsed once the task has been
-   * started.
+   * @warning this cannot be undone!
+   *
    */
-  void readDIMACSFile(std::string_view sourcePath);
+ void applyCubeFromCuberAsAssumption(CNFTree::Path p);
 
-  /** @brief Read the given CNF and generate task from there.
-   *
-   * The root CNF gets parsed directly, other CNFs (cubes) are applied to the
-   * current state. This makes this function useful in conjunction with
-   * initialising this task from an old task that already finished. */
-  void readCNF(std::shared_ptr<CNF> cnf, CNFTree::Path path);
+ /** @brief Queue parsing a DIMACS file into the internal solver instance.
+  *
+  * This returns immediately and the file is only parsed once the task has been
+  * started.
+  */
+ void readDIMACSFile(std::string_view sourcePath);
 
-  virtual TaskResultPtr execute();
-  virtual void terminate();
+ /** @brief Read the given CNF and generate task from there.
+  *
+  * The root CNF gets parsed directly, other CNFs (cubes) are applied to the
+  * current state. This makes this function useful in conjunction with
+  * initialising this task from an old task that already finished. */
+ void readCNF(std::shared_ptr<CNF> cnf, CNFTree::Path path);
 
-  CaDiCaL::Solver& getSolver()
-  {
-    assert(m_solver);
-    return *m_solver;
+ virtual TaskResultPtr execute();
+ virtual void terminate();
+
+ CaDiCaL::Solver& getSolver()
+ {
+   assert(m_solver);
+   return *m_solver;
   }
   uint32_t getVarCount() { return m_internalVarCount; }
 

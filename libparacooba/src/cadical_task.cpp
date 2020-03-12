@@ -121,6 +121,34 @@ CaDiCaLTask::applyCubeFromCuber(CNFTree::Path p, cuber::Cuber& cuber)
 }
 
 void
+CaDiCaLTask::applyCubeFromCuberAsAssumption(CNFTree::Path p)
+{
+  provideSolver();
+
+  assert(p != CNFTree::DefaultUninitiatedPath);
+  assert(m_cuber);
+
+  std::vector<int> literals;
+  literals.reserve(CNFTree::getDepth(p));
+  m_cuber->getCube(p, literals);
+
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "Applying from cube " << CNFTree::pathToStrNoAlloc(m_path) << " ";
+
+  for(int lit : literals) {
+    m_solver->add(lit);
+    m_solver->add(0);
+  }
+
+  // This means, that the task was assigned from a factory, a callback must be
+  // given.
+  assert(m_cnf);
+  m_finishedSignal.connect(
+    std::bind(&CNF::solverFinishedSlot, m_cnf, std::placeholders::_1, p));
+}
+
+
+void
 CaDiCaLTask::readDIMACSFile(std::string_view sourcePath)
 {
   m_sourcePath = sourcePath;

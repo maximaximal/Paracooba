@@ -1,15 +1,16 @@
 #include "../include/paracooba/daemon.hpp"
+#include "../include/paracooba/cuber/literal_frequency.hpp"
 #include "../include/paracooba/cadical_task.hpp"
 #include "../include/paracooba/cnf.hpp"
 #include "../include/paracooba/communicator.hpp"
-#include "../include/paracooba/config.hpp"
 #include "../include/paracooba/log.hpp"
 #include "../include/paracooba/runner.hpp"
 #include "../include/paracooba/task_factory.hpp"
 #include <boost/filesystem.hpp>
+#include <memory>
 #include <shared_mutex>
 
-namespace paracooba {
+  namespace paracooba {
 Daemon::Context::Context(std::shared_ptr<CNF> rootCNF,
                          int64_t originatorID,
                          Daemon* daemon,
@@ -208,5 +209,43 @@ Daemon::getOrCreateContext(int64_t id)
     it = contextIt;
   }
   return { *it->second, inserted };
+}
+
+void
+Daemon::duplicateContextWithNewId(int64_t oldId, int64_t currId, CNFTree::Path p)
+{
+
+  std::unique_lock uniqueLock(m_contextMapMutex);
+  auto it = m_contextMap.find(oldId);
+
+  assert(it != m_contextMap.end());
+
+  auto cnf {*it->second->getRootCNF().get()};
+  auto rootCNF = std::make_shared<CNF>(cnf);
+
+  assert(p != CNFTree::DefaultUninitiatedPath);
+
+  std::vector<int> literals;
+  literals.reserve(CNFTree::getDepth(p));
+
+  PARACOOBA_LOG(m_logger, Trace)
+    << "Declaring assumption from cube " << CNFTree::pathToStrNoAlloc(p) << " ";
+
+  rootCNF->getRootTask()->applyCubeFromCuberAsAssumption(p);
+
+  cuber::Cuber::LiteralMap map (rootCNF->getRootTask()->getVarCount() + 1, 0);
+  auto cuber = cuber::LiteralFrequency(m_config,
+                                       m_log,
+                                       *rootCNF.get(),
+                                       &map);
+  auto [statsNode, inserted] =
+    m_communicator->getClusterStatistics()->getOrCreateNode(currId);
+  auto pw =
+    std::make_pair(currId, std::make_unique<Context>(rootCNF, currId, this,
+      statsNode));
+  inserted = true; auto [contextIt, contextInserted] =
+  m_contextMap.insert(std::move(pw));
+
+  assert(contextInserted);
 }
 }
