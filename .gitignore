@@ -127,3 +127,4 @@ tags
 .cquery_cached_index
 internalwebserver-docroot/js/.tern-port
 build/
+.clangd
