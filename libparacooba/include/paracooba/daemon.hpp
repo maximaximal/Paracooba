@@ -88,7 +88,7 @@ class Daemon
   void forgetAboutContext(int64_t id);
 
   private:
-  std::shared_ptr<Config> m_config;
+  ConfigPtr m_config;
   ContextMap m_contextMap;
   std::shared_mutex m_contextMapMutex;
   LogPtr m_log;

@@ -25,7 +25,7 @@ class CNFTree
   public:
   explicit CNFTree(LogPtr log,
                    CNF& rootCNF,
-                   std::shared_ptr<Config> config,
+                   ConfigPtr config,
                    int64_t originCNFId);
   ~CNFTree();
 
@@ -252,7 +252,7 @@ class CNFTree
   Path getTopmostAvailableParentInner(Path p) const;
 
   CNF& m_rootCNF;
-  std::shared_ptr<Config> m_config;
+  ConfigPtr m_config;
   int64_t m_originCNFId;
   StateChangedSignal m_rootStateChangedSignal;
   NodeMap m_nodeMap;

@@ -14,7 +14,7 @@ const size_t CNFTree::maxPathDepth = sizeof(CNFTree::Path) * 8 - 6;
 
 CNFTree::CNFTree(LogPtr log,
                  CNF& rootCNF,
-                 std::shared_ptr<Config> config,
+                 ConfigPtr config,
                  int64_t originCNFId)
   : m_rootCNF(rootCNF)
   , m_config(config)
