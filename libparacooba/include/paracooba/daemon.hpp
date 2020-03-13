@@ -4,6 +4,7 @@
 #include "cluster-statistics.hpp"
 #include "log.hpp"
 #include "util.hpp"
+#include "ema.hpp"
 #include <map>
 #include <memory>
 #include <mutex>
