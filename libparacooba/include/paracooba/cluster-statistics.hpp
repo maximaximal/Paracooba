@@ -30,6 +30,7 @@ namespace paracooba {
 
 class NetworkedNode;
 class TaskFactory;
+class TaskSkeleton;
 
 /** @brief Statistics about the whole cluster, based on which decisions may be
  * made.
@@ -342,7 +343,7 @@ class ClusterStatistics
   void handlePathOnNode(int64_t originator,
                         Node& node,
                         std::shared_ptr<CNF> rootCNF,
-                        CNFTree::Path p);
+                        const TaskSkeleton& skel);
 
   bool hasNode(int64_t id);
 

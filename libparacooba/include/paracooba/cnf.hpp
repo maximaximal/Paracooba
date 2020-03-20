@@ -26,6 +26,7 @@ namespace paracooba {
 class NetworkedNode;
 class CaDiCaLTask;
 class TaskFactory;
+class TaskSkeleton;
 
 namespace cuber {
 class Registry;
@@ -100,7 +101,9 @@ class CNF
 
   void sendAllowanceMap(int64_t id, SendFinishedCB finishedCB);
 
-  void sendPath(int64_t id, CNFTree::Path p, SendFinishedCB finishedCB);
+  void sendPath(int64_t id,
+                const TaskSkeleton& skel,
+                SendFinishedCB finishedCB);
 
   void sendResult(int64_t id, CNFTree::Path p, SendFinishedCB finishedCallback);
 

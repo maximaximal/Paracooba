@@ -46,16 +46,15 @@ inconsistencies.
 
 template<class Functor>
 TaskFactory::ProducedTask
-parametricProduceTask(
-  PriorityQueueLockSemanticsUniquePtr<TaskFactory::TaskSkeleton>& queue,
-  TaskFactory& factory,
-  Functor f)
+parametricProduceTask(PriorityQueueLockSemanticsUniquePtr<TaskSkeleton>& queue,
+                      TaskFactory& factory,
+                      Functor f)
 {
   std::unique_lock lock(queue.getMutex());
   if(queue.empty()) {
     return { nullptr, 0, 0 };
   }
-  std::unique_ptr<TaskFactory::TaskSkeleton> skel = f(queue);
+  std::unique_ptr<TaskSkeleton> skel = f(queue);
   lock.unlock();// Early unlock: This could happen in parallel.
 
   switch(skel->mode) {
@@ -72,15 +71,13 @@ parametricProduceTask(
   return { nullptr, skel->originator, 0 };
 }
 
-std::unique_ptr<TaskFactory::TaskSkeleton>
-popFromFrontOfQueue(
-  PriorityQueueLockSemanticsUniquePtr<TaskFactory::TaskSkeleton>& queue)
+std::unique_ptr<TaskSkeleton>
+popFromFrontOfQueue(PriorityQueueLockSemanticsUniquePtr<TaskSkeleton>& queue)
 {
   return queue.popNoLock();
 }
-std::unique_ptr<TaskFactory::TaskSkeleton>
-popFromBackOfQueue(
-  PriorityQueueLockSemanticsUniquePtr<TaskFactory::TaskSkeleton>& queue)
+std::unique_ptr<TaskSkeleton>
+popFromBackOfQueue(PriorityQueueLockSemanticsUniquePtr<TaskSkeleton>& queue)
 {
   return queue.popBackNoLock();
 }
@@ -91,13 +88,13 @@ TaskFactory::produceTask()
   return parametricProduceTask(m_skeletons, *this, &popFromFrontOfQueue);
 }
 
-TaskFactory::TaskSkeleton
+TaskSkeleton
 TaskFactory::produceTaskSkeleton()
 {
   return std::move(*m_skeletons.pop());
 }
 
-TaskFactory::TaskSkeleton
+TaskSkeleton
 TaskFactory::produceTaskSkeletonBackwards()
 {
   return std::move(*m_skeletons.popBack());
@@ -221,7 +218,7 @@ TaskFactory::ExternalTasksSet::readdTasks(TaskFactory* factory)
   return count;
 }
 
-TaskFactory::TaskSkeleton
+TaskSkeleton
 TaskFactory::ExternalTasksSet::removeTask(CNFTree::Path p)
 {
   for(auto it = tasks.begin(); it != tasks.end();) {

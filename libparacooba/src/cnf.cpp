@@ -151,8 +151,9 @@ CNF::sendAllowanceMap(int64_t id, SendFinishedCB finishedCallback)
 }
 
 void
-CNF::sendPath(int64_t id, CNFTree::Path p, SendFinishedCB finishedCB)
+CNF::sendPath(int64_t id, const TaskSkeleton& skel, SendFinishedCB finishedCB)
 {
+  CNFTree::Path p = skel.p;
   assert(CNFTree::getDepth(p) > 0);
   assert(rootTaskReady.isReady());
 

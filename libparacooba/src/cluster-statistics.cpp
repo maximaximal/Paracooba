@@ -246,9 +246,10 @@ void
 ClusterStatistics::handlePathOnNode(int64_t originator,
                                     Node& node,
                                     std::shared_ptr<CNF> rootCNF,
-                                    CNFTree::Path p)
+                                    const TaskSkeleton& skel)
 {
   Communicator* comm = m_config->getCommunicator();
+  CNFTree::Path p = skel.p;
 
   // Local node should be handled externally, without using this function.
   assert(&node != m_thisNode);
@@ -259,7 +260,7 @@ ClusterStatistics::handlePathOnNode(int64_t originator,
 
   // This path should be handled on another compute node. This means, the
   // other compute node requires a Cube-Beam from the Communicator class.
-  rootCNF->sendPath(node.getId(), p, []() {});
+  rootCNF->sendPath(node.getId(), skel, []() {});
 }
 bool
 ClusterStatistics::hasNode(int64_t id)
@@ -308,8 +309,7 @@ ClusterStatistics::rebalance(int originator, TaskFactory& factory)
       for(size_t i = 0; i < numberOfTasksToSend && factory.canProduceTask();
           ++i) {
         auto skel = factory.produceTaskSkeleton();
-        handlePathOnNode(
-          originator, *mostFitNode, factory.getRootCNF(), skel.p);
+        handlePathOnNode(originator, *mostFitNode, factory.getRootCNF(), skel);
       }
     } else {
       break;

@@ -15,6 +15,7 @@ namespace paracooba {
 class Task;
 class CaDiCaLMgr;
 class CaDiCaLTask;
+class TaskSkeleton;
 
 /** @brief Creates new tasks for the runners during the solving process.
  *
@@ -42,31 +43,6 @@ class TaskFactory
     return (CNFTree::maxPathDepth - CNFTree::getDepth(p)) +
            (mode != Solve ? 100 : 0);
   }
-
-  struct TaskSkeleton
-  {
-    Mode mode;
-    int64_t originator;
-    CNFTree::Path p;
-
-    TaskSkeleton(Mode mode, int64_t originator, CNFTree::Path p)
-      : mode(mode)
-      , originator(originator)
-      , p(p)
-    {}
-
-    inline int getPriority() const { return getTaskPriority(mode, p); }
-
-    inline bool operator<(TaskSkeleton const& b) const
-    {
-      return getPriority() > b.getPriority();
-    }
-
-    inline bool operator==(const TaskSkeleton& b) const
-    {
-      return mode == b.mode && originator == b.originator && p == b.p;
-    }
-  };
 
   struct ProducedTask
   {
@@ -133,6 +109,35 @@ class TaskFactory
   std::unique_ptr<CaDiCaLMgr> m_cadicalMgr;
 
   mutable std::shared_mutex m_externalTasksSetMapMutex;
+};
+
+class TaskSkeleton
+{
+  public:
+  TaskFactory::Mode mode;
+  int64_t originator;
+  CNFTree::Path p;
+
+  TaskSkeleton(TaskFactory::Mode mode, int64_t originator, CNFTree::Path p)
+    : mode(mode)
+    , originator(originator)
+    , p(p)
+  {}
+
+  inline int getPriority() const
+  {
+    return TaskFactory::getTaskPriority(mode, p);
+  }
+
+  inline bool operator<(TaskSkeleton const& b) const
+  {
+    return getPriority() > b.getPriority();
+  }
+
+  inline bool operator==(const TaskSkeleton& b) const
+  {
+    return mode == b.mode && originator == b.originator && p == b.p;
+  }
 };
 }
 
