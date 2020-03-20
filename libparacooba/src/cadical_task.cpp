@@ -93,8 +93,32 @@ CaDiCaLTask::applyCubeFromCuberDeferred(CNFTree::Path p, cuber::Cuber& cuber)
   m_name = "Solver Task for Path " + CNFTree::pathToStdString(p);
   m_path = p;
   m_cuber = &cuber;
+  m_optionalCube = std::nullopt;
 }
 
+void
+CaDiCaLTask::applyCubeDeferred(CNFTree::Path p, const Cube& cube)
+{
+  m_name =
+    "Solver Task for Path " + CNFTree::pathToStdString(p) + " with given cube";
+  m_path = p;
+  m_optionalCube = cube;
+  m_cuber = nullptr;
+}
+
+void
+CaDiCaLTask::applyCube(CNFTree::Path p, const Cube& cube)
+{
+  provideSolver();
+
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "Applying from cube " << CNFTree::pathToStrNoAlloc(m_path)
+    << " (supplied via optional cube)";
+
+  for(int lit : cube) {
+    m_solver->assume(lit);
+  }
+}
 void
 CaDiCaLTask::applyCubeFromCuber(CNFTree::Path p, cuber::Cuber& cuber)
 {
@@ -102,14 +126,14 @@ CaDiCaLTask::applyCubeFromCuber(CNFTree::Path p, cuber::Cuber& cuber)
 
   assert(p != CNFTree::DefaultUninitiatedPath);
 
-  std::vector<int> literals;
-  literals.reserve(CNFTree::getDepth(p));
-  cuber.getCube(p, literals);
+  Cube cube;
+  cube.reserve(CNFTree::getDepth(p));
+  cuber.getCube(p, cube);
 
   PARACOOBA_LOG((*m_logger), Trace)
     << "Applying from cube " << CNFTree::pathToStrNoAlloc(m_path) << " ";
 
-  for(int lit : literals) {
+  for(int lit : cube) {
     m_solver->assume(lit);
   }
 

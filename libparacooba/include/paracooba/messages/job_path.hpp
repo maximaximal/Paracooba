@@ -15,10 +15,12 @@ class JobPath
 {
   public:
   using Path = int64_t;
+  using OptionalCube = std::optional<std::vector<int>>;
 
   JobPath() {}
-  JobPath(Path path)
+  JobPath(Path path, const OptionalCube& optionalCube)
     : path(path)
+    , optionalCube(optionalCube)
   {}
   ~JobPath() {}
 
@@ -27,6 +29,7 @@ class JobPath
    * What work will be done will be decided based on the cubing algorithm used.
    */
   Path getPath() const { return path; };
+  const OptionalCube& getOptionalCube() const { return optionalCube; }
 
   std::string tagline() const;
 
@@ -34,11 +37,12 @@ class JobPath
   friend class cereal::access;
 
   Path path = 0;
+  OptionalCube optionalCube;
 
   template<class Archive>
   void serialize(Archive& ar)
   {
-    ar(CEREAL_NVP(path));
+    ar(CEREAL_NVP(path), CEREAL_NVP(optionalCube));
   }
 };
 }

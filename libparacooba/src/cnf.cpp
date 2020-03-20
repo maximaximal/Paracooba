@@ -159,7 +159,7 @@ CNF::sendPath(int64_t id, const TaskSkeleton& skel, SendFinishedCB finishedCB)
 
   m_cnfTree->offloadNodeToRemote(p, id);
 
-  messages::JobPath jp(p);
+  messages::JobPath jp(p, skel.optionalCube);
   messages::JobDescription jd(m_originId);
   jd.insert(jp);
   m_jobDescriptionTransmitter->transmitJobDescription(
@@ -276,8 +276,8 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
       // Immediately realise task, so the chain of distributing tasks cannot be
       // broken by offloading the task directly after it was inserted into the
       // factory.
-      std::unique_ptr<DecisionTask> task =
-        std::make_unique<DecisionTask>(shared_from_this(), p);
+      std::unique_ptr<DecisionTask> task = std::make_unique<DecisionTask>(
+        shared_from_this(), p, jp.getOptionalCube());
       m_config->getCommunicator()->getRunner()->push(
         std::move(task),
         sentFromID,

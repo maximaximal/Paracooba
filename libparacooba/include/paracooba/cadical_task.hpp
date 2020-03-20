@@ -2,8 +2,9 @@
 #define PARACOOBA_CDCLTASK_HPP
 
 #include "cnftree.hpp"
-#include "task.hpp"
 #include "cuber/cuber.hpp"
+#include "task.hpp"
+#include "types.hpp"
 #include <memory>
 
 namespace CaDiCaL {
@@ -64,6 +65,7 @@ class CaDiCaLTask : public Task
   void copyFromCaDiCaLTask(const CaDiCaLTask& other);
 
   void applyCubeFromCuberDeferred(CNFTree::Path p, cuber::Cuber& cuber);
+  void applyCubeDeferred(CNFTree::Path, const Cube& cube);
 
   /** @brief Queue parsing a DIMACS file into the internal solver instance.
    *
@@ -106,6 +108,7 @@ class CaDiCaLTask : public Task
   private:
   void provideSolver();
 
+  void applyCube(CNFTree::Path p, const Cube& cube);
   void applyCubeFromCuber(CNFTree::Path p, cuber::Cuber& cuber);
 
   friend class Terminator;
@@ -114,6 +117,7 @@ class CaDiCaLTask : public Task
   Mode m_mode = ParseAndSolve;
   CNFTree::Path m_path = CNFTree::DefaultUninitiatedPath;
   cuber::Cuber* m_cuber = nullptr;
+  OptionalCube m_optionalCube;
   std::vector<int> m_pregeneratedCubes;
 
   std::unique_ptr<CaDiCaL::Solver> m_solver;

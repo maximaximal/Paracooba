@@ -10,9 +10,12 @@
 #include <cassert>
 
 namespace paracooba {
-DecisionTask::DecisionTask(std::shared_ptr<CNF> rootCNF, CNFTree::Path p)
+DecisionTask::DecisionTask(std::shared_ptr<CNF> rootCNF,
+                           CNFTree::Path p,
+                           const OptionalCube& optionalCube)
   : m_rootCNF(rootCNF)
   , m_path(p)
+  , m_optionalCube(optionalCube)
 {
   m_name = "DecisionTask for Path " + CNFTree::pathToStdString(p);
 }
@@ -45,7 +48,8 @@ DecisionTask::execute()
 
   cnfTree.setStateFromLocal(m_path, CNFTree::Working);
 
-  if(m_rootCNF->getCuberRegistry().shouldGenerateTreeSplit(m_path)) {
+  if(!m_optionalCube.has_value() &&
+     m_rootCNF->getCuberRegistry().shouldGenerateTreeSplit(m_path)) {
     // New split generated! This means, the TRUE and FALSE branches are now
     // available and the generated decision must be set into the path.
     cnfTree.setStateFromLocal(m_path, CNFTree::Split);
@@ -79,7 +83,8 @@ DecisionTask::execute()
     PARACOOBA_LOG(*m_logger, Trace)
       << "No decision made for path " << CNFTree::pathToStrNoAlloc(m_path);
 
-    m_factory->addPath(m_path, TaskFactory::Solve, m_originator);
+    m_factory->addPath(
+      m_path, TaskFactory::Solve, m_originator, m_optionalCube);
 
     return std::make_unique<TaskResult>(TaskResult::NoDecisionMade);
   }

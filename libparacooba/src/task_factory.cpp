@@ -30,9 +30,12 @@ TaskFactory::~TaskFactory()
 }
 
 void
-TaskFactory::addPath(CNFTree::Path p, Mode mode, int64_t originator)
+TaskFactory::addPath(CNFTree::Path p,
+                     Mode mode,
+                     int64_t originator,
+                     OptionalCube optionalCube)
 {
-  auto ptr = std::make_unique<TaskSkeleton>(mode, originator, p);
+  auto ptr = std::make_unique<TaskSkeleton>(mode, originator, p, optionalCube);
   /*
     For debugging task insertion. Can throw segfaults because of library
 inconsistencies.
@@ -129,7 +132,7 @@ TaskFactory::ProducedTask
 TaskFactory::produceCubeOrSolveTask(std::unique_ptr<TaskSkeleton> skel)
 {
   std::unique_ptr<DecisionTask> task =
-    std::make_unique<DecisionTask>(m_rootCNF, skel->p);
+    std::make_unique<DecisionTask>(m_rootCNF, skel->p, skel->optionalCube);
   return { std::move(task), skel->originator, skel->getPriority() };
 }
 TaskFactory::ProducedTask
@@ -141,7 +144,11 @@ TaskFactory::produceSolveTask(std::unique_ptr<TaskSkeleton> skel)
   std::unique_ptr<CaDiCaLTask> task = std::make_unique<CaDiCaLTask>(*rootTask);
   task->setMode(CaDiCaLTask::Solve);
   task->setCaDiCaLMgr(m_cadicalMgr.get());
-  task->applyCubeFromCuberDeferred(skel->p, m_rootCNF->getCuberRegistry());
+  if(skel->optionalCube.has_value()) {
+    task->applyCubeDeferred(skel->p, skel->optionalCube.value());
+  } else {
+    task->applyCubeFromCuberDeferred(skel->p, m_rootCNF->getCuberRegistry());
+  }
   return { std::move(task), skel->originator, skel->getPriority() };
 }
 

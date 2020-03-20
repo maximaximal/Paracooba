@@ -8,6 +8,7 @@
 #include "cnftree.hpp"
 #include "log.hpp"
 #include "paracooba/priority_queue_lock_semantics.hpp"
+#include "types.hpp"
 #include <atomic>
 #include <shared_mutex>
 
@@ -51,7 +52,10 @@ class TaskFactory
     int priority;
   };
 
-  void addPath(CNFTree::Path p, Mode m, int64_t originator);
+  void addPath(CNFTree::Path p,
+               Mode m,
+               int64_t originator,
+               OptionalCube optionalCube = std::nullopt);
 
   ProducedTask produceTask();
   ProducedTask produceTaskBackwards();
@@ -117,11 +121,16 @@ class TaskSkeleton
   TaskFactory::Mode mode;
   int64_t originator;
   CNFTree::Path p;
+  OptionalCube optionalCube;
 
-  TaskSkeleton(TaskFactory::Mode mode, int64_t originator, CNFTree::Path p)
+  TaskSkeleton(TaskFactory::Mode mode,
+               int64_t originator,
+               CNFTree::Path p,
+               OptionalCube optionalCube = std::nullopt)
     : mode(mode)
     , originator(originator)
     , p(p)
+    , optionalCube(optionalCube)
   {}
 
   inline int getPriority() const
