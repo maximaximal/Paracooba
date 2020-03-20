@@ -239,7 +239,8 @@ CaDiCaLTask::execute()
         status = TaskResult::Unsatisfiable;
         break;
       default:
-        status = TaskResult::Unsolved;
+        status = TaskResult::Split;
+	splitProblem();
         break;
     }
   }
@@ -248,6 +249,21 @@ CaDiCaLTask::execute()
   return std::move(result);
 }
 
+void
+CaDiCaLTask::splitProblem()
+{
+  int lit_to_split = m_solver->lookahead();
+
+  std::vector<int> literals;
+  m_cuber->getCube(m_path, literals);
+  std::vector<CNFTree::LiteralVector> v = {
+    std::copy(begin(literals), end(literals), literals),
+    literals};
+  v[0].push_back(lit_to_split);
+  v[1].push_back(-lit_to_split);
+  //  TaskFactory::TaskSkeleton *task1 = TaskSkeleton(TaskFactory::Mode::Solve, m_originator, m_path);
+  //  m_factory->
+}
 void
 CaDiCaLTask::terminate()
 {

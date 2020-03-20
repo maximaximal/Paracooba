@@ -116,6 +116,8 @@ class CaDiCaLTask : public Task
 
   void applyCubeFromCuber(CNFTree::Path p, cuber::Cuber& cuber);
 
+  void splitProblem();
+
   friend class Terminator;
   std::unique_ptr<Terminator> m_terminator;
   std::shared_ptr<CNF> m_cnf;

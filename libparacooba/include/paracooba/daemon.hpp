@@ -99,6 +99,7 @@ class Daemon
   LogPtr m_log;
   Logger m_logger;
   std::shared_ptr<Communicator> m_communicator;
+  EMA time_ema;
 };
 
 inline Daemon::Context::State

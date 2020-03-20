@@ -348,6 +348,10 @@ CNF::receiveJobDescription(int64_t sentFromID, messages::JobDescription&& jd)
         });
       break;
     }
+  case messages::JobDescription::Kind::Unknown: {
+    assert(false && "unknown JOB description");
+    __builtin_unreachable();
+  }
   }
 }
 

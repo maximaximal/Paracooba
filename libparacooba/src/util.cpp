@@ -32,4 +32,5 @@ GetRootCNF(Config* config, int64_t cnfID)
     return client->getRootCNF();
   }
 }
+
 }

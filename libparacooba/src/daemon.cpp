@@ -6,11 +6,12 @@
 #include "../include/paracooba/log.hpp"
 #include "../include/paracooba/runner.hpp"
 #include "../include/paracooba/task_factory.hpp"
+#include "paracooba/ema.hpp"
 #include <boost/filesystem.hpp>
 #include <memory>
 #include <shared_mutex>
 
-  namespace paracooba {
+namespace paracooba {
 Daemon::Context::Context(std::shared_ptr<CNF> rootCNF,
                          int64_t originatorID,
                          Daemon* daemon,
@@ -128,6 +129,7 @@ Daemon::Daemon(ConfigPtr config,
   , m_log(log)
   , m_communicator(communicator)
   , m_logger(log->createLogger("Daemon"))
+  , time_ema{100}
 {
   m_config->m_daemon = this;
 }
@@ -214,7 +216,7 @@ Daemon::getOrCreateContext(int64_t id)
 void
 Daemon::duplicateContextWithNewId(int64_t oldId, int64_t currId, CNFTree::Path p)
 {
-
+  // use start instead?
   std::unique_lock uniqueLock(m_contextMapMutex);
   auto it = m_contextMap.find(oldId);
 

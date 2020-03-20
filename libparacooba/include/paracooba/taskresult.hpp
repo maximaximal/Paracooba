@@ -29,6 +29,7 @@ class TaskResult
     PathAlreadyVisitedError,
 
     Satisfiable,
+    Split,
     Unsolved,
     Unsatisfiable,
     Parsed,
