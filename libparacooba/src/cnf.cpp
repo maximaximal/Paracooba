@@ -32,10 +32,13 @@ extern "C"
 }
 
 namespace paracooba {
+static const size_t CNFStatisticsNodeWindowSize = 20;
+
 CNF::CNF(ConfigPtr config,
          LogPtr log,
          int64_t originId,
          ClusterNodeStore& clusterNodeStore,
+	 boost::asio::io_service& io_service,
          std::string_view dimacsFile)
   : m_config(config)
   , m_originId(originId)
@@ -44,6 +47,10 @@ CNF::CNF(ConfigPtr config,
   , m_logger(log->createLogger("CNF"))
   , m_clusterNodeStore(clusterNodeStore)
   , m_cnfTree(std::make_unique<CNFTree>(log, *this, config, originId))
+  , m_acc_solvingTime(
+      boost::accumulators::tag::rolling_window::window_size =
+      CNFStatisticsNodeWindowSize)
+  , m_io_service(io_service)
 {
   if(dimacsFile != "") {
     struct stat statbuf;
@@ -57,6 +64,8 @@ CNF::CNF(ConfigPtr config,
     m_fileSize = statbuf.st_size;
     m_fd = open(m_dimacsFile.c_str(), O_RDONLY);
     assert(m_fd > 0);
+
+    initMeanDuration(CNFStatisticsNodeWindowSize);
   }
 
   connectToCNFTreeSignal();
@@ -69,6 +78,8 @@ CNF::CNF(const CNF& o)
   , m_logger(o.m_log->createLogger("CNF"))
   , m_clusterNodeStore(o.m_clusterNodeStore)
   , m_cnfTree(std::make_unique<CNFTree>(m_log, *this, o.m_config, o.m_originId))
+  , m_acc_solvingTime(std::move(o.m_acc_solvingTime))
+  , m_io_service(o.m_io_service)
 {
   connectToCNFTreeSignal();
 }
@@ -460,6 +471,9 @@ CNF::solverFinishedSlot(const TaskResult& result, Path p)
     case TaskResult::Unsolved:
       res->state = CNFTree::Unknown;
       break;
+    case TaskResult::Resplitted:
+      res->state = CNFTree::Split;
+      break;
     default: {
       // Other results are not handled here.
       std::unique_lock loggerLock(m_loggerMutex);
@@ -469,7 +483,6 @@ CNF::solverFinishedSlot(const TaskResult& result, Path p)
     }
   }
 
-  // Give back the solver handle from the result after it was fully processed.
   res->task->releaseSolver();
 
   CNFTree::State state = res->state;
@@ -477,10 +490,10 @@ CNF::solverFinishedSlot(const TaskResult& result, Path p)
   assert(state != CNFTree::SAT ||
          (state == CNFTree::SAT && res->encodedAssignment));
 
-  if(state == CNFTree::SAT || state == CNFTree::UNSAT ||
-     state == CNFTree::Unknown) {
-    if(state != CNFTree::Unknown) {
-      m_cnfTree->setStateFromLocal(p, state);
+  if(res->state == CNFTree::SAT || res->state == CNFTree::UNSAT ||
+     res->state == CNFTree::Split || res->state == CNFTree::Unknown) {
+    if(res->state != CNFTree::Unknown) {
+      m_cnfTree->setStateFromLocal(p, res->state);
     }
   }
 }

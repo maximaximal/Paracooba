@@ -35,12 +35,14 @@ CaDiCaLTask::CaDiCaLTask(const CaDiCaLTask& other)
   , m_varCount(other.m_varCount)
   , m_mode(other.m_mode)
   , m_cadicalMgr(other.m_cadicalMgr)
+  , m_autoStopTimer(other.m_cnf->getIOService())
+  , m_io_service(other.m_cnf->getIOService())
 {
   copyFromCaDiCaLTask(other);
   m_name = "CaDiCaL Task (copied)";
 }
-CaDiCaLTask::CaDiCaLTask(const TaskResult& result)
-  : CaDiCaLTask(nullptr, ParseAndSolve)
+CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service, const TaskResult& result)
+  : CaDiCaLTask(io_service, nullptr, ParseAndSolve)
 {
   Task& otherTask = result.getTask();
   if(CaDiCaLTask* otherCaDiCaLTask = dynamic_cast<CaDiCaLTask*>(&otherTask)) {
@@ -56,19 +58,25 @@ CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
   , m_solver(std::move(other.m_solver))
   , m_cnf(std::move(other.m_cnf))
   , m_cadicalMgr(other.m_cadicalMgr)
+  , m_autoStopTimer(other.m_io_service)
+  , m_io_service(other.m_io_service)
 {
   m_terminator->setCaDiCaLTask(this);
   m_name = "CaDiCaL Task (moved)";
 }
 
-CaDiCaLTask::CaDiCaLTask(uint32_t* varCount, Mode mode)
+
+CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service, uint32_t* varCount, Mode mode)
   : m_terminator(std::make_unique<Terminator>(this))
   , m_varCount(varCount)
   , m_mode(mode)
   , m_solver(std::make_unique<CaDiCaL::Solver>())
+  , m_autoStopTimer(io_service)
+  , m_io_service(io_service)
 {
   m_name = "CaDiCaL Task (completely new)";
 }
+
 CaDiCaLTask::~CaDiCaLTask() {}
 
 void
@@ -111,24 +119,7 @@ CaDiCaLTask::applyCube(Path p, const Cube& cube)
 {
   provideSolver();
 
-  PARACOOBA_LOG((*m_logger), Trace)
-    << "Applying from cube " << CNFTree::pathToStrNoAlloc(m_path)
-    << " (supplied via optional cube)";
-
-  for(int lit : cube) {
-    m_solver->assume(lit);
-  }
-}
-void
-CaDiCaLTask::applyCubeFromCuber(Path p, cuber::Cuber& cuber)
-{
-  provideSolver();
-
   assert(p != CNFTree::DefaultUninitiatedPath);
-
-  Cube cube;
-  cube.reserve(CNFTree::getDepth(p));
-  cuber.getCube(p, cube);
 
   PARACOOBA_LOG((*m_logger), Trace)
     << "Applying from cube " << CNFTree::pathToStrNoAlloc(m_path) << " ";
@@ -143,6 +134,32 @@ CaDiCaLTask::applyCubeFromCuber(Path p, cuber::Cuber& cuber)
   m_finishedSignal.connect(
     std::bind(&CNF::solverFinishedSlot, m_cnf, std::placeholders::_1, p));
 }
+
+void
+CaDiCaLTask::applyCubeFromCuber(Path p, cuber::Cuber& cuber)
+{
+  provideSolver();
+
+  assert(p != CNFTree::DefaultUninitiatedPath);
+
+  Cube cube;
+  cube.reserve(CNFTree::getDepth(p));
+  cuber.getCube(p, cube);
+
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "Applying from supplied cube " << CNFTree::pathToStrNoAlloc(m_path) << " ";
+
+  for(int lit : cube) {
+    m_solver->assume(lit);
+  }
+
+  // This means, that the task was assigned from a factory, a callback must be
+  // given.
+  assert(m_cnf);
+  m_finishedSignal.connect(
+    std::bind(&CNF::solverFinishedSlot, m_cnf, std::placeholders::_1, p));
+}
+
 
 void
 CaDiCaLTask::readDIMACSFile(std::string_view sourcePath)
@@ -174,8 +191,13 @@ CaDiCaLTask::execute()
     m_mode = Parse;
     readDIMACSFile(m_cnf->getDimacsFile());
   } else if(m_path != CNFTree::DefaultUninitiatedPath) {
-    assert(m_cuber);
-    applyCubeFromCuber(m_path, *m_cuber);
+    if(m_cuber) {
+      assert(m_cuber);
+      applyCubeFromCuber(m_path, *m_cuber);
+    } else {
+      assert(m_optionalCube.has_value());
+      applyCube(m_path, m_optionalCube.value());
+    }
   }
 
   TaskResult::Status status;
@@ -216,9 +238,39 @@ CaDiCaLTask::execute()
   m_internalVarCount = m_solver->vars();
 
   if(m_mode & Mode::Solve) {
+    std::chrono::duration<double> average_time = std::chrono::duration_cast<std::chrono::milliseconds>(m_cnf->averageSolvingTime());
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(average_time * 3 / 2);
     PARACOOBA_LOG((*m_logger), Trace)
-      << "Start solving CNF formula using CaDiCaL CNF solver.";
+      << "Start solving CNF formula using CaDiCaL CNF solver "
+      << "for roughly "
+      << duration.count()
+      << "ms.";
+
+    m_terminate = false;
+    m_autoStopTimer.expires_after(duration);
+    m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
+        std::lock_guard lock(m_solverMutex);
+	if(errc != boost::asio::error::operation_aborted && m_solver){
+	  PARACOOBA_LOG((*m_logger), Trace)
+	    << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
+	    << " will be interrupted.";
+	  m_solver->terminate();
+	  //m_finishedSignal.disconnect_all_slots();
+	  m_terminate = true;
+	}
+      });
+    auto start = std::chrono::steady_clock::now();
     int solveResult = m_solver->solve();
+    auto end = std::chrono::steady_clock::now();
+    m_autoStopTimer.cancel();
+
+    PARACOOBA_LOG((*m_logger), Trace)
+      << "Stopped solving CNF formula using CaDiCaL CNF solver "
+      << "after roughly "
+      << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
+         1'000 * (end - start))).count()
+      << "ms.";
+    m_cnf->update_averageSolvingTime(std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>( (end - start))));
 
     if(!m_terminate) {
       PARACOOBA_LOG((*m_logger), Trace)
@@ -228,7 +280,17 @@ CaDiCaLTask::execute()
 
     switch(solveResult) {
       case 0:
-        status = TaskResult::Unsolved;
+	{
+	  auto new_cubes = resplit();
+	  // res.task->releaseSolver();
+	  for(auto &p : new_cubes) {
+	    auto [path, cube] = p;
+	    m_cnf->getTaskFactory()->addPath(path, TaskFactory::CubeOrSolve, m_originator,
+					     std::optional{cube});
+	  }
+	}
+	status = TaskResult::Resplitted;
+	//m_cnf->CNF::solverFinishedSlot(status, m_path);
         break;
       case 10:
         status = TaskResult::Satisfiable;
@@ -246,18 +308,82 @@ CaDiCaLTask::execute()
   return std::move(result);
 }
 
+std::vector<std::pair<Path, Cube>>
+CaDiCaLTask::resplit()
+{
+  assert(m_solver);
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
+    << " resplitted.";
+  assert(m_solver);
+
+  Cube literals;
+  if(m_cuber) {
+    m_cuber->getCube(m_path, literals);
+    Cube literals2(literals);
+    for(auto lit : literals) {
+      PARACOOBA_LOG((*m_logger), Trace)
+	<< "cube lit" << lit;
+    }
+    Literal lit_to_split = m_solver->lookahead();
+    assert(lit_to_split != 0);
+    PARACOOBA_LOG((*m_logger), Trace)
+      << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
+      << " resplitted on literal " << lit_to_split;
+    literals.push_back(lit_to_split);
+    literals2.push_back(-lit_to_split);
+    m_solver->reset_assumptions();
+    return std::vector<std::pair<Path, Cube>>
+      {{CNFTree::getNextLeftPath(m_path), literals},
+       {CNFTree::getNextRightPath(m_path), literals2}};
+  } else {
+    assert(m_optionalCube.has_value());
+    Cube literals(m_optionalCube.value());
+    Cube literals2(m_optionalCube.value());
+    m_solver->reset_assumptions();
+    for(auto lit : literals) {
+      PARACOOBA_LOG((*m_logger), Trace)
+	<< "cube lit" << lit;
+      m_solver->assume(lit);
+    }
+    Literal lit_to_split = m_solver->lookahead();
+    PARACOOBA_LOG((*m_logger), Trace)
+      << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
+      << " resplitted on literal " << lit_to_split;
+    assert(lit_to_split != 0);
+    assert(std::find(begin(literals), end(literals), lit_to_split) == end(literals));
+    assert(std::find(begin(literals), end(literals), -lit_to_split) == end(literals));
+    literals.push_back(lit_to_split);
+    literals2.push_back(-lit_to_split);
+    m_solver->reset_assumptions();
+    return std::vector<std::pair<Path, Cube>>
+      {{CNFTree::getNextLeftPath(m_path), literals},
+       {CNFTree::getNextRightPath(m_path), literals2}};
+  }
+  /*  m_cnf->getTaskFactory()->addPath(CNFTree::getNextLeftPath(m_path), TaskFactory::CubeOrSolve, m_originator,
+				   std::optional{literals});
+  m_cnf->getTaskFactory()->addPath(CNFTree::getNextRightPath(m_path), TaskFactory::CubeOrSolve, m_originator,
+  std::optional{literals2});*/
+}
+
 void
 CaDiCaLTask::terminate()
 {
   Task::terminate();
   // Terminating resets the cadical manager, as it no longer exists at this
   // point.
+  
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "Terminating instance";
   m_cadicalMgr = nullptr;
   m_terminate = true;
 }
 void
 CaDiCaLTask::releaseSolver()
 {
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "Release instance";
+  std::lock_guard lock(m_solverMutex);
   m_solver->disconnect_terminator();
   if(!m_cadicalMgr)
     return;

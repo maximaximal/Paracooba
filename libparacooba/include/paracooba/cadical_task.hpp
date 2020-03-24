@@ -7,6 +7,10 @@
 #include "types.hpp"
 #include <memory>
 
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/io_service.hpp>
+
+
 namespace CaDiCaL {
 class Solver;
 }
@@ -47,10 +51,10 @@ class CaDiCaLTask : public Task
    * This only works with results of a CaDiCaL task! The contained task is read
    * and all important options are applied to this new task.
    */
-  CaDiCaLTask(const TaskResult& result);
+  CaDiCaLTask(boost::asio::io_service& io_service, const TaskResult& result);
 
   /** @brief Create a new CaDiCaL solver task */
-  CaDiCaLTask(uint32_t* varCount = nullptr, Mode = ParseAndSolve);
+  CaDiCaLTask(boost::asio::io_service& io_service, uint32_t* varCount = nullptr, Mode = ParseAndSolve);
 
   /** @brief Destructor */
   virtual ~CaDiCaLTask();
@@ -80,6 +84,9 @@ class CaDiCaLTask : public Task
    * current state. This makes this function useful in conjunction with
    * initialising this task from an old task that already finished. */
   void readCNF(std::shared_ptr<CNF> cnf, Path path);
+
+  /** @brief split the current problem and re-enqueue the split problems */
+  std::vector<std::pair<Path, Cube>> resplit();
 
   virtual TaskResultPtr execute();
   virtual void terminate();
@@ -127,6 +134,9 @@ class CaDiCaLTask : public Task
   uint32_t m_internalVarCount = 0;
 
   CaDiCaLMgr* m_cadicalMgr = nullptr;
+  boost::asio::steady_timer m_autoStopTimer;
+  boost::asio::io_service& m_io_service;
+  std::mutex m_solverMutex;
 };
 
 inline CaDiCaLTask::Mode

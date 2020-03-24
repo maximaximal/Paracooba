@@ -137,7 +137,7 @@ Config::~Config() {}
 int64_t
 Config::generateId(int64_t uniqueNumber)
 {
-  int16_t pid = static_cast<int16_t>(::getpid());
+  int16_t pid = std::abs(static_cast<int16_t>(::getpid()));
   return ((int64_t)pid << 48) | uniqueNumber;
 }
 

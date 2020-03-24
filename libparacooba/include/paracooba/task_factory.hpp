@@ -57,6 +57,13 @@ class TaskFactory
                int64_t originator,
                OptionalCube optionalCube = std::nullopt);
 
+  void addCubeOrSolvedPath(Path p,
+               int64_t originator,
+               OptionalCube optionalCube = std::nullopt)
+  {
+    addPath(p, CubeOrSolve, originator, optionalCube);
+  };
+
   ProducedTask produceTask();
   ProducedTask produceTaskBackwards();
 

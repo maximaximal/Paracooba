@@ -13,11 +13,17 @@
 #include <vector>
 
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/rolling_mean.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/asio/io_service.hpp>
 
 #include "cnftree.hpp"
 #include "log.hpp"
 #include "readywaiter.hpp"
 #include "taskresult.hpp"
+#include "types.hpp"
+#include "task_factory.hpp"
 
 #include "messages/jobdescription_receiver.hpp"
 #include "messages/jobdescription_transmitter.hpp"
@@ -25,7 +31,6 @@
 namespace paracooba {
 class NetworkedNode;
 class CaDiCaLTask;
-class TaskFactory;
 class TaskSkeleton;
 class ClusterNodeStore;
 
@@ -50,6 +55,7 @@ class CNF
       LogPtr log,
       int64_t originId,
       ClusterNodeStore& clusterNodeStore,
+      boost::asio::io_service& service,
       std::string_view dimacsFile = "");
 
   /** @brief Copy another CNF formula.
@@ -162,6 +168,37 @@ class CNF
     PregeneratedCubes
   };
 
+  void initMeanDuration(size_t windowSize)
+  {
+    using namespace std::chrono_literals;
+    for(size_t i = 0; i < windowSize; ++i) {
+      m_acc_solvingTime(10000ms);
+    }
+  }
+
+  std::chrono::duration<double> averageSolvingTime()
+  {
+    std::unique_lock<std::mutex> lock(m_acc_solvingTimeMutex);
+    return boost::accumulators::rolling_mean(m_acc_solvingTime);
+  }
+
+  void update_averageSolvingTime(std::chrono::duration<double> t)
+  {
+    using namespace std::chrono_literals;
+    t = (t.count() < 30'000? std::chrono::duration<double>(30s) : t);
+    std::unique_lock<std::mutex> lock(m_acc_solvingTimeMutex);
+    m_acc_solvingTime(t);
+  }
+
+  void addPath(Path p,
+               int64_t originator,
+               OptionalCube optionalCube = std::nullopt)
+  {
+    m_taskFactory->addCubeOrSolvedPath(p, originator, optionalCube);
+  }
+
+  inline boost::asio::io_service& getIOService() { return m_io_service; }
+
   private:
   struct SendDataStruct
   {
@@ -207,6 +244,14 @@ class CNF
   ResultFoundSignal m_resultSignal;
 
   std::atomic_size_t m_numberOfUnansweredRemoteWork = 0;
+
+  ::boost::accumulators::accumulator_set<
+    std::chrono::duration<double>,
+    ::boost::accumulators::stats<::boost::accumulators::tag::rolling_mean>>
+  m_acc_solvingTime;
+  std::mutex m_acc_solvingTimeMutex;
+
+  boost::asio::io_service& m_io_service;
 };
 
 std::ostream&

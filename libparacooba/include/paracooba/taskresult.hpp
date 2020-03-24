@@ -31,6 +31,7 @@ class TaskResult
     Satisfiable,
     Unsolved,
     Unsatisfiable,
+    Resplitted,
     Parsed,
     Unknown
   };

@@ -23,6 +23,7 @@ Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
                                     log,
                                     config->getInt64(Config::Id),
                                     *communicator->getClusterStatistics(),
+				    communicator->getIOService(),
                                     getDIMACSSourcePathFromConfig());
 
   // Connect to node fully known signal, so fully known nodes receive the CNF
@@ -107,7 +108,7 @@ Client::solve()
     m_communicator->exit();
   });
 
-  auto task = std::make_unique<CaDiCaLTask>(&m_cnfVarCount, mode);
+  auto task = std::make_unique<CaDiCaLTask>(m_communicator->getIOService(), &m_cnfVarCount, mode);
   task->setRootCNF(m_rootCNF);
   auto& finishedSignal = task->getFinishedSignal();
   task->readDIMACSFile(getDIMACSSourcePathFromConfig());

@@ -50,7 +50,7 @@ Daemon::Context::start(State change)
       (m_state & AllowanceMapReceived && !(m_state & FormulaReceived)))) {
     m_state = m_state | FormulaReceived;
 
-    auto task = std::make_unique<CaDiCaLTask>(nullptr, CaDiCaLTask::Parse);
+    auto task = std::make_unique<CaDiCaLTask>(m_rootCNF->getIOService(), nullptr, CaDiCaLTask::Parse);
     task->readCNF(m_rootCNF, 0);
 
     auto& finishedSignal = task->getFinishedSignal();
@@ -214,7 +214,7 @@ Daemon::getOrCreateContext(int64_t id)
   if(it == m_contextMap.end()) {
     // Create the new context with a new CNF.
     auto rootCNF = std::make_shared<CNF>(
-      m_config, m_log, id, *m_communicator->getClusterStatistics());
+      m_config, m_log, id, *m_communicator->getClusterStatistics(), m_communicator->getIOService());
     auto [statsNode, inserted] =
       m_communicator->getClusterStatistics()->getOrCreateNode(id);
     auto p = std::make_pair(

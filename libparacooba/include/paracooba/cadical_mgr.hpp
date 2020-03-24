@@ -25,6 +25,7 @@ class CaDiCaLMgr
   void returnSolverFromWorker(std::unique_ptr<CaDiCaL::Solver> task,
                               uint32_t workerId);
 
+
   private:
   CaDiCaLTask* m_rootTask = nullptr;
 
