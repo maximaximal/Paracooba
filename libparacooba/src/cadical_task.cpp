@@ -360,10 +360,6 @@ CaDiCaLTask::resplit()
       {{CNFTree::getNextLeftPath(m_path), literals},
        {CNFTree::getNextRightPath(m_path), literals2}};
   }
-  /*  m_cnf->getTaskFactory()->addPath(CNFTree::getNextLeftPath(m_path), TaskFactory::CubeOrSolve, m_originator,
-				   std::optional{literals});
-  m_cnf->getTaskFactory()->addPath(CNFTree::getNextRightPath(m_path), TaskFactory::CubeOrSolve, m_originator,
-  std::optional{literals2});*/
 }
 
 void
@@ -381,8 +377,6 @@ CaDiCaLTask::terminate()
 void
 CaDiCaLTask::releaseSolver()
 {
-  PARACOOBA_LOG((*m_logger), Trace)
-    << "Release instance";
   std::lock_guard lock(m_solverMutex);
   m_solver->disconnect_terminator();
   if(!m_cadicalMgr)
