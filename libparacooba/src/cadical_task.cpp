@@ -247,7 +247,7 @@ CaDiCaLTask::execute()
       << "ms.";
 
     m_terminate = false;
-    m_autoStopTimer.expires_after(duration);
+    m_autoStopTimer.expires_from_now(duration);
     m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
         std::lock_guard lock(m_solverMutex);
 	if(errc != boost::asio::error::operation_aborted && m_solver){
