@@ -178,11 +178,14 @@ class CNF
     return duration < 1s ? 1s : duration;
   }
 
+  // One issue are the very small timings. They heavily impact the average and are very problematic.
+  // We update the average, but try to keep the number above a cetrain value
   void update_averageSolvingTime(std::chrono::duration<double> t)
   {
     using namespace std::chrono_literals;
-    //t = (t.count() < 30'000? std::chrono::duration<double>(30s) : t);
     std::unique_lock<std::mutex> lock(m_acc_solvingTimeMutex);
+    auto avg = boost::accumulators::rolling_mean(m_acc_solvingTime);
+    t = (2 * t < avg ? avg * 3 / 4 : t);
     m_acc_solvingTime(t);
   }
 
