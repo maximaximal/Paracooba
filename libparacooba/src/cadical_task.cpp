@@ -239,7 +239,7 @@ CaDiCaLTask::execute()
 
   if(m_mode & Mode::Solve) {
     std::chrono::duration<double> average_time = std::chrono::duration_cast<std::chrono::milliseconds>(m_cnf->averageSolvingTime());
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(average_time * 3 / 2);
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(average_time * 3);
     PARACOOBA_LOG((*m_logger), Trace)
       << "Start solving CNF formula using CaDiCaL CNF solver "
       << "for roughly "
@@ -269,7 +269,7 @@ CaDiCaLTask::execute()
       << "after roughly "
       << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
          1'000 * (end - start))).count()
-      << "ms.";
+      << "s.";
     m_cnf->update_averageSolvingTime(std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>((end - start))));
 
     if(!m_terminate) {
@@ -283,6 +283,9 @@ CaDiCaLTask::execute()
 	{
 	  auto new_cubes = resplit();
 	  // res.task->releaseSolver();
+	  PARACOOBA_LOG((*m_logger), Trace)
+	    << " originator is "
+	    << m_originator;
 	  for(auto &p : new_cubes) {
 	    auto [path, cube] = p;
 	    m_cnf->getTaskFactory()->addPath(path, TaskFactory::CubeOrSolve, 0,
