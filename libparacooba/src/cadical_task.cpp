@@ -285,7 +285,7 @@ CaDiCaLTask::execute()
 	  // res.task->releaseSolver();
 	  for(auto &p : new_cubes) {
 	    auto [path, cube] = p;
-	    m_cnf->getTaskFactory()->addPath(path, TaskFactory::CubeOrSolve, m_originator,
+	    m_cnf->getTaskFactory()->addPath(path, TaskFactory::CubeOrSolve, 0,
 					     std::optional{cube});
 	  }
 	}
