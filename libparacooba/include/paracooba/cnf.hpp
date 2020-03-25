@@ -172,8 +172,10 @@ class CNF
 
   std::chrono::duration<double> averageSolvingTime()
   {
+    using namespace std::chrono_literals;
     std::unique_lock<std::mutex> lock(m_acc_solvingTimeMutex);
-    return boost::accumulators::rolling_mean(m_acc_solvingTime);
+    auto duration = boost::accumulators::rolling_mean(m_acc_solvingTime);
+    return duration < 1s ? 1s : duration;
   }
 
   void update_averageSolvingTime(std::chrono::duration<double> t)
