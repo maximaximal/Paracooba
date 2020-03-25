@@ -270,7 +270,7 @@ CaDiCaLTask::execute()
       << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
          1'000 * (end - start))).count()
       << "ms.";
-    m_cnf->update_averageSolvingTime(std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>( (end - start))));
+    m_cnf->update_averageSolvingTime(std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>((end - start))));
 
     if(!m_terminate) {
       PARACOOBA_LOG((*m_logger), Trace)

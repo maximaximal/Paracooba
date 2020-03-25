@@ -168,13 +168,7 @@ class CNF
     PregeneratedCubes
   };
 
-  void initMeanDuration(size_t windowSize)
-  {
-    using namespace std::chrono_literals;
-    for(size_t i = 0; i < windowSize; ++i) {
-      m_acc_solvingTime(10000ms);
-    }
-  }
+  void initMeanDuration(size_t windowSize);
 
   std::chrono::duration<double> averageSolvingTime()
   {
@@ -185,7 +179,7 @@ class CNF
   void update_averageSolvingTime(std::chrono::duration<double> t)
   {
     using namespace std::chrono_literals;
-    t = (t.count() < 30'000? std::chrono::duration<double>(30s) : t);
+    //t = (t.count() < 30'000? std::chrono::duration<double>(30s) : t);
     std::unique_lock<std::mutex> lock(m_acc_solvingTimeMutex);
     m_acc_solvingTime(t);
   }

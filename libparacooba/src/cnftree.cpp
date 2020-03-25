@@ -25,6 +25,15 @@ CNFTree::CNFTree(LogPtr log,
 {}
 CNFTree::~CNFTree() {}
 
+void CNF::initMeanDuration(size_t windowSize)
+{
+  using namespace std::chrono_literals;
+  for(size_t i = 0; i < windowSize; ++i) {
+    m_acc_solvingTime(15'000ms);
+  }
+}
+
+
 CNFTree::State
 CNFTree::getState(Path p) const
 {
