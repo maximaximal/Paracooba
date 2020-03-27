@@ -86,7 +86,7 @@ class CaDiCaLTask : public Task
   void readCNF(std::shared_ptr<CNF> cnf, Path path);
 
   /** @brief split the current problem and re-enqueue the split problems */
-  std::vector<std::pair<Path, Cube>> resplit();
+  std::vector<std::pair<Path, Cube>> resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> >);
 
   virtual TaskResultPtr execute();
   virtual void terminate();

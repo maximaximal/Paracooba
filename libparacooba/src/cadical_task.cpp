@@ -269,7 +269,7 @@ CaDiCaLTask::execute()
       << "after roughly "
       << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
          1'000 * (end - start))).count()
-      << "s.";
+      << "ms.";
     m_cnf->update_averageSolvingTime(std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>((end - start))));
 
     if(!m_terminate) {
@@ -281,21 +281,29 @@ CaDiCaLTask::execute()
     switch(solveResult) {
       case 0:
 	{
-	  auto new_cubes = resplit();
+	  m_terminate = false;
+	  auto start = std::chrono::steady_clock::now();
+	  auto new_cubes = resplit(duration);
+	  m_terminate = false;
+	  auto end = std::chrono::steady_clock::now();
 	  // res.task->releaseSolver();
 	  PARACOOBA_LOG((*m_logger), Trace)
-	    << " originator is "
-	    << m_originator;
+	    << " splitting took "
+	    << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
+		1'000 * (end - start))).count() << "ms";
+
 	  for(auto &p : new_cubes) {
 	    auto [path, cube] = p;
 	    m_cnf->getTaskFactory()->addPath(path, TaskFactory::CubeOrSolve, 0,
 					     std::optional{cube});
 	  }
+	  if(new_cubes.size())
+	    status = TaskResult::Resplitted;
+	  else
+	    status = TaskResult::Unsatisfiable;
+	  break;
 	}
-	status = TaskResult::Resplitted;
-	//m_cnf->CNF::solverFinishedSlot(status, m_path);
-        break;
-      case 10:
+    case 10:
         status = TaskResult::Satisfiable;
         break;
       case 20:
@@ -312,13 +320,13 @@ CaDiCaLTask::execute()
 }
 
 std::vector<std::pair<Path, Cube>>
-CaDiCaLTask::resplit()
+CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> > duration)
 {
   assert(m_solver);
   PARACOOBA_LOG((*m_logger), Trace)
     << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
     << " resplitted.";
-  assert(m_solver);
+  assert(!m_terminate);
 
   Cube literals;
   if(m_cuber) {
@@ -327,9 +335,25 @@ CaDiCaLTask::resplit()
     for(auto lit : literals) {
       PARACOOBA_LOG((*m_logger), Trace)
 	<< "cube lit" << lit;
+      m_solver->assume(lit);
     }
+    m_autoStopTimer.expires_from_now(duration);
+    m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
+      std::lock_guard lock(m_solverMutex);
+      if(errc != boost::asio::error::operation_aborted && m_solver){
+	PARACOOBA_LOG((*m_logger), Trace)
+	  << "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(m_path)
+	  << " will be interrupted.";
+	m_solver->terminate();
+	m_terminate = true;
+      }
+    });
+
     Literal lit_to_split = m_solver->lookahead();
+    m_autoStopTimer.cancel();
     assert(lit_to_split != 0);
+    if(lit_to_split == INT_MIN)
+      return std::vector<std::pair<Path, Cube>> {};
     PARACOOBA_LOG((*m_logger), Trace)
       << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
       << " resplitted on literal " << lit_to_split;
@@ -343,17 +367,32 @@ CaDiCaLTask::resplit()
     assert(m_optionalCube.has_value());
     Cube literals(m_optionalCube.value());
     Cube literals2(m_optionalCube.value());
-    m_solver->reset_assumptions();
+
     for(auto lit : literals) {
       PARACOOBA_LOG((*m_logger), Trace)
 	<< "cube lit" << lit;
       m_solver->assume(lit);
     }
+
+    m_autoStopTimer.expires_from_now(duration);
+    m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
+      std::lock_guard lock(m_solverMutex);
+      if(errc != boost::asio::error::operation_aborted && m_solver){
+	PARACOOBA_LOG((*m_logger), Trace)
+	  << "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(m_path)
+	  << " will be interrupted.";
+	m_solver->terminate();
+	m_terminate = true;
+      }
+    });
     Literal lit_to_split = m_solver->lookahead();
+    m_autoStopTimer.cancel();
     PARACOOBA_LOG((*m_logger), Trace)
       << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
       << " resplitted on literal " << lit_to_split;
     assert(lit_to_split != 0);
+    if(lit_to_split == INT_MIN)
+      return std::vector<std::pair<Path, Cube>> {};
     assert(std::find(begin(literals), end(literals), lit_to_split) == end(literals));
     assert(std::find(begin(literals), end(literals), -lit_to_split) == end(literals));
     literals.push_back(lit_to_split);

@@ -492,7 +492,7 @@ CNF::solverFinishedSlot(const TaskResult& result, Path p)
 
   if(res->state == CNFTree::SAT || res->state == CNFTree::UNSAT ||
      res->state == CNFTree::Split || res->state == CNFTree::Unknown) {
-    if(res->state != CNFTree::Unknown) {
+    if(res->state == CNFTree::SAT || res->state == CNFTree::UNSAT) {
       m_cnfTree->setStateFromLocal(p, res->state);
     }
   }
@@ -711,6 +711,7 @@ CNF::Result::encodeAssignment()
 {
   if(encodedAssignment)
     return;
+
   assert(decodedAssignment || task);
   encodedAssignment = std::make_shared<AssignmentVector>();
 

@@ -4,7 +4,7 @@ include(ExternalProject)
 ExternalProject_Add(cadical
     PREFIX cadical
     URL ${CMAKE_CURRENT_SOURCE_DIR}/cadical-e5317d86.tar.gz
-    URL_HASH SHA256=0f8584d21ecd75267eb981d5214eef9d5dbe1b18e824cfe1d4a5913f0ae4a924
+    URL_HASH SHA256=4cd4ceb890320fb6533f0743c36318b625b644a960a4864382ed6433169656eb
     BUILD_IN_SOURCE 1
     BUILD_COMMAND bash -c "CXXFLAGS=-fPIC ./configure -q && make cadical"
     UPDATE_COMMAND ""

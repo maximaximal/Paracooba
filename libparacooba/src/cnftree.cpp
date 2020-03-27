@@ -29,7 +29,7 @@ void CNF::initMeanDuration(size_t windowSize)
 {
   using namespace std::chrono_literals;
   for(size_t i = 0; i < windowSize; ++i) {
-    m_acc_solvingTime(15'000ms);
+    m_acc_solvingTime(1'500ms);
   }
 }
 
@@ -200,6 +200,9 @@ CNFTree::propagateUpwardsFrom(Path p, Path sourcePath)
     // The node must always exist, except work was directly offloaded.
     assert(
       (getNode(sourcePath) && getNode(sourcePath)->requiresRemoteUpdate()));
+    std::unique_lock loggerLock(m_logMutex);
+    PARACOOBA_LOG(m_logger, Trace)
+      << "Directly offloaded " << " for path " << pathToStdString(p);
     return;
   }
 
