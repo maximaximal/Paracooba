@@ -18,6 +18,7 @@ int
 main(int argc, char* argv[])
 {
   // Start of main.
+  auto start = std::chrono::system_clock::now();
   std::shared_ptr<Config> config = std::make_shared<Config>();
   bool continueRunning = config->parseParameters(argc, argv);
   if(!continueRunning) {
@@ -89,6 +90,9 @@ main(int argc, char* argv[])
     }
   } else {
   }
+
+  auto end = std::chrono::system_clock::now();
+  PARACOOBA_LOG(logger, Trace) << "Solving took " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "s";
 
   PARACOOBA_LOG(logger, Trace) << "Ending paracooba.";
   return EXIT_SUCCESS;
