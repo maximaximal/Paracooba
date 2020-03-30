@@ -112,6 +112,8 @@ class CaDiCaLTask : public Task
     return m_pregeneratedCubes;
   }
 
+  void lookahead(int);
+
   private:
   void provideSolver();
 

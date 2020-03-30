@@ -464,4 +464,23 @@ CaDiCaLTask::provideSolver()
 
   m_solver->connect_terminator(m_terminator.get());
 }
+
+void
+CaDiCaLTask::lookahead(int depth)
+{
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "Generating cubes of length " << depth << " ";
+
+  assert(m_solver);
+  assert(m_pregeneratedCubes.empty());
+  auto cubes {m_solver->generate_cubes(depth)};
+  std::vector<int> flatCubes;
+  for(auto & cube : cubes) {
+    std::for_each(begin(cube), end(cube), [this](int lit) {m_pregeneratedCubes.emplace_back(lit);});
+    m_pregeneratedCubes.emplace_back(0);
+  }
+
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "Generated " << cubes.size() << " cubes. ";
+}
 }

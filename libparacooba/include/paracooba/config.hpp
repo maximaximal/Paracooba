@@ -58,6 +58,7 @@ class Config
     ShortNetworkTimeout,
 
     FreqCuberCutoff,
+    CaDiCaLCubes,
 
     _KEY_COUNT
   };
@@ -191,6 +192,9 @@ class Config
   /** @brief Check if this Paracooba instance is currently shutting down. */
   inline bool isStopping() const { return m_stopping; }
 
+  /** @brief Check if CaDiCaL should be used to cube formulas. */
+  inline bool useCaDiCaLCubes() { return m_CaDiCaLCubes; }
+
   int64_t generateId(int64_t uniqueNumber);
 
   ID getId() const;
@@ -255,6 +259,7 @@ class Config
   bool m_useSTDOUTForLogging = false;
   bool m_limitedTreeDump = true;
   bool m_stopping = false;
+  bool m_CaDiCaLCubes    = false;
 #ifdef ENABLE_INTERNAL_WEBSERVER
   bool m_enableInternalWebserver = true;
 #else
@@ -324,6 +329,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "network-timeout";
     case Config::ShortNetworkTimeout:
       return "short-network-timeout";
+    case Config::CaDiCaLCubes:
+      return "cadical-cubes";
     default:
       return "";
   }

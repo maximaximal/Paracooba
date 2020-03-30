@@ -28,7 +28,8 @@ class Registry : public Cuber
   enum Mode
   {
     PregeneratedCubes,
-    LiteralFrequency
+    LiteralFrequency,
+    CaDiCaLCubes
   };
 
   bool init(Mode mode, const messages::JobInitiator* ji = nullptr);

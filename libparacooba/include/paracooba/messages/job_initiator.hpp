@@ -24,7 +24,8 @@ class JobInitiator
   enum CubingKind
   {
     LiteralFrequency,
-    PregeneratedCubes
+    PregeneratedCubes,
+    CaDiCaLCubes
   };
 
   JobInitiator() {}

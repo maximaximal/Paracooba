@@ -44,6 +44,17 @@ Registry::init(Mode mode, const messages::JobInitiator* ji)
       m_cubers.push_back(std::move(pregeneratedCubesPtr));
       break;
     }
+    case CaDiCaLCubes: {
+      assert(ji);
+      auto pregeneratedCubesPtr =
+        std::make_unique<cuber::Pregenerated>(m_config, m_log, m_rootCNF, *ji);
+      if(!pregeneratedCubesPtr->init()) {
+        return false;
+      }
+      m_jobInitiator = &pregeneratedCubesPtr->getJobInitiator();
+      m_cubers.push_back(std::move(pregeneratedCubesPtr));
+      break;
+    }
   }
 
   // Now, the allowance map is ready and all waiting callbacks can be called.

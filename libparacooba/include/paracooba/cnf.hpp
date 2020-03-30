@@ -165,7 +165,8 @@ class CNF
   enum CubingKind
   {
     LiteralFrequency,
-    PregeneratedCubes
+    PregeneratedCubes,
+    CaDiCaLCubes
   };
 
   void initMeanDuration(size_t windowSize);
@@ -196,6 +197,9 @@ class CNF
   }
 
   inline boost::asio::io_service& getIOService() { return m_io_service; }
+
+  /** @brief Use CaDiCaL to generate cubes */
+  void generateCubes(int);
 
   private:
   struct SendDataStruct

@@ -159,6 +159,12 @@ CNF::sendAllowanceMap(NetworkedNode& nn, SendFinishedCB finishedCallback)
             jd.insert(*ji);
             break;
           }
+          case cuber::Registry::CaDiCaLCubes: {
+            auto ji = m_cuberRegistry->getJobInitiator();
+            assert(ji);
+            jd.insert(*ji);
+            break;
+          }
         }
 
         nn.transmitJobDescription(
@@ -371,6 +377,9 @@ CNF::receiveJobDescription(messages::JobDescription&& jd, NetworkedNode& nn)
             case messages::JobInitiator::LiteralFrequency:
               m_cuberRegistry->init(cuber::Registry::LiteralFrequency, &ji);
               m_cuberRegistry->getAllowanceMap() = ji.getAllowanceMap();
+              break;
+	    case messages::JobInitiator::CaDiCaLCubes:
+	      assert(false);
               break;
           }
         });
@@ -592,6 +601,8 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
   if(!m_config->isDaemonMode()) {
     assert(!m_cuberRegistry);
 
+    if(m_config->useCaDiCaLCubes())
+      generateCubes(3);
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
     if(pregenCubes.size() > 0) {
@@ -604,7 +615,8 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
     if(!m_cuberRegistry->init(pregenCubes.size() > 0
                                 ? cuber::Registry::PregeneratedCubes
-                                : cuber::Registry::LiteralFrequency,
+			      : (m_config->useCaDiCaLCubes() ? cuber::Registry::CaDiCaLCubes
+				 : cuber::Registry::LiteralFrequency),
                               &ji)) {
       PARACOOBA_LOG(m_logger, Fatal) << "Could not initialise cuber registry!";
       m_cuberRegistry.reset();
@@ -777,5 +789,9 @@ operator<<(std::ostream& o, CNF::CubingKind k)
       break;
   }
   return o;
+}
+
+void CNF::generateCubes(int depth) {
+  m_rootTask->lookahead(depth);
 }
 }
