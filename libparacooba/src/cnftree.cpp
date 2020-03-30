@@ -219,9 +219,11 @@ CNFTree::propagateUpwardsFrom(Path p, Path sourcePath)
 
   if((leftChild && leftChild->state == SAT) ||
      (rightChild && rightChild->state == SAT)) {
-    node->state = SAT;
-    changed = true;
+      // don't bubble up the results twice
+      changed = node ? node->state != SAT  : false;
+      node->state = SAT;
   }
+
 
   if(changed) {
     {

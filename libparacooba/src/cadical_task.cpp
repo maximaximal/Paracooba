@@ -294,13 +294,14 @@ CaDiCaLTask::execute()
 
 	  for(auto &p : new_cubes) {
 	    auto [path, cube] = p;
-	    m_cnf->addPath(path, TaskFactory::CubeOrSolve, 0,
-					     std::optional{cube});
+	    m_cnf->addPath(path, 0, std::optional{cube});
+	    // m_cnf->getCNFTree().setStateFromLocal(path, CNFTree::Split);
 	  }
 	  if(new_cubes.size())
 	    status = TaskResult::Resplitted;
 	  else
 	    status = TaskResult::Unsatisfiable;
+	  m_cnf->getCNFTree().setStateFromLocal(m_path, CNFTree::Working);
 	  break;
 	}
     case 10:
