@@ -292,16 +292,15 @@ CaDiCaLTask::execute()
 	    << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
 		1'000 * (end - start))).count() << "ms";
 
-	  for(auto &p : new_cubes) {
-	    auto [path, cube] = p;
-	    m_cnf->addPath(path, 0, std::optional{cube});
-	    // m_cnf->getCNFTree().setStateFromLocal(path, CNFTree::Split);
-	  }
 	  if(new_cubes.size())
 	    status = TaskResult::Resplitted;
 	  else
 	    status = TaskResult::Unsatisfiable;
 	  m_cnf->getCNFTree().setStateFromLocal(m_path, CNFTree::Working);
+
+	  auto result = std::make_unique<TaskResult>(status);
+	  result->setCubes(std::move(new_cubes));
+	  return std::move(result);
 	  break;
 	}
     case 10:

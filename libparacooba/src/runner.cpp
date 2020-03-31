@@ -157,6 +157,7 @@ Runner::worker(uint32_t workerId)
         entry->task->m_originator = entry->originator;
         entry->task->m_workerId = workerId;
 
+	auto factory {entry->task->m_factory};
         m_currentlyRunningTasks[workerId] = entry->task.get();
         ++m_numberOfRunningTasks;
         TaskResultPtr result;
@@ -173,6 +174,18 @@ Runner::worker(uint32_t workerId)
         if(result) {
           result->setTask(std::move(entry->task));
           result->getTask().finish(*result);
+	  if(result->getStatus() == TaskResult::Resplitted) {
+	    auto cubes{result->getCubes()};
+	    PARACOOBA_LOG(logger, Trace)
+	      << "Worker " << workerId
+	      << " has generated " << cubes.size()
+	      << " cubes.";
+	    for(auto [path, cube] : cubes) {
+	      assert(factory);
+	      std::unique_lock lock(m_taskFactoriesMutex);
+	      factory->addCubeOrSolvedPath(path, 0, std::optional{cube});
+	    }
+	  }
           entry->result.set_value(std::move(result));
         }
       } else {
