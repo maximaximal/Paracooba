@@ -35,7 +35,18 @@ class JobInitiator
   {};
 
   using AllowanceMap = std::vector<int>;
-  using DataVariant = std::variant<AllowanceMap, PregeneratedCubesTag>;
+
+  struct CaDiCaLCubesTag {
+    std::vector<int> cubes;
+
+    template <class Archive>
+    void serialize( Archive & ar )
+    {
+      ar(cubes);
+    }
+  };
+
+  using DataVariant = std::variant<AllowanceMap, PregeneratedCubesTag, CaDiCaLCubesTag>;
 
   CubingKind getCubingKind() const
   {
@@ -43,6 +54,8 @@ class JobInitiator
       return PregeneratedCubes;
     if(std::holds_alternative<AllowanceMap>(body))
       return LiteralFrequency;
+    if(std::holds_alternative<CaDiCaLCubesTag>(body))
+      return CaDiCaLCubes;
 
     return PregeneratedCubes;
   }
@@ -61,6 +74,24 @@ class JobInitiator
   {
     assert(getCubingKind() == LiteralFrequency);
     return std::get<AllowanceMap>(body);
+  }
+
+  std::vector<int>& initCaDiCaLCubes()
+  {
+    CaDiCaLCubesTag c;
+    body = std::move(c);
+    return getCaDiCaLCubes();
+  }
+  const std::vector<int>& getCaDiCaLCubes() const
+  {
+    assert(getCubingKind() == CaDiCaLCubes);
+    return std::get<CaDiCaLCubesTag>(body).cubes;
+  }
+
+  std::vector<int>& getCaDiCaLCubes()
+  {
+    assert(getCubingKind() == CaDiCaLCubes);
+    return std::get<CaDiCaLCubesTag>(body).cubes;
   }
 
   void initAsPregenCubes() { body = PregeneratedCubesTag{}; }

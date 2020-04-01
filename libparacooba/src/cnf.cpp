@@ -160,9 +160,9 @@ CNF::sendAllowanceMap(NetworkedNode& nn, SendFinishedCB finishedCallback)
             break;
           }
           case cuber::Registry::CaDiCaLCubes: {
-            auto ji = m_cuberRegistry->getJobInitiator();
-            assert(ji);
-            jd.insert(*ji);
+            auto initiator = messages::JobInitiator();
+            initiator.initCaDiCaLCubes() = m_rootTask->getPregeneratedCubes();
+            jd.insert(initiator);
             break;
           }
         }
@@ -379,7 +379,7 @@ CNF::receiveJobDescription(messages::JobDescription&& jd, NetworkedNode& nn)
               m_cuberRegistry->getAllowanceMap() = ji.getAllowanceMap();
               break;
 	    case messages::JobInitiator::CaDiCaLCubes:
-	      assert(false);
+              m_cuberRegistry->init(cuber::Registry::CaDiCaLCubes, &ji);
               break;
           }
         });
@@ -602,10 +602,14 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     assert(!m_cuberRegistry);
 
     if(m_config->useCaDiCaLCubes())
-      generateCubes(3);
+      generateCubes(5);
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
-    if(pregenCubes.size() > 0) {
+    if(m_config->useCaDiCaLCubes()) {
+      ji.initCaDiCaLCubes() = pregenCubes;
+    }
+    else if(pregenCubes.size() > 0) {
+      PARACOOBA_LOG(m_logger, Debug) << "init cubes";
       ji.initAsPregenCubes();
     }
 
@@ -614,9 +618,9 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     // need the root node to be created.
     m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
     if(!m_cuberRegistry->init(pregenCubes.size() > 0
-                                ? cuber::Registry::PregeneratedCubes
-			      : (m_config->useCaDiCaLCubes() ? cuber::Registry::CaDiCaLCubes
-				 : cuber::Registry::LiteralFrequency),
+                                ?  (m_config->useCaDiCaLCubes() ? cuber::Registry::CaDiCaLCubes
+				    : cuber::Registry::PregeneratedCubes)
+			      :cuber::Registry::LiteralFrequency,
                               &ji)) {
       PARACOOBA_LOG(m_logger, Fatal) << "Could not initialise cuber registry!";
       m_cuberRegistry.reset();
@@ -785,6 +789,9 @@ operator<<(std::ostream& o, CNF::CubingKind k)
       o << "PregeneratedCubes";
       break;
     default:
+    case CNF::CubingKind::CaDiCaLCubes:
+      o << "PregeneratedCubes";
+      break;
       o << "(! UNKNOWN CUBING KIND !)";
       break;
   }

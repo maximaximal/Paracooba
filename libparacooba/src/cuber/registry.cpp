@@ -3,6 +3,8 @@
 #include "../../include/paracooba/cuber/literal_frequency.hpp"
 #include "../../include/paracooba/cuber/pregenerated.hpp"
 #include "paracooba/messages/job_initiator.hpp"
+#include "../../include/paracooba/cnf.hpp"
+#include "../../include/paracooba/cadical_task.hpp"
 
 namespace paracooba {
 namespace cuber {
@@ -48,6 +50,7 @@ Registry::init(Mode mode, const messages::JobInitiator* ji)
       assert(ji);
       auto pregeneratedCubesPtr =
         std::make_unique<cuber::Pregenerated>(m_config, m_log, m_rootCNF, *ji);
+      m_rootCNF.getRootTask()->setPregeneratedCubes(ji->getCaDiCaLCubes());
       if(!pregeneratedCubesPtr->init()) {
         return false;
       }

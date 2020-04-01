@@ -117,6 +117,11 @@ class CaDiCaLTask : public Task
     return m_pregeneratedCubes;
   }
 
+  void setPregeneratedCubes(std::vector<int>cubes)
+  {
+    m_pregeneratedCubes = cubes;
+  }
+
   void lookahead(int);
 
   private:
