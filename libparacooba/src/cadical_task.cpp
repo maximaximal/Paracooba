@@ -320,6 +320,73 @@ CaDiCaLTask::execute()
 }
 
 std::vector<std::pair<Path, Cube>>
+CaDiCaLTask::resplit_once(Path path, Cube literals,
+			  std::chrono::duration<long int, std::ratio<1, 1000000000> > duration)
+{
+  assert(m_solver);
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "CNF formula for path " << CNFTree::pathToStrNoAlloc(path)
+    << " resplitted.";
+  assert(!m_terminate);
+
+  Cube literals2(literals);
+  for(auto lit : literals) {
+    PARACOOBA_LOG((*m_logger), Trace)
+      << "cube lit" << lit;
+    m_solver->assume(lit);
+  }
+
+  Literal lit_to_split = m_solver->lookahead();
+  m_autoStopTimer.cancel();
+  assert(lit_to_split != 0);
+  if(lit_to_split == INT_MIN)
+    return std::vector<std::pair<Path, Cube>> {};
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "CNF formula for path " << CNFTree::pathToStrNoAlloc(path)
+    << " resplitted on literal " << lit_to_split;
+  literals.push_back(lit_to_split);
+  literals2.push_back(-lit_to_split);
+  m_solver->reset_assumptions();
+  return std::vector<std::pair<Path, Cube>>
+    {{CNFTree::getNextLeftPath(path), literals},
+     {CNFTree::getNextRightPath(path), literals2}};
+}
+
+std::vector<std::pair<Path, Cube>>
+CaDiCaLTask::resplit_depth(Path path, Cube literals,
+			   std::chrono::duration<long int, std::ratio<1, 1000000000> > duration,
+			   int depth)
+{
+  Cube literals2(literals);
+  for(auto lit : literals) {
+    PARACOOBA_LOG((*m_logger), Trace)
+      << "cube lit" << lit;
+    m_solver->assume(lit);
+  }
+  m_autoStopTimer.expires_from_now(duration);
+  m_autoStopTimer.async_wait([this, path](const boost::system::error_code& errc) {
+    std::lock_guard lock(m_solverMutex);
+    if(errc != boost::asio::error::operation_aborted && m_solver){
+      PARACOOBA_LOG((*m_logger), Trace)
+	<< "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(path)
+	<< " will be interrupted.";
+      m_solver->terminate();
+      m_terminate = true;
+    }
+  });
+
+  std::vector<std::pair<Path, Cube>> cubes{resplit_once(path, literals, duration)};
+  for(int i = 0; i < depth && !m_terminate; ++i) {
+    auto cubes2{std::move(cubes)};
+    for(auto && [p, cube] : cubes2) {
+      for(auto &&pcube : resplit_once(p, cube, duration))
+	cubes.push_back(pcube);
+    }
+  }
+  return cubes;
+}
+
+std::vector<std::pair<Path, Cube>>
 CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> > duration)
 {
   assert(m_solver);
@@ -327,80 +394,26 @@ CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> >
     << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
     << " resplitted.";
   assert(!m_terminate);
-
-  Cube literals;
-  if(m_cuber) {
-    m_cuber->getCube(m_path, literals);
-    Cube literals2(literals);
-    for(auto lit : literals) {
+  m_autoStopTimer.expires_from_now(duration);
+  m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
+    std::lock_guard lock(m_solverMutex);
+    if(errc != boost::asio::error::operation_aborted && m_solver){
       PARACOOBA_LOG((*m_logger), Trace)
-	<< "cube lit" << lit;
-      m_solver->assume(lit);
+	<< "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(m_path)
+	<< " will be interrupted.";
+      m_solver->terminate();
+      m_terminate = true;
     }
-    m_autoStopTimer.expires_from_now(duration);
-    m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
-      std::lock_guard lock(m_solverMutex);
-      if(errc != boost::asio::error::operation_aborted && m_solver){
-	PARACOOBA_LOG((*m_logger), Trace)
-	  << "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(m_path)
-	  << " will be interrupted.";
-	m_solver->terminate();
-	m_terminate = true;
-      }
-    });
+  });
 
-    Literal lit_to_split = m_solver->lookahead();
-    m_autoStopTimer.cancel();
-    assert(lit_to_split != 0);
-    if(lit_to_split == INT_MIN)
-      return std::vector<std::pair<Path, Cube>> {};
-    PARACOOBA_LOG((*m_logger), Trace)
-      << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
-      << " resplitted on literal " << lit_to_split;
-    literals.push_back(lit_to_split);
-    literals2.push_back(-lit_to_split);
-    m_solver->reset_assumptions();
-    return std::vector<std::pair<Path, Cube>>
-      {{CNFTree::getNextLeftPath(m_path), literals},
-       {CNFTree::getNextRightPath(m_path), literals2}};
+  if(m_cuber) {
+    Cube literals;
+    m_cuber->getCube(m_path, literals);
+    return resplit_depth(m_path, literals, duration, 0);
   } else {
     assert(m_optionalCube.has_value());
     Cube literals(m_optionalCube.value());
-    Cube literals2(m_optionalCube.value());
-
-    for(auto lit : literals) {
-      PARACOOBA_LOG((*m_logger), Trace)
-	<< "cube lit" << lit;
-      m_solver->assume(lit);
-    }
-
-    m_autoStopTimer.expires_from_now(duration);
-    m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
-      std::lock_guard lock(m_solverMutex);
-      if(errc != boost::asio::error::operation_aborted && m_solver){
-	PARACOOBA_LOG((*m_logger), Trace)
-	  << "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(m_path)
-	  << " will be interrupted.";
-	m_solver->terminate();
-	m_terminate = true;
-      }
-    });
-    Literal lit_to_split = m_solver->lookahead();
-    m_autoStopTimer.cancel();
-    PARACOOBA_LOG((*m_logger), Trace)
-      << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
-      << " resplitted on literal " << lit_to_split;
-    assert(lit_to_split != 0);
-    if(lit_to_split == INT_MIN)
-      return std::vector<std::pair<Path, Cube>> {};
-    assert(std::find(begin(literals), end(literals), lit_to_split) == end(literals));
-    assert(std::find(begin(literals), end(literals), -lit_to_split) == end(literals));
-    literals.push_back(lit_to_split);
-    literals2.push_back(-lit_to_split);
-    m_solver->reset_assumptions();
-    return std::vector<std::pair<Path, Cube>>
-      {{CNFTree::getNextLeftPath(m_path), literals},
-       {CNFTree::getNextRightPath(m_path), literals2}};
+    return resplit_depth(m_path, literals, duration, 0);
   }
 }
 
@@ -482,4 +495,5 @@ CaDiCaLTask::lookahead(int depth)
   PARACOOBA_LOG((*m_logger), Trace)
     << "Generated " << cubes.size() << " cubes. ";
 }
+
 }

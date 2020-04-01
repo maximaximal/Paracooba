@@ -87,6 +87,11 @@ class CaDiCaLTask : public Task
 
   /** @brief split the current problem and re-enqueue the split problems */
   std::vector<std::pair<Path, Cube>> resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> >);
+  std::vector<std::pair<Path, Cube>> resplit_once(Path path, Cube literals,
+							   std::chrono::duration<long int, std::ratio<1, 1000000000> >);
+  std::vector<std::pair<Path, Cube>> resplit_depth(Path path, Cube literals,
+							    std::chrono::duration<long int, std::ratio<1, 1000000000> >,
+							    int);
 
   virtual TaskResultPtr execute();
   virtual void terminate();

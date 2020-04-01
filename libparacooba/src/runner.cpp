@@ -180,9 +180,8 @@ Runner::worker(uint32_t workerId)
 	      << "Worker " << workerId
 	      << " has generated " << cubes.size()
 	      << " cubes.";
-	    for(auto [path, cube] : cubes) {
+	    for(auto && [path, cube] : cubes) {
 	      assert(factory);
-	      std::unique_lock lock(m_taskFactoriesMutex);
 	      factory->addCubeOrSolvedPath(path, 0, std::optional{cube});
 	    }
 	  }
