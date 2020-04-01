@@ -3,6 +3,8 @@
 #include "../../include/paracooba/cluster-node.hpp"
 #include "../../include/paracooba/messages/message.hpp"
 #include "../../include/paracooba/networked_node.hpp"
+#include "../../include/paracooba/config.hpp"
+#include <boost/asio/ip/tcp.hpp>
 #include <cereal/archives/binary.hpp>
 #include <mutex>
 
@@ -101,6 +103,9 @@ UDPServer::operator()(const boost::system::error_code& ec,
             clusterNodeStore().getOrCreateNode(msg.getOrigin());
           NetworkedNode* nn = node.getNetworkedNode();
           nn->setRemoteUdpEndpoint(remoteEndpoint());
+          nn->setRemoteTcpEndpoint(boost::asio::ip::tcp::endpoint(
+            remoteEndpoint().address(),
+            config()->getUint16(Config::TCPTargetPort)));
 
           messageReceiver().receiveMessage(msg, *nn);
         } catch(cereal::Exception& e) {

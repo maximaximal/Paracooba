@@ -89,6 +89,7 @@ class UDPServer : public messages::MessageTransmitter
   boost::asio::streambuf& sendStreambuf() { return m_state->sendStreambuf; }
   boost::asio::coroutine& readCoro() { return m_state->readCoro; }
   Logger& logger() { return m_state->logger; }
+  ConfigPtr& config() { return m_state->config; }
   messages::MessageReceiver& messageReceiver()
   {
     return m_state->messageReceiver;
