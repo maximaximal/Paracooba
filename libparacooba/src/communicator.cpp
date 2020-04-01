@@ -22,6 +22,7 @@
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
+#include <boost/exception/all.hpp>
 #include <boost/system/error_code.hpp>
 #include <cassert>
 #include <chrono>
@@ -161,9 +162,13 @@ Communicator::run()
   PARACOOBA_LOG(m_logger, Trace) << "Communicator io_service started.";
   bool ioServiceRunningWithoutException = true;
   while(ioServiceRunningWithoutException) {
-    m_ioService.run();
     try {
+      m_ioService.run();
       ioServiceRunningWithoutException = false;
+    } catch(const boost::exception& e) {
+      PARACOOBA_LOG(m_logger, LocalError)
+        << "Boost exception encountered from ioService! Diagnostics info: "
+        << boost::diagnostic_information(e);
     } catch(const std::exception& e) {
       PARACOOBA_LOG(m_logger, LocalError)
         << "Exception encountered from ioService! Message: " << e.what();

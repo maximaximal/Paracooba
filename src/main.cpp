@@ -1,5 +1,7 @@
-#include <boost/program_options.hpp>
 #include <iostream>
+
+#include <boost/exception/all.hpp>
+#include <boost/program_options.hpp>
 
 #include <paracooba/client.hpp>
 #include <paracooba/cnf.hpp>
@@ -43,8 +45,13 @@ main(int argc, char* argv[])
     client->solve();
   }
 
-    communicator->run();
   try {
+    communicator->run();
+  } catch(const boost::exception& e) {
+    PARACOOBA_LOG(logger, LocalError)
+      << "Encountered boost exception which was not catched until main()! "
+         "Diagnostics info: "
+      << boost::diagnostic_information(e);
   } catch(std::exception& e) {
     PARACOOBA_LOG(logger, LocalError)
       << "Encountered exception which was not catched until main()! Message: "
