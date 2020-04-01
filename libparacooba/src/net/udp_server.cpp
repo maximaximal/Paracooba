@@ -3,7 +3,6 @@
 #include "../../include/paracooba/cluster-node.hpp"
 #include "../../include/paracooba/messages/message.hpp"
 #include "../../include/paracooba/networked_node.hpp"
-#include <boost/asio/redirect_error.hpp>
 #include <cereal/archives/binary.hpp>
 #include <mutex>
 
