@@ -5,10 +5,18 @@ set(TEST_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/path_factory_test.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/assignment_serializer_test.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cuber_test.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/connection_test.cpp
     )
 
-add_executable(parac-test ${TEST_SRCS})
+# Use BOOST_BEAST_HEADER to guide to newer boost version.
+if(NOT BOOST_BEAST_HEADER)
+    set(TEST_SRCS_SOCKETS)
+else()
+    set(TEST_SRCS_SOCKETS
+        ${CMAKE_CURRENT_SOURCE_DIR}/connection_test.cpp
+    )
+endif()
+
+add_executable(parac-test ${TEST_SRCS} ${TEST_SRCS_SOCKETS})
 
 set_property(TARGET parac-test PROPERTY CXX_STANDARD 17)
 
