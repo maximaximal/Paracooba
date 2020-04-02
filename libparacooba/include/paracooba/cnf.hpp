@@ -72,8 +72,8 @@ class CNF
     Result(const Result& o);
     Result(Result&& o);
 
-    Path p;
-    CNFTree::State state;
+    Path p = CNFTree::DefaultUninitiatedPath;
+    CNFTree::State state = CNFTree::State::Unknown;
     uint32_t size = 0;
     bool finished = false;
     AssignmentVectorPtr encodedAssignment;
