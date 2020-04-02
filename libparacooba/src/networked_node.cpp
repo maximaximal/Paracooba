@@ -64,7 +64,6 @@ NetworkedNode::assignConnection(const net::Connection& conn)
     return false;
   }
   m_connection = std::make_unique<net::Connection>(conn);
-  m_connectionReadyWaiter.setReady(m_connection.get());
   return true;
 }
 

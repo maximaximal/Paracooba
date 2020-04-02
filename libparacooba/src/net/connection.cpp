@@ -265,6 +265,11 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
       connectionEstablished() = true;
       writeHandler();
 
+      // Now set the connection to ready in the networked node.
+      if(auto nn = remoteNN().lock()) {
+        nn->getConnectionReadyWaiter().setReady(nn->getConnection());
+      }
+
       // Handshake finished, both sides know about the other side. Communication
       // can begin now. Communication runs in a loop, as unlimited messages may
       // be received over a connection.
