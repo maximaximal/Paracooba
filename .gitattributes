@@ -1,2 +1,3 @@
 internalwebserver-docroot/js/deps/* linguist-vendored
 internalwebserver-docroot/css/* linguist-vendored
+third_party/* linguist-vendored
