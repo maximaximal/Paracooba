@@ -122,6 +122,7 @@ LiteralFrequency::getCube(Path path, Cube& literals)
 
     auto lit = (*m_literalFrequency)[dec];
     assert(lit != 0);
+    assert(lit > 0);
 
     literals.push_back(lit * (CNFTree::getAssignment(path, depth) ? 1 : -1));
   }
