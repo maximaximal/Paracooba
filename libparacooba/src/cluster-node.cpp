@@ -26,7 +26,7 @@ ClusterNode::ClusterNode(
   , m_thisId(thisId)
   , m_id(id)
   , m_networkedNode(
-      std::make_unique<NetworkedNode>(id, statelessMessageTransmitter))
+      std::make_shared<NetworkedNode>(id, statelessMessageTransmitter))
   , m_clusterNodeStore(clusterNodeStore)
 {
   initMeanDuration(ClusterNodeWindowSize);
@@ -36,7 +36,7 @@ ClusterNode::ClusterNode(ClusterNode&& o) noexcept
   : m_changed(o.m_changed)
   , m_name(std::move(o.m_name))
   , m_host(std::move(o.m_host))
-  , m_networkedNode(std::move(o.m_networkedNode))
+  , m_networkedNode(o.m_networkedNode)
   , m_maximumCPUFrequency(o.m_maximumCPUFrequency)
   , m_uptime(o.m_uptime)
   , m_availableWorkers(o.m_availableWorkers)
@@ -53,12 +53,6 @@ ClusterNode::ClusterNode(ClusterNode&& o) noexcept
   , m_clusterNodeStore(o.m_clusterNodeStore)
 {}
 ClusterNode::~ClusterNode() {}
-
-void
-ClusterNode::setNetworkedNode(std::unique_ptr<NetworkedNode> networkedNode)
-{
-  PARACOOBA_CLUSTERNODE_CHANGED(m_networkedNode, std::move(networkedNode))
-}
 
 void
 ClusterNode::setWorkQueueSize(uint64_t workQueueSize)

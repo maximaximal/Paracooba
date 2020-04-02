@@ -5,6 +5,7 @@
 #include <map>
 #include <optional>
 #include <vector>
+#include <memory>
 
 namespace paracooba {
 using Literal = int;
@@ -20,6 +21,10 @@ using ClusterNodeMap = std::map<ID, ClusterNode>;
 
 using SuccessCB = std::function<void(bool)>;
 static SuccessCB EmptySuccessCB = nullptr;
+
+class NetworkedNode;
+using NetworkedNodePtr = std::shared_ptr<NetworkedNode>;
+using NetworkedNodeWeakPtr = std::weak_ptr<NetworkedNode>;
 }
 
 #endif

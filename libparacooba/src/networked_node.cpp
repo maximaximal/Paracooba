@@ -11,7 +11,10 @@ NetworkedNode::NetworkedNode(
   , m_statelessMessageTransmitter(statelessMessageTransmitter)
 {}
 
-NetworkedNode::~NetworkedNode() {}
+NetworkedNode::~NetworkedNode()
+{
+  resetConnection();
+}
 
 void
 NetworkedNode::transmitMessage(const messages::Message& msg,
@@ -68,6 +71,9 @@ NetworkedNode::assignConnection(const net::Connection& conn)
 void
 NetworkedNode::resetConnection()
 {
+  if(m_connection) {
+    m_connection->resetRemoteNN();
+  }
   m_connectionReadyWaiter.reset();
   m_connection.reset();
 }

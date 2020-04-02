@@ -146,7 +146,7 @@ TEST_CASE("Initiate a paracooba::net::Connection")
     conn1.socket(),
     boost::bind(
       &Connection::readHandler, conn1, boost::asio::placeholders::error, 0));
-  conn2.connect(*node1.getNetworkedNode());
+  conn2.connect(node1.getNetworkedNodePtr());
 
   ioService.run_for(std::chrono::milliseconds(1));
 

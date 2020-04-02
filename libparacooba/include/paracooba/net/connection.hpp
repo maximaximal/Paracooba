@@ -102,7 +102,7 @@ class Connection
     ClusterNodeStore& clusterNodeStore;
     messages::MessageReceiver& messageReceiver;
     messages::JobDescriptionReceiverProvider& jobDescriptionReceiverProvider;
-    NetworkedNode* remoteNN = nullptr;
+    NetworkedNodeWeakPtr remoteNN;
     std::shared_ptr<CNF> cnf;
     std::string remote;
 
@@ -162,7 +162,7 @@ class Connection
 
   boost::asio::ip::tcp::socket& socket() { return m_state->socket; }
 
-  void connect(NetworkedNode& nn);
+  void connect(const NetworkedNodePtr& nn);
   void connect(const std::string& remote);
 
   bool isConnectionEstablished() const
@@ -177,6 +177,8 @@ class Connection
   Mode getSendMode() const { return m_state->sendMode; }
 
   void exit() { isExit() = true; }
+
+  void resetRemoteNN() { remoteNN().reset(); }
 
   private:
   void writeHandler(boost::system::error_code ec = boost::system::error_code(),
@@ -215,7 +217,7 @@ class Connection
   ClusterNodeStore& clusterNodeStore() { return m_state->clusterNodeStore; }
   ContextPtr& context() { return m_state->context; }
   std::shared_ptr<CNF>& cnf() { return m_state->cnf; }
-  NetworkedNode*& remoteNN() { return m_state->remoteNN; }
+  NetworkedNodeWeakPtr& remoteNN() { return m_state->remoteNN; }
   messages::MessageReceiver& messageReceiver()
   {
     return m_state->messageReceiver;

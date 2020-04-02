@@ -107,7 +107,7 @@ TCPAcceptor::initiateConnectionToClusterNode(ClusterNode& clusterNode)
     return;
   }
 
-  NetworkedNode* nn = clusterNode.getNetworkedNode();
+  NetworkedNodePtr nn = clusterNode.getNetworkedNodePtr();
   assert(nn);
 
   if(nn->isConnectionReady()) {
@@ -123,7 +123,7 @@ TCPAcceptor::initiateConnectionToClusterNode(ClusterNode& clusterNode)
                                   clusterNodeStore(),
                                   messageReceiver(),
                                   jobDescriptionReceiverProvider());
-  newConnectionAttempt.connect(*nn);
+  newConnectionAttempt.connect(nn);
 }
 
 void

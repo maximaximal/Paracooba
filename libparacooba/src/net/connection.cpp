@@ -51,9 +51,9 @@ Connection::State::State(boost::asio::io_service& ioService,
 
 Connection::State::~State()
 {
-  if(remoteNN) {
-    remoteNN->removeActiveTCPClient();
-    remoteNN->resetConnection();
+  if(auto nn = remoteNN.lock()) {
+    nn->removeActiveTCPClient();
+    nn->resetConnection();
   }
 
   if(!exit && !config->isStopping()) {
@@ -63,27 +63,25 @@ Connection::State::~State()
     switch(resumeMode) {
       case RestartAfterShutdown: {
         // Attempt restart.
-        if(remoteNN || remote != "") {
-          Connection conn(ioService,
-                          log,
-                          config,
-                          clusterNodeStore,
-                          messageReceiver,
-                          jobDescriptionReceiverProvider,
-                          connectionTry);
+        Connection conn(ioService,
+                        log,
+                        config,
+                        clusterNodeStore,
+                        messageReceiver,
+                        jobDescriptionReceiverProvider,
+                        connectionTry);
 
-          if(remoteNN) {
-            conn.connect(*remoteNN);
-          } else {
-            conn.connect(remote);
-          }
+        // Also apply all old queue entries to send.
+        while(!sendQueue.empty()) {
+          auto entry = sendQueue.front();
+          sendQueue.pop();
+          conn.sendSendQueueEntry(std::move(entry));
+        }
 
-          // Also apply all old queue entries to send.
-          while(!sendQueue.empty()) {
-            auto entry = sendQueue.front();
-            sendQueue.pop();
-            conn.sendSendQueueEntry(std::move(entry));
-          }
+        if(auto nn = remoteNN.lock()) {
+          conn.connect(nn);
+        } else if(remote != "") {
+          conn.connect(remote);
         } else {
           PARACOOBA_LOG(logger, NetTrace)
             << "Cannot restart connection, as no remoteNN is set and no remote "
@@ -213,8 +211,10 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
                       std::placeholders::_1,
                       std::placeholders::_2);
 
-  if(remoteNN() && remoteNN()->deletionRequested()) {
-    return;
+  if(auto nn = remoteNN().lock()) {
+    if(nn->deletionRequested()) {
+      return;
+    }
   }
 
   if(!ec) {
@@ -255,8 +255,16 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
         yield break;
       }
 
+      if(auto nn = remoteNN().lock()) {
+        nn->addActiveTCPClient();
+      } else {
+        PARACOOBA_LOG(logger(), LocalError)
+          << "Connection established, remoteNN initialized, but no remoteNN "
+             "can be transformed into shared_ptr! Connection will be "
+             "dropped.";
+        return;
+      }
       connectionEstablished() = true;
-      remoteNN()->addActiveTCPClient();
 
       // Handshake finished, both sides know about the other side. Communication
       // can begin now. Communication runs in a loop, as unlimited messages may
@@ -395,8 +403,8 @@ Connection::writeHandler(boost::system::error_code ec, size_t bytes_transferred)
             if(msg->getType() == messages::Type::OfflineAnnouncement) {
               PARACOOBA_LOG(logger(), NetTrace)
                 << "This was an offline announcement, connection ends.";
-              if(remoteNN()) {
-                remoteNN()->resetConnection();
+              if(auto nn = remoteNN().lock()) {
+                nn->resetConnection();
               }
               yield break;
             }
@@ -417,8 +425,8 @@ Connection::writeHandler(boost::system::error_code ec, size_t bytes_transferred)
     if(currentSendFinishedCB()) {
       currentSendFinishedCB()(false);
     }
-    if(remoteNN()) {
-      remoteNN()->resetConnection();
+    if(auto nn = remoteNN().lock()) {
+      nn->resetConnection();
     }
   }
 }
@@ -428,13 +436,13 @@ Connection::writeHandler(boost::system::error_code ec, size_t bytes_transferred)
 #include <boost/asio/unyield.hpp>
 
 void
-Connection::connect(NetworkedNode& nn)
+Connection::connect(const NetworkedNodePtr& nn)
 {
   // The initial peer that started the connection should also re-start the
   // connection.
   resumeMode() = RestartAfterShutdown;
-  remoteNN() = &nn;
-  remoteId() = nn.getId();
+  remoteNN() = nn;
+  remoteId() = nn->getId();
 
   uint16_t allowedRetries = config()->getUint16(Config::ConnectionRetries);
 
@@ -442,10 +450,10 @@ Connection::connect(NetworkedNode& nn)
 
   if(getConnectionTries() < allowedRetries) {
     PARACOOBA_LOG(logger(), NetTrace)
-      << "Trying to connect to " << nn.getRemoteTcpEndpoint()
-      << " (ID: " << nn.getId() << "), Try " << getConnectionTries();
+      << "Trying to connect to " << nn->getRemoteTcpEndpoint()
+      << " (ID: " << nn->getId() << "), Try " << getConnectionTries();
     socket().async_connect(
-      nn.getRemoteTcpEndpoint(),
+      nn->getRemoteTcpEndpoint(),
       boost::bind(
         &Connection::readHandler, *this, boost::asio::placeholders::error, 0));
   } else {
@@ -587,23 +595,29 @@ Connection::receiveSerializedMessage(size_t bytes_received)
         jobDescriptionReceiverProvider().getJobDescriptionReceiver(
           jd.getOriginatorID());
       if(receiver) {
-        receiver->receiveJobDescription(std::move(jd), *remoteNN());
+        if(auto nn = remoteNN().lock()) {
+          receiver->receiveJobDescription(std::move(jd), *nn);
 
-        if(context()) {
-          // This is a connection between a Master and a Daemon. So the
-          // context for this formula can be notified of this JD.
-          switch(jd.getKind()) {
-            case messages::JobDescription::Initiator:
-              context()->start(Daemon::Context::State::AllowanceMapReceived);
-              break;
-            default:
-              if(!context()->getReadyForWork()) {
-                PARACOOBA_LOG(logger(), GlobalError)
-                  << "Receive JobDescription while context is not ready for "
-                     "work!";
-              }
-              break;
+          if(context()) {
+            // This is a connection between a Master and a Daemon. So the
+            // context for this formula can be notified of this JD.
+            switch(jd.getKind()) {
+              case messages::JobDescription::Initiator:
+                context()->start(Daemon::Context::State::AllowanceMapReceived);
+                break;
+              default:
+                if(!context()->getReadyForWork()) {
+                  PARACOOBA_LOG(logger(), GlobalError)
+                    << "Receive JobDescription while context is not ready for "
+                       "work!";
+                }
+                break;
+            }
           }
+        } else {
+          PARACOOBA_LOG(logger(), LocalError)
+            << "Received a JobDescription from " << remoteId()
+            << " but no remoteNN in connection!";
         }
       } else {
         PARACOOBA_LOG(logger(), GlobalError)
@@ -612,12 +626,18 @@ Connection::receiveSerializedMessage(size_t bytes_received)
           << " could be retrieved!";
       }
     } else if(currentMode() == TransmitControlMessage) {
-      messages::Message msg;
-      ia(msg);
-      messageReceiver().receiveMessage(msg, *remoteNN());
+      if(auto nn = remoteNN().lock()) {
+        messages::Message msg;
+        ia(msg);
+        messageReceiver().receiveMessage(msg, *nn);
 
-      if(msg.getType() == messages::Type::OfflineAnnouncement) {
-        resumeMode() = EndAfterShutdown;
+        if(msg.getType() == messages::Type::OfflineAnnouncement) {
+          resumeMode() = EndAfterShutdown;
+        }
+      } else {
+        PARACOOBA_LOG(logger(), LocalError)
+          << "Received a Serialized Message from " << remoteId()
+          << " but no remoteNN in connection!";
       }
     }
   } catch(const cereal::Exception& e) {
@@ -677,17 +697,18 @@ Connection::popNextSendItem()
 bool
 Connection::initRemoteNN()
 {
-  if(remoteNN()) {
+  if(auto nn = remoteNN().lock()) {
     // If the remote was already set from outside, this can return
     // immediately. No new node needs to be created.
-    remoteNN()->assignConnection(*this);
+    nn->assignConnection(*this);
     return true;
   }
 
   auto [node, inserted] = clusterNodeStore().getOrCreateNode(remoteId());
 
   if(node.getNetworkedNode()->assignConnection(*this)) {
-    remoteNN() = node.getNetworkedNode();
+    auto nn = node.getNetworkedNodePtr();
+    remoteNN() = nn;
 
     PARACOOBA_LOG(logger(), NetTrace)
       << "Initiated Remote NN, connection established.";
@@ -697,7 +718,7 @@ Connection::initRemoteNN()
         // The side with specified remote is the one that originally started the
         // connection. This makes it also the side that now sends an
         // announcement request.
-        remoteNN()->announcementRequest(*config(), *remoteNN());
+        nn->announcementRequest(*config(), *nn);
       }
     }
     return true;
@@ -711,8 +732,8 @@ Connection::reconnect()
 {
   socket().close();
 
-  if(remoteNN()) {
-    connect(*remoteNN());
+  if(auto nn = remoteNN().lock()) {
+    connect(nn);
   } else if(remote() != "") {
     connect(remote());
   } else {

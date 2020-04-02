@@ -77,7 +77,6 @@ class ClusterNode
   {
     PARACOOBA_CLUSTERNODE_CHANGED(m_host, host)
   }
-  void setNetworkedNode(std::unique_ptr<NetworkedNode> networkedNode);
   void setMaximumCPUFrequency(uint16_t maximumCPUFrequency)
   {
     PARACOOBA_CLUSTERNODE_CHANGED(m_maximumCPUFrequency, maximumCPUFrequency)
@@ -119,6 +118,7 @@ class ClusterNode
   {
     return m_networkedNode.get();
   }
+  NetworkedNodePtr getNetworkedNodePtr() { return m_networkedNode; }
 
   std::string_view getName() const { return m_name; }
   int64_t getId() const { return m_id; }
@@ -253,7 +253,7 @@ class ClusterNode
 
   std::string m_name = "Unknown";
   std::string m_host = "";
-  std::unique_ptr<NetworkedNode> m_networkedNode;
+  std::shared_ptr<NetworkedNode> m_networkedNode;
 
   std::chrono::time_point<std::chrono::system_clock> m_lastStatusReceived =
     std::chrono::system_clock::now();
