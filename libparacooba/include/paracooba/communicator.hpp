@@ -98,6 +98,8 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   void requestCNFTreePathInfo(
     const messages::CNFTreeNodeStatusRequest& request);
 
+  void sendStatusToAllPeers();
+
   private:
   friend class webserver::API;
 

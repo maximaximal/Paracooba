@@ -411,6 +411,19 @@ Communicator::tick(const boost::system::error_code& ec)
   }
   checkAndTransmitClusterStatisticsChanges();
 
+  sendStatusToAllPeers();
+
+  m_clusterStatistics->rebalance();
+
+  m_tickTimer.expires_from_now(
+    std::chrono::milliseconds(m_config->getUint64(Config::TickMilliseconds)));
+  m_tickTimer.async_wait(
+    std::bind(&Communicator::tick, this, std::placeholders::_1));
+}
+
+void
+Communicator::sendStatusToAllPeers()
+{
   messages::NodeStatus::OptionalDaemon optionalDaemon = std::nullopt;
 
   if(m_config->isDaemonMode()) {
@@ -448,12 +461,5 @@ Communicator::tick(const boost::system::error_code& ec)
       nn->transmitMessage(msg, *nn);
     }
   }
-
-  m_clusterStatistics->rebalance();
-
-  m_tickTimer.expires_from_now(
-    std::chrono::milliseconds(m_config->getUint64(Config::TickMilliseconds)));
-  m_tickTimer.async_wait(
-    std::bind(&Communicator::tick, this, std::placeholders::_1));
 }
 }

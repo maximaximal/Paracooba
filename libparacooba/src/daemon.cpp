@@ -99,6 +99,10 @@ Daemon::Context::start(State change)
       m_state = m_state | WaitingForWork;
       m_readyForWork = true;
       PARACOOBA_LOG(m_logger, Trace) << "Ready for Work!";
+
+      // Once the daemon is ready, immediately send a status update to make
+      // startup faster.
+      m_daemon->m_communicator->sendStatusToAllPeers();
     }
   }
 
