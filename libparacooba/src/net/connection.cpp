@@ -224,11 +224,9 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
         read(socket(), BUF(remoteId));
         yield async_write(socket(), BUF(thisId), rh);
         currentlySending() = false;
-        writeHandler();
       } else {
         yield async_write(socket(), BUF(thisId), rh);
         currentlySending() = false;
-        writeHandler();
         yield async_read(socket(), BUF(remoteId), rh);
       }
 
@@ -265,6 +263,7 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
         return;
       }
       connectionEstablished() = true;
+      writeHandler();
 
       // Handshake finished, both sides know about the other side. Communication
       // can begin now. Communication runs in a loop, as unlimited messages may
@@ -345,6 +344,10 @@ Connection::writeHandler(boost::system::error_code ec, size_t bytes_transferred)
     reenter(&writeCoro())
     {
       while(true) {
+        while(!connectionEstablished()) {
+          yield;
+        }
+
         while(!currentSendItem()) {
           yield popNextSendItem();
         }
