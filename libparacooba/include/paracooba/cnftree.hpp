@@ -153,6 +153,9 @@ class CNFTree
   static inline uint64_t getShiftedPath(Path p) { return p >> 6u; }
   static inline uint64_t getDepthShiftedPath(Path p)
   {
+    assert(getDepth(p) <= maxPathDepth);
+    if(getDepth(p) == 0)
+      return 0;
     return p >> ((sizeof(p) * 8) - getDepth(p));
   }
 
