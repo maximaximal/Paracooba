@@ -74,7 +74,7 @@ class CNF
 
   struct Result
   {
-    Result() {}
+    Result() {state =  CNFTree::Unknown;}
     Result(const Result& o);
     Result(Result&& o);
 
