@@ -75,5 +75,6 @@ NetworkedNode::resetConnection()
   }
   m_connectionReadyWaiter.reset();
   m_connection.reset();
+  removeActiveTCPClient();
 }
 }

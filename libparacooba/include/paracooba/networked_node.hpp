@@ -71,7 +71,11 @@ class NetworkedNode
   inline std::ostream& operator<<(std::ostream& o) { return o << getId(); }
 
   void addActiveTCPClient() { ++m_activeTCPClients; }
-  void removeActiveTCPClient() { --m_activeTCPClients; }
+  void removeActiveTCPClient()
+  {
+    if(m_activeTCPClients > 0)
+      --m_activeTCPClients;
+  }
   bool hasActiveTCPClients() { return m_activeTCPClients > 0; }
   bool deletionRequested() { return m_deletionRequested; }
   void requestDeletion();
