@@ -801,4 +801,9 @@ operator<<(std::ostream& o, CNF::CubingKind k)
 void CNF::generateCubes(int depth) {
   m_rootTask->lookahead(depth);
 }
+
+
+bool CNF::shouldResplitCubes() {
+  return m_config->shouldResplitCubes();
+}
 }

@@ -201,6 +201,8 @@ class CNF
   /** @brief Use CaDiCaL to generate cubes */
   void generateCubes(int);
 
+  bool shouldResplitCubes();
+
   private:
   struct SendDataStruct
   {

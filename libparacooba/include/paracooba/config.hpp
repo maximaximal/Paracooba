@@ -59,6 +59,7 @@ class Config
 
     FreqCuberCutoff,
     CaDiCaLCubes,
+    Resplit,
 
     _KEY_COUNT
   };
@@ -166,6 +167,8 @@ class Config
   inline bool isInfoMode() const { return m_infoMode; }
   /** @brief Check if daemon mode is active. */
   inline bool isDaemonMode() const { return m_daemonMode; }
+  /** @brief Check if cubes should be resplit. */
+  inline bool shouldResplitCubes() const { return m_resplitCubes; }
 
   /** @brief Set debug mode active. */
   inline void setDebugMode(bool v) { m_debugMode = v; }
@@ -177,6 +180,8 @@ class Config
   inline void setDaemonMode(bool v) { m_daemonMode = v; }
   /** @brief Set stopping mode, so no other restarts are carried out. */
   inline void setStopping(bool v) { m_stopping = v; }
+  /** @brief Resplit cubes if solving takes too long. */
+  inline void setResplitCubes(bool v) { m_resplitCubes = v; }
 
   /** @brief Check if STDOUT should be used for logging instead of CLOG. */
   inline bool useSTDOUTForLogging() const { return m_useSTDOUTForLogging; }
@@ -260,6 +265,7 @@ class Config
   bool m_limitedTreeDump = true;
   bool m_stopping = false;
   bool m_CaDiCaLCubes    = false;
+  bool m_resplitCubes    = false;
 #ifdef ENABLE_INTERNAL_WEBSERVER
   bool m_enableInternalWebserver = true;
 #else
@@ -331,6 +337,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "short-network-timeout";
     case Config::CaDiCaLCubes:
       return "cadical-cubes";
+    case Config::Resplit:
+      return "resplit-cubes";
     default:
       return "";
   }

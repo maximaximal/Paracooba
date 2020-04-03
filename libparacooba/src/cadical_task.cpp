@@ -247,8 +247,9 @@ CaDiCaLTask::execute()
       << "ms.";
 
     m_terminate = false;
-    m_autoStopTimer.expires_from_now(duration);
-    m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
+    if(m_cnf->shouldResplitCubes()) {
+      m_autoStopTimer.expires_from_now(duration);
+      m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
         std::lock_guard lock(m_solverMutex);
 	if(errc != boost::asio::error::operation_aborted && m_solver){
 	  PARACOOBA_LOG((*m_logger), Trace)
@@ -259,6 +260,7 @@ CaDiCaLTask::execute()
 	  m_terminate = true;
 	}
       });
+    }
     auto start = std::chrono::steady_clock::now();
     int solveResult = m_solver->solve();
     auto end = std::chrono::steady_clock::now();
