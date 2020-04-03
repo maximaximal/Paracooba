@@ -28,6 +28,7 @@ namespace paracooba {
 namespace messages {
 class CNFTreeNodeStatusRequest;
 class JobDescriptionReceiverProvider;
+class Message;
 }
 
 namespace net {
@@ -99,6 +100,10 @@ class Communicator : public std::enable_shared_from_this<Communicator>
     const messages::CNFTreeNodeStatusRequest& request);
 
   void sendStatusToAllPeers();
+
+  /** @brief Send to selected peers. Automatically filters this node. */
+  void sendToSelectedPeers(const messages::Message& msg,
+                           const ClusterNodePredicate& predicate);
 
   private:
   friend class webserver::API;

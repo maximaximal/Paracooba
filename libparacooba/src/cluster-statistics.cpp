@@ -217,7 +217,7 @@ ClusterStatistics::handlePathOnNode(int64_t originator,
 
   // This path should be handled on another compute node. This means, the
   // other compute node requires a Cube-Beam from the Communicator class.
-  NetworkedNode *nn = node.getNetworkedNode();
+  NetworkedNode* nn = node.getNetworkedNode();
   assert(nn);
   rootCNF->sendPath(*nn, skel, []() {});
 }
@@ -310,5 +310,21 @@ ClusterStatistics::tick()
       unsafeRemoveNode(statNode.getId(), "Deletion was requested.");
     }
   }
+}
+
+bool
+ClusterStatistics::remoteConnectionStringKnown(
+  const std::string& remoteConnectionString)
+{
+  const auto [nodeMap, lock] = getNodeMap();
+
+  for(auto& it : nodeMap) {
+    auto& node = it.second;
+    if(node.getNetworkedNode()->getRemoteConnectionString() ==
+       remoteConnectionString) {
+      return true;
+    }
+  }
+  return false;
 }
 }

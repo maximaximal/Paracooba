@@ -161,6 +161,7 @@ class Connection
                    size_t n = 0);
 
   boost::asio::ip::tcp::socket& socket() { return m_state->socket; }
+  const boost::asio::ip::tcp::socket& socket() const { return m_state->socket; }
 
   void connect(const NetworkedNodePtr& nn);
   void connect(const std::string& remote);
@@ -179,6 +180,8 @@ class Connection
   void exit() { isExit() = true; }
 
   void resetRemoteNN() { remoteNN().reset(); }
+
+  boost::asio::ip::tcp::endpoint getRemoteTcpEndpoint() const;
 
   private:
   void writeHandler(boost::system::error_code ec = boost::system::error_code(),

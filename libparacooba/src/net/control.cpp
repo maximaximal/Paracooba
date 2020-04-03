@@ -5,16 +5,20 @@
 #include "../../include/paracooba/config.hpp"
 #include "../../include/paracooba/daemon.hpp"
 #include "../../include/paracooba/messages/message.hpp"
+#include "../../include/paracooba/net/connection.hpp"
 #include "../../include/paracooba/networked_node.hpp"
 
 #include <regex>
 
 namespace paracooba {
 namespace net {
-Control::Control(ConfigPtr config,
+Control::Control(boost::asio::io_service& ioService,
+                 ConfigPtr config,
                  LogPtr log,
                  ClusterNodeStore& clusterNodeStore)
-  : m_config(config)
+  : m_ioService(ioService)
+  , m_config(config)
+  , m_log(log)
   , m_logger(log->createLogger("Control"))
   , m_clusterNodeStore(clusterNodeStore)
 {}
@@ -23,6 +27,8 @@ Control::~Control() {}
 void
 Control::receiveMessage(const messages::Message& msg, NetworkedNode& nn)
 {
+  assert(m_jobDescriptionReceiverProvider);
+
   PARACOOBA_LOG(m_logger, NetTrace)
     << "  -> " << msg.getType() << " from ID " << msg.getOrigin();
 
@@ -44,6 +50,9 @@ Control::receiveMessage(const messages::Message& msg, NetworkedNode& nn)
       break;
     case messages::Type::CNFTreeNodeStatusReply:
       handleCNFTreeNodeStatusReply(msg, nn);
+      break;
+    case messages::Type::NewRemoteConnected:
+      handleNewRemoteConnected(msg, nn);
       break;
     case messages::Type::Unknown:
       // Nothing to do on unknown messages.
@@ -221,6 +230,56 @@ Control::handleCNFTreeNodeStatusReply(const messages::Message& msg,
     sendMessage(cnfTreeNodeStatusReply.getHandle(), replyMsg, false);
   }
   */
+}
+void
+Control::handleNewRemoteConnected(const messages::Message& msg,
+                                  NetworkedNode& nn)
+{
+  const messages::NewRemoteConnected& newRemoteConnected =
+    msg.getNewRemoteConnected();
+  int64_t originId = msg.getOrigin();
+
+  auto [clusterNode, inserted] = m_clusterNodeStore.getOrCreateNode(originId);
+
+  if(inserted) {
+    PARACOOBA_LOG(m_logger, GlobalError)
+      << "Received NewRemoteConnected message, but remote node was newly "
+         "inserted. This should not happen!";
+    return;
+  }
+
+  if(clusterNode.isDaemon()) {
+    PARACOOBA_LOG(m_logger, GlobalError)
+      << "Received NewRemoteConnected message from daemon node, but these "
+         "messages should only be sent from Master nodes!";
+    return;
+  }
+
+  if(m_clusterNodeStore.hasNode(newRemoteConnected.getId())) {
+    PARACOOBA_LOG(m_logger, NetTrace)
+      << "Received a NewRemoteConnected message for remote with id "
+      << newRemoteConnected.getId()
+      << ", but that remote is already in local cluster node store. Ignoring "
+         "this message.";
+    return;
+  }
+
+  PARACOOBA_LOG(m_logger, NetTrace)
+    << "This NewRemoteConnected message concerns the remote "
+    << newRemoteConnected.getRemote() << " with id "
+    << newRemoteConnected.getId();
+
+  assert(m_jobDescriptionReceiverProvider);
+
+  // Connect to the new node. This should only happen once, but if it happens
+  // multiple times, the Connection logic handles the issue.
+  Connection connection(m_ioService,
+                        m_log,
+                        m_config,
+                        m_clusterNodeStore,
+                        *this,
+                        *m_jobDescriptionReceiverProvider);
+  connection.connect(newRemoteConnected.getRemote());
 }
 }
 }

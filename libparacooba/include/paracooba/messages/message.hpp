@@ -9,6 +9,7 @@
 #include "announcement_request.hpp"
 #include "cnftree_node_status_reply.hpp"
 #include "cnftree_node_status_request.hpp"
+#include "new_remote.hpp"
 #include "node_status.hpp"
 #include "offline_announcement.hpp"
 #include "online_announcement.hpp"
@@ -63,6 +64,10 @@ class Message
       return Type::CNFTreeNodeStatusRequest;
     if(std::holds_alternative<CNFTreeNodeStatusReply>(body))
       return Type::CNFTreeNodeStatusReply;
+    if(std::holds_alternative<CNFTreeNodeStatusReply>(body))
+      return Type::CNFTreeNodeStatusReply;
+    if(std::holds_alternative<NewRemoteConnected>(body))
+      return Type::NewRemoteConnected;
 
     return Type::Unknown;
   }
@@ -73,13 +78,15 @@ class Message
   PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(NodeStatus)
   PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(CNFTreeNodeStatusRequest)
   PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(CNFTreeNodeStatusReply)
+  PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(NewRemoteConnected)
 
   using MessageBodyVariant = std::variant<NodeStatus,
                                           OnlineAnnouncement,
                                           OfflineAnnouncement,
                                           AnnouncementRequest,
                                           CNFTreeNodeStatusRequest,
-                                          CNFTreeNodeStatusReply>;
+                                          CNFTreeNodeStatusReply,
+                                          NewRemoteConnected>;
 
   int64_t getTarget() const { return target; }
   int64_t getOrigin() const { return origin; }

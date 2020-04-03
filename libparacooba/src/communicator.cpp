@@ -72,8 +72,10 @@ Communicator::Communicator(ConfigPtr config, LogPtr log)
   , m_logger(log->createLogger("Communicator"))
   , m_signalSet(std::make_unique<boost::asio::signal_set>(m_ioService, SIGINT))
   , m_clusterStatistics(std::make_shared<ClusterStatistics>(config, log))
-  , m_control(
-      std::make_unique<net::Control>(m_config, m_log, *m_clusterStatistics))
+  , m_control(std::make_unique<net::Control>(m_ioService,
+                                             m_config,
+                                             m_log,
+                                             *m_clusterStatistics))
   , m_tickTimer(
       (m_ioService),
       std::chrono::milliseconds(m_config->getUint64(Config::TickMilliseconds)))
@@ -101,6 +103,8 @@ void
 Communicator::run()
 {
   using namespace boost::asio;
+
+  m_control->setJobDescriptionReceiverProvider(getJobDescriptionReceiverProvider());
 
   if(!listenForIncomingUDP(m_config->getUint16(Config::UDPListenPort)))
     return;
@@ -453,12 +457,21 @@ Communicator::sendStatusToAllPeers()
   msg.insert(std::move(nodeStatus));
 
   // Send built message to all other known nodes.
+  sendToSelectedPeers(msg, [](const ClusterNode&) { return true; });
+}
+
+void
+Communicator::sendToSelectedPeers(const messages::Message& msg,
+                                  const ClusterNodePredicate& predicate)
+{
   auto [nodeMap, lock] = m_clusterStatistics->getNodeMap();
   for(auto& it : nodeMap) {
     auto& node = it.second;
     if(node.getId() != m_config->getInt64(Config::Id)) {
-      NetworkedNode* nn = node.getNetworkedNode();
-      nn->transmitMessage(msg, *nn);
+      if(predicate(node)) {
+        NetworkedNode* nn = node.getNetworkedNode();
+        nn->transmitMessage(msg, *nn);
+      }
     }
   }
 }

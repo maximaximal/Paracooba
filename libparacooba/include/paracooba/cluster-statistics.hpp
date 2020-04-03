@@ -104,6 +104,9 @@ class ClusterStatistics : public ClusterNodeStore
   /** @brief Check all connections for their timeouts. */
   void tick();
 
+  virtual bool remoteConnectionStringKnown(
+    const std::string& remoteConnectionString);
+
   protected:
   friend class Communicator;
   ClusterNode& addNode(ClusterNode&& node);

@@ -3,9 +3,9 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <vector>
-#include <memory>
 
 namespace paracooba {
 using Literal = int;
@@ -18,6 +18,7 @@ using Path = uint64_t;
 
 class ClusterNode;
 using ClusterNodeMap = std::map<ID, ClusterNode>;
+using ClusterNodePredicate = std::function<bool(const ClusterNode&)>;
 
 using SuccessCB = std::function<void(bool)>;
 static SuccessCB EmptySuccessCB = nullptr;

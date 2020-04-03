@@ -46,7 +46,17 @@ class NetworkedNode
   {
     m_remoteTcpEndoint = endpoint;
     m_tcpEndpointSet = true;
+    updateRemoteConnectionString();
   }
+
+  const std::string& getRemoteConnectionString() const
+  {
+    static const std::string defaultRemoteConnectionString = "";
+    if(!m_tcpEndpointSet || !m_tcpPortSet)
+      return defaultRemoteConnectionString;
+    return m_remoteConnectionString;
+  }
+  void updateRemoteConnectionString();
 
   virtual void transmitMessage(const messages::Message& msg,
                                NetworkedNode& nn,
@@ -65,6 +75,7 @@ class NetworkedNode
   {
     m_remoteTcpEndoint.port(p);
     m_tcpPortSet = true;
+    updateRemoteConnectionString();
   }
   int64_t getId() const { return m_id; }
 
@@ -106,6 +117,8 @@ class NetworkedNode
 
   std::atomic_size_t m_activeTCPClients = 0;
   std::atomic_bool m_deletionRequested = false;
+
+  std::string m_remoteConnectionString;
 
   messages::MessageTransmitter& m_statelessMessageTransmitter;
   std::unique_ptr<net::Connection> m_connection;

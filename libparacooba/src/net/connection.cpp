@@ -263,7 +263,8 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
         return;
       }
       connectionEstablished() = true;
-      writeHandler();
+      // should not be required and may lead to issues.
+      // writeHandler();
 
       // Now set the connection to ready in the networked node.
       if(auto nn = remoteNN().lock()) {
@@ -373,12 +374,16 @@ Connection::writeHandler(boost::system::error_code ec, size_t bytes_transferred)
           sendSize() = (*cnf)->getSizeToBeSent();
           yield async_write(socket(), BUF(sendSize), wh);
 
+          // Re-get CNF after yield.
+          cnf = &std::get<std::shared_ptr<CNF>>(*currentSendItem());
+
           PARACOOBA_LOG(logger(), NetTrace)
             << "Now sending CNF with size " << BytePrettyPrint(sendSize())
             << ".";
 
           // Let sending of potentially huge CNF be handled by the CNF class
           // internally.
+          assert(*cnf);
           yield(*cnf)->send(&socket(),
                             std::bind(&Connection::writeHandler,
                                       *this,
@@ -474,6 +479,14 @@ Connection::connect(const NetworkedNodePtr& nn)
 void
 Connection::connect(const std::string& remote)
 {
+  if(clusterNodeStore().remoteConnectionStringKnown(remote)) {
+    PARACOOBA_LOG(logger(), NetTrace)
+      << "Remote connection string \"" << remote
+      << "\" already known! Ending connection on connection try "
+      << getConnectionTries();
+    return;
+  }
+
   resumeMode() = EndAfterShutdown;
   this->remote() = remote;
 
@@ -756,6 +769,12 @@ Connection::reconnectAfterMS(uint32_t milliseconds)
   steadyTimer().expires_from_now(std::chrono::milliseconds(milliseconds));
   steadyTimer().async_wait(
     [*this](const boost::system::error_code& ec) mutable { reconnect(); });
+}
+
+boost::asio::ip::tcp::endpoint
+Connection::getRemoteTcpEndpoint() const
+{
+  return socket().remote_endpoint();
 }
 
 std::ostream&

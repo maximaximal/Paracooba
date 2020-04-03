@@ -2,6 +2,7 @@
 #include "../include/paracooba/net/connection.hpp"
 #include <boost/type_traits/is_stateless.hpp>
 #include <memory>
+#include <sstream>
 
 namespace paracooba {
 NetworkedNode::NetworkedNode(
@@ -64,6 +65,9 @@ NetworkedNode::assignConnection(const net::Connection& conn)
     return false;
   }
   m_connection = std::make_unique<net::Connection>(conn);
+  m_remoteTcpEndoint.address(conn.getRemoteTcpEndpoint().address());
+  updateRemoteConnectionString();
+  m_tcpEndpointSet = true;
   return true;
 }
 
@@ -76,5 +80,13 @@ NetworkedNode::resetConnection()
   m_connectionReadyWaiter.reset();
   m_connection.reset();
   removeActiveTCPClient();
+}
+
+void
+NetworkedNode::updateRemoteConnectionString()
+{
+  std::stringstream ss;
+  ss << m_remoteTcpEndoint;
+  m_remoteConnectionString = ss.str();
 }
 }

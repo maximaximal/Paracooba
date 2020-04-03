@@ -5,6 +5,7 @@
 #include "../include/paracooba/config.hpp"
 #include "../include/paracooba/cuber/registry.hpp"
 #include "../include/paracooba/daemon.hpp"
+#include "../include/paracooba/messages/message.hpp"
 #include "../include/paracooba/net/connection.hpp"
 #include "../include/paracooba/networked_node.hpp"
 #include "../include/paracooba/readywaiter.hpp"
@@ -23,7 +24,7 @@ Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
                                     log,
                                     config->getInt64(Config::Id),
                                     *communicator->getClusterStatistics(),
-				    communicator->getIOService(),
+                                    communicator->getIOService(),
                                     getDIMACSSourcePathFromConfig());
 
   // Connect to node fully known signal, so fully known nodes receive the CNF
@@ -36,23 +37,58 @@ Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
       NetworkedNode* nn = node.getNetworkedNode();
       assert(nn);
 
-      nn->getConnectionReadyWaiter().callWhenReady(
-        [this, &node, nn](net::Connection& conn) {
-          conn.sendCNF(m_rootCNF, [this, &node, &conn, nn](bool success) {
-            PARACOOBA_LOG(m_logger, Trace)
-              << "Sent root CNF to " << node.getId() << " with "
-              << (success ? "success" : "error");
+      nn->getConnectionReadyWaiter().callWhenReady([this, &node, nn](
+                                                     net::Connection& conn) {
+        conn.sendCNF(m_rootCNF, [this, &node, &conn, nn](bool success) {
+          PARACOOBA_LOG(m_logger, Trace)
+            << "Sent root CNF to " << node.getId() << " with "
+            << (success ? "success" : "error");
 
-            if(success) {
-              // Now, send the allowance map to fully initiate the remote
-              // compute node and begin working on tasks.
-              m_rootCNF->sendAllowanceMap(*nn, [this, &node]() {
-                PARACOOBA_LOG(m_logger, Trace)
-                  << "Sent allowance map to " << node.getId() << ".";
-              });
-            }
-          });
+          if(success) {
+            // Now, send the allowance map to fully initiate the remote
+            // compute node and begin working on tasks.
+            m_rootCNF->sendAllowanceMap(*nn, [this, &node]() {
+              PARACOOBA_LOG(m_logger, Trace)
+                << "Sent allowance map to " << node.getId() << ".";
+            });
+          }
         });
+
+        // This is posted as a new task, so the connection initialisation
+        // finishes correctly and the whole call stack gets smaller again.
+        m_communicator->getIOService().post([this, nn]() {
+          // Because a new client was successfully connected, all other known
+          // nodes should receive a NewRemoteConnected message.
+          ID newNodeId = nn->getId();
+          messages::Message msg(m_config->getId());
+          msg.insert(messages::NewRemoteConnected(
+            nn->getRemoteConnectionString(), newNodeId));
+
+          assert(nn->getRemoteConnectionString() != "");
+
+          m_communicator->sendToSelectedPeers(
+            msg, [newNodeId](const ClusterNode& node) {
+              return node.getId() != newNodeId;
+            });
+
+          // Additionally, all other known nodes should be sent to the new
+          // client node.
+          {
+            auto [nodeMap, lock] =
+              m_communicator->getClusterStatistics()->getNodeMap();
+            for(auto& it : nodeMap) {
+              auto& node = it.second;
+              const std::string& connStr =
+                node.getNetworkedNode()->getRemoteConnectionString();
+              if(node.getId() != m_config->getInt64(Config::Id) &&
+                 node.getId() != newNodeId && connStr != "") {
+                msg.insert(messages::NewRemoteConnected(connStr, node.getId()));
+                nn->transmitMessage(msg, *nn);
+              }
+            }
+          }
+        });
+      });
     });
 }
 Client::~Client()
@@ -96,7 +132,8 @@ Client::solve()
           << "Satisfying assignment available with "
           << result->decodedAssignment->size() << " literals ("
           << BytePrettyPrint(result->decodedAssignment->size() *
-                             sizeof(Literal)) << " in memory)";
+                             sizeof(Literal))
+          << " in memory)";
         break;
       case CNFTree::UNSAT:
         m_status = TaskResult::Unsatisfiable;
@@ -108,7 +145,8 @@ Client::solve()
     m_communicator->exit();
   });
 
-  auto task = std::make_unique<CaDiCaLTask>(m_communicator->getIOService(), &m_cnfVarCount, mode);
+  auto task = std::make_unique<CaDiCaLTask>(
+    m_communicator->getIOService(), &m_cnfVarCount, mode);
   task->setRootCNF(m_rootCNF);
   auto& finishedSignal = task->getFinishedSignal();
   task->readDIMACSFile(getDIMACSSourcePathFromConfig());
