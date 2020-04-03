@@ -602,7 +602,7 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     assert(!m_cuberRegistry);
 
     if(m_config->useCaDiCaLCubes())
-      generateCubes(5);
+      generateCubes(17);
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
     if(m_config->useCaDiCaLCubes()) {
