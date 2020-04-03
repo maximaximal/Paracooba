@@ -37,9 +37,10 @@ NetworkedNode::transmitJobDescription(messages::JobDescription&& jd,
                                       SuccessCB sendFinishedCB)
 {
   assert(&nn == this);
-  assert(m_connectionReadyWaiter.isReady());
-  assert(m_connection);
-  m_connection->sendJobDescription(jd, sendFinishedCB);
+  m_connectionReadyWaiter.callWhenReady(
+    [this, &jd, sendFinishedCB](net::Connection& conn) {
+      conn.sendJobDescription(jd, sendFinishedCB);
+    });
 }
 
 void
