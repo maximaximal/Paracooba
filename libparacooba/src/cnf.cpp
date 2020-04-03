@@ -32,7 +32,7 @@ extern "C"
 }
 
 namespace paracooba {
-static const size_t CNFStatisticsNodeWindowSize = 20;
+static const size_t CNFStatisticsNodeWindowSize = 10;
 
 CNF::CNF(ConfigPtr config,
          LogPtr log,
@@ -49,7 +49,7 @@ CNF::CNF(ConfigPtr config,
   , m_cnfTree(std::make_unique<CNFTree>(log, *this, config, originId))
   , m_acc_solvingTime(
       boost::accumulators::tag::rolling_window::window_size =
-      CNFStatisticsNodeWindowSize)
+      CNFStatisticsNodeWindowSize * config->getUint32(Config::ThreadCount))
   , m_io_service(io_service)
 {
   if(dimacsFile != "") {
