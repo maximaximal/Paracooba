@@ -491,7 +491,7 @@ Connection::connect(const std::string& remote)
   this->remote() = remote;
 
   std::string host = remote;
-  std::string port = std::to_string(config()->getUint16(Config::UDPTargetPort));
+  std::string port = std::to_string(config()->getUint16(Config::TCPTargetPort));
 
   auto posOfColon = remote.find(":");
   if(posOfColon != std::string::npos) {
