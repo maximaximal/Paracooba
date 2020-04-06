@@ -385,7 +385,7 @@ CaDiCaLTask::resplit_depth(Path path, Cube literals,
     auto cubes2{std::move(cubes)};
     for(auto && [p, cube] : cubes2) {
       for(auto &&pcube : resplit_once(p, cube, duration))
-	cubes.push_back(pcube);
+        cubes.push_back(pcube);
     }
   }
   return cubes;
@@ -428,7 +428,7 @@ CaDiCaLTask::terminate()
   Task::terminate();
   // Terminating resets the cadical manager, as it no longer exists at this
   // point.
-  
+
   PARACOOBA_LOG((*m_logger), Trace)
     << "Terminating instance";
   m_cadicalMgr = nullptr;
