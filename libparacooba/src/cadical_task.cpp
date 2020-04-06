@@ -404,8 +404,8 @@ CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> >
     std::lock_guard lock(m_solverMutex);
     if(errc != boost::asio::error::operation_aborted && m_solver){
       PARACOOBA_LOG((*m_logger), Cubes)
-	<< "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(m_path)
-	<< " will be interrupted.";
+        << "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(m_path)
+        << " will be interrupted.";
       m_solver->terminate();
       m_terminate = true;
     }
@@ -485,20 +485,34 @@ CaDiCaLTask::provideSolver()
 void
 CaDiCaLTask::lookahead(int depth)
 {
-  PARACOOBA_LOG((*m_logger), Trace)
+  using namespace std::chrono_literals;
+
+  PARACOOBA_LOG((*m_logger), Cubes)
     << "Generating cubes of length " << depth << " ";
 
   assert(m_solver);
   assert(m_pregeneratedCubes.empty());
+  m_autoStopTimer.expires_from_now(30s);
+  m_autoStopTimer.async_wait(
+    [this](const boost::system::error_code& errc) {
+      std::lock_guard lock(m_solverMutex);
+      if(errc != boost::asio::error::operation_aborted && m_solver) {
+        PARACOOBA_LOG((*m_logger), Cubes)
+          << "CNF cubing will be interrupted.";
+        m_solver->terminate();
+        m_terminate = true;
+      }
+    });
   auto cubes {m_solver->generate_cubes(depth)};
+  m_autoStopTimer.cancel();
   std::vector<int> flatCubes;
-  for(auto & cube : cubes) {
-    std::for_each(begin(cube), end(cube), [this](int lit) {m_pregeneratedCubes.emplace_back(lit);});
-    m_pregeneratedCubes.emplace_back(0);
-  }
-
   PARACOOBA_LOG((*m_logger), Trace)
     << "Generated " << cubes.size() << " cubes. ";
-}
 
+  for(const auto & cube : cubes) {
+    std::for_each(begin(cube), end(cube),
+                  [this](int lit) {m_pregeneratedCubes.emplace_back(lit);});
+    m_pregeneratedCubes.emplace_back(0);
+  }
+}
 }
