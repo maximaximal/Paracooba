@@ -252,7 +252,7 @@ CaDiCaLTask::execute()
       m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
         std::lock_guard lock(m_solverMutex);
 	if(errc != boost::asio::error::operation_aborted && m_solver){
-	  PARACOOBA_LOG((*m_logger), Trace)
+	  PARACOOBA_LOG((*m_logger), Cubes)
 	    << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
 	    << " will be interrupted.";
 	  m_solver->terminate();
@@ -266,7 +266,7 @@ CaDiCaLTask::execute()
     auto end = std::chrono::steady_clock::now();
     m_autoStopTimer.cancel();
 
-    PARACOOBA_LOG((*m_logger), Trace)
+    PARACOOBA_LOG((*m_logger), Cubes)
       << "Stopped solving CNF formula using CaDiCaL CNF solver "
       << "after roughly "
       << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -289,18 +289,21 @@ CaDiCaLTask::execute()
 	  m_terminate = false;
 	  auto end = std::chrono::steady_clock::now();
 	  // res.task->releaseSolver();
-	  PARACOOBA_LOG((*m_logger), Trace)
+	  PARACOOBA_LOG((*m_logger), Cubes)
 	    << " splitting took "
 	    << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
 		1'000 * (end - start))).count() << "ms";
 
 	  if(new_cubes.size())
 	    status = TaskResult::Resplitted;
-	  else
+	  else // very unlikely, but still
 	    status = TaskResult::Unsatisfiable;
 	  m_cnf->getCNFTree().setStateFromLocal(m_path, CNFTree::Working);
+    //for(auto&& [path, cube]: new_cubes)
+    //  m_cnf->addPath(path, m_originator, cube);
 
 	  auto result = std::make_unique<TaskResult>(status);
+    // TODO: splitting and offloading ist not yet supported
 	  result->setCubes(std::move(new_cubes));
 	  return std::move(result);
 	  break;
@@ -326,15 +329,15 @@ CaDiCaLTask::resplit_once(Path path, Cube literals,
 			  std::chrono::duration<long int, std::ratio<1, 1000000000> > duration)
 {
   assert(m_solver);
-  PARACOOBA_LOG((*m_logger), Trace)
+  PARACOOBA_LOG((*m_logger), Cubes)
     << "CNF formula for path " << CNFTree::pathToStrNoAlloc(path)
     << " resplitted.";
   assert(!m_terminate);
 
   Cube literals2(literals);
   for(auto lit : literals) {
-    PARACOOBA_LOG((*m_logger), Trace)
-      << "cube lit" << lit;
+    PARACOOBA_LOG((*m_logger), Cubes)
+      << "cube lit: " << lit;
     m_solver->assume(lit);
   }
 
@@ -343,7 +346,7 @@ CaDiCaLTask::resplit_once(Path path, Cube literals,
   assert(lit_to_split != 0);
   if(lit_to_split == INT_MIN)
     return std::vector<std::pair<Path, Cube>> {};
-  PARACOOBA_LOG((*m_logger), Trace)
+  PARACOOBA_LOG((*m_logger), Cubes)
     << "CNF formula for path " << CNFTree::pathToStrNoAlloc(path)
     << " resplitted on literal " << lit_to_split;
   literals.push_back(lit_to_split);
@@ -361,7 +364,7 @@ CaDiCaLTask::resplit_depth(Path path, Cube literals,
 {
   Cube literals2(literals);
   for(auto lit : literals) {
-    PARACOOBA_LOG((*m_logger), Trace)
+    PARACOOBA_LOG((*m_logger), Cubes)
       << "cube lit" << lit;
     m_solver->assume(lit);
   }
@@ -369,9 +372,9 @@ CaDiCaLTask::resplit_depth(Path path, Cube literals,
   m_autoStopTimer.async_wait([this, path](const boost::system::error_code& errc) {
     std::lock_guard lock(m_solverMutex);
     if(errc != boost::asio::error::operation_aborted && m_solver){
-      PARACOOBA_LOG((*m_logger), Trace)
-	<< "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(path)
-	<< " will be interrupted.";
+      PARACOOBA_LOG((*m_logger), Cubes)
+        << "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(path)
+        << " will be interrupted.";
       m_solver->terminate();
       m_terminate = true;
     }
@@ -392,7 +395,7 @@ std::vector<std::pair<Path, Cube>>
 CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> > duration)
 {
   assert(m_solver);
-  PARACOOBA_LOG((*m_logger), Trace)
+  PARACOOBA_LOG((*m_logger), Cubes)
     << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
     << " resplitted.";
   assert(!m_terminate);
@@ -400,7 +403,7 @@ CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> >
   m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
     std::lock_guard lock(m_solverMutex);
     if(errc != boost::asio::error::operation_aborted && m_solver){
-      PARACOOBA_LOG((*m_logger), Trace)
+      PARACOOBA_LOG((*m_logger), Cubes)
 	<< "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(m_path)
 	<< " will be interrupted.";
       m_solver->terminate();

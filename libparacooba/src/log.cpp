@@ -202,11 +202,13 @@ operator<<(
   static const char* colorised_strings[] = {
     "\033[0;37mNTRC\033[0m", "\033[0;37mTRCE\033[0m", "\033[0;32mDEBG\033[0m",
     "\033[1;37mINFO\033[0m", "\033[0;33mLWRN\033[0m", "\033[0;33mLERR\033[0m",
-    "\033[0;31mGWRN\033[0m", "\033[0;31mGERR\033[0m", "\033[0;35mFTAL\033[0m"
+    "\033[0;31mGWRN\033[0m", "\033[0;31mGERR\033[0m", "\033[0;35mFTAL\033[0m",
+    "\033[0;37mCUBE\033[0m",
   };
   static const char* uncolorised_strings[] = { "NTRC", "TRCE", "DEBG",
                                                "INFO", "LWRN", "LERR",
-                                               "GWRN", "GERR", "FTAL" };
+                                               "GWRN", "GERR", "FTAL",
+                                               "CUBE" };
 
   static const char** strings = uncolorised_strings;
 

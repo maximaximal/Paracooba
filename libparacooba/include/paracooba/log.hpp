@@ -59,7 +59,8 @@ class Log
     LocalError,
     GlobalWarning,
     GlobalError,
-    Fatal
+    Fatal,
+    Cubes
   };
 
   template<typename LoggerType>
