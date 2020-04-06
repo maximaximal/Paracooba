@@ -90,7 +90,7 @@ class Node
   uint32_t uptime;
   uint16_t udpListenPort;
   uint16_t tcpListenPort;
-  bool daemonMode;
+  bool daemonMode = false; /* TODO fixes 'invalid bool' from sanitizer. This could be a gcc bug*/
   std::string name;
 
   KnownPeersVector knownPeers;
