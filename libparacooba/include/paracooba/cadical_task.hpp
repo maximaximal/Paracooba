@@ -142,6 +142,7 @@ class CaDiCaLTask : public Task
   std::unique_ptr<CaDiCaL::Solver> m_solver;
   std::string m_sourcePath;
   bool m_terminate = false;
+  bool m_interrupt_solving = false;
   uint32_t* m_varCount = nullptr;
   uint32_t m_internalVarCount = 0;
 
