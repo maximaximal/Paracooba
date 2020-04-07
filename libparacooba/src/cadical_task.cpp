@@ -8,6 +8,8 @@
 #include <cassert>
 
 #include <iostream>
+#include <algorithm>
+
 using std::cout;
 using std::endl;
 
@@ -516,14 +518,18 @@ CaDiCaLTask::lookahead(int depth)
     });
   auto cubes {m_solver->generate_cubes(depth)};
   m_autoStopTimer.cancel();
+  m_interrupt_solving = false;
   std::vector<int> flatCubes;
-  PARACOOBA_LOG((*m_logger), Trace)
-    << "Generated " << cubes.size() << " cubes. ";
+  size_t max_depth = 0;
 
   for(const auto & cube : cubes) {
     std::for_each(begin(cube), end(cube),
                   [this](int lit) {m_pregeneratedCubes.emplace_back(lit);});
     m_pregeneratedCubes.emplace_back(0);
+    max_depth = std::max(max_depth, cube.size());
   }
+
+  PARACOOBA_LOG((*m_logger), Trace)
+    << "Generated " << cubes.size() << " cubes. Max depth = " << max_depth;
 }
 }
