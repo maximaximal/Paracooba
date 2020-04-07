@@ -279,13 +279,6 @@ CaDiCaLTask::execute()
         << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
         << " solved.";
     }
-    if(m_terminate) {
-      PARACOOBA_LOG((*m_logger), Trace)
-        << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
-        << " interrupted.";
-
-      solveResult = 50;
-    }
 
     switch(solveResult) {
     case 0:
@@ -314,7 +307,6 @@ CaDiCaLTask::execute()
         //  m_cnf->addPath(path, m_originator, cube);
 
         auto result = std::make_unique<TaskResult>(status);
-        // TODO: splitting and offloading ist not yet supported
         result->setCubes(std::move(new_cubes));
         return std::move(result);
         break;
@@ -355,8 +347,12 @@ CaDiCaLTask::resplit_once(Path path, Cube literals,
   Literal lit_to_split = m_solver->lookahead();
   m_autoStopTimer.cancel();
   assert(lit_to_split != 0);
-  if(lit_to_split == INT_MIN)
-    return std::vector<std::pair<Path, Cube>> {};
+  if(lit_to_split == INT_MIN) {
+    PARACOOBA_LOG((*m_logger), Cubes)
+      << "CNF formula for path " << CNFTree::pathToStrNoAlloc(path)
+      << " is UNSAT";
+    return std::vector<std::pair<Path, Cube>>{};
+  }
   PARACOOBA_LOG((*m_logger), Cubes)
     << "CNF formula for path " << CNFTree::pathToStrNoAlloc(path)
     << " resplitted on literal " << lit_to_split;
@@ -392,7 +388,10 @@ CaDiCaLTask::resplit_depth(Path path, Cube literals,
   });
 
   std::vector<std::pair<Path, Cube>> cubes{resplit_once(path, literals, duration)};
-  for(int i = 0; i < depth && !m_interrupt_solving; ++i) {
+  m_autoStopTimer.cancel();
+
+  for(int i = 0; i < depth && !m_interrupt_solving; ++i)
+  {
     auto cubes2{std::move(cubes)};
     for(auto && [p, cube] : cubes2) {
       for(auto &&pcube : resplit_once(p, cube, duration))
