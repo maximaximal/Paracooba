@@ -143,6 +143,8 @@ class Communicator : public std::enable_shared_from_this<Communicator>
   boost::asio::high_resolution_timer m_tickTimer;
 
   std::unique_ptr<webserver::Initiator> m_webserverInitiator;
+
+  void readRemotesFromEnvironment(std::vector<std::string>& vect);
 };
 
 using CommunicatorPtr = std::shared_ptr<Communicator>;
