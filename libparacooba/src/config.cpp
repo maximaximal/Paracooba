@@ -131,7 +131,10 @@ Config::Config()
     (GetConfigNameFromEnum(Config::CaDiCaLCubes),
          po::bool_switch(&m_CaDiCaLCubes)->default_value(false)->value_name("bool"), "Use CaDiCaL to cube the formula")
     (GetConfigNameFromEnum(Config::Resplit),
-         po::bool_switch(&m_resplitCubes)->default_value(false)->value_name("bool"), "Resplit cubes if they take too long.")
+         po::bool_switch(&m_resplitCubes)->default_value(false)->value_name("bool"), "Resplit cubes if they take too long")
+    (GetConfigNameFromEnum(Config::InitialCubeDepth),
+     po::value<uint16_t>()->default_value(1 + static_cast<int>(std::log2(10*threadCount)))->value_name("int"), "Initial size of the cubes (requires option --cadical-cubes) to have an efect.")
+
     ;
   // clang-format on
 }
@@ -279,6 +282,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::IPBroadcastAddress);
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::DumpTreeAtExit);
+  conditionallySetConfigOptionToArray<uint16_t>(
+     vm, m_config.data(), Config::InitialCubeDepth);
 
   if(vm.count(GetConfigNameFromEnum(Id))) {
     m_config[Id] = generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());

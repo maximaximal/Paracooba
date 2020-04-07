@@ -60,6 +60,7 @@ class Config
     FreqCuberCutoff,
     CaDiCaLCubes,
     Resplit,
+    InitialCubeDepth,
 
     _KEY_COUNT
   };
@@ -339,6 +340,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "cadical-cubes";
     case Config::Resplit:
       return "resplit-cubes";
+    case Config::InitialCubeDepth:
+      return "cadical-cubes-depth";
     default:
       return "";
   }

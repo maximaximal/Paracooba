@@ -602,31 +602,37 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     assert(!m_cuberRegistry);
 
     if(m_config->useCaDiCaLCubes())
-      generateCubes(17);
+      generateCubes(m_config->getUint16(Config::InitialCubeDepth));
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
     if(m_config->useCaDiCaLCubes()) {
       ji.initCaDiCaLCubes() = pregenCubes;
-    }
-    else if(pregenCubes.size() > 0) {
-      PARACOOBA_LOG(m_logger, Debug) << "init cubes";
+      PARACOOBA_LOG(m_logger, Trace)
+        << "Generated "
+        << pregenCubes.size() << " CaDiCaL cubes. Depth was: "
+        << m_config->getUint16(Config::InitialCubeDepth);
+    } else if(pregenCubes.size() > 0) {
+      PARACOOBA_LOG(m_logger, Debug) << "init cubes. ";
       ji.initAsPregenCubes();
     }
 
-    // The cuber registry may already have been created if this is a daemon
-    // node. It can then just be re-used, as the daemon cuber registry did not
-    // need the root node to be created.
-    m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
-    if(!m_cuberRegistry->init(pregenCubes.size() > 0
-                                ?  (m_config->useCaDiCaLCubes() ? cuber::Registry::CaDiCaLCubes
-				    : cuber::Registry::PregeneratedCubes)
-			      :cuber::Registry::LiteralFrequency,
-                              &ji)) {
-      PARACOOBA_LOG(m_logger, Fatal) << "Could not initialise cuber registry!";
-      m_cuberRegistry.reset();
-      return;
+      // The cuber registry may already have been created if this is a daemon
+      // node. It can then just be re-used, as the daemon cuber registry did not
+      // need the root node to be created.
+      m_cuberRegistry =
+        std::make_unique<cuber::Registry>(m_config, m_log, *this);
+      if(!m_cuberRegistry->init(pregenCubes.size() > 0
+                                  ? (m_config->useCaDiCaLCubes()
+                                       ? cuber::Registry::CaDiCaLCubes
+                                       : cuber::Registry::PregeneratedCubes)
+                                  : cuber::Registry::LiteralFrequency,
+                                &ji)) {
+        PARACOOBA_LOG(m_logger, Fatal)
+          << "Could not initialise cuber registry!";
+        m_cuberRegistry.reset();
+        return;
+      }
     }
-  }
 
   rootTaskReady.setReady(m_rootTask.get());
 }
