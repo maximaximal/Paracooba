@@ -4,5 +4,5 @@ RUN apt-get install libboost-all-dev cmake g++ make git -y
 ADD . paracooba
 RUN cd paracooba && mkdir build && cd build && cmake .. && make -j
 EXPOSE 18001
-ENTRYPOINT ["paracooba/build/parac"]
+ENTRYPOINT ["paracooba/aws-run.sh"]
 CMD []
