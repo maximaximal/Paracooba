@@ -52,6 +52,7 @@ class Log
   enum Severity
   {
     NetTrace,
+    Cubes,
     Trace,
     Debug,
     Info,
@@ -60,7 +61,6 @@ class Log
     GlobalWarning,
     GlobalError,
     Fatal,
-    Cubes
   };
 
   template<typename LoggerType>
