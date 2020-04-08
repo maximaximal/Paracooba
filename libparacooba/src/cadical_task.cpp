@@ -249,7 +249,8 @@ CaDiCaLTask::execute()
       << "ms.";
 
     m_interrupt_solving = false;
-    if(m_cnf->shouldResplitCubes()) {
+    if(m_cnf->shouldResplitCubes() &&
+       CNFTree::getDepth(m_path) < CNFTree::maxPathDepth) {
       m_autoStopTimer.expires_from_now(duration);
       m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
         std::lock_guard lock(m_solverMutex);
