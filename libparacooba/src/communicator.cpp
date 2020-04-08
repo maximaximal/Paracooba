@@ -26,6 +26,8 @@
 #include <boost/system/error_code.hpp>
 #include <cassert>
 #include <chrono>
+#include <cstdint>
+#include <cstdlib>
 #include <mutex>
 #include <regex>
 #include <sstream>
@@ -104,7 +106,8 @@ Communicator::run()
 {
   using namespace boost::asio;
 
-  m_control->setJobDescriptionReceiverProvider(getJobDescriptionReceiverProvider());
+  m_control->setJobDescriptionReceiverProvider(
+    getJobDescriptionReceiverProvider());
 
   if(!listenForIncomingUDP(m_config->getUint16(Config::UDPListenPort)))
     return;
@@ -138,8 +141,10 @@ Communicator::run()
   }
 
   // Handle known remotes after startup.
-  const Config::StringVector& knownRemotes =
+  Config::StringVector knownRemotes =
     m_config->getStringVector(Config::KnownRemotes);
+  readRemotesFromEnvironment(knownRemotes);
+
   if(knownRemotes.size() > 0) {
     m_ioService.post([this, &knownRemotes]() {
       PARACOOBA_LOG(m_logger, Debug) << "Connecting to known remote hosts, "
@@ -458,6 +463,30 @@ Communicator::sendStatusToAllPeers()
 
   // Send built message to all other known nodes.
   sendToSelectedPeers(msg, [](const ClusterNode&) { return true; });
+}
+
+void
+conditionalReadIntoStrVectFromEnv(Logger& l,
+                                  std::vector<std::string>& vect,
+                                  const char* env)
+{
+  const char* var = ::std::getenv(env);
+  if(var != nullptr) {
+    PARACOOBA_LOG(l, Info) << "Adding known remote node \"" << var
+                           << "\" from environment variable \"" << env << "\".";
+    vect.push_back(env);
+  }
+}
+
+void
+Communicator::readRemotesFromEnvironment(std::vector<std::string>& vect)
+{
+  // https://github.com/aws-samples/aws-batch-comp-infrastructure-sample#run-solversh
+  conditionalReadIntoStrVectFromEnv(
+    m_logger, vect, "AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS");
+
+  // General master host envvar.
+  conditionalReadIntoStrVectFromEnv(m_logger, vect, "PARACOOBA_MASTER_HOST");
 }
 
 void
