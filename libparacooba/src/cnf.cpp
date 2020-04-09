@@ -801,7 +801,7 @@ operator<<(std::ostream& o, CNF::CubingKind k)
       break;
     default:
     case CNF::CubingKind::CaDiCaLCubes:
-      o << "PregeneratedCubes";
+      o << "CaDiCaLCubes";
       break;
       o << "(! UNKNOWN CUBING KIND !)";
       break;

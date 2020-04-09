@@ -280,7 +280,7 @@ CaDiCaLTask::execute()
     if(!m_interrupt_solving) {
       PARACOOBA_LOG((*m_logger), Trace)
         << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
-        << " solved.";
+        << " solved with result " << solveResult;
     }
 
     switch(solveResult) {
@@ -291,7 +291,6 @@ CaDiCaLTask::execute()
         auto new_cubes = resplit(duration);
         m_interrupt_solving = false;
         auto end = std::chrono::steady_clock::now();
-        // res.task->releaseSolver();
         PARACOOBA_LOG((*m_logger), Cubes)
           << " splitting took "
           << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
