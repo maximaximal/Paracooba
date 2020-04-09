@@ -122,7 +122,7 @@ class CaDiCaLTask : public Task
     m_pregeneratedCubes = cubes;
   }
 
-  void lookahead(int);
+  TaskResult::Status lookahead(int);
 
   private:
   void provideSolver();

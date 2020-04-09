@@ -348,6 +348,7 @@ CaDiCaLTask::resplit_once(Path path, Cube literals,
   }
 
   Literal lit_to_split = m_solver->lookahead();
+  m_solver->reset_assumptions();
   m_autoStopTimer.cancel();
   assert(lit_to_split != 0);
   if(lit_to_split == INT_MIN) {
@@ -410,7 +411,7 @@ CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> >
   assert(m_solver);
   PARACOOBA_LOG((*m_logger), Cubes)
     << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
-    << " resplitted.";
+    << " must be resplitted.";
   assert(!m_interrupt_solving);
   m_autoStopTimer.expires_from_now(duration);
   m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
@@ -496,7 +497,7 @@ CaDiCaLTask::provideSolver()
   m_solver->connect_terminator(m_terminator.get());
 }
 
-void
+TaskResult::Status
 CaDiCaLTask::lookahead(int depth)
 {
   using namespace std::chrono_literals;
@@ -520,10 +521,12 @@ CaDiCaLTask::lookahead(int depth)
   auto cubes {m_solver->generate_cubes(depth)};
   m_autoStopTimer.cancel();
   m_interrupt_solving = false;
+  if(cubes.status == 20)
+    return TaskResult::Unsatisfiable;
   std::vector<int> flatCubes;
   size_t max_depth = 0;
 
-  for(const auto & cube : cubes) {
+  for(const auto & cube : cubes.cubes) {
     std::for_each(begin(cube), end(cube),
                   [this](int lit) {m_pregeneratedCubes.emplace_back(lit);});
     m_pregeneratedCubes.emplace_back(0);
@@ -531,6 +534,7 @@ CaDiCaLTask::lookahead(int depth)
   }
 
   PARACOOBA_LOG((*m_logger), Trace)
-    << "Generated " << cubes.size() << " cubes. Max depth = " << max_depth;
+    << "Generated " << cubes.cubes.size() << " cubes. Max depth = " << max_depth;
+  return TaskResult::Unknown;
 }
 }

@@ -133,7 +133,7 @@ class CNF
 
   inline int64_t getOriginId() { return m_originId; }
 
-  void setRootTask(std::unique_ptr<CaDiCaLTask> root);
+  TaskResult::Status setRootTask(std::unique_ptr<CaDiCaLTask> root);
   CaDiCaLTask* getRootTask();
 
   cuber::Registry& getCuberRegistry() { return *m_cuberRegistry; }
@@ -179,8 +179,7 @@ class CNF
     return duration < 1s ? 1s : duration;
   }
 
-  // One issue are the very small timings. They heavily impact the average and are very problematic.
-  // We update the average, but try to keep the number above a cetrain value
+  // @brief Update the average solving time.
   void update_averageSolvingTime(std::chrono::duration<double> t)
   {
     using namespace std::chrono_literals;
@@ -199,7 +198,7 @@ class CNF
   inline boost::asio::io_service& getIOService() { return m_io_service; }
 
   /** @brief Use CaDiCaL to generate cubes */
-  void generateCubes(int);
+  TaskResult::Status generateCubes(int);
 
   bool shouldResplitCubes();
 

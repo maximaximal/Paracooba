@@ -176,7 +176,13 @@ Client::solve()
       auto rootTaskMutPtr = static_unique_pointer_cast<CaDiCaLTask>(
         std::move(resultMut.getTaskPtr()));
       assert(rootTaskMutPtr);
-      m_rootCNF->setRootTask(std::move(rootTaskMutPtr));
+      auto cubingres = m_rootCNF->setRootTask(std::move(rootTaskMutPtr));
+      if(cubingres != TaskResult::Unknown) {
+        PARACOOBA_LOG(m_logger, Trace)
+          << "Solution found while splitting";
+        m_status = cubingres;
+        return;
+      }
     }
 
     // Client is now ready for work.

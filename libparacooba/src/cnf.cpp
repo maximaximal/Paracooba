@@ -589,7 +589,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
   }
 }
 
-void
+TaskResult::Status
 CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
 {
   /// This shall only be called once, the internal root task must therefore
@@ -597,45 +597,50 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
   /// registry in m_cuberRegistry.
   assert(!m_rootTask);
   m_rootTask = std::move(root);
+  TaskResult::Status res = TaskResult::Unknown;
 
   if(!m_config->isDaemonMode()) {
     assert(!m_cuberRegistry);
 
     if(m_config->useCaDiCaLCubes())
-      generateCubes(m_config->getUint16(Config::InitialCubeDepth));
+      res = generateCubes(m_config->getUint16(Config::InitialCubeDepth));
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
+    cuber::Registry::Mode m = cuber::Registry::LiteralFrequency;
     if(m_config->useCaDiCaLCubes()) {
       ji.initCaDiCaLCubes() = pregenCubes;
+      m = cuber::Registry::CaDiCaLCubes;
       PARACOOBA_LOG(m_logger, Trace)
-        << "Generated "
-        << pregenCubes.size() << " CaDiCaL cubes. Depth was: "
+        << "Generated " << pregenCubes.size() << " CaDiCaL cubes. Depth was: "
         << m_config->getUint16(Config::InitialCubeDepth);
+      if(pregenCubes.size() == 0)
+        return res;
     } else if(pregenCubes.size() > 0) {
       PARACOOBA_LOG(m_logger, Debug) << "init cubes. ";
       ji.initAsPregenCubes();
+      m = cuber::Registry::PregeneratedCubes;
     }
 
-      // The cuber registry may already have been created if this is a daemon
-      // node. It can then just be re-used, as the daemon cuber registry did not
-      // need the root node to be created.
-      m_cuberRegistry =
-        std::make_unique<cuber::Registry>(m_config, m_log, *this);
-      if(!m_cuberRegistry->init(pregenCubes.size() > 0
-                                  ? (m_config->useCaDiCaLCubes()
-                                       ? cuber::Registry::CaDiCaLCubes
-                                       : cuber::Registry::PregeneratedCubes)
-                                  : cuber::Registry::LiteralFrequency,
-                                &ji)) {
+    // The cuber registry may already have been created if this is a daemon
+    // node. It can then just be re-used, as the daemon cuber registry did not
+    // need the root node to be created.
+    m_cuberRegistry =
+      std::make_unique<cuber::Registry>(m_config, m_log, *this);
+
+
+    if(!m_cuberRegistry->init(m, &ji))
+      {
         PARACOOBA_LOG(m_logger, Fatal)
           << "Could not initialise cuber registry!";
         m_cuberRegistry.reset();
-        return;
+        return res;
       }
-    }
+  }
 
   rootTaskReady.setReady(m_rootTask.get());
+  return res;
 }
+
 CaDiCaLTask*
 CNF::getRootTask()
 {
@@ -804,10 +809,11 @@ operator<<(std::ostream& o, CNF::CubingKind k)
   return o;
 }
 
-void CNF::generateCubes(int depth) {
-  m_rootTask->lookahead(depth);
+TaskResult::Status
+CNF::generateCubes(int depth)
+{
+  return m_rootTask->lookahead(depth);
 }
-
 
 bool CNF::shouldResplitCubes() {
   return m_config->shouldResplitCubes();
