@@ -299,17 +299,14 @@ CaDiCaLTask::execute()
         if(m_terminate) {
           status = TaskResult::Unsolved;
           break;
-        }
-        else if(new_cubes.size())
+        } else if(new_cubes.size()) {
           status = TaskResult::Resplitted;
-        else // very unlikely, but still
+          m_cnf->getCNFTree().setStateFromLocal(m_path, CNFTree::Working);
+          for(auto&& [path, cube] : new_cubes)
+            m_cnf->addPath(path, m_originator, cube);
+        } else // very unlikely, but still
           status = TaskResult::Unsatisfiable;
-        m_cnf->getCNFTree().setStateFromLocal(m_path, CNFTree::Working);
-        //for(auto&& [path, cube]: new_cubes)
-        //  m_cnf->addPath(path, m_originator, cube);
-
         auto result = std::make_unique<TaskResult>(status);
-        result->setCubes(std::move(new_cubes));
         return std::move(result);
         break;
       }

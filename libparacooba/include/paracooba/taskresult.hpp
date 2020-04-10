@@ -57,19 +57,12 @@ class TaskResult
    * Once this has been moved again, no other call can use the internal task!
    */
   std::unique_ptr<Task>& getTaskPtr() { return m_task; }
-  using Path = uint64_t;
-  using PathCube = std::pair<Path, Cube>;
-  using PathCubes = std::vector<PathCube>;
-  void setCubes (PathCubes &&cubes) {m_cubes = cubes; }
-  PathCubes && getCubes () {return std::move(m_cubes); }
 
   private:
   friend class Runner;
 
   Status m_status;
   std::unique_ptr<Task> m_task;
-
-  PathCubes m_cubes;
 
   void setTask(std::unique_ptr<Task> task);
 };

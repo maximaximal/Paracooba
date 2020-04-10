@@ -174,21 +174,6 @@ Runner::worker(uint32_t workerId)
         if(result) {
           result->setTask(std::move(entry->task));
           result->getTask().finish(*result);
-
-          // empty cubes are not possible
-          assert(result->getStatus() != TaskResult::Resplitted ||
-                 !result->getCubes().empty());
-
-          if(result->getStatus() == TaskResult::Resplitted) {
-            auto cubes{ result->getCubes() };
-            PARACOOBA_LOG(logger, Trace)
-              << "Worker " << workerId << " has generated " << cubes.size()
-              << " cubes.";
-            for(auto&& [path, cube] : cubes) {
-              assert(factory);
-              factory->addCubeOrSolvedPath(path, 0, std::optional{ cube });
-            }
-          }
           entry->result.set_value(std::move(result));
         }
       } else {
