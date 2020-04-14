@@ -217,9 +217,8 @@ ClusterStatistics::handlePathOnNode(int64_t originator,
 
   // This path should be handled on another compute node. This means, the
   // other compute node requires a Cube-Beam from the Communicator class.
-  NetworkedNode* nn = node.getNetworkedNode();
-  assert(nn);
-  rootCNF->sendPath(*nn, skel, []() {});
+  NetworkedNodePtr nn = node.getNetworkedNodePtr();
+  rootCNF->sendPath(nn, skel, []() {});
 }
 
 bool

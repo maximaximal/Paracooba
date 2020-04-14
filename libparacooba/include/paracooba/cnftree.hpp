@@ -47,18 +47,27 @@ class CNFTree
     _STATE_COUNT
   };
 
+  static std::shared_ptr<NetworkedNode> const currentNode;
+  static const std::shared_ptr<NetworkedNode> defaultNode()
+  { return currentNode; }
+
   /** @brief A single node on the virtual cubing binary tree.
    */
   struct Node
   {
     State state = Unvisited;
 
-    NetworkedNode* receivedFrom = nullptr;
-    NetworkedNode* offloadedTo = nullptr;
+    std::weak_ptr<NetworkedNode> receivedFrom = currentNode;
+    std::weak_ptr<NetworkedNode> offloadedTo = currentNode;
 
-    inline bool isOffloaded() const { return offloadedTo != nullptr; }
-    inline bool isLocal() const { return offloadedTo == nullptr; }
-    inline bool requiresRemoteUpdate() const { return receivedFrom != nullptr; }
+    inline bool isOffloaded() const {
+      return !offloadedTo.expired() && offloadedTo.lock() != currentNode; }
+    inline bool isLocal() const {
+      return !offloadedTo.expired() && offloadedTo.lock() == currentNode;
+    }
+    inline bool requiresRemoteUpdate() const {
+      return !receivedFrom.expired() && receivedFrom.lock() != currentNode;
+    }
   };
 
   using StateChangedSignal = boost::signals2::signal<void(Path, State)>;
@@ -126,14 +135,14 @@ class CNFTree
   /** @brief Only called when receiving results. */
   void setStateFromRemote(Path p, State state, NetworkedNode& remoteNode);
   /** @brief Only called when receiving paths. */
-  void insertNodeFromRemote(Path p, NetworkedNode& remoteNode);
+  void insertNodeFromRemote(Path p, std::shared_ptr<NetworkedNode> remoteNode);
   /** @brief Only called when rebalancing. Does not send anything. */
-  void offloadNodeToRemote(Path p, NetworkedNode& networkedNode);
+  void offloadNodeToRemote(Path p, std::shared_ptr<NetworkedNode> networkedNode);
   /** @brief Only called when resetting a node in case of re-adding tasks. */
   void resetNode(Path p);
   /** @brief Get the node a path was offloaded to. If the path is handled
    * locally, returns nullptr. If the path does not exist, returns nullptr. */
-  NetworkedNode* getOffloadTargetNetworkedNode(Path p);
+  std::shared_ptr<NetworkedNode> getOffloadTargetNetworkedNode(Path p);
 
   Path getTopmostAvailableParent(Path p) const;
 

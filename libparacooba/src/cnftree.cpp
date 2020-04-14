@@ -4,6 +4,9 @@
 #include "../include/paracooba/config.hpp"
 #include "../include/paracooba/networked_node.hpp"
 #include "../include/paracooba/util.hpp"
+
+#include "../include/paracooba/messages/message_receiver.hpp"
+
 #include <cassert>
 #include <fstream>
 #include <iostream>
@@ -12,6 +15,8 @@
 
 namespace paracooba {
 const size_t CNFTree::maxPathDepth = sizeof(Path) * 8 - 6;
+
+std::shared_ptr<NetworkedNode> const CNFTree::currentNode{nullptr};
 
 CNFTree::CNFTree(LogPtr log,
                  CNF& rootCNF,
@@ -23,7 +28,8 @@ CNFTree::CNFTree(LogPtr log,
   , m_logger(log->createLogger(
       ("CNFTree of formula " + std::to_string(rootCNF.getOriginId()))))
 {}
-CNFTree::~CNFTree() {}
+CNFTree::~CNFTree() {
+}
 
 void CNF::initMeanDuration(size_t windowSize)
 {
@@ -74,13 +80,13 @@ CNFTree::setStateFromRemote(Path p, State state, NetworkedNode& remoteNode)
   std::lock_guard lock(m_nodeMapMutex);
   Node* node = getNode(p);
   assert(node);
-  assert(node->offloadedTo == &remoteNode);
+  //TODO readd assert(!node->offloadedTo.expired() && *node->offloadedTo.lock() == remoteNode);
   node->state = state;
 
   propagateUpwardsFrom(p);
 }
 void
-CNFTree::insertNodeFromRemote(Path p, NetworkedNode& remoteNode)
+CNFTree::insertNodeFromRemote(Path p, std::shared_ptr<NetworkedNode> remoteNode)
 {
   std::lock_guard lock(m_nodeMapMutex);
   auto [it, inserted] =
@@ -96,17 +102,18 @@ CNFTree::insertNodeFromRemote(Path p, NetworkedNode& remoteNode)
       std::unique_lock loggerLock(m_logMutex);
       PARACOOBA_LOG(m_logger, GlobalWarning)
         << "Receive path " << pathToStrNoAlloc(p)
-        << " that was inserted previously from remote " << node->receivedFrom
-        << " again! This time from " << remoteNode.getId()
+        << " that was inserted previously from remote "
+        << (node->receivedFrom.expired() ? currentNode : node->receivedFrom.lock())
+        << " again! This time from " << remoteNode->getId()
         << ". Setting receivedFrom to new remote and ignore this "
            "network-related "
            "error.";
     }
   }
-  node->receivedFrom = &remoteNode;
+  node->receivedFrom = remoteNode;
 }
 void
-CNFTree::offloadNodeToRemote(Path p, NetworkedNode& remoteNode)
+CNFTree::offloadNodeToRemote(Path p, std::shared_ptr<NetworkedNode> remoteNode)
 {
   std::lock_guard lock(m_nodeMapMutex);
   Node* node = getNode(p);
@@ -117,7 +124,7 @@ CNFTree::offloadNodeToRemote(Path p, NetworkedNode& remoteNode)
   }
   assert(!node->isOffloaded());
 
-  node->offloadedTo = &remoteNode;
+  node->offloadedTo = remoteNode;
   node->state = Working;
 }
 void
@@ -127,22 +134,25 @@ CNFTree::resetNode(Path p)
   Node* node = getNode(p);
   assert(node);
   assert(node->isOffloaded());
-  node->offloadedTo = 0;
+  node->offloadedTo = currentNode;
   node->state = Unvisited;
 }
 
-NetworkedNode*
+std::shared_ptr<NetworkedNode>
 CNFTree::getOffloadTargetNetworkedNode(Path p)
 {
   std::lock_guard lock(m_nodeMapMutex);
   Node* node = getNode(p);
   if(!node) {
-    return nullptr;
+    return currentNode;
   }
   if(node->isOffloaded()) {
-    return node->offloadedTo;
+    if(auto nn = node->offloadedTo.lock())
+      return nn;
+    else
+      return currentNode;
   }
-  return nullptr;
+  return currentNode;
 }
 
 Path
@@ -252,7 +262,12 @@ void
 CNFTree::sendNodeResultToSender(Path p, const Node& node)
 {
   assert(node.requiresRemoteUpdate());
-  m_rootCNF.sendResult(*node.receivedFrom, cleanupPath(p), []() {});
+  if(auto nn = node.receivedFrom.lock())
+    m_rootCNF.sendResult(*nn, cleanupPath(p), []() {});
+  else
+    PARACOOBA_LOG(m_logger, GlobalError)
+      << "Could not send result for path " << CNFTree::pathToStrNoAlloc(p)
+      << " back to remote!";
 }
 
 void
@@ -323,9 +338,18 @@ CNFTree::dumpNode(Path p,
 
   std::string pStr = "n";
   pStr += CNFTree::pathToStrNoAlloc(p);
-  o << pStr << " [label=\"" << pStr << "(" << n->state << ") >"
-    << n->receivedFrom << ">" << n->offloadedTo << "\" shape=box];"
-    << std::endl;
+  o << pStr << " [label=\"" << pStr << "(" << n->state << ") >";
+  if (auto nn = n->receivedFrom.lock())
+    o << "no_remote";
+  else
+    o << n->receivedFrom.lock();
+  o << ">";
+  if(auto nn = n->offloadedTo.lock())
+    o << "no_remote";
+  else
+    o << n->receivedFrom.lock();
+
+  o << "\" shape=box];" << std::endl;
 
   if(parentPath != "") {
     o << parentPath << " -> " << pStr << ";" << std::endl;

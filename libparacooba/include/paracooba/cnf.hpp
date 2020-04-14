@@ -114,7 +114,7 @@ class CNF
 
   void sendAllowanceMap(NetworkedNode& nn, SendFinishedCB finishedCB);
 
-  void sendPath(NetworkedNode& nn,
+  void sendPath(NetworkedNodePtr nn,
                 const TaskSkeleton& skel,
                 SendFinishedCB finishedCB);
 
@@ -129,7 +129,7 @@ class CNF
                std::size_t length);
 
   virtual void receiveJobDescription(messages::JobDescription&& jd,
-                                     NetworkedNode& nn);
+                                     NetworkedNodePtr nn);
 
   inline int64_t getOriginId() { return m_originId; }
 

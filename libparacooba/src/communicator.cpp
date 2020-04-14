@@ -363,9 +363,9 @@ Communicator::requestCNFTreePathInfo(
 
   Path p = request.getPath();
 
-  NetworkedNode* nn = cnfTree.getOffloadTargetNetworkedNode(p);
+  std::shared_ptr<NetworkedNode> nn = cnfTree.getOffloadTargetNetworkedNode(p);
 
-  if(nn == nullptr) {
+  if(nn == CNFTree::defaultNode()) {
     // Handled locally, can directly insert local information, if this should be
     // sent to a remote or inserted into local info if requested locally.
 

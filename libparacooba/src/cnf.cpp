@@ -182,7 +182,7 @@ CNF::sendAllowanceMap(NetworkedNode& nn, SendFinishedCB finishedCallback)
 }
 
 void
-CNF::sendPath(NetworkedNode& nn,
+CNF::sendPath(NetworkedNodePtr nn,
               const TaskSkeleton& skel,
               SendFinishedCB finishedCB)
 {
@@ -195,16 +195,16 @@ CNF::sendPath(NetworkedNode& nn,
   messages::JobPath jp(p, skel.optionalCube);
   messages::JobDescription jd(m_originId);
   jd.insert(jp);
-  nn.transmitJobDescription(
-    std::move(jd), nn, [this, p, &nn, finishedCB](bool success) {
+  nn->transmitJobDescription(
+    std::move(jd), *nn, [this, p, &nn, finishedCB](bool success) {
       if(success) {
         finishedCB();
       } else {
         PARACOOBA_LOG(m_logger, GlobalError)
           << "Could not send path " << CNFTree::pathToStrNoAlloc(p) << " to "
-          << nn.getId() << "! Re-Add to local factory.";
+          << nn->getId() << "! Re-Add to local factory.";
         // Reset the task, so it is processed again!
-        m_taskFactory->removeExternallyProcessedTask(p, nn.getId(), true);
+        m_taskFactory->removeExternallyProcessedTask(p, nn->getId(), true);
       }
     });
 }
@@ -288,12 +288,12 @@ jrStateToCNFTreeState(messages::JobResult::State s)
 }
 
 void
-CNF::receiveJobDescription(messages::JobDescription&& jd, NetworkedNode& nn)
+CNF::receiveJobDescription(messages::JobDescription&& jd, std::shared_ptr<NetworkedNode> nn)
 {
   {
     std::unique_lock loggerLock(m_loggerMutex);
     PARACOOBA_LOG(m_logger, Trace)
-      << "Received " << jd.tagline() << " from " << nn.getId();
+      << "Received " << jd.tagline() << " from " << nn->getId();
   }
   switch(jd.getKind()) {
     case messages::JobDescription::Kind::Path: {
@@ -313,7 +313,7 @@ CNF::receiveJobDescription(messages::JobDescription&& jd, NetworkedNode& nn)
         shared_from_this(), p, jp.getOptionalCube());
       m_config->getCommunicator()->getRunner()->push(
         std::move(task),
-        nn.getId(),
+        nn->getId(),
         TaskFactory::getTaskPriority(TaskFactory::CubeOrSolve, p),
         m_taskFactory);
       break;
@@ -335,7 +335,7 @@ CNF::receiveJobDescription(messages::JobDescription&& jd, NetworkedNode& nn)
           std::unique_lock loggerLock(m_loggerMutex);
           PARACOOBA_LOG(m_logger, GlobalWarning)
             << "Result for path " << CNFTree::pathToStrNoAlloc(jr.getPath())
-            << " received from " << nn.getId()
+            << " received from " << nn->getId()
             << " already inserted into results previously! Previous result "
                "state: "
             << res->state
@@ -346,7 +346,7 @@ CNF::receiveJobDescription(messages::JobDescription&& jd, NetworkedNode& nn)
         res->state = jrStateToCNFTreeState(jr.getState());
         assert(res->state != CNFTree::Unknown);
 
-        m_taskFactory->removeExternallyProcessedTask(res->p, nn.getId());
+        m_taskFactory->removeExternallyProcessedTask(res->p, nn->getId());
 
         if(res->state == CNFTree::SAT) {
           res->size = jr.getDataVec().size();
@@ -358,7 +358,7 @@ CNF::receiveJobDescription(messages::JobDescription&& jd, NetworkedNode& nn)
         res->finished = true;
       }
 
-      handleFinishedResultReceived(*res, nn);
+      handleFinishedResultReceived(*res, *nn);
       break;
     }
     case messages::JobDescription::Kind::Initiator: {

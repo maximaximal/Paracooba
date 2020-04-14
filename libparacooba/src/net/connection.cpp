@@ -617,7 +617,7 @@ Connection::receiveSerializedMessage(size_t bytes_received)
           jd.getOriginatorID());
       if(receiver) {
         if(auto nn = remoteNN().lock()) {
-          receiver->receiveJobDescription(std::move(jd), *nn);
+          receiver->receiveJobDescription(std::move(jd), nn);
 
           if(context()) {
             // This is a connection between a Master and a Daemon. So the
