@@ -33,7 +33,7 @@ MessageTransmitter::announcementRequest(const Config& config,
                                         SuccessCB sendFinishedCB)
 {
   messages::Message msg = buildMessage(config);
-  msg.insert(messages::AnnouncementRequest());
+  msg.insert(messages::AnnouncementRequest(config.buildNode()));
   nn.transmitMessage(msg, nn, sendFinishedCB);
 }
 
