@@ -1,9 +1,9 @@
 #include "../../include/paracooba/net/udp_server.hpp"
 #include "../../include/paracooba/cluster-node-store.hpp"
 #include "../../include/paracooba/cluster-node.hpp"
+#include "../../include/paracooba/config.hpp"
 #include "../../include/paracooba/messages/message.hpp"
 #include "../../include/paracooba/networked_node.hpp"
-#include "../../include/paracooba/config.hpp"
 #include <boost/asio/ip/tcp.hpp>
 #include <cereal/archives/binary.hpp>
 #include <mutex>

@@ -26,7 +26,7 @@ ClusterNode::ClusterNode(
   , m_thisId(thisId)
   , m_id(id)
   , m_networkedNode(
-      std::make_shared<NetworkedNode>(id, statelessMessageTransmitter))
+      std::make_shared<NetworkedNode>(id, statelessMessageTransmitter, *this))
   , m_clusterNodeStore(clusterNodeStore)
 {
   initMeanDuration(ClusterNodeWindowSize);

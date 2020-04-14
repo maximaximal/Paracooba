@@ -4,6 +4,7 @@
 #include <atomic>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/udp.hpp>
+#include <ostream>
 #include <pthread.h>
 
 #include "messages/jobdescription_transmitter.hpp"
@@ -16,6 +17,8 @@ namespace net {
 class Connection;
 }
 
+class ClusterNode;
+
 class NetworkedNode
   : public messages::JobDescriptionTransmitter
   , public messages::MessageTransmitter
@@ -25,7 +28,8 @@ class NetworkedNode
 
   explicit NetworkedNode(
     ID id,
-    messages::MessageTransmitter& statelessMessageTransmitter);
+    messages::MessageTransmitter& statelessMessageTransmitter,
+    ClusterNode& clusterNode);
   virtual ~NetworkedNode();
 
   const boost::asio::ip::udp::endpoint& getRemoteUdpEndpoint() const
@@ -79,7 +83,7 @@ class NetworkedNode
   }
   int64_t getId() const { return m_id; }
 
-  inline std::ostream& operator<<(std::ostream& o) { return o << getId(); }
+  inline std::ostream& operator<<(std::ostream& o) const;
 
   void addActiveTCPClient() { ++m_activeTCPClients; }
   void removeActiveTCPClient()
@@ -105,6 +109,8 @@ class NetworkedNode
   bool isUdpPortSet() const { return m_udpPortSet; }
   bool isTcpPortSet() const { return m_tcpPortSet; }
 
+  ClusterNode& getClusterNode() const { return m_clusterNode; }
+
   private:
   boost::asio::ip::udp::endpoint m_remoteUdpEndoint;
   boost::asio::ip::tcp::endpoint m_remoteTcpEndoint;
@@ -123,7 +129,12 @@ class NetworkedNode
   messages::MessageTransmitter& m_statelessMessageTransmitter;
   std::unique_ptr<net::Connection> m_connection;
   ConnectionReadyWaiter m_connectionReadyWaiter;
+
+  ClusterNode& m_clusterNode;
 };
+
+std::ostream&
+operator<<(std::ostream& o, const NetworkedNode& n);
 }
 
 #endif

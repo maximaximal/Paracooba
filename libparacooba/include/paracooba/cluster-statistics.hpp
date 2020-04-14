@@ -55,10 +55,10 @@ class ClusterStatistics : public ClusterNodeStore
     for(auto& it : c.m_nodeMap) {
       auto& node = it.second;
       if(first) {
-        o << "{" << node << "}";
+        o << "{" << node.dumpToJSON() << "}";
         first = false;
       } else {
-        o << ",{" << node << "}";
+        o << ",{" << node.dumpToJSON() << "}";
       }
     }
     o << "]}";

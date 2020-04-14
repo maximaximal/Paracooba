@@ -88,6 +88,11 @@ ClusterStatistics::getOrCreateNode(ID id)
                                              id,
                                              *m_statelessMessageTransmitter,
                                              *this) });
+
+  if(inserted) {
+    PARACOOBA_LOG(m_logger, Trace) << "Added new node with id " << id << ".";
+  }
+
   return { it->second, inserted };
 }
 
@@ -132,9 +137,8 @@ ClusterStatistics::unsafeRemoveNode(int64_t id, const std::string& reason)
       }
     }
 
-    PARACOOBA_LOG(m_logger, Trace)
-      << "Remove cluster statistics node with id: " << id
-      << " becase of reason: " << reason;
+    PARACOOBA_LOG(m_logger, Trace) << "Remove cluster statistics node " << node
+                                   << " becase of reason: " << reason;
 
     it->second.m_nodeOfflineSignal(reason);
     m_nodeMap.erase(id);

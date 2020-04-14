@@ -248,6 +248,26 @@ class ClusterNode
     const messages::AnnouncementRequest& announcementRequest);
   void applyNodeStatusMessage(const messages::NodeStatus& nodeStatus);
 
+  std::string dumpToJSON() const
+  {
+    std::stringstream s;
+    s << "\"name\": \"" << m_name << "\","
+      << "\"id\": " << m_id << ","
+      << "\"maximumCPUFrequency\": " << m_maximumCPUFrequency << ","
+      << "\"availableWorkers\": " << m_availableWorkers << ","
+      << "\"udpListenPort\": " << m_udpListenPort << ","
+      << "\"uptime\": " << m_uptime << ","
+      << "\"workQueueCapacity\": " << m_workQueueCapacity << ","
+      << "\"readyForWork\": " << getReadyForWork() << ","
+      << "\"fullyKnown\": " << m_fullyKnown << ","
+      << "\"daemon\": " << m_daemon << ","
+      << "\"highlighted\": false,"
+      << "\"fitnessForNewAssignment\": " << getFitnessForNewAssignment() << ","
+      << "\"aggregatedContextSize\": " << getAggregatedContextSize() << ","
+      << "\"workQueueSize\": " << m_workQueueSize;
+    return s.str();
+  }
+
   private:
   friend class ClusterStatistics;
 
@@ -292,27 +312,13 @@ class ClusterNode
     m_acc_durationSinceLastStatus;
 
   bool operator=(const ClusterNode& n) { return m_id == n.m_id; }
-
-  friend std::ostream& operator<<(std::ostream& o, const ClusterNode& n)
-  {
-    o << "\"name\": \"" << n.m_name << "\","
-      << "\"id\": " << n.m_id << ","
-      << "\"maximumCPUFrequency\": " << n.m_maximumCPUFrequency << ","
-      << "\"availableWorkers\": " << n.m_availableWorkers << ","
-      << "\"udpListenPort\": " << n.m_udpListenPort << ","
-      << "\"uptime\": " << n.m_uptime << ","
-      << "\"workQueueCapacity\": " << n.m_workQueueCapacity << ","
-      << "\"readyForWork\": " << n.getReadyForWork() << ","
-      << "\"fullyKnown\": " << n.m_fullyKnown << ","
-      << "\"daemon\": " << n.m_daemon << ","
-      << "\"highlighted\": false,"
-      << "\"fitnessForNewAssignment\": " << n.getFitnessForNewAssignment()
-      << ","
-      << "\"aggregatedContextSize\": " << n.getAggregatedContextSize() << ","
-      << "\"workQueueSize\": " << n.m_workQueueSize;
-    return o;
-  }
 };
+
+inline std::ostream&
+operator<<(std::ostream& o, const ClusterNode& c)
+{
+  return o << c.getName() << " (" << c.getId() << ")";
+}
 }
 
 #endif

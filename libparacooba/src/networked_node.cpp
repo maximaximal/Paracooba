@@ -1,4 +1,5 @@
 #include "../include/paracooba/networked_node.hpp"
+#include "../include/paracooba/cluster-node.hpp"
 #include "../include/paracooba/net/connection.hpp"
 #include <boost/type_traits/is_stateless.hpp>
 #include <memory>
@@ -7,9 +8,11 @@
 namespace paracooba {
 NetworkedNode::NetworkedNode(
   ID id,
-  messages::MessageTransmitter& statelessMessageTransmitter)
+  messages::MessageTransmitter& statelessMessageTransmitter,
+  ClusterNode& node)
   : m_id(id)
   , m_statelessMessageTransmitter(statelessMessageTransmitter)
+  , m_clusterNode(node)
 {}
 
 NetworkedNode::~NetworkedNode()
@@ -41,6 +44,12 @@ NetworkedNode::transmitJobDescription(messages::JobDescription&& jd,
     [this, &jd, sendFinishedCB](net::Connection& conn) {
       conn.sendJobDescription(jd, sendFinishedCB);
     });
+}
+
+std::ostream&
+NetworkedNode::operator<<(std::ostream& o) const
+{
+  return o << m_clusterNode;
 }
 
 void
@@ -89,5 +98,11 @@ NetworkedNode::updateRemoteConnectionString()
   std::stringstream ss;
   ss << m_remoteTcpEndoint;
   m_remoteConnectionString = ss.str();
+}
+
+std::ostream&
+operator<<(std::ostream& o, const NetworkedNode& n)
+{
+  return o << n.getClusterNode();
 }
 }

@@ -30,7 +30,7 @@ Control::receiveMessage(const messages::Message& msg, NetworkedNode& nn)
   assert(m_jobDescriptionReceiverProvider);
 
   PARACOOBA_LOG(m_logger, NetTrace)
-    << "  -> " << msg.getType() << " from ID " << msg.getOrigin();
+    << "  -> " << msg.getType() << " from " << nn;
 
   switch(msg.getType()) {
     case messages::Type::OnlineAnnouncement:
@@ -105,8 +105,10 @@ Control::handleAnnouncementRequest(const messages::Message& msg,
     msg.getAnnouncementRequest();
   const messages::Node& requester = announcementRequest.getRequester();
 
+  assert(msg.getOrigin() == requester.getId());
+
   auto [clusterNode, inserted] =
-    m_clusterNodeStore.getOrCreateNode(requester.getId());
+    m_clusterNodeStore.getOrCreateNode(msg.getOrigin());
 
   clusterNode.applyAnnouncementRequestMessage(announcementRequest);
 
