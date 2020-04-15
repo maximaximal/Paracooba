@@ -42,7 +42,8 @@ class ClusterNodeStore : public messages::JobDescriptionTransmitter
                                       ID id,
                                       SuccessCB sendFinishedCB);
 
-  virtual bool remoteConnectionStringKnown(const std::string& remoteConnectionString)
+  virtual bool remoteConnectionStringKnown(
+    const std::string& remoteConnectionString)
   {
     return false;
   }

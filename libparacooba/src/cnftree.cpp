@@ -16,7 +16,28 @@
 namespace paracooba {
 const size_t CNFTree::maxPathDepth = sizeof(Path) * 8 - 6;
 
-std::shared_ptr<NetworkedNode> const CNFTree::currentNode{nullptr};
+// Taken from https://stackoverflow.com/a/45507610/2646647
+template<typename T>
+bool
+isUninitialized(std::weak_ptr<T> const& weak)
+{
+  using wt = std::weak_ptr<T>;
+  return !weak.owner_before(wt{}) && !wt{}.owner_before(weak);
+}
+
+template<typename T>
+std::string
+ptrToString(std::weak_ptr<T> const& w, const std::string& fallback)
+{
+  if(isUninitialized(w))
+    return fallback;
+
+  auto val = w.lock();
+  std::stringstream sstream;
+  sstream << *val;
+
+  return sstream.str();
+}
 
 CNFTree::CNFTree(LogPtr log,
                  CNF& rootCNF,
@@ -28,17 +49,32 @@ CNFTree::CNFTree(LogPtr log,
   , m_logger(log->createLogger(
       ("CNFTree of formula " + std::to_string(rootCNF.getOriginId()))))
 {}
-CNFTree::~CNFTree() {
+CNFTree::~CNFTree() {}
+
+bool
+CNFTree::Node::isOffloaded() const
+{
+  return !isLocal();
+}
+bool
+CNFTree::Node::isLocal() const
+{
+  return isUninitialized(offloadedTo);
+}
+bool
+CNFTree::Node::requiresRemoteUpdate() const
+{
+  return !isUninitialized(receivedFrom);
 }
 
-void CNF::initMeanDuration(size_t windowSize)
+void
+CNF::initMeanDuration(size_t windowSize)
 {
   using namespace std::chrono_literals;
   for(size_t i = 0; i < windowSize; ++i) {
     m_acc_solvingTime(1'500ms);
   }
 }
-
 
 CNFTree::State
 CNFTree::getState(Path p) const
@@ -80,7 +116,8 @@ CNFTree::setStateFromRemote(Path p, State state, NetworkedNode& remoteNode)
   std::lock_guard lock(m_nodeMapMutex);
   Node* node = getNode(p);
   assert(node);
-  //TODO readd assert(!node->offloadedTo.expired() && *node->offloadedTo.lock() == remoteNode);
+  // TODO readd assert(!node->offloadedTo.expired() && *node->offloadedTo.lock()
+  // == remoteNode);
   node->state = state;
 
   propagateUpwardsFrom(p);
@@ -103,8 +140,8 @@ CNFTree::insertNodeFromRemote(Path p, std::shared_ptr<NetworkedNode> remoteNode)
       PARACOOBA_LOG(m_logger, GlobalWarning)
         << "Receive path " << pathToStrNoAlloc(p)
         << " that was inserted previously from remote "
-        << (node->receivedFrom.expired() ? currentNode : node->receivedFrom.lock())
-        << " again! This time from " << remoteNode->getId()
+        << ptrToString(node->receivedFrom, "Local") << " again! This time from "
+        << remoteNode->getId()
         << ". Setting receivedFrom to new remote and ignore this "
            "network-related "
            "error.";
@@ -134,7 +171,7 @@ CNFTree::resetNode(Path p)
   Node* node = getNode(p);
   assert(node);
   assert(node->isOffloaded());
-  node->offloadedTo = currentNode;
+  node->offloadedTo.reset();
   node->state = Unvisited;
 }
 
@@ -144,15 +181,15 @@ CNFTree::getOffloadTargetNetworkedNode(Path p)
   std::lock_guard lock(m_nodeMapMutex);
   Node* node = getNode(p);
   if(!node) {
-    return currentNode;
+    return nullptr;
   }
   if(node->isOffloaded()) {
     if(auto nn = node->offloadedTo.lock())
       return nn;
     else
-      return currentNode;
+      return nullptr;
   }
-  return currentNode;
+  return nullptr;
 }
 
 Path
@@ -211,8 +248,8 @@ CNFTree::propagateUpwardsFrom(Path p, Path sourcePath)
     assert(
       (getNode(sourcePath) && getNode(sourcePath)->requiresRemoteUpdate()));
     std::unique_lock loggerLock(m_logMutex);
-    PARACOOBA_LOG(m_logger, Trace)
-      << "Directly offloaded " << " for path " << pathToStdString(p);
+    PARACOOBA_LOG(m_logger, Trace) << "Directly offloaded "
+                                   << " for path " << pathToStdString(p);
     return;
   }
 
@@ -229,11 +266,10 @@ CNFTree::propagateUpwardsFrom(Path p, Path sourcePath)
 
   if((leftChild && leftChild->state == SAT) ||
      (rightChild && rightChild->state == SAT)) {
-      // don't bubble up the results twice
-      changed = node ? node->state != SAT  : false;
-      node->state = SAT;
+    // don't bubble up the results twice
+    changed = node ? node->state != SAT : false;
+    node->state = SAT;
   }
-
 
   if(changed) {
     {
@@ -339,7 +375,7 @@ CNFTree::dumpNode(Path p,
   std::string pStr = "n";
   pStr += CNFTree::pathToStrNoAlloc(p);
   o << pStr << " [label=\"" << pStr << "(" << n->state << ") >";
-  if (auto nn = n->receivedFrom.lock())
+  if(auto nn = n->receivedFrom.lock())
     o << "no_remote";
   else
     o << n->receivedFrom.lock();

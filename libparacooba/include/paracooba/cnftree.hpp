@@ -47,27 +47,18 @@ class CNFTree
     _STATE_COUNT
   };
 
-  static std::shared_ptr<NetworkedNode> const currentNode;
-  static const std::shared_ptr<NetworkedNode> defaultNode()
-  { return currentNode; }
-
   /** @brief A single node on the virtual cubing binary tree.
    */
   struct Node
   {
     State state = Unvisited;
 
-    std::weak_ptr<NetworkedNode> receivedFrom = currentNode;
-    std::weak_ptr<NetworkedNode> offloadedTo = currentNode;
+    std::weak_ptr<NetworkedNode> receivedFrom;
+    std::weak_ptr<NetworkedNode> offloadedTo;
 
-    inline bool isOffloaded() const {
-      return !offloadedTo.expired() && offloadedTo.lock() != currentNode; }
-    inline bool isLocal() const {
-      return !offloadedTo.expired() && offloadedTo.lock() == currentNode;
-    }
-    inline bool requiresRemoteUpdate() const {
-      return !receivedFrom.expired() && receivedFrom.lock() != currentNode;
-    }
+    bool isOffloaded() const;
+    bool isLocal() const;
+    bool requiresRemoteUpdate() const;
   };
 
   using StateChangedSignal = boost::signals2::signal<void(Path, State)>;
@@ -137,7 +128,8 @@ class CNFTree
   /** @brief Only called when receiving paths. */
   void insertNodeFromRemote(Path p, std::shared_ptr<NetworkedNode> remoteNode);
   /** @brief Only called when rebalancing. Does not send anything. */
-  void offloadNodeToRemote(Path p, std::shared_ptr<NetworkedNode> networkedNode);
+  void offloadNodeToRemote(Path p,
+                           std::shared_ptr<NetworkedNode> networkedNode);
   /** @brief Only called when resetting a node in case of re-adding tasks. */
   void resetNode(Path p);
   /** @brief Get the node a path was offloaded to. If the path is handled
