@@ -30,7 +30,8 @@ main(int argc, char* argv[])
 
   PARACOOBA_LOG(logger, Trace)
     << "Starting paracooba \"" << config->getString(Config::LocalName)
-    << "\" in " << (config->isDaemonMode() ? "daemon mode" : "client mode");
+    << "\" in " << (config->isDaemonMode() ? "daemon mode" : "client mode")
+    << "with ID = " << config->getId();
 
   CommunicatorPtr communicator = std::make_shared<Communicator>(config, log);
 
