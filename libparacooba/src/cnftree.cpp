@@ -249,7 +249,7 @@ CNFTree::propagateUpwardsFrom(Path p, Path sourcePath)
       (getNode(sourcePath) && getNode(sourcePath)->requiresRemoteUpdate()));
     std::unique_lock loggerLock(m_logMutex);
     PARACOOBA_LOG(m_logger, Trace) << "Directly offloaded "
-                                   << " for path " << pathToStdString(p);
+                                   << "for path " << pathToStdString(p);
     return;
   }
 
@@ -300,10 +300,11 @@ CNFTree::sendNodeResultToSender(Path p, const Node& node)
   assert(node.requiresRemoteUpdate());
   if(auto nn = node.receivedFrom.lock())
     m_rootCNF.sendResult(*nn, cleanupPath(p), []() {});
-  else
+  else {
     PARACOOBA_LOG(m_logger, GlobalError)
       << "Could not send result for path " << CNFTree::pathToStrNoAlloc(p)
       << " back to remote!";
+  }
 }
 
 void
