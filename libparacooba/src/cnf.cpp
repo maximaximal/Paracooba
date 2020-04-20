@@ -195,24 +195,18 @@ CNF::sendPath(NetworkedNodePtr nn,
   messages::JobPath jp(p, skel.optionalCube);
   messages::JobDescription jd(m_originId);
   jd.insert(jp);
-  std::weak_ptr<NetworkedNode> nn2(nn);
+  auto id = nn->getId();
   nn->transmitJobDescription(
-    std::move(jd), *nn, [this, nn2, p, finishedCB](bool success) {
+    std::move(jd), *nn, [this, id, p, finishedCB](bool success) {
       if(success) {
         finishedCB();
       } else {
-        if (auto nn = nn2.lock()) {
-          PARACOOBA_LOG(m_logger, GlobalError)
-            << "Could not send path " << CNFTree::pathToStrNoAlloc(p) << " to "
-            << nn->getId() << "! Re-Add to local factory.";
-          // Reset the task, so it is processed again!
-          m_taskFactory->removeExternallyProcessedTask(p, nn->getId(), true);
-	}
- 	else {
-	  PARACOOBA_LOG(m_logger, GlobalError)
-	    << "Could not send path " << CNFTree::pathToStrNoAlloc(p) << " and sender was already deleted.";
-	 }
-      }
+        PARACOOBA_LOG(m_logger, GlobalError)
+          << "Could not send path " << CNFTree::pathToStrNoAlloc(p) << " to "
+          << id << "! Re-Add to local factory.";
+        // Reset the task, so it is processed again!
+        m_taskFactory->removeExternallyProcessedTask(p, id, true);
+	    }
     });
 }
 
