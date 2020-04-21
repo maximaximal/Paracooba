@@ -474,7 +474,7 @@ conditionalReadIntoStrVectFromEnv(Logger& l,
   if(var != nullptr) {
     PARACOOBA_LOG(l, Info) << "Adding known remote node \"" << var
                            << "\" from environment variable \"" << env << "\".";
-    vect.push_back(env);
+    vect.push_back(var);
   }
 }
 
