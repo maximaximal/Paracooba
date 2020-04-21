@@ -26,8 +26,8 @@ using MutableConstant = boost::log::attributes::mutable_constant<T>;
 extern thread_local MutableConstant<int> lineAttr;
 extern thread_local MutableConstant<const char*> fileAttr;
 extern thread_local MutableConstant<const char*> functionAttr;
-extern thread_local MutableConstant<std::string_view> threadNameAttr;
-extern thread_local MutableConstant<std::string_view> localNameAttr;
+extern thread_local MutableConstant<std::string> threadNameAttr;
+extern thread_local MutableConstant<std::string> localNameAttr;
 
 namespace paracooba {
 class Config;
@@ -182,7 +182,7 @@ operator<<(
 #define PARACOOBA_LOG(LOGGER, SEVERITY)                                       \
   if((LOGGER).log->isLogLevelEnabled(::paracooba::Log::Severity::SEVERITY)) { \
     PARACOOBA_LOG_LOCATION()                                                  \
-    localNameAttr.set((LOGGER).log->getLocalName());                          \
+    localNameAttr.set(std::string((LOGGER).log->getLocalName()));             \
     threadNameAttr.set((LOGGER).log->getThreadLocalData().threadName);        \
   }                                                                           \
   BOOST_LOG_SEV((LOGGER).logger, ::paracooba::Log::Severity::SEVERITY)

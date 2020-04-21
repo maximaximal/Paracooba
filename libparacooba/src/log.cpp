@@ -30,7 +30,7 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(paracooba_logger_function, "Function", std::string)
 BOOST_LOG_ATTRIBUTE_KEYWORD(paracooba_logger_line, "Line", int)
 BOOST_LOG_ATTRIBUTE_KEYWORD(paracooba_logger_localname,
                             "LocalName",
-                            std::string_view)
+                            std::string)
 BOOST_LOG_ATTRIBUTE_KEYWORD(paracooba_logger_timestamp,
                             "Timestamp",
                             boost::posix_time::ptime)
@@ -42,17 +42,17 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(paracooba_logger_context_meta,
 
 BOOST_LOG_ATTRIBUTE_KEYWORD(paracooba_logger_thread_name,
                             "ThreadName",
-                            std::string_view)
+                            std::string)
 
 thread_local MutableConstant<int> lineAttr = MutableConstant<int>(0);
 thread_local MutableConstant<const char*> fileAttr =
   MutableConstant<const char*>("");
 thread_local MutableConstant<const char*> functionAttr =
   MutableConstant<const char*>("");
-thread_local MutableConstant<std::string_view> threadNameAttr =
-  MutableConstant<std::string_view>("");
-thread_local MutableConstant<std::string_view> localNameAttr =
-  MutableConstant<std::string_view>("Unnamed Thread");
+thread_local MutableConstant<std::string> threadNameAttr =
+  MutableConstant<std::string>("");
+thread_local MutableConstant<std::string> localNameAttr =
+  MutableConstant<std::string>("Unnamed Thread");
 
 bool LogSinksSetup = false;
 
@@ -226,7 +226,7 @@ operator<<(
   ::paracooba::Log::Severity level = manip.get();
 
   if(static_cast<std::size_t>(level) <
-     sizeof(uncolorised_strings) / sizeof(**strings))
+     sizeof(uncolorised_strings) / sizeof(*strings))
     strm << strings[level];
   else
     strm << static_cast<int>(level);
