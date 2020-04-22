@@ -128,5 +128,7 @@ tags
 internalwebserver-docroot/js/.tern-port
 build/
 build-gcc/
+build-fresh/
+build-*/
 clangd
 .ccls-cache
