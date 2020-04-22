@@ -499,7 +499,7 @@ Connection::connect(const std::string& remote)
   }
 
   resumeMode() = EndAfterShutdown;
-  this->remote() = remote;
+  this->remote() = connectionString;
 
   uint16_t allowedRetries = config()->getUint16(Config::ConnectionRetries);
   ++connectionTry();
