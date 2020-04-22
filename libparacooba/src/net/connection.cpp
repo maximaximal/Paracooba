@@ -479,7 +479,18 @@ Connection::connect(const NetworkedNodePtr& nn)
 void
 Connection::connect(const std::string& remote)
 {
-  if(clusterNodeStore().remoteConnectionStringKnown(remote)) {
+  std::string host = remote;
+  std::string port = std::to_string(config()->getUint16(Config::TCPTargetPort));
+
+  auto posOfColon = remote.find(":");
+  if(posOfColon != std::string::npos) {
+    host = remote.substr(0, posOfColon);
+    port = remote.substr(posOfColon + 1, std::string::npos);
+  }
+
+  std::string connectionString = host + ":" + port;
+
+  if(clusterNodeStore().remoteConnectionStringKnown(connectionString)) {
     PARACOOBA_LOG(logger(), NetTrace)
       << "Remote connection string \"" << remote
       << "\" already known! Ending connection on connection try "
@@ -489,15 +500,6 @@ Connection::connect(const std::string& remote)
 
   resumeMode() = EndAfterShutdown;
   this->remote() = remote;
-
-  std::string host = remote;
-  std::string port = std::to_string(config()->getUint16(Config::TCPTargetPort));
-
-  auto posOfColon = remote.find(":");
-  if(posOfColon != std::string::npos) {
-    host = remote.substr(0, posOfColon);
-    port = remote.substr(posOfColon + 1, std::string::npos);
-  }
 
   uint16_t allowedRetries = config()->getUint16(Config::ConnectionRetries);
   ++connectionTry();
