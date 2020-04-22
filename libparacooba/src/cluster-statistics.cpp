@@ -82,12 +82,12 @@ ClusterStatistics::getOrCreateNode(ID id)
 {
   assert(m_statelessMessageTransmitter);
   auto [it, inserted] =
-    m_nodeMap.emplace(std::pair{ id,
-                                 ClusterNode(m_changed,
-                                             m_thisNode->getId(),
-                                             id,
-                                             *m_statelessMessageTransmitter,
-                                             *this) });
+    m_nodeMap.try_emplace(id,
+                          m_changed,
+                          m_thisNode->getId(),
+                          id,
+                          *m_statelessMessageTransmitter,
+                          *this);
 
   if(inserted) {
     PARACOOBA_LOG(m_logger, Trace) << "Added new node with id " << id << ".";
@@ -107,7 +107,7 @@ ClusterNode&
 ClusterStatistics::addNode(ClusterNode&& node)
 {
   auto [map, lock] = getUniqueNodeMap();
-  return map.emplace(node.m_id, std::move(node)).first->second;
+  return map.try_emplace(node.m_id, std::move(node)).first->second;
 }
 
 void
