@@ -12,7 +12,7 @@ NetworkedNode::NetworkedNode(
   ClusterNode& node)
   : m_id(id)
   , m_statelessMessageTransmitter(statelessMessageTransmitter)
-  , m_clusterNode(node)
+  , m_clusterNode(&node)
 {}
 
 NetworkedNode::~NetworkedNode()
@@ -44,12 +44,6 @@ NetworkedNode::transmitJobDescription(messages::JobDescription&& jd,
     [this, &jd, sendFinishedCB](net::Connection& conn) {
       conn.sendJobDescription(jd, sendFinishedCB);
     });
-}
-
-std::ostream&
-NetworkedNode::operator<<(std::ostream& o) const
-{
-  return o << m_clusterNode;
 }
 
 void

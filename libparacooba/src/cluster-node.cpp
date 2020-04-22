@@ -51,7 +51,9 @@ ClusterNode::ClusterNode(ClusterNode&& o) noexcept
   , m_acc_workQueueSize(std::move(o.m_acc_workQueueSize))
   , m_acc_durationSinceLastStatus(std::move(o.m_acc_durationSinceLastStatus))
   , m_clusterNodeStore(o.m_clusterNodeStore)
-{}
+{
+  m_networkedNode->setClusterNode(*this);
+}
 ClusterNode::~ClusterNode() {}
 
 void
@@ -134,5 +136,11 @@ ClusterNode::applyNodeStatusMessage(const messages::NodeStatus& nodeStatus)
         context.getOriginator(), context.getState(), context.getFactorySize());
     }
   }
+}
+
+std::ostream&
+operator<<(std::ostream& o, const ClusterNode& c)
+{
+  return o << c.getName() << " (" << c.getId() << ")";
 }
 }

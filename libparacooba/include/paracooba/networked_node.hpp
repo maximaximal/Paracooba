@@ -83,8 +83,6 @@ class NetworkedNode
   }
   int64_t getId() const { return m_id; }
 
-  inline std::ostream& operator<<(std::ostream& o) const;
-
   void addActiveTCPClient() { ++m_activeTCPClients; }
   void removeActiveTCPClient()
   {
@@ -109,9 +107,15 @@ class NetworkedNode
   bool isUdpPortSet() const { return m_udpPortSet; }
   bool isTcpPortSet() const { return m_tcpPortSet; }
 
-  ClusterNode& getClusterNode() const { return m_clusterNode; }
+  ClusterNode& getClusterNode() const { return *m_clusterNode; }
 
   private:
+  friend class ClusterNode;
+  void setClusterNode(ClusterNode& clusterNode)
+  {
+    m_clusterNode = &clusterNode;
+  }
+
   boost::asio::ip::udp::endpoint m_remoteUdpEndoint;
   boost::asio::ip::tcp::endpoint m_remoteTcpEndoint;
   int64_t m_id;
@@ -130,7 +134,7 @@ class NetworkedNode
   std::unique_ptr<net::Connection> m_connection;
   ConnectionReadyWaiter m_connectionReadyWaiter;
 
-  ClusterNode& m_clusterNode;
+  ClusterNode* m_clusterNode;
 };
 
 std::ostream&

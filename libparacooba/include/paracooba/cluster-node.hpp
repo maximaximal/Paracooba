@@ -314,11 +314,8 @@ class ClusterNode
   bool operator=(const ClusterNode& n) { return m_id == n.m_id; }
 };
 
-inline std::ostream&
-operator<<(std::ostream& o, const ClusterNode& c)
-{
-  return o << c.getName() << " (" << c.getId() << ")";
-}
+std::ostream&
+operator<<(std::ostream& o, const ClusterNode& c);
 }
 
 #endif
