@@ -10,6 +10,7 @@
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/utility/formatting_ostream.hpp>
 #include <boost/log/utility/manipulators/to_log.hpp>
+#include <boost/thread.hpp>
 #include <memory>
 #include <string>
 #include <thread>
@@ -21,7 +22,12 @@
 #endif
 
 template<typename T>
-using MutableConstant = boost::log::attributes::mutable_constant<T>;
+using MutableConstant =
+  boost::log::attributes::mutable_constant < T,
+  boost::shared_mutex,                // synchronization primitive
+  boost::unique_lock<boost::shared_mutex>,// exclusive lock type
+  boost::shared_lock<boost::shared_mutex> // shared lock type;
+  >;
 
 extern thread_local MutableConstant<int> lineAttr;
 extern thread_local MutableConstant<const char*> fileAttr;
