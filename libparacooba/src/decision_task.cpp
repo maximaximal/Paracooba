@@ -81,10 +81,16 @@ DecisionTask::execute()
     return std::make_unique<TaskResult>(TaskResult::DecisionMade);
   } else {
     PARACOOBA_LOG(*m_logger, Trace)
-      << "No decision made for path " << CNFTree::pathToStrNoAlloc(m_path);
+      << "No decision made for path " << CNFTree::pathToStrNoAlloc(m_path)
+      << ". Directly adding solve task to local runner";
 
-    m_factory->addPath(
-      m_path, TaskFactory::Solve, m_originator, m_optionalCube);
+    auto skel = std::make_unique<TaskSkeleton>(
+      TaskFactory::Solve, m_originator, m_path, m_optionalCube);
+    auto producedSolveTask = m_factory->produceSolveTask(std::move(skel));
+    m_runner->push(std::move(producedSolveTask.task),
+                   producedSolveTask.originator,
+                   producedSolveTask.priority,
+                   m_factory);
 
     return std::make_unique<TaskResult>(TaskResult::NoDecisionMade);
   }
