@@ -9,6 +9,7 @@ set(BUILD_URL "" CACHE STRING "Unique URL to identify this build.")
 set(VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}+${BUILD_NUMBER})
 
 option(DEBUG_ENABLE_ADDRESS_SANITIZER "enable address sanitizer (GCC)" OFF)
+option(DEBUG_ENABLE_BUILD_LOGALYZER "enable logalyzer tool to be built. Makes finding missed transfers easier" OFF)
 
 # Libraries
 find_package(Threads)
@@ -51,6 +52,11 @@ add_subdirectory(libparacooba)
 # Files
 add_subdirectory(src)
 add_subdirectory(test)
+
+# Logalyzer
+if(DEBUG_ENABLE_BUILD_LOGALYZER)
+    add_subdirectory(logalyzer)
+endif()
 
 # Basenames for logging
 # This macro has been taken from https://stackoverflow.com/a/27990434
