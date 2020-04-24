@@ -38,7 +38,7 @@ CNF::CNF(ConfigPtr config,
          LogPtr log,
          int64_t originId,
          ClusterNodeStore& clusterNodeStore,
-	 boost::asio::io_service& io_service,
+         boost::asio::io_service& io_service,
          std::string_view dimacsFile)
   : m_config(config)
   , m_originId(originId)
@@ -47,9 +47,9 @@ CNF::CNF(ConfigPtr config,
   , m_logger(log->createLogger("CNF"))
   , m_clusterNodeStore(clusterNodeStore)
   , m_cnfTree(std::make_unique<CNFTree>(log, *this, config, originId))
-  , m_acc_solvingTime(
-      boost::accumulators::tag::rolling_window::window_size =
-      CNFStatisticsNodeWindowSize * config->getUint32(Config::ThreadCount))
+  , m_acc_solvingTime(boost::accumulators::tag::rolling_window::window_size =
+                        CNFStatisticsNodeWindowSize *
+                        config->getUint32(Config::ThreadCount))
   , m_io_service(io_service)
 {
   if(dimacsFile != "") {
@@ -192,6 +192,9 @@ CNF::sendPath(NetworkedNodePtr nn,
 
   m_cnfTree->offloadNodeToRemote(p, nn);
 
+  PARACOOBA_LOG(m_logger, Trace)
+    << "Offload path " << CNFTree::pathToStdString(p) << " to node " << nn;
+
   messages::JobPath jp(p, skel.optionalCube);
   messages::JobDescription jd(m_originId);
   jd.insert(jp);
@@ -206,7 +209,7 @@ CNF::sendPath(NetworkedNodePtr nn,
           << id << "! Re-Add to local factory.";
         // Reset the task, so it is processed again!
         m_taskFactory->removeExternallyProcessedTask(p, id, true);
-	    }
+      }
     });
 }
 
@@ -289,7 +292,8 @@ jrStateToCNFTreeState(messages::JobResult::State s)
 }
 
 void
-CNF::receiveJobDescription(messages::JobDescription&& jd, std::shared_ptr<NetworkedNode> nn)
+CNF::receiveJobDescription(messages::JobDescription&& jd,
+                           std::shared_ptr<NetworkedNode> nn)
 {
   {
     std::unique_lock loggerLock(m_loggerMutex);
@@ -379,7 +383,7 @@ CNF::receiveJobDescription(messages::JobDescription&& jd, std::shared_ptr<Networ
               m_cuberRegistry->init(cuber::Registry::LiteralFrequency, &ji);
               m_cuberRegistry->getAllowanceMap() = ji.getAllowanceMap();
               break;
-	    case messages::JobInitiator::CaDiCaLCubes:
+            case messages::JobInitiator::CaDiCaLCubes:
               m_cuberRegistry->init(cuber::Registry::CaDiCaLCubes, &ji);
               break;
           }
@@ -625,17 +629,13 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     // The cuber registry may already have been created if this is a daemon
     // node. It can then just be re-used, as the daemon cuber registry did not
     // need the root node to be created.
-    m_cuberRegistry =
-      std::make_unique<cuber::Registry>(m_config, m_log, *this);
+    m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
 
-
-    if(!m_cuberRegistry->init(m, &ji))
-      {
-        PARACOOBA_LOG(m_logger, Fatal)
-          << "Could not initialise cuber registry!";
-        m_cuberRegistry.reset();
-        return res;
-      }
+    if(!m_cuberRegistry->init(m, &ji)) {
+      PARACOOBA_LOG(m_logger, Fatal) << "Could not initialise cuber registry!";
+      m_cuberRegistry.reset();
+      return res;
+    }
   }
 
   rootTaskReady.setReady(m_rootTask.get());
@@ -816,7 +816,9 @@ CNF::generateCubes(int depth)
   return m_rootTask->lookahead(depth);
 }
 
-bool CNF::shouldResplitCubes() {
+bool
+CNF::shouldResplitCubes()
+{
   return m_config->shouldResplitCubes();
 }
 }
