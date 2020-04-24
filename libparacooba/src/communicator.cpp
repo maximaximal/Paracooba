@@ -137,8 +137,9 @@ Communicator::run()
   if(m_config->autoDiscoveryEnabled()) {
     m_udpServer->startAccepting(*m_clusterStatistics,
                                 m_clusterStatistics->getThisNode());
-    m_tcpAcceptor->startAccepting();
-
+  }
+  m_tcpAcceptor->startAccepting();
+  if(m_config->autoDiscoveryEnabled()) {
     messages::Message announcementRequestMsg =
       m_udpServer->buildMessage(*m_config);
     messages::AnnouncementRequest announcementRequest(m_config->buildNode());
