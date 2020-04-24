@@ -193,7 +193,7 @@ CNF::sendPath(NetworkedNodePtr nn,
   m_cnfTree->offloadNodeToRemote(p, nn);
 
   PARACOOBA_LOG(m_logger, Trace)
-    << "Offload path " << CNFTree::pathToStdString(p) << " to node " << nn;
+    << "Offload path " << CNFTree::pathToStdString(p) << " to node " << *nn;
 
   messages::JobPath jp(p, skel.optionalCube);
   messages::JobDescription jd(m_originId);
@@ -298,7 +298,7 @@ CNF::receiveJobDescription(messages::JobDescription&& jd,
   {
     std::unique_lock loggerLock(m_loggerMutex);
     PARACOOBA_LOG(m_logger, Trace)
-      << "Received " << jd.tagline() << " from " << nn->getId();
+      << "Received " << jd.tagline() << " from " << *nn;
   }
   switch(jd.getKind()) {
     case messages::JobDescription::Kind::Path: {
@@ -655,7 +655,7 @@ CNF::handleFinishedResultReceived(const Result& result, NetworkedNode& nn)
     std::unique_lock loggerLock(m_loggerMutex);
     PARACOOBA_LOG(m_logger, Trace)
       << "Finished result received! State: " << result.state << " on path "
-      << CNFTree::pathToStrNoAlloc(result.p) << " from id " << nn.getId();
+      << CNFTree::pathToStrNoAlloc(result.p) << " from id " << nn;
   }
 
   // Insert result into local CNF Tree. The state change should only stay local,
