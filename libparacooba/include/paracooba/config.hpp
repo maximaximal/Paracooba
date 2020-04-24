@@ -170,6 +170,8 @@ class Config
   inline bool isDaemonMode() const { return m_daemonMode; }
   /** @brief Check if cubes should be resplit. */
   inline bool shouldResplitCubes() const { return m_resplitCubes; }
+  /** @brief Check if auto discovery is enabled. */
+  inline bool autoDiscoveryEnabled() const { return m_enableAutoDiscovery; }
 
   /** @brief Set debug mode active. */
   inline void setDebugMode(bool v) { m_debugMode = v; }
@@ -183,6 +185,8 @@ class Config
   inline void setStopping(bool v) { m_stopping = v; }
   /** @brief Resplit cubes if solving takes too long. */
   inline void setResplitCubes(bool v) { m_resplitCubes = v; }
+  /** @brief Set autodiscovery mode active. */
+  inline void setEnableAutoDiscovery(bool v) { m_enableAutoDiscovery = v; }
 
   /** @brief Check if STDOUT should be used for logging instead of CLOG. */
   inline bool useSTDOUTForLogging() const { return m_useSTDOUTForLogging; }
@@ -257,6 +261,7 @@ class Config
   boost::program_options::options_description m_optionsCommon;
   boost::program_options::options_description m_optionsFile;
 
+  bool m_enableAutoDiscovery = true;
   bool m_debugMode = false;
   bool m_networkDebugMode = false;
   bool m_infoMode = false;
@@ -265,8 +270,8 @@ class Config
   bool m_useSTDOUTForLogging = false;
   bool m_limitedTreeDump = true;
   bool m_stopping = false;
-  bool m_CaDiCaLCubes    = false;
-  bool m_resplitCubes    = false;
+  bool m_CaDiCaLCubes = false;
+  bool m_resplitCubes = false;
 #ifdef ENABLE_INTERNAL_WEBSERVER
   bool m_enableInternalWebserver = true;
 #else

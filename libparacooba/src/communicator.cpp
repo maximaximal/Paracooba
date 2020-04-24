@@ -125,25 +125,35 @@ Communicator::run()
     m_runner->start();
   }
 
-  m_udpServer->startAccepting(*m_clusterStatistics,
-                              m_clusterStatistics->getThisNode());
-  m_tcpAcceptor->startAccepting();
+  // Handle known remotes after startup.
+  Config::StringVector knownRemotes =
+    m_config->getStringVector(Config::KnownRemotes);
+  readRemotesFromEnvironment(knownRemotes);
 
-  messages::Message announcementRequestMsg =
-    m_udpServer->buildMessage(*m_config);
-  messages::AnnouncementRequest announcementRequest(m_config->buildNode());
-  announcementRequestMsg.insert(announcementRequest);
-  m_udpServer->broadcastMessage(announcementRequestMsg);
+  if(knownRemotes.size()) {
+    m_config->setEnableAutoDiscovery(false);
+  }
+
+  if(m_config->autoDiscoveryEnabled()) {
+    m_udpServer->startAccepting(*m_clusterStatistics,
+                                m_clusterStatistics->getThisNode());
+    m_tcpAcceptor->startAccepting();
+
+    messages::Message announcementRequestMsg =
+      m_udpServer->buildMessage(*m_config);
+    messages::AnnouncementRequest announcementRequest(m_config->buildNode());
+    announcementRequestMsg.insert(announcementRequest);
+    m_udpServer->broadcastMessage(announcementRequestMsg);
+  } else {
+    PARACOOBA_LOG(m_logger, Debug)
+      << "Auto Discovery disabled! Only known remotes are used. UDP packets "
+         "are ignored.";
+  }
 
   if(m_webserverInitiator) {
     m_ioService.post(
       std::bind(&webserver::Initiator::run, m_webserverInitiator.get()));
   }
-
-  // Handle known remotes after startup.
-  Config::StringVector knownRemotes =
-    m_config->getStringVector(Config::KnownRemotes);
-  readRemotesFromEnvironment(knownRemotes);
 
   if(knownRemotes.size() > 0) {
     m_ioService.post([this, &knownRemotes]() {
