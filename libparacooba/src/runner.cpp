@@ -157,7 +157,7 @@ Runner::worker(uint32_t workerId)
         entry->task->m_originator = entry->originator;
         entry->task->m_workerId = workerId;
 
-        auto factory {entry->task->m_factory};
+        auto factory{ entry->task->m_factory };
         m_currentlyRunningTasks[workerId] = entry->task.get();
         ++m_numberOfRunningTasks;
         TaskResultPtr result;
@@ -214,6 +214,7 @@ Runner::checkTaskFactories()
       }
     }
   }
+  conditionallySetAutoShutdownTimer();
 }
 void
 Runner::conditionallySetAutoShutdownTimer()
@@ -230,7 +231,7 @@ Runner::conditionallySetAutoShutdownTimer()
 
   m_autoShutdownArmed = true;
 
-  PARACOOBA_LOG(m_logger, LocalWarning) << "Starting automatic shutdown timer!";
+  PARACOOBA_LOG(m_logger, LocalWarning) << "Starting auto shutdown timer!";
 
   m_autoShutdownTimer.expires_from_now(std::chrono::seconds(seconds));
 
@@ -249,7 +250,7 @@ Runner::resetAutoShutdownTimer()
 
   m_autoShutdownArmed = false;
 
-  PARACOOBA_LOG(m_logger, LocalWarning) << "Auto-Shutdown Canceled.";
+  PARACOOBA_LOG(m_logger, LocalWarning) << "auto shutdown canceled.";
   m_autoShutdownTimer.cancel();
 }
 
