@@ -190,10 +190,10 @@ CNF::sendPath(NetworkedNodePtr nn,
   assert(CNFTree::getDepth(p) > 0);
   assert(rootTaskReady.isReady());
 
-  m_cnfTree->offloadNodeToRemote(p, nn);
-
   PARACOOBA_LOG(m_logger, Trace)
     << "Offload path " << CNFTree::pathToStdString(p) << " to node " << *nn;
+
+  m_cnfTree->offloadNodeToRemote(p, nn);
 
   messages::JobPath jp(p, skel.optionalCube);
   messages::JobDescription jd(m_originId);
@@ -340,7 +340,7 @@ CNF::receiveJobDescription(messages::JobDescription&& jd,
           std::unique_lock loggerLock(m_loggerMutex);
           PARACOOBA_LOG(m_logger, GlobalWarning)
             << "Result for path " << CNFTree::pathToStrNoAlloc(jr.getPath())
-            << " received from " << nn->getId()
+            << " received from " << *nn
             << " already inserted into results previously! Previous result "
                "state: "
             << res->state
