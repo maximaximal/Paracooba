@@ -195,6 +195,13 @@ class CNF
     m_taskFactory->addCubeOrSolvedPath(p, originator, optionalCube);
   }
 
+  // @brief return true if the taskfactory is empty (and more jobs should be
+  // produced)
+  bool isTaskFactoryNonEmpty()
+  {
+    return m_taskFactory && m_taskFactory->getSize() > 0;
+  }
+
   inline boost::asio::io_service& getIOService() { return m_io_service; }
 
   /** @brief Use CaDiCaL to generate cubes */
