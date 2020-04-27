@@ -10,6 +10,8 @@ set(VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_
 
 option(DEBUG_ENABLE_ADDRESS_SANITIZER "enable address sanitizer (GCC)" OFF)
 option(DEBUG_ENABLE_BUILD_LOGALYZER "enable logalyzer tool to be built. Makes finding missed transfers easier" OFF)
+option(DEBUG_ENABLE_CLANG_TIDY "enable clang-tidy check of source code" OFF)
+option(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX "allow clang-tidy to modify source files and automatically fix issues" OFF)
 
 # Libraries
 find_package(Threads)
@@ -31,6 +33,24 @@ if(NOT BOOST_BEAST_HEADER)
 else()
     message(STATUS "Found Boost Beast HTTP library. Enabling internal webserver.")
     set(BOOST_BEAST_AVAILABLE TRUE)
+endif()
+
+find_program(
+    CLANG_TIDY_EXE
+    NAMES "clang-tidy"
+    DOC "Path to clang-tidy executable"
+)
+if(NOT CLANG_TIDY_EXE)
+    message(STATUS "clang-tidy not found.")
+else()
+    message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE} - Enable checking with -DDEBUG_ENABLE_CLANG_TIDY=ON in CMake. Warning: Compilation Overhead!")
+    
+    set(CLANG_TIDY_ARG_FIX "")
+    if(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX)
+        set(CLANG_TIDY_ARG_FIX "-fix")
+    endif()
+
+    set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" ${CLANG_TIDY_ARG_FIX} "-checks=*,-clang-analyzer-alpha.*,-llvm-namespace-comment,-google-readability-namespace-comments,-fuchsia*,-modernize-use-trailing-return-type,-hicpp-no-array-decay,-cppcoreguidelines-*,-modernize-use-equals-default,-*braces-around-statements,-hicpp-avoid-goto,-modernize-concat-nested-namespaces,-readability-implicit-bool-conversion")
 endif()
 
 # Add Catch2 unit testing framework.
@@ -86,6 +106,24 @@ define_file_basename_for_sources(parac)
 target_link_libraries(parac PUBLIC paracooba)
 target_link_libraries(parac PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(parac PUBLIC Boost::log Boost::program_options)
+
+if(CLANG_TIDY_EXE AND DEBUG_ENABLE_CLANG_TIDY)
+    set_target_properties(
+        paracooba PROPERTIES
+        CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
+    )
+    set_target_properties(
+        parac PROPERTIES
+        CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
+    )
+
+    if(DEBUG_ENABLE_BUILD_LOGALYZER)
+        set_target_properties(
+            parac_logalyzer PROPERTIES
+            CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
+        )
+    endif()
+endif()
 target_include_directories(parac PUBLIC ${libcadical_INCLUDE_DIRS})
 
 # Installation logic.
