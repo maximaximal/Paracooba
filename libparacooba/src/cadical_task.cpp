@@ -39,6 +39,7 @@ CaDiCaLTask::CaDiCaLTask(const CaDiCaLTask& other)
   , m_cadicalMgr(other.m_cadicalMgr)
   , m_autoStopTimer(other.m_cnf->getIOService())
   , m_io_service(other.m_cnf->getIOService())
+  , fastSplit(other.fastSplit)
 {
   copyFromCaDiCaLTask(other);
   m_name = "CaDiCaL Task (copied)";
@@ -62,6 +63,7 @@ CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
   , m_cadicalMgr(other.m_cadicalMgr)
   , m_autoStopTimer(other.m_io_service)
   , m_io_service(other.m_io_service)
+  , fastSplit(other.fastSplit)
 {
   m_terminator->setCaDiCaLTask(this);
   m_name = "CaDiCaL Task (moved)";
@@ -241,7 +243,7 @@ CaDiCaLTask::execute()
 
   if(m_mode & Mode::Solve) {
     std::chrono::duration<double> average_time = std::chrono::duration_cast<std::chrono::milliseconds>(m_cnf->averageSolvingTime());
-    fastSplit = fastSplit && !m_cnf->isTaskFactoryNonEmpty();
+    fastSplit = (fastSplit && !m_cnf->isTaskFactoryNonEmpty());
     const int multiplication_factor = fastSplit ? 1 : 3;
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       average_time * multiplication_factor);
