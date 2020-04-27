@@ -253,7 +253,7 @@ CaDiCaLTask::execute()
 
     m_interrupt_solving = false;
     if(m_cnf->shouldResplitCubes() &&
-       CNFTree::getDepth(m_path) < CNFTree::maxPathDepth) {
+       CNFTree::getDepth(m_path) < CNFTree::maxPathDepth - 1) {
       m_autoStopTimer.expires_from_now(duration);
       m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
         std::lock_guard lock(m_solverMutex);
@@ -380,7 +380,11 @@ CaDiCaLTask::resplit_depth(Path path, Cube literals,
 
   std::vector<std::pair<Path, Cube>> cubes{resplit_once(path, literals)};
 
-  for(int i = 0; i < depth && !m_interrupt_solving; ++i) {
+  auto path_depth = 1 + CNFTree::getDepth(path);
+  for(int i = path_depth;
+      i < depth && i < CNFTree::maxPathDepth - 1 &&
+        !m_interrupt_solving;
+      ++i) {
     PARACOOBA_LOG((*m_logger), Cubes)
       << "Cubing path " << CNFTree::pathToStrNoAlloc(path) << " at depth "
       << i;
