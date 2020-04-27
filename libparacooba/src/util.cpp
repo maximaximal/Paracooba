@@ -12,7 +12,8 @@ BytePrettyPrint(size_t bytes)
   const char* suffixArr[] = { "B", "kiB", "MiB", "GiB", "TiB", "PiB" };
   return std::to_string(
            (size_t)std::round(std::pow(1024, base - std::floor(base)))) +
-         suffixArr[(size_t)std::floor(base)];
+         suffixArr[(size_t)std::floor(base)] + " (=" + std::to_string(bytes) +
+         " BYTES)";
 }
 
 std::shared_ptr<CNF>
