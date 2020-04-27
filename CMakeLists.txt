@@ -11,7 +11,7 @@ set(VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_
 option(DEBUG_ENABLE_ADDRESS_SANITIZER "enable address sanitizer (GCC)" OFF)
 option(DEBUG_ENABLE_BUILD_LOGALYZER "enable logalyzer tool to be built. Makes finding missed transfers easier" OFF)
 option(DEBUG_ENABLE_CLANG_TIDY "enable clang-tidy check of source code" OFF)
-option(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX "allow clang-tidy to modify source files and automatically fix issues" OFF)
+option(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX "allow clang-tidy to modify source files and automatically fix issues. Very likely leads to uncompilable code, use selectively." OFF)
 
 # Libraries
 find_package(Threads)
@@ -51,6 +51,13 @@ else()
     endif()
 
     set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" ${CLANG_TIDY_ARG_FIX} "-checks=*,-clang-analyzer-alpha.*,-llvm-namespace-comment,-google-readability-namespace-comments,-fuchsia*,-modernize-use-trailing-return-type,-hicpp-no-array-decay,-cppcoreguidelines-*,-modernize-use-equals-default,-*braces-around-statements,-hicpp-avoid-goto,-modernize-concat-nested-namespaces,-readability-implicit-bool-conversion")
+endif()
+
+find_program(CCACHE_PROGRAM ccache)
+# Speed up compilations using ccache.
+if(CCACHE_PROGRAM)
+    message(STATUS "Found ccache at ${CCACHE_PROGRAM} - using it to speed up compilations.")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
 endif()
 
 # Add Catch2 unit testing framework.
