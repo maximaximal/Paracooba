@@ -149,6 +149,7 @@ class CaDiCaLTask : public Task
   boost::asio::steady_timer m_autoStopTimer;
   boost::asio::io_service& m_io_service;
   std::mutex m_solverMutex;
+  bool fastSplit = true;
 };
 
 inline CaDiCaLTask::Mode
