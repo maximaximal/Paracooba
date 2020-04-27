@@ -277,7 +277,7 @@ CaDiCaLTask::execute()
       << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
          1'000 * (end - start))).count()
       << "ms.";
-    if(!fastSplit) {
+    if(!fastSplit || solveResult != 0) {
       auto solving_duration =
         std::chrono::duration_cast<std::chrono::milliseconds>((end - start));
       m_cnf->update_averageSolvingTime(std::chrono::duration<double>(solving_duration));
