@@ -393,6 +393,7 @@ CaDiCaLTask::resplit_depth(Path path, Cube literals,
       << "Cubing path " << CNFTree::pathToStrNoAlloc(path) << " at depth "
       << i;
     auto cubes2{std::move(cubes)};
+    cubes.clear();
     for(auto&& [p, cube] : cubes2) {
       m_cnf->getCNFTree().setStateFromLocal(p, CNFTree::Working);
       for(auto &&pcube : resplit_once(p, cube))
