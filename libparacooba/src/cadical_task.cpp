@@ -242,7 +242,7 @@ CaDiCaLTask::execute()
   if(m_mode & Mode::Solve) {
     std::chrono::duration<double> average_time = std::chrono::duration_cast<std::chrono::milliseconds>(m_cnf->averageSolvingTime());
     const bool fastSplit = !m_cnf->isTaskFactoryNonEmpty();
-    const int multiplication_factor = fastSplit ? 3 : 1;
+    const int multiplication_factor = fastSplit ? 1 : 3;
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       average_time * multiplication_factor);
     PARACOOBA_LOG((*m_logger), Trace)
@@ -277,7 +277,11 @@ CaDiCaLTask::execute()
       << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
          1'000 * (end - start))).count()
       << "ms.";
-    m_cnf->update_averageSolvingTime(std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>((end - start))));
+    if(!fastSplit) {
+      auto solving_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>((end - start));
+      m_cnf->update_averageSolvingTime(std::chrono::duration<double>(solving_duration));
+    }
 
     if(!m_interrupt_solving) {
       PARACOOBA_LOG((*m_logger), Trace)
