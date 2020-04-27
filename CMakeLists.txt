@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.9)
 project(paracooba
     VERSION 0.1.0)
 
@@ -13,8 +13,18 @@ option(DEBUG_ENABLE_BUILD_LOGALYZER "enable logalyzer tool to be built. Makes fi
 option(DEBUG_ENABLE_CLANG_TIDY "enable clang-tidy check of source code" OFF)
 option(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX "allow clang-tidy to modify source files and automatically fix issues. Very likely leads to uncompilable code, use selectively." OFF)
 
+option(ENABLE_TESTS "enable building and integrating unit tests" ON)
+
 # Libraries
 find_package(Threads)
+
+# Enable LTO.
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported_result)
+if(ipo_supported_result)
+    message(STATUS "LTO supported. Enable Link Time Optimization on all targets.")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
 
 # Ubuntu standard package is lame.
 # set(Boost_USE_STATIC_LIBS ON)
@@ -61,9 +71,11 @@ if(CCACHE_PROGRAM)
 endif()
 
 # Add Catch2 unit testing framework.
-include(CTest)
-include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/catch/Catch2-2.9.2/contrib/Catch.cmake)
-enable_testing()
+if(ENABLE_TESTS)
+    include(CTest)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/catch/Catch2-2.9.2/contrib/Catch.cmake)
+    enable_testing()
+endif()
 
 add_subdirectory(third_party)
 
@@ -78,7 +90,10 @@ add_subdirectory(libparacooba)
 
 # Files
 add_subdirectory(src)
-add_subdirectory(test)
+
+if(ENABLE_TESTS)
+    add_subdirectory(test)
+endif()
 
 # Logalyzer
 if(DEBUG_ENABLE_BUILD_LOGALYZER)
@@ -131,6 +146,7 @@ if(CLANG_TIDY_EXE AND DEBUG_ENABLE_CLANG_TIDY)
         )
     endif()
 endif()
+
 target_include_directories(parac PUBLIC ${libcadical_INCLUDE_DIRS})
 
 # Installation logic.
