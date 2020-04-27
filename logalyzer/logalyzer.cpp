@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include <stdlib.h>
+
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 
@@ -18,30 +20,37 @@ using std::endl;
 // Developed using
 
 #define LOGENTRY_REGEX \
-  R"(^\[([a-zA-Z0-9_.:\ -]+)\] \[([a-zA-Z.;0-9]+)\] " \
-    "\[[\^\[0-9;m]*([A-Z]+)[\^\[0-9m]*\] \[(\w+)\] \[(.*)\] (.*))"
+  R"(\[([a-zA-Z0-9_.:\ -]+)\] \[([a-zA-Z.;0-9]+)\] \[[\^\[0-9;m]*([A-Z]+)[\^\[0-9m]*\] \[(\w+)\] \[(.*)\] (.*))"
 
 template<typename StringContainer = std::string_view>
 class LogEntry
 {
   public:
-  LogEntry()
-    : rgx(LOGENTRY_REGEX)
-  {}
+  LogEntry() {}
   ~LogEntry() {}
+
+  /// Cosntruct from string_view based entry.
+  LogEntry(const LogEntry<std::string_view>& o)
+    : datetime(o.datetime)
+    , host(o.host)
+    , severity(o.severity)
+    , thread(o.thread)
+    , logger(o.logger)
+    , msg(o.msg)
+  {}
 
   bool parseLogLine(const std::string& line)
   {
-    auto rit = boost::cregex_token_iterator(
-      line.data(), line.data() + line.length(), rgx, 6);
-    auto rend = boost::cregex_token_iterator();
-
-    while(rit != rend) {
-      cout << "Matched: " << *rit << endl;
-      ++rit;
+    if(boost::regex_search(line, result, rgx)) {
+      datetime = StringContainer(result[1].first.base(), result[1].length());
+      host = StringContainer(result[2].first.base(), result[2].length());
+      severity = StringContainer(result[3].first.base(), result[3].length());
+      thread = StringContainer(result[4].first.base(), result[4].length());
+      logger = StringContainer(result[5].first.base(), result[5].length());
+      msg = StringContainer(result[6].first.base(), result[6].length());
+      return true;
     }
-
-    return true;
+    return false;
   }
 
   StringContainer datetime;
@@ -51,8 +60,12 @@ class LogEntry
   StringContainer logger;
   StringContainer msg;
 
-  boost::regex rgx;
+  boost::regex rgx = boost::regex(LOGENTRY_REGEX);
+  boost::smatch result;
 };
+
+using LogEntryRef = LogEntry<std::string_view>;
+using LogEntryVal = LogEntry<std::string>;
 
 class LogLineProducer
 {
@@ -111,6 +124,89 @@ class LogLineProducer
   std::ifstream m_currentIfstream;
 };
 
+class Node
+{
+  public:
+  Node() = default;
+  ~Node() = default;
+
+  template<typename LogEntry>
+  bool operator()(const LogEntry& entry)
+  {
+    return true;
+  }
+
+  private:
+};
+
+class NodeStats
+{
+  public:
+  NodeStats() = default;
+  ~NodeStats() = default;
+
+  template<typename LogEntry>
+  bool operator()(const LogEntry& entry)
+  {
+    // Initialization logic
+    if(entry.logger == "main") {
+      if(boost::regex_search(std::string(entry.msg), m_result, m_nameIdRgx)) {
+        map(std::strtoul(m_result[1].str().c_str(), NULL, 0),
+            std::string(entry.host));
+      }
+    }
+
+    // Handling of node specific stuff.
+    Node* n;
+    if(!getFromMap(entry.host, &n))
+      return false;
+
+    return true;
+  }
+
+  bool getFromMap(const std::string_view& view, Node** node)
+  {
+    auto it = m_nameIdMap.find(view);
+    if(it == m_nameIdMap.end())
+      return false;
+    return getFromMap(it->second, node);
+  }
+  bool getFromMap(const std::string& name, Node** node)
+  {
+    auto it = m_nameIdMap.find(name);
+    if(it == m_nameIdMap.end())
+      return false;
+    return getFromMap(it->second, node);
+  }
+  bool getFromMap(uint64_t id, Node** node)
+  {
+    *node = &m_nodes[id];
+    return true;
+  }
+  bool map(uint64_t id, const std::string& name)
+  {
+    auto it = m_nameIdMap.find(name);
+    if(it != m_nameIdMap.end()) {
+      if(it->second != id) {
+        cerr << "ID Conflict! Previously, " << name << " was ID " << it->second
+             << ". Now, " << id << "!";
+        return false;
+      }
+      return true;
+    }
+    m_nameIdMap.insert({ name, id });
+    std::cerr << "New host mapping: " << name << " -> " << id << endl;
+    return true;
+  }
+
+  private:
+  std::map<uint64_t, Node> m_nodes;
+  std::map<std::string, uint64_t, std::less<>> m_nameIdMap;
+
+  boost::regex m_nameIdRgx = boost::regex(R"(= ([0-9]*))");
+  boost::smatch m_result;
+};
+
 int
 main(int argc, char* argv[])
 {
@@ -151,11 +247,13 @@ main(int argc, char* argv[])
 
   LogLineProducer producer(files);
 
-  LogEntry entry;
+  LogEntryRef entry;
+  NodeStats stats;
+
   std::string line;
   while(producer.nextLine(line)) {
     if(entry.parseLogLine(line)) {
-      cout << entry.logger << endl;
+      stats(entry);
     }
   }
 }
