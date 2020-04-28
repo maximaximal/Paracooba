@@ -734,7 +734,7 @@ Connection::initRemoteNN()
     auto nn = node.getNetworkedNodePtr();
     remoteNN() = nn;
 
-    PARACOOBA_LOG(logger(), NetTrace)
+    PARACOOBA_LOG(logger(), Trace)
       << "Initiated Remote NN, connection established.";
 
     if(inserted) {
