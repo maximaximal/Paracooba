@@ -18,20 +18,25 @@ UDPServer::State::State(boost::asio::io_service& ioService,
                         ConfigPtr config,
                         LogPtr log,
                         messages::MessageReceiver& messageReceiver)
-  : socket(ioService, endpoint)
+  : socket(ioService)
   , config(config)
   , broadcastEndpoint(broadcastEndpoint)
   , logger(log->createLogger("UDPServer"))
   , messageReceiver(messageReceiver)
 {
-  socket.set_option(boost::asio::socket_base::broadcast(true));
+  if(config->autoDiscoveryEnabled()) {
+    socket.bind(endpoint);
+    socket.set_option(boost::asio::socket_base::broadcast(true));
+  }
 }
 
 UDPServer::State::~State()
 {
-  PARACOOBA_LOG(logger, Trace)
-    << "UDPServer at " << socket.local_endpoint() << ":"
-    << " stopped.";
+  if(config->autoDiscoveryEnabled()) {
+    PARACOOBA_LOG(logger, Trace)
+      << "UDPServer at " << socket.local_endpoint() << ":"
+      << " stopped.";
+  }
 }
 
 UDPServer::UDPServer(boost::asio::io_service& ioService,
@@ -53,6 +58,8 @@ void
 UDPServer::startAccepting(ClusterNodeStore& clusterNodeStore,
                           ClusterNode& thisNode)
 {
+  assert(config()->autoDiscoveryEnabled());
+
   m_state->clusterNodeStore = &clusterNodeStore;
   m_state->thisNode = &thisNode;
 
@@ -69,6 +76,7 @@ UDPServer::startAccepting(ClusterNodeStore& clusterNodeStore,
 void
 UDPServer::accept()
 {
+  assert(config()->autoDiscoveryEnabled());
   recvStreambuf().consume(recvStreambuf().size() + 1);
   (*this)(boost::system::error_code(), 0);
 }
@@ -79,6 +87,7 @@ void
 UDPServer::operator()(const boost::system::error_code& ec,
                       size_t bytes_received)
 {
+  assert(config()->autoDiscoveryEnabled());
   enrichLogger();
 
   if(!ec || ec == boost::asio::error::message_size) {
@@ -134,6 +143,12 @@ UDPServer::transmitMessage(const messages::Message& msg,
                            NetworkedNode& nn,
                            SuccessCB successCB)
 {
+  if(!config()->autoDiscoveryEnabled()) {
+    PARACOOBA_LOG(logger(), LocalError)
+      << "Cannot send from UDP Server when UDP is disabled!";
+    return;
+  }
+
   if(!nn.isUdpPortSet() || !nn.isUdpEndpointSet()) {
     if(successCB) {
       successCB(false);
@@ -148,6 +163,11 @@ UDPServer::transmitMessage(const messages::Message& msg,
 void
 UDPServer::broadcastMessage(const messages::Message& msg, SuccessCB successCB)
 {
+  if(!config()->autoDiscoveryEnabled()) {
+    PARACOOBA_LOG(logger(), LocalError)
+      << "Cannot broadcast from UDP Server when UDP is disabled!";
+    return;
+  }
   transmitMessageToEndpoint(msg, broadcastEndpoint(), successCB);
 }
 
@@ -156,6 +176,13 @@ UDPServer::transmitMessageToEndpoint(const messages::Message& msg,
                                      boost::asio::ip::udp::endpoint target,
                                      SuccessCB sendFinishedCB)
 {
+  if(!config()->autoDiscoveryEnabled()) {
+    PARACOOBA_LOG(logger(), LocalError)
+      << "Cannot transmit message to endpoint from UDP Server when UDP is "
+         "disabled!";
+    return;
+  }
+
   std::lock_guard lock(sendMutex());
   std::ostream sendOstream(&sendStreambuf());
   cereal::BinaryOutputArchive oarchive(sendOstream);

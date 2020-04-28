@@ -106,6 +106,15 @@ Communicator::run()
 {
   using namespace boost::asio;
 
+  // Handle known remotes after startup.
+  Config::StringVector knownRemotes =
+    m_config->getStringVector(Config::KnownRemotes);
+  readRemotesFromEnvironment(knownRemotes);
+
+  if(knownRemotes.size()) {
+    m_config->setEnableAutoDiscovery(false);
+  }
+
   m_control->setJobDescriptionReceiverProvider(
     getJobDescriptionReceiverProvider());
 
@@ -123,15 +132,6 @@ Communicator::run()
   }
   if(!m_runner->isRunning()) {
     m_runner->start();
-  }
-
-  // Handle known remotes after startup.
-  Config::StringVector knownRemotes =
-    m_config->getStringVector(Config::KnownRemotes);
-  readRemotesFromEnvironment(knownRemotes);
-
-  if(knownRemotes.size()) {
-    m_config->setEnableAutoDiscovery(false);
   }
 
   if(m_config->autoDiscoveryEnabled()) {
