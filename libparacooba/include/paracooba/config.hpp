@@ -204,7 +204,7 @@ class Config
   /** @brief Check if automatic TCP port assignment is enabled. */
   inline bool isTCPAutoPortAssignmentEnabled() const
   {
-    return m_enableTCPAutoPortAssignment;
+    return !m_disableTCPAutoPortAssignment;
   }
 
   /** @brief Check if CaDiCaL should be used to cube formulas. */
@@ -267,7 +267,7 @@ class Config
   boost::program_options::options_description m_optionsFile;
 
   bool m_enableAutoDiscovery = true;
-  bool m_enableTCPAutoPortAssignment = true;
+  bool m_disableTCPAutoPortAssignment = true;
   bool m_debugMode = false;
   bool m_networkDebugMode = false;
   bool m_infoMode = false;

@@ -21,6 +21,7 @@ TCPAcceptor::State::State(
   messages::JobDescriptionReceiverProvider& jdReceiverProvider)
   : ioService(ioService)
   , acceptor(ioService, endpoint.protocol())
+  , endpoint(endpoint)
   , log(log)
   , logger(log->createLogger("TCPAcceptor"))
   , config(config)
@@ -33,6 +34,7 @@ TCPAcceptor::State::State(
         port < std::numeric_limits<decltype(port)>::max();
         ++port) {
       endpoint.port(port);
+      this->endpoint = endpoint;
       config->set(Config::TCPListenPort, port);
 
       PARACOOBA_LOG(logger, NetTrace)
@@ -41,6 +43,7 @@ TCPAcceptor::State::State(
 
       boost::system::error_code ec;
       acceptor.bind(endpoint, ec);
+      acceptor.listen();
       if(!ec) {
         // Successfully bound!
         return;
@@ -59,6 +62,7 @@ TCPAcceptor::State::State(
     throw std::runtime_error("No free TCP port found!");
   } else {
     acceptor.bind(endpoint);
+    acceptor.listen();
   }
 }
 
@@ -117,7 +121,8 @@ TCPAcceptor::operator()(const boost::system::error_code& ec)
         if(!newConnection())
           makeNewConnection();
 
-        yield acceptor().async_accept(newConnection()->socket(), *this);
+        yield acceptor().async_accept(
+          newConnection()->socket(), endpoint(), *this);
 
         newConnection()->socket().non_blocking(true);
 
