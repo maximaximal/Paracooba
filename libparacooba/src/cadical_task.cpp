@@ -530,7 +530,7 @@ CaDiCaLTask::lookahead(int depth)
         m_interrupt_solving = true;
       }
     });
-  auto cubes {m_solver->generate_cubes(depth)};
+  auto cubes {m_solver->generate_cubes(depth, depth / 2)};
   m_autoStopTimer.cancel();
   m_interrupt_solving = false;
   if(cubes.status == 20)
