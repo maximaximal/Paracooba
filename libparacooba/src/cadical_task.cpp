@@ -206,6 +206,7 @@ CaDiCaLTask::execute()
 
   TaskResult::Status status;
   if(m_mode & Parse) {
+    fastSplit = true;
     if(!boost::filesystem::exists(m_sourcePath)) {
       return std::move(std::make_unique<TaskResult>(TaskResult::MissingInputs));
     }

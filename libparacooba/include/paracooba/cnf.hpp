@@ -184,7 +184,6 @@ class CNF
   {
     using namespace std::chrono_literals;
     std::unique_lock<std::mutex> lock(m_acc_solvingTimeMutex);
-    auto avg = boost::accumulators::rolling_mean(m_acc_solvingTime);
     m_acc_solvingTime(t);
   }
 
