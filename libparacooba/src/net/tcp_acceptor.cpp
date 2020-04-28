@@ -1,10 +1,13 @@
 #include "../../include/paracooba/net/tcp_acceptor.hpp"
 #include "../../include/paracooba/cluster-node-store.hpp"
 #include "../../include/paracooba/cluster-node.hpp"
+#include "../../include/paracooba/config.hpp"
 #include "../../include/paracooba/net/connection.hpp"
 #include "../../include/paracooba/networked_node.hpp"
 #include <boost/system/error_code.hpp>
+#include <limits>
 #include <pthread.h>
+#include <stdexcept>
 
 namespace paracooba {
 namespace net {
@@ -17,14 +20,43 @@ TCPAcceptor::State::State(
   messages::MessageReceiver& msgReceiver,
   messages::JobDescriptionReceiverProvider& jdReceiverProvider)
   : ioService(ioService)
-  , acceptor(ioService, endpoint)
+  , acceptor(ioService)
   , log(log)
   , logger(log->createLogger("TCPAcceptor"))
   , config(config)
   , clusterNodeStore(clusterNodeStore)
   , msgReceiver(msgReceiver)
   , jdReceiverProvider(jdReceiverProvider)
-{}
+{
+  if(config->isTCPAutoPortAssignmentEnabled()) {
+    for(auto port = endpoint.port();
+        port < std::numeric_limits<decltype(port)>::max();
+        ++port) {
+      endpoint.port(port);
+
+      PARACOOBA_LOG(logger, NetTrace)
+        << "Automatic TCP port assignment is enabled. Now trying endpoint "
+        << endpoint;
+
+      boost::system::error_code ec;
+      acceptor.bind(endpoint, ec);
+      if(!ec) {
+        // Successfully bound!
+        return;
+      }
+
+      if(ec == boost::asio::error::address_in_use) {
+        PARACOOBA_LOG(logger, NetTrace)
+          << "Local endpoint " << endpoint
+          << " was already in use! Incrementing port.";
+      }
+    }
+
+    throw std::runtime_error("No free TCP port found!");
+  } else {
+    acceptor.bind(endpoint);
+  }
+}
 
 TCPAcceptor::State::~State()
 {

@@ -201,6 +201,11 @@ class Config
   inline bool isLimitedTreeDumpActive() const { return m_limitedTreeDump; }
   /** @brief Check if this Paracooba instance is currently shutting down. */
   inline bool isStopping() const { return m_stopping; }
+  /** @brief Check if automatic TCP port assignment is enabled. */
+  inline bool isTCPAutoPortAssignmentEnabled() const
+  {
+    return m_enableTCPAutoPortAssignment;
+  }
 
   /** @brief Check if CaDiCaL should be used to cube formulas. */
   inline bool useCaDiCaLCubes() { return m_CaDiCaLCubes; }
@@ -262,6 +267,7 @@ class Config
   boost::program_options::options_description m_optionsFile;
 
   bool m_enableAutoDiscovery = true;
+  bool m_enableTCPAutoPortAssignment = true;
   bool m_debugMode = false;
   bool m_networkDebugMode = false;
   bool m_infoMode = false;

@@ -127,6 +127,7 @@ Config::Config()
     ("enable-client-cadical", po::bool_switch(&m_enableClientCaDiCaL)->default_value(false)->value_name("bool"), "direct solving via CaDiCaL on client")
     ("enable-internal-webserver", po::bool_switch(&m_enableInternalWebserver)->default_value(false)->value_name("bool"), "enable internal webserver to see debugging, diagnostics and status information")
     ("enable-autodiscovery", po::bool_switch(&m_enableAutoDiscovery)->default_value(true)->value_name("bool"), "enable auto discovery via UDP broadcasts. Gets deactivated if --known-remotes is used or if nodes are added via envvars.")
+    ("enable-tcp-auto-port-assignment", po::bool_switch(&m_enableTCPAutoPortAssignment)->default_value(true)->value_name("bool"), "enable automatic port assignment for TCP listen port. Can be handy if many nodes are started on same host. Tries binds until it succeeds (or reaches limit of 65535).")
     (GetConfigNameFromEnum(Config::LogToSTDOUT), po::bool_switch(&m_useSTDOUTForLogging)->default_value(false)->value_name("bool"), "use stdout for logging")
     (GetConfigNameFromEnum(Config::LimitedTreeDump), po::bool_switch(&m_limitedTreeDump)->default_value(true)->value_name("bool"), "Limit tree dumping to only contain unvisited and unknown nodes, do not further explore known results")
     (GetConfigNameFromEnum(Config::CaDiCaLCubes),
@@ -284,7 +285,7 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::DumpTreeAtExit);
   conditionallySetConfigOptionToArray<uint16_t>(
-     vm, m_config.data(), Config::InitialCubeDepth);
+    vm, m_config.data(), Config::InitialCubeDepth);
 
   if(vm.count(GetConfigNameFromEnum(Id))) {
     m_config[Id] = generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());
