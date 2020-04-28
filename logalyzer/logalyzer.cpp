@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include <stdlib.h>
+#include <charconv>
 
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
@@ -48,6 +48,16 @@ class LogEntry
       thread = StringContainer(result[4].first.base(), result[4].length());
       logger = StringContainer(result[5].first.base(), result[5].length());
       msg = StringContainer(result[6].first.base(), result[6].length());
+
+      size_t ctxStartPos = logger.find('<');
+      if(ctxStartPos != std::string::npos) {
+        ctx = StringContainer(logger.begin() + ctxStartPos + 1,
+                              logger.size() - ctxStartPos - 2);
+        logger = StringContainer(logger.begin(), ctxStartPos);
+        hasCtx = true;
+      } else {
+        hasCtx = false;
+      }
       return true;
     }
     return false;
@@ -60,12 +70,42 @@ class LogEntry
   StringContainer logger;
   StringContainer msg;
 
+  StringContainer ctx;
+  bool hasCtx;
+
   boost::regex rgx = boost::regex(LOGENTRY_REGEX);
   boost::smatch result;
 };
 
 using LogEntryRef = LogEntry<std::string_view>;
 using LogEntryVal = LogEntry<std::string>;
+
+template<typename T>
+bool
+toNumber(const std::string_view& view, T& number)
+{
+  if(auto [p, ec] =
+       std::from_chars(view.data(), view.data() + view.size(), number);
+     ec == std::errc()) {
+    return true;
+  }
+  return false;
+}
+
+bool
+extractBytes(std::string_view view, uint64_t& bytes)
+{
+  auto pos = view.find("(=");
+  if(pos == std::string::npos)
+    return false;
+
+  pos += 2;
+  auto posAfter = view.find(' ', pos);
+  if(posAfter == std::string::npos)
+    return false;
+
+  return toNumber(view.substr(pos, posAfter - pos), bytes);
+}
 
 class LogLineProducer
 {
@@ -124,6 +164,9 @@ class LogLineProducer
   std::ifstream m_currentIfstream;
 };
 
+class Connection
+{};
+
 class Node
 {
   public:
@@ -133,10 +176,16 @@ class Node
   template<typename LogEntry>
   bool operator()(const LogEntry& entry)
   {
+    if(entry.logger == "Connection") {
+      uint64_t bytes;
+      extractBytes(entry.msg, bytes);
+    }
+
     return true;
   }
 
   private:
+  std::map<uint64_t, Connection> m_connections;
 };
 
 class NodeStats
@@ -159,6 +208,9 @@ class NodeStats
     // Handling of node specific stuff.
     Node* n;
     if(!getFromMap(entry.host, &n))
+      return false;
+
+    if(!(*n)(entry))
       return false;
 
     return true;
@@ -253,7 +305,9 @@ main(int argc, char* argv[])
   std::string line;
   while(producer.nextLine(line)) {
     if(entry.parseLogLine(line)) {
-      stats(entry);
+      if(!stats(entry)) {
+        cerr << "   -- Error! Continuing." << endl;
+      }
     }
   }
 }
