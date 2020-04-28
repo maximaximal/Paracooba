@@ -43,9 +43,9 @@ TCPAcceptor::State::State(
 
       boost::system::error_code ec;
       acceptor.bind(endpoint, ec);
-      acceptor.listen();
       if(!ec) {
         // Successfully bound!
+        acceptor.listen();
         return;
       }
 
