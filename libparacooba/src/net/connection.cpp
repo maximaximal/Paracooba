@@ -619,12 +619,13 @@ Connection::receiveSerializedMessage(size_t bytes_received)
           jd.getOriginatorID());
       if(receiver) {
         if(auto nn = remoteNN().lock()) {
+          auto kind = jd.getKind();
           receiver->receiveJobDescription(std::move(jd), nn);
 
           if(context()) {
             // This is a connection between a Master and a Daemon. So the
             // context for this formula can be notified of this JD.
-            switch(jd.getKind()) {
+            switch(kind) {
               case messages::JobDescription::Initiator:
                 context()->start(Daemon::Context::State::AllowanceMapReceived);
                 break;
@@ -741,7 +742,13 @@ Connection::initRemoteNN()
         // The side with specified remote is the one that originally started the
         // connection. This makes it also the side that now sends an
         // announcement request.
-        nn->announcementRequest(*config(), *nn);
+        //
+        // The message must be built locally and not be sent using the
+        // NetworkedNode, because the networked node is to be activated outside
+        // of this function.
+        messages::Message msg(config()->getId());
+        msg.insert(messages::AnnouncementRequest(config()->buildNode()));
+        sendMessage(msg);
       }
     }
     return true;
