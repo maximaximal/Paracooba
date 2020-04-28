@@ -20,7 +20,7 @@ TCPAcceptor::State::State(
   messages::MessageReceiver& msgReceiver,
   messages::JobDescriptionReceiverProvider& jdReceiverProvider)
   : ioService(ioService)
-  , acceptor(ioService)
+  , acceptor(ioService, endpoint.protocol())
   , log(log)
   , logger(log->createLogger("TCPAcceptor"))
   , config(config)
@@ -33,6 +33,7 @@ TCPAcceptor::State::State(
         port < std::numeric_limits<decltype(port)>::max();
         ++port) {
       endpoint.port(port);
+      config->set(Config::TCPListenPort, port);
 
       PARACOOBA_LOG(logger, NetTrace)
         << "Automatic TCP port assignment is enabled. Now trying endpoint "
@@ -49,6 +50,9 @@ TCPAcceptor::State::State(
         PARACOOBA_LOG(logger, NetTrace)
           << "Local endpoint " << endpoint
           << " was already in use! Incrementing port.";
+      } else {
+        throw std::runtime_error("Cannot bind to endpoint! Error: " +
+                                 ec.message());
       }
     }
 

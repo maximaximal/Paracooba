@@ -18,7 +18,7 @@ UDPServer::State::State(boost::asio::io_service& ioService,
                         ConfigPtr config,
                         LogPtr log,
                         messages::MessageReceiver& messageReceiver)
-  : socket(ioService)
+  : socket(ioService, endpoint.protocol())
   , config(config)
   , broadcastEndpoint(broadcastEndpoint)
   , logger(log->createLogger("UDPServer"))
