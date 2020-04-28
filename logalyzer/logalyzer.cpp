@@ -22,6 +22,21 @@ using std::endl;
 #define LOGENTRY_REGEX \
   R"(\[([a-zA-Z0-9_.:\ -]+)\] \[([a-zA-Z.;0-9]+)\] \[[\^\[0-9;m]*([A-Z]+)[\^\[0-9m]*\] \[(\w+)\] \[(.*)\] (.*))"
 
+#define CONNECTION_SENDING_REGEX \
+  R"(Now sending message of type ([a-zA-Z]+) with size .+ \(=([0-9]+) BYTES\))"
+
+// Copied over from util.cpp so there is no link required.
+std::string
+BytePrettyPrint(size_t bytes)
+{
+  auto base = (double)std::log(bytes) / (double)std::log(1024);
+  const char* suffixArr[] = { "B", "kiB", "MiB", "GiB", "TiB", "PiB" };
+  return std::to_string(
+           (size_t)std::round(std::pow(1024, base - std::floor(base)))) +
+         suffixArr[(size_t)std::floor(base)] + " (=" + std::to_string(bytes) +
+         " BYTES)";
+}
+
 template<typename StringContainer = std::string_view>
 class LogEntry
 {
@@ -165,27 +180,154 @@ class LogLineProducer
 };
 
 class Connection
-{};
+{
+  public:
+  explicit Connection(uint64_t id1, uint64_t id2)
+    : m_id1(id1)
+    , m_id2(id2)
+  {
+    assert(id1 != 0);
+    assert(id2 != 0);
+  }
+  ~Connection() = default;
+
+  bool operator()(const LogEntryRef& entry)
+  {
+    if(boost::regex_search(std::string(entry.msg), m_result, m_sendRegex)) {
+      std::string type = m_result[1];
+      size_t bytes = std::strtoul(m_result[2].str().c_str(), NULL, 0);
+
+      m_bytesTransferred += bytes;
+    }
+    return true;
+  }
+
+  void print()
+  {
+    std::cout << "Connection " << m_id1 << " <-> " << m_id2
+              << " Statistics: " << endl;
+    std::cout << "  Data Transferred: " << BytePrettyPrint(m_bytesTransferred)
+              << endl;
+  }
+
+  private:
+  uint64_t m_id1, m_id2;
+
+  uint64_t m_bytesTransferred;
+
+  static boost::regex m_sendRegex;
+  boost::smatch m_result;
+};
+boost::regex Connection::m_sendRegex = boost::regex(CONNECTION_SENDING_REGEX);
+
+class ConnectionsStats
+{
+  public:
+  ConnectionsStats() = default;
+  ~ConnectionsStats() = default;
+
+  using IDPair = std::pair<uint64_t, uint64_t>;
+
+  bool operator()(uint64_t currentId, const LogEntryRef& entry)
+  {
+    assert(entry.logger == "Connection");
+
+    uint64_t remoteId = 0;
+    if(!getRemoteId(entry, remoteId))
+      return false;
+
+    // This happens on connection init.
+    if(remoteId == 0)
+      return false;
+
+    Connection& conn = getConnection(currentId, remoteId);
+    if(!conn(entry))
+      return false;
+
+    return true;
+  }
+
+  bool getRemoteId(const LogEntryRef& entry, uint64_t& id)
+  {
+    if(!entry.hasCtx)
+      return false;
+
+    size_t idStart = 6;
+    size_t idEnd = entry.ctx.find('\'', idStart + 1);
+
+    if(idEnd == std::string::npos) {
+      return false;
+    }
+
+    auto numberStr = entry.ctx.substr(idStart, idEnd - idStart);
+
+    return toNumber(numberStr, id);
+  }
+
+  Connection& getConnection(uint64_t id1, uint64_t id2)
+  {
+    IDPair pair(std::min(id1, id2), std::max(id1, id2));
+    auto it = m_links.find(pair);
+    if(it == m_links.end()) {
+      return m_links.try_emplace(pair, pair.first, pair.second).first->second;
+    }
+    return it->second;
+  }
+
+  void print()
+  {
+    for(auto& e : m_links) {
+      e.second.print();
+    }
+  }
+
+  private:
+  std::map<IDPair, Connection> m_links;
+};
+
+ConnectionsStats connections;
 
 class Node
 {
   public:
-  Node() = default;
+  explicit Node(uint64_t id)
+    : m_id(id)
+  {}
   ~Node() = default;
 
-  template<typename LogEntry>
-  bool operator()(const LogEntry& entry)
+  bool operator()(const LogEntryRef& entry)
   {
     if(entry.logger == "Connection") {
-      uint64_t bytes;
-      extractBytes(entry.msg, bytes);
+      if(!connections(m_id, entry)) {
+        return false;
+      }
+    }
+
+    auto it = m_severities.find(entry.severity);
+    if(it == m_severities.end()) {
+      m_severities.insert({ std::string(entry.severity), 1 });
+    } else {
+      ++it->second;
     }
 
     return true;
   }
 
+  void print()
+  {
+    cout << "Statistics for node " << m_host << " (" << m_id << ")" << endl;
+    cout << "  Log Messages per Severity:" << endl;
+    for(auto& e : m_severities) {
+      cout << "    " << e.first << ": " << e.second << endl;
+    }
+  }
+
+  void setHost(const std::string host) { m_host = host; }
+
   private:
-  std::map<uint64_t, Connection> m_connections;
+  std::string m_host;
+  std::map<std::string, size_t, std::less<>> m_severities;
+  uint64_t m_id;
 };
 
 class NodeStats
@@ -232,7 +374,12 @@ class NodeStats
   }
   bool getFromMap(uint64_t id, Node** node)
   {
-    *node = &m_nodes[id];
+    auto it = m_nodes.find(id);
+    if(it == m_nodes.end()) {
+      *node = &m_nodes.emplace(id, id).first->second;
+    } else {
+      *node = &it->second;
+    }
     return true;
   }
   bool map(uint64_t id, const std::string& name)
@@ -247,8 +394,17 @@ class NodeStats
       return true;
     }
     m_nameIdMap.insert({ name, id });
-    std::cerr << "New host mapping: " << name << " -> " << id << endl;
+    Node* n;
+    getFromMap(id, &n);
+    n->setHost(name);
     return true;
+  }
+
+  void print()
+  {
+    for(auto& n : m_nodes) {
+      n.second.print();
+    }
   }
 
   private:
@@ -305,9 +461,10 @@ main(int argc, char* argv[])
   std::string line;
   while(producer.nextLine(line)) {
     if(entry.parseLogLine(line)) {
-      if(!stats(entry)) {
-        cerr << "   -- Error! Continuing." << endl;
-      }
+      stats(entry);
     }
   }
+
+  stats.print();
+  connections.print();
 }
