@@ -123,6 +123,28 @@ class CaDiCaLTask : public Task
 
   TaskResult::Status lookahead(int);
 
+  class FastSplit {
+  public:
+    operator bool () const {
+      return fastSplit;
+    }
+    void tick(bool b) {
+      if(b)
+        ++beta;
+      if(alpha == period) {
+        fastSplit = (beta > period / 2);
+        beta = fastSplit ? 1 : 0;
+        period *= 2;
+        alpha = 0;
+      }
+    }
+  private:
+    unsigned alpha = 0;
+    unsigned beta = 0;
+    bool fastSplit = true;
+    unsigned period = 1;
+  };
+
   private:
   void provideSolver();
 
@@ -149,7 +171,7 @@ class CaDiCaLTask : public Task
   boost::asio::steady_timer m_autoStopTimer;
   boost::asio::io_service& m_io_service;
   std::mutex m_solverMutex;
-  bool fastSplit = false;
+  FastSplit fastSplit;
 };
 
 inline CaDiCaLTask::Mode

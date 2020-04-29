@@ -63,7 +63,7 @@ CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
   , m_cadicalMgr(other.m_cadicalMgr)
   , m_autoStopTimer(other.m_io_service)
   , m_io_service(other.m_io_service)
-  , fastSplit(other.fastSplit)
+  , fastSplit(std::move(other.fastSplit))
 {
   m_terminator->setCaDiCaLTask(this);
   m_name = "CaDiCaL Task (moved)";
@@ -206,7 +206,6 @@ CaDiCaLTask::execute()
 
   TaskResult::Status status;
   if(m_mode & Parse) {
-    fastSplit = true;
     if(!boost::filesystem::exists(m_sourcePath)) {
       return std::move(std::make_unique<TaskResult>(TaskResult::MissingInputs));
     }
@@ -244,7 +243,7 @@ CaDiCaLTask::execute()
 
   if(m_mode & Mode::Solve) {
     std::chrono::duration<double> average_time = std::chrono::duration_cast<std::chrono::milliseconds>(m_cnf->averageSolvingTime());
-    fastSplit = (fastSplit && !m_cnf->isTaskFactoryNonEmpty());
+    fastSplit.tick(!m_cnf->isTaskFactoryNonEmpty());
     const int multiplication_factor = fastSplit ? 1 : 3;
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       average_time * multiplication_factor);
