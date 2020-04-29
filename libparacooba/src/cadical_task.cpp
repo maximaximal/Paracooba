@@ -357,6 +357,7 @@ CaDiCaLTask::resplit_once(Path path, Cube literals)
     PARACOOBA_LOG((*m_logger), Cubes)
       << "CNF formula for path " << CNFTree::pathToStrNoAlloc(path)
       << " is UNSAT";
+    m_cnf->getCNFTree().setStateFromLocal(path, CNFTree::UNSAT);
     return std::vector<std::pair<Path, Cube>>{};
   }
   PARACOOBA_LOG((*m_logger), Cubes)
