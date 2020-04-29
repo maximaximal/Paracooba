@@ -608,7 +608,8 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
     assert(!m_cuberRegistry);
 
     if(m_config->useCaDiCaLCubes())
-      res = generateCubes(m_config->getUint16(Config::InitialCubeDepth));
+      res = generateCubes(m_config->getUint16(Config::InitialCubeDepth),
+                          m_config->getUint16(Config::InitialMinimalCubeDepth));
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
     cuber::Registry::Mode m = cuber::Registry::LiteralFrequency;
@@ -811,9 +812,9 @@ operator<<(std::ostream& o, CNF::CubingKind k)
 }
 
 TaskResult::Status
-CNF::generateCubes(int depth)
+CNF::generateCubes(int depth, int min_depth)
 {
-  return m_rootTask->lookahead(depth);
+  return m_rootTask->lookahead(depth, min_depth);
 }
 
 bool

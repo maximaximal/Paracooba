@@ -204,7 +204,7 @@ class CNF
   inline boost::asio::io_service& getIOService() { return m_io_service; }
 
   /** @brief Use CaDiCaL to generate cubes */
-  TaskResult::Status generateCubes(int);
+  TaskResult::Status generateCubes(int, int);
 
   bool shouldResplitCubes();
 

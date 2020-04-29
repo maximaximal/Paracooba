@@ -121,7 +121,7 @@ class CaDiCaLTask : public Task
     m_pregeneratedCubes = cubes;
   }
 
-  TaskResult::Status lookahead(int);
+  TaskResult::Status lookahead(int, int);
 
   class FastSplit {
   public:

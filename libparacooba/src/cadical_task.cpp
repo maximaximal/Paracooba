@@ -519,7 +519,7 @@ CaDiCaLTask::provideSolver()
 }
 
 TaskResult::Status
-CaDiCaLTask::lookahead(int depth)
+CaDiCaLTask::lookahead(int depth, int min_depth)
 {
   using namespace std::chrono_literals;
 
@@ -539,7 +539,7 @@ CaDiCaLTask::lookahead(int depth)
         m_interrupt_solving = true;
       }
     });
-  auto cubes {m_solver->generate_cubes(depth, depth / 2)};
+  auto cubes {m_solver->generate_cubes(depth, min_depth)};
   m_autoStopTimer.cancel();
   m_interrupt_solving = false;
   if(cubes.status == 20)

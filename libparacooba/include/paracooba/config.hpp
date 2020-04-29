@@ -61,6 +61,7 @@ class Config
     CaDiCaLCubes,
     Resplit,
     InitialCubeDepth,
+    InitialMinimalCubeDepth,
 
     _KEY_COUNT
   };
@@ -363,6 +364,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "resplit-cubes";
     case Config::InitialCubeDepth:
       return "cadical-cubes-depth";
+    case Config::InitialMinimalCubeDepth:
+      return "cadical-minimal-cubes-depth";
     default:
       return "";
   }
