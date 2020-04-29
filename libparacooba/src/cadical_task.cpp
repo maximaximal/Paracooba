@@ -351,14 +351,18 @@ CaDiCaLTask::resplit_once(Path path, Cube literals)
 
   Literal lit_to_split = m_solver->lookahead();
   m_solver->reset_assumptions();
-  assert(lit_to_split != 0);
-  if(lit_to_split == INT_MIN) {
-    PARACOOBA_LOG((*m_logger), Cubes)
-      << "CNF formula for path " << CNFTree::pathToStrNoAlloc(path)
-      << " is UNSAT";
-    m_cnf->getCNFTree().setStateFromLocal(path, CNFTree::UNSAT);
-    return std::vector<std::pair<Path, Cube>>{};
+  if (lit_to_split == 0) {
+    if(m_solver->state() == CaDiCaL::SATISFIED) {
+      m_cnf->getCNFTree().setStateFromLocal(path, CNFTree::SAT);
+      return std::vector<std::pair<Path, Cube>>{};
+    } else if(m_solver->state() == CaDiCaL::UNSATISFIED) {
+      m_cnf->getCNFTree().setStateFromLocal(path, CNFTree::UNSAT);
+      return std::vector<std::pair<Path, Cube>>{};
+    } else {
+      assert(false);
+    }
   }
+
   PARACOOBA_LOG((*m_logger), Cubes)
     << "CNF formula for path " << CNFTree::pathToStrNoAlloc(path)
     << " resplitted on literal " << lit_to_split;
@@ -535,6 +539,8 @@ CaDiCaLTask::lookahead(int depth)
   m_interrupt_solving = false;
   if(cubes.status == 20)
     return TaskResult::Unsatisfiable;
+  else if(cubes.status == 10)
+    return TaskResult::Satisfiable;
   std::vector<int> flatCubes;
   size_t max_depth = 0;
 
