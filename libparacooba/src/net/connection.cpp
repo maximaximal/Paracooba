@@ -707,8 +707,11 @@ Connection::enrichLogger()
 void
 Connection::popNextSendItem()
 {
-  assert(!currentSendItem());
   std::lock_guard lock(sendQueueMutex());
+  if(!currentSendItem()) {
+    // This may happen if called from multiple threads.
+    return;
+  }
   if(sendQueue().empty())
     return;
   auto& queueFrontEntry = sendQueue().front();
