@@ -162,6 +162,11 @@ Runner::worker(uint32_t workerId)
         ++m_numberOfRunningTasks;
         TaskResultPtr result;
         try {
+          {
+
+            std::unique_lock<std::mutex> lock(m_taskQueue->getMutex());
+            entry->task->shouldFastSplit(m_taskQueue->size() == 0);
+          }
           result = std::move(entry->task->execute());
         } catch(const std::exception& e) {
           PARACOOBA_LOG(logger, LocalError)
