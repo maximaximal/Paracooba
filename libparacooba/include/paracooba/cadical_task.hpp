@@ -149,6 +149,8 @@ class CaDiCaLTask : public Task
     unsigned period = 8;
   };
 
+  virtual void shouldFastSplit(bool) override;
+
   private:
   void provideSolver();
 

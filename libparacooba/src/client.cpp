@@ -179,7 +179,8 @@ Client::solve()
       auto cubingres = m_rootCNF->setRootTask(std::move(rootTaskMutPtr));
       if(cubingres != TaskResult::Unknown) {
         PARACOOBA_LOG(m_logger, Trace)
-          << "Solution found while splitting";
+          << "Solution found while splitting "
+          << cubingres;
         m_status = cubingres;
         return;
       }

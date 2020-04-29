@@ -53,6 +53,7 @@ class Task
   inline FinishedSignal& getFinishedSignal() { return m_finishedSignal; }
 
   const TaskFactory* getTaskFactory() const { return m_factory; }
+  virtual void shouldFastSplit (bool) {};
 
   protected:
   friend class Runner;

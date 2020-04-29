@@ -555,4 +555,10 @@ CaDiCaLTask::lookahead(int depth)
     << "Generated " << cubes.cubes.size() << " cubes. Max depth = " << max_depth;
   return TaskResult::Unknown;
 }
+
+void
+CaDiCaLTask::shouldFastSplit(bool b)
+{
+  fastSplit.tick(b);
+}
 }
