@@ -218,6 +218,7 @@ class Config
 
   /** @brief Check if CaDiCaL should be used to cube formulas. */
   inline bool useCaDiCaLCubes() { return m_CaDiCaLCubes; }
+  inline void disableCaDiCaLCubes() { m_CaDiCaLCubes = false; }
 
   int64_t generateId(int64_t uniqueNumber);
 

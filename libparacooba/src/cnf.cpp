@@ -607,9 +607,17 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
   if(!m_config->isDaemonMode()) {
     assert(!m_cuberRegistry);
 
+    if(!m_rootTask->getPregeneratedCubes().empty() &&
+       m_config->useCaDiCaLCubes()) {
+      m_config->disableCaDiCaLCubes();
+      PARACOOBA_LOG(m_logger, GlobalWarning)
+        << "--cadical-cubes was given as argument on an icnf file. "
+        << "Using the pregenerated cubes instead, NOT CaDiCaL to cube. ";
+    }
+
     if(m_config->useCaDiCaLCubes())
       res = generateCubes(m_config->getUint16(Config::InitialCubeDepth),
-                          m_config->getUint16(Config::InitialMinimalCubeDepth));
+                      m_config->getUint16(Config::InitialMinimalCubeDepth));
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
     cuber::Registry::Mode m = cuber::Registry::LiteralFrequency;
@@ -627,10 +635,11 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
       m = cuber::Registry::PregeneratedCubes;
     }
 
-    // The cuber registry may already have been created if this is a daemon
-    // node. It can then just be re-used, as the daemon cuber registry did not
-    // need the root node to be created.
-    m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
+      // The cuber registry may already have been created if this is a daemon
+      // node. It can then just be re-used, as the daemon cuber registry did not
+      // need the root node to be created.
+      m_cuberRegistry =
+        std::make_unique<cuber::Registry>(m_config, m_log, *this);
 
     if(!m_cuberRegistry->init(m, &ji)) {
       PARACOOBA_LOG(m_logger, Fatal) << "Could not initialise cuber registry!";
