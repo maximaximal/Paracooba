@@ -4,6 +4,6 @@ set(LOGALYZER_SRCS
 
 add_executable(parac_logalyzer ${LOGALYZER_SRCS})
 
-set_property(TARGET parac_logalyzer PROPERTY CXX_STANDARD 20)
+set_property(TARGET parac_logalyzer PROPERTY CXX_STANDARD 17)
 
 target_link_libraries(parac_logalyzer PUBLIC Boost::program_options Boost::regex)
