@@ -708,7 +708,7 @@ void
 Connection::popNextSendItem()
 {
   std::lock_guard lock(sendQueueMutex());
-  if(!currentSendItem()) {
+  if(currentSendItem()) {
     // This may happen if called from multiple threads.
     return;
   }
