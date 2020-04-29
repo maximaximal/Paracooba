@@ -57,7 +57,7 @@ Connection::State::~State()
   }
 
   if(!exit && !config->isStopping()) {
-    PARACOOBA_LOG(logger, NetTrace)
+    PARACOOBA_LOG(logger, NetDebug)
       << "Connection Ended with resume mode " << resumeMode;
 
     switch(resumeMode) {
@@ -83,7 +83,7 @@ Connection::State::~State()
         } else if(remote != "") {
           conn.connect(remote);
         } else {
-          PARACOOBA_LOG(logger, NetTrace)
+          PARACOOBA_LOG(logger, NetDebug)
             << "Cannot restart connection, as no remoteNN is set and no remote "
                "address was specified!";
         }
@@ -231,23 +231,22 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
       }
 
       if(remoteId() == thisId()) {
-        PARACOOBA_LOG(logger(), NetTrace)
+        PARACOOBA_LOG(logger(), NetDebug)
           << "Connection from same local ID, not accepting.";
         resumeMode() = EndAfterShutdown;
         yield break;
       }
 
       if(remoteId() == 0) {
-        PARACOOBA_LOG(logger(), NetTrace)
+        PARACOOBA_LOG(logger(), NetDebug)
           << "Remote ID is 0! Ending connection.";
         resumeMode() = EndAfterShutdown;
         yield break;
       }
-
       if(!initRemoteNN()) {
         // Exit coroutine and connection. This connection is already established
         // and is full duplex, the other direction is not required!
-        PARACOOBA_LOG(logger(), NetTrace)
+        PARACOOBA_LOG(logger(), NetDebug)
           << "Connection is already established from other side, connection "
              "will be dropped.";
         yield break;
@@ -433,7 +432,7 @@ Connection::writeHandler(boost::system::error_code ec, size_t bytes_transferred)
     }
   } else {
     // Error during writing!
-    PARACOOBA_LOG(logger(), NetTrace)
+    PARACOOBA_LOG(logger(), LocalError)
       << "Error during sending! Error: " << ec.message();
     if(currentSendFinishedCB()) {
       currentSendFinishedCB()(false);
@@ -462,7 +461,7 @@ Connection::connect(const NetworkedNodePtr& nn)
   ++connectionTry();
 
   if(getConnectionTries() < allowedRetries) {
-    PARACOOBA_LOG(logger(), NetTrace)
+    PARACOOBA_LOG(logger(), NetDebug)
       << "Trying to connect to " << nn->getRemoteTcpEndpoint()
       << " (ID: " << nn->getId() << "), Try " << getConnectionTries();
     socket().async_connect(
@@ -470,7 +469,7 @@ Connection::connect(const NetworkedNodePtr& nn)
       boost::bind(
         &Connection::readHandler, *this, boost::asio::placeholders::error, 0));
   } else {
-    PARACOOBA_LOG(logger(), NetTrace)
+    PARACOOBA_LOG(logger(), NetDebug)
       << "Retries exhausted, no reconnect will be tried.";
     resumeMode() = EndAfterShutdown;
   }
@@ -491,7 +490,7 @@ Connection::connect(const std::string& remote)
   std::string connectionString = host + ":" + port;
 
   if(clusterNodeStore().remoteConnectionStringKnown(connectionString)) {
-    PARACOOBA_LOG(logger(), NetTrace)
+    PARACOOBA_LOG(logger(), NetDebug)
       << "Remote connection string \"" << remote
       << "\" already known! Ending connection on connection try "
       << getConnectionTries();
@@ -505,7 +504,7 @@ Connection::connect(const std::string& remote)
   ++connectionTry();
 
   if(getConnectionTries() < allowedRetries) {
-    PARACOOBA_LOG(logger(), NetTrace)
+    PARACOOBA_LOG(logger(), NetDebug)
       << "Trying to resolve " << remote << " (\"" << host << "\":\"" << port
       << "\"), Try " << connectionTry();
 
@@ -517,7 +516,7 @@ Connection::connect(const std::string& remote)
         const boost::system::error_code& ec,
         boost::asio::ip::tcp::resolver::iterator endpointIt) mutable {
         if(ec) {
-          PARACOOBA_LOG(logger(), NetTrace)
+          PARACOOBA_LOG(logger(), LocalError)
             << "Could not resolve " << remote << " (\"" << host << "\":\""
             << port << "\")! Error: " << ec.message();
           return;
@@ -529,14 +528,14 @@ Connection::connect(const std::string& remote)
                       [*this, &chosenEndpoint, &host, &port, &remote](
                         auto& endpointEntry) mutable {
                         auto endpoint = endpointEntry.endpoint();
-                        PARACOOBA_LOG(logger(), NetTrace)
+                        PARACOOBA_LOG(logger(), NetDebug)
                           << "Resolved " << remote << " (\"" << host << "\":\""
                           << port << "\") to endpoint " << endpoint
                           << " on try " << connectionTry();
                         chosenEndpoint = endpoint;
                       });
 
-        PARACOOBA_LOG(logger(), NetTrace)
+        PARACOOBA_LOG(logger(), NetDebug)
           << "Resolved " << remote << " (\"" << host << "\":\"" << port
           << "\") to endpoint " << chosenEndpoint << " on try "
           << connectionTry()
@@ -682,7 +681,8 @@ Connection::logger()
 void
 Connection::enrichLogger()
 {
-  if(!m_state->log->isLogLevelEnabled(Log::NetTrace))
+  if(!m_state->log->isLogLevelEnabled(Log::NetTrace) &&
+     !m_state->log->isLogLevelEnabled(Log::NetDebug))
     return;
 
   std::stringstream context;
@@ -770,7 +770,7 @@ Connection::reconnect()
   } else if(remote() != "") {
     connect(remote());
   } else {
-    PARACOOBA_LOG(logger(), NetTrace)
+    PARACOOBA_LOG(logger(), NetDebug)
       << "Reconnect cancelled, as there is no remote defined.";
   }
 }
