@@ -129,12 +129,16 @@ class CaDiCaLTask : public Task
       return fastSplit;
     }
     void tick(bool b) {
+      assert(beta <= alpha);
       if(b)
         ++beta;
+      else
+        fastSplit = false;
+      ++alpha;
+
       if(alpha == period) {
         fastSplit = (beta > period / 2);
-        beta = fastSplit ? 1 : 0;
-        period *= 2;
+        beta = 0;
         alpha = 0;
       }
     }
@@ -142,7 +146,7 @@ class CaDiCaLTask : public Task
     unsigned alpha = 0;
     unsigned beta = 0;
     bool fastSplit = true;
-    unsigned period = 1;
+    unsigned period = 8;
   };
 
   private:
