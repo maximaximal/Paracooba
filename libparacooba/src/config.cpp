@@ -290,6 +290,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::DumpTreeAtExit);
   conditionallySetConfigOptionToArray<uint16_t>(
     vm, m_config.data(), Config::InitialCubeDepth);
+  conditionallySetConfigOptionToArray<uint16_t>(
+    vm, m_config.data(), Config::InitialMinimalCubeDepth);
 
   if(vm.count(GetConfigNameFromEnum(Id))) {
     m_config[Id] = generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());
