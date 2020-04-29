@@ -44,7 +44,6 @@ class TCPAcceptor : boost::asio::coroutine
 
     boost::asio::io_service& ioService;
     boost::asio::ip::tcp::acceptor acceptor;
-    boost::asio::ip::tcp::endpoint endpoint;
     LogPtr log;
     Logger logger;
     ConfigPtr config;
@@ -75,7 +74,6 @@ class TCPAcceptor : boost::asio::coroutine
 
   boost::asio::io_service& ioService() { return m_state->ioService; }
   boost::asio::ip::tcp::acceptor& acceptor() { return m_state->acceptor; }
-  boost::asio::ip::tcp::endpoint& endpoint() { return m_state->endpoint; }
   LogPtr& log() { return m_state->log; }
   Logger& logger() { return m_state->logger; }
   ConfigPtr& config() { return m_state->config; }

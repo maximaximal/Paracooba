@@ -318,16 +318,16 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
     // (closed client session)
 
     if(resumeMode() == RestartAfterShutdown) {
-      PARACOOBA_LOG(logger(), NetTrace)
+      PARACOOBA_LOG(logger(), LocalWarning)
         << "Connection ended! Retry after timeout." << ec.message();
       reconnectAfterMS(config()->getUint32(Config::NetworkTimeout));
     }
   } else if(ec == boost::asio::error::connection_refused) {
-    PARACOOBA_LOG(logger(), NetTrace)
+    PARACOOBA_LOG(logger(), LocalError)
       << "Connection refused! Retry after short timeout." << ec.message();
     reconnectAfterMS(config()->getUint32(Config::ShortNetworkTimeout));
   } else {
-    PARACOOBA_LOG(logger(), NetTrace)
+    PARACOOBA_LOG(logger(), LocalError)
       << "Error in readHandler: " << ec.message();
   }
 }
