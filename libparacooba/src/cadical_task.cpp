@@ -279,10 +279,11 @@ CaDiCaLTask::execute()
       << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
          1'000 * (end - start))).count()
       << "ms.";
-    if(!fastSplit || solveResult != 0) {
-      auto solving_duration =
-        std::chrono::duration_cast<std::chrono::milliseconds>((end - start));
-      m_cnf->update_averageSolvingTime(std::chrono::duration<double>(solving_duration));
+
+    auto duration_solving =
+      std::chrono::duration_cast<std::chrono::milliseconds>((end - start));
+    if(solveResult != 0) {
+      m_cnf->update_averageSolvingTime(std::chrono::duration<double>(duration_solving));
     }
 
     if(!m_interrupt_solving) {
@@ -304,6 +305,10 @@ CaDiCaLTask::execute()
           << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
               1'000 * (end - start))).count() << "ms";
 
+        auto duration_splitting =
+          std::chrono::duration_cast<std::chrono::milliseconds>((end - start));
+        m_cnf->update_averageSolvingTime(
+          std::chrono::duration<double>(duration_solving + duration_splitting));
         if(m_terminate) {
           status = TaskResult::Unsolved;
           break;
