@@ -22,9 +22,9 @@
 #endif
 
 template<typename T>
-using MutableConstant =
-  boost::log::attributes::mutable_constant < T,
-  boost::shared_mutex,                // synchronization primitive
+using MutableConstant = boost::log::attributes::mutable_constant<
+  T,
+  boost::shared_mutex,                    // synchronization primitive
   boost::unique_lock<boost::shared_mutex>,// exclusive lock type
   boost::shared_lock<boost::shared_mutex> // shared lock type;
   >;
@@ -60,6 +60,7 @@ class Log
     NetTrace,
     Cubes,
     Trace,
+    NetDebug,
     Debug,
     Info,
     LocalWarning,
@@ -128,7 +129,7 @@ class Log
 
   inline bool isLogLevelEnabled(Severity severity) const
   {
-    return severity >= m_targetSeverity;
+    return m_severityConfig[static_cast<size_t>(severity)];
   }
 
   struct ThreadLocalData
@@ -156,15 +157,18 @@ class Log
   }
   std::string_view getLocalName() const;
 
+  std::string debugSeverityConfig() const;
+
   private:
   ConfigPtr m_config;
   boost::shared_ptr<boost::log::sinks::synchronous_sink<
     boost::log::sinks::basic_text_ostream_backend<char>>>
     m_consoleSink;
-  Severity m_targetSeverity = LocalWarning;
 
   std::map<std::thread::id, ThreadLocalData> m_threadLocalData;
   mutable std::shared_mutex m_threadLocalDataMutex;
+
+  std::array<bool, static_cast<size_t>(Severity::Fatal)> m_severityConfig;
 };
 
 using Logger = Log::Logger;
@@ -191,6 +195,7 @@ operator<<(
     localNameAttr.set(std::string((LOGGER).log->getLocalName()));             \
     threadNameAttr.set((LOGGER).log->getThreadLocalData().threadName);        \
   }                                                                           \
+  if((LOGGER).log->isLogLevelEnabled(::paracooba::Log::Severity::SEVERITY))   \
   BOOST_LOG_SEV((LOGGER).logger, ::paracooba::Log::Severity::SEVERITY)
 
 #endif

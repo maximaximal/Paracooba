@@ -120,8 +120,10 @@ Config::Config()
     (GetConfigNameFromEnum(Config::DaemonHost),
      po::value<std::string>()->default_value("127.0.0.1")->value_name("string"),
          "Initial peer to connect to. Should should be a long-running daemon.")
-    ("debug,d", po::bool_switch(&m_debugMode)->default_value(false)->value_name("bool"), "debug mode (all debug output)")
-    ("network-debug,nd", po::bool_switch(&m_networkDebugMode)->default_value(false)->value_name("bool"), "network debug mode (all debug output, including network communication)")
+    ("debug,d", po::bool_switch(&m_debugMode)->default_value(false)->value_name("bool"), "debug mode (activate DEBG output)")
+    ("trace,t", po::bool_switch(&m_traceMode)->default_value(false)->value_name("bool"), "trace mode (activate TRCE output)")
+    ("network-debug,nd", po::bool_switch(&m_networkDebugMode)->default_value(false)->value_name("bool"), "network debug mode (NDBG output)")
+    ("network-trace,nt", po::bool_switch(&m_networkTraceMode)->default_value(false)->value_name("bool"), "network trace mode (NTRC output)")
     ("info,i", po::bool_switch(&m_infoMode)->default_value(false)->value_name("bool"), "info mode (more information)")
     ("daemon", po::bool_switch(&m_daemonMode)->default_value(false)->value_name("bool"), "daemon mode")
     ("enable-client-cadical", po::bool_switch(&m_enableClientCaDiCaL)->default_value(false)->value_name("bool"), "direct solving via CaDiCaL on client")

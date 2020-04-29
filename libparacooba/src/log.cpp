@@ -16,6 +16,7 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/console.hpp>
 #include <boost/log/utility/setup/file.hpp>
+#include <boost/phoenix/bind.hpp>
 
 namespace logging = boost::log;
 namespace sinks = boost::log::sinks;
@@ -83,22 +84,24 @@ Log::Log(ConfigPtr config)
     logging::core::get()->add_global_attribute("ThreadName", threadNameAttr);
     logging::add_common_attributes();
 
-    // Logging Filter
-    Severity defaultSeverity = Severity::LocalWarning;
-    m_targetSeverity = std::min(
-      { config->isDebugMode() ? Severity::Trace : defaultSeverity,
-        config->isInfoMode() ? Severity::Info : defaultSeverity,
-        config->isNetworkDebugMode() ? Severity::NetTrace : defaultSeverity });
-
-    assert(m_targetSeverity >= NetTrace);
-    assert(m_targetSeverity <= Fatal);
-
-    boost::log::core::get()->set_filter(paracooba_logger_severity >=
-                                        m_targetSeverity);
+    m_severityConfig[static_cast<size_t>(NetTrace)] =
+      config->isNetworkTraceMode();
+    m_severityConfig[static_cast<size_t>(Cubes)] = config->isTraceMode();
+    m_severityConfig[static_cast<size_t>(Trace)] = config->isTraceMode();
+    m_severityConfig[static_cast<size_t>(NetDebug)] =
+      config->isNetworkDebugMode();
+    m_severityConfig[static_cast<size_t>(Debug)] = config->isDebugMode();
+    m_severityConfig[static_cast<size_t>(Info)] =
+      config->isInfoMode() || config->isDebugMode();
+    m_severityConfig[static_cast<size_t>(LocalWarning)] = true;
+    m_severityConfig[static_cast<size_t>(LocalError)] = true;
+    m_severityConfig[static_cast<size_t>(GlobalWarning)] = true;
+    m_severityConfig[static_cast<size_t>(GlobalError)] = true;
+    m_severityConfig[static_cast<size_t>(Fatal)] = true;
   } catch(const std::exception& e) {
     std::cerr
       << "> Exception during initialisation of global log variables! Error: "
-      << e.what() << ". Log level would have been " << m_targetSeverity
+      << e.what() << ". Log level config: " << debugSeverityConfig()
       << std::endl;
     BOOST_THROW_EXCEPTION(e);
   }
@@ -178,13 +181,35 @@ Log::getLocalName() const
   return m_config->getString(Config::LocalName);
 }
 
+static const char* strings[] = { "NetTrace",      "Trace",        "Debug",
+                                 "Info",          "LocalWarning", "LocalError",
+                                 "GlobalWarning", "GlobalError",  "Fatal" };
+static const char* colorised_strings[] = {
+  "\033[0;37mNTRC\033[0m", "\033[0;37mCUBE\033[0m", "\033[0;37mTRCE\033[0m",
+  "\033[0;37mNDBG\033[0m", "\033[0;32mDEBG\033[0m", "\033[1;37mINFO\033[0m",
+  "\033[0;33mLWRN\033[0m", "\033[0;33mLERR\033[0m", "\033[0;31mGWRN\033[0m",
+  "\033[0;31mGERR\033[0m", "\033[0;35mFTAL\033[0m",
+};
+static const char* uncolorised_strings[] = { "NTRC", "CUBE", "TRCE", "NDBG",
+                                             "DEBG", "INFO", "LWRN", "LERR",
+                                             "GWRN", "GERR", "FTAL" };
+
+#define SEV_PRINT_HELPER(Severity)
+
+std::string
+Log::debugSeverityConfig() const
+{
+  std::string out("Enabled Log Levels:");
+  for(size_t severity = 0; severity <= static_cast<size_t>(Fatal); ++severity) {
+    out += " ";
+    out += (m_severityConfig[severity] ? uncolorised_strings[severity] : "");
+  }
+  return out;
+}
+
 std::ostream&
 operator<<(std::ostream& strm, ::paracooba::Log::Severity level)
 {
-  static const char* strings[] = {
-    "NetTrace",   "Trace",         "Debug",       "Info", "LocalWarning",
-    "LocalError", "GlobalWarning", "GlobalError", "Fatal"
-  };
   if(static_cast<std::size_t>(level) < sizeof(strings) / sizeof(*strings))
     strm << strings[level];
   else
@@ -199,16 +224,6 @@ operator<<(
   boost::log::to_log_manip<::paracooba::Log::Severity,
                            ::paracooba::Log::Severity_Tag> const& manip)
 {
-  static const char* colorised_strings[] = {
-    "\033[0;37mNTRC\033[0m", "\033[0;37mCUBE\033[0m", "\033[0;37mTRCE\033[0m",
-    "\033[0;32mDEBG\033[0m", "\033[1;37mINFO\033[0m", "\033[0;33mLWRN\033[0m",
-    "\033[0;33mLERR\033[0m", "\033[0;31mGWRN\033[0m", "\033[0;31mGERR\033[0m",
-    "\033[0;35mFTAL\033[0m",
-  };
-  static const char* uncolorised_strings[] = { "NTRC", "CUBE", "TRCE", "DEBG",
-                                               "INFO", "LWRN", "LERR", "GWRN",
-                                               "GERR", "FTAL" };
-
   static const char** strings = uncolorised_strings;
 
   const char* terminal = std::getenv("TERM");

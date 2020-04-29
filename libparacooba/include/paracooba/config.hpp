@@ -164,6 +164,10 @@ class Config
   inline bool isDebugMode() const { return m_debugMode; }
   /** @brief Check if network debug mode is active. */
   inline bool isNetworkDebugMode() const { return m_networkDebugMode; }
+  /** @brief Check if trace mode is active. */
+  inline bool isTraceMode() const { return m_traceMode; }
+  /** @brief Check if network trace mode is active. */
+  inline bool isNetworkTraceMode() const { return m_networkTraceMode; }
   /** @brief Check if info mode is active. */
   inline bool isInfoMode() const { return m_infoMode; }
   /** @brief Check if daemon mode is active. */
@@ -174,9 +178,13 @@ class Config
   inline bool autoDiscoveryEnabled() const { return !m_disableAutoDiscovery; }
 
   /** @brief Set debug mode active. */
+  inline void setTraceMode(bool v) { m_traceMode = v; }
+  /** @brief Set trace mode active. */
   inline void setDebugMode(bool v) { m_debugMode = v; }
   /** @brief Set network debug mode active. */
   inline void setNetworkDebugMode(bool v) { m_networkDebugMode = v; }
+  /** @brief Set network trace mode active. */
+  inline void setNetworkTraceMode(bool v) { m_networkTraceMode = v; }
   /** @brief Set info mode active. */
   inline void setInfoMode(bool v) { m_infoMode = v; }
   /** @brief Set daemon mode active. */
@@ -269,7 +277,9 @@ class Config
   bool m_disableAutoDiscovery = false;
   bool m_disableTCPAutoPortAssignment = false;
   bool m_debugMode = false;
+  bool m_traceMode = false;
   bool m_networkDebugMode = false;
+  bool m_networkTraceMode = false;
   bool m_infoMode = false;
   bool m_daemonMode = false;
   bool m_enableClientCaDiCaL = false;
