@@ -165,7 +165,7 @@ Runner::worker(uint32_t workerId)
           {
 
             std::unique_lock<std::mutex> lock(m_taskQueue->getMutex());
-            entry->task->shouldFastSplit(m_taskQueue->size() == 0);
+            entry->task->shouldFastSplit(m_taskQueue->size() < m_currentlyRunningTasks.size());
           }
           result = std::move(entry->task->execute());
         } catch(const std::exception& e) {
