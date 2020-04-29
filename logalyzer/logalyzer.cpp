@@ -1,4 +1,3 @@
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -7,6 +6,7 @@
 
 #include <charconv>
 
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 
@@ -162,9 +162,9 @@ class LogLineProducer
       std::string file = "";
       do {
         file = *m_filesIt++;
-      } while(!std::filesystem::exists(file) && !atEnd());
+      } while(!boost::filesystem::exists(file) && !atEnd());
 
-      if(!std::filesystem::exists(file)) {
+      if(!boost::filesystem::exists(file)) {
         return false;
       }
 
