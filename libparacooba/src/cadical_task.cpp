@@ -564,6 +564,6 @@ CaDiCaLTask::lookahead(int depth, int min_depth)
 void
 CaDiCaLTask::shouldFastSplit(bool b)
 {
-  fastSplit.tick(b);
+  fastSplit.half_tick(b);
 }
 }

@@ -128,9 +128,13 @@ class CaDiCaLTask : public Task
     operator bool () const {
       return fastSplit;
     }
+    void half_tick(bool b) {
+      local_situation = b;
+    }
     void tick(bool b) {
       assert(beta <= alpha);
-      if(b)
+      const bool full_tick = b || local_situation;
+      if(full_tick)
         ++beta;
       else
         fastSplit = false;
@@ -155,6 +159,7 @@ class CaDiCaLTask : public Task
     bool fastSplit = true;
     const unsigned period = 8;
     int depth = 2;
+    bool local_situation = false;
   };
 
   virtual void shouldFastSplit(bool) override;
