@@ -133,15 +133,13 @@ class CaDiCaLTask : public Task
     }
     void tick(bool b) {
       assert(beta <= alpha);
-      const bool full_tick = b || local_situation;
+      const bool full_tick = (b || local_situation);
       if(full_tick)
         ++beta;
-      else
-        fastSplit = false;
       ++alpha;
 
       if(alpha == period) {
-        fastSplit = (beta > period / 2);
+        fastSplit = (beta >= period / 2);
         beta = 0;
         alpha = 0;
         if(fastSplit)
@@ -158,8 +156,8 @@ class CaDiCaLTask : public Task
     unsigned beta = 0;
     bool fastSplit = true;
     const unsigned period = 8;
-    int depth = 2;
-    bool local_situation = false;
+    int depth = 1;
+    bool local_situation = true;
   };
 
   virtual void shouldFastSplit(bool) override;
