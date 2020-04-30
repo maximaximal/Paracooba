@@ -440,7 +440,7 @@ CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> >
     }
   });
 
-  const int depth = 0;
+  const int depth = fastSplit.split_depth();
   const auto full_duration = duration;
   if(m_cuber) {
     Cube literals;

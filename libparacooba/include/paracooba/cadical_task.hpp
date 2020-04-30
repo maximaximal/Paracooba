@@ -140,13 +140,21 @@ class CaDiCaLTask : public Task
         fastSplit = (beta > period / 2);
         beta = 0;
         alpha = 0;
+        if(fastSplit)
+          ++depth;
+        else
+          --depth;
       }
+    }
+    int split_depth () {
+      return fastSplit ? depth : 0;
     }
   private:
     unsigned alpha = 0;
     unsigned beta = 0;
     bool fastSplit = true;
-    unsigned period = 8;
+    const unsigned period = 8;
+    int depth = 2;
   };
 
   virtual void shouldFastSplit(bool) override;
