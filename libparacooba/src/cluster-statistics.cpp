@@ -138,7 +138,7 @@ ClusterStatistics::unsafeRemoveNode(int64_t id, const std::string& reason)
     }
 
     PARACOOBA_LOG(m_logger, Trace) << "Remove cluster statistics node " << node
-                                   << " becase of reason: " << reason;
+                                   << " because of reason: " << reason;
 
     it->second.m_nodeOfflineSignal(reason);
     m_nodeMap.erase(id);
