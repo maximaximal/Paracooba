@@ -136,6 +136,8 @@ class CaDiCaLTask : public Task
       const bool full_tick = (b || local_situation);
       if(full_tick)
         ++beta;
+      else
+        fastSplit = false;
       ++alpha;
 
       if(alpha == period) {
