@@ -1,7 +1,7 @@
 The MIT License (MIT)
 =====================
 
-Copyright © 2019-2020 Max Heisinger, Mathias Fleury, Armin Biere
+Copyright © 2019-2020 Max Heisinger, Mathias Fleury, Armin Biere, Johannes Kepler University Linz, Austria
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
