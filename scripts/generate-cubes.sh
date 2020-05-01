@@ -28,9 +28,12 @@ prefix=/tmp/generate-cubes-$$
 cleanup () {
   rm -f $prefix*
 }
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
 trap "cleanup" 2 11
 cubes=$prefix.cubes
-../build/third_party/March/march_cu $input -o $cubes $options 1>&2 || exit 1
+$DIR/../build/third_party/March/march_cu $input -o $cubes $options 1>&2 || exit 1
 sed -e 's,^p cnf.*,p inccnf,' $input
 cat $cubes
 cleanup
