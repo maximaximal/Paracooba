@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
 usage () {
 cat <<EOF 2>&1
 usage: generate-cubes.sh [-h] <input> [ <output> [ <march_cu option> ... ] ]
