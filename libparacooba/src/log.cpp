@@ -114,7 +114,7 @@ Log::Log(ConfigPtr config)
         targetStream,
         keywords::format =
           (expr::stream
-           << "[" << paracooba_logger_timestamp << "] ["
+           << "c [" << paracooba_logger_timestamp << "] ["
            << paracooba_logger_localname << "] ["
            << expr::attr<Log::Severity, Log::Severity_Tag>("Severity") << "] ["
            << paracooba_logger_thread_name << "] "

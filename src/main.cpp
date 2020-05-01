@@ -79,11 +79,21 @@ main(int argc, char* argv[])
       case TaskResult::Unsolved:
         std::cout << "unknown" << std::endl;
         break;
-      case TaskResult::Satisfiable:
-        std::cout << "sat" << std::endl;
+       case TaskResult::Satisfiable:
+        {
+          std::cout << "s SATISFIABLE";
+          auto assignement { *client->getSatAssignment() };
+          for(auto i = 1; i < assignement.size(); ++i) {
+            if(i % 10 == 1) {
+              std::cout << "\nv";
+            }
+            std::cout << " " << (assignement[i] ? "-" : "") << i;
+          }
+          std ::cout << " 0\n";
+        }
         break;
       case TaskResult::Unsatisfiable:
-        std::cout << "unsat" << std::endl;
+        std::cout << "s UNSATIFIABLE" << std::endl;
         break;
       default:
         std::cout << "invalid result" << std::endl;
