@@ -60,7 +60,6 @@ main(int argc, char* argv[])
       << e.what();
   }
 
-  int return_code = 0;
 
   if(!config->isDaemonMode()) {
     // Client mode. There should be some action.
@@ -78,7 +77,7 @@ main(int argc, char* argv[])
     }
     switch(status) {
       case TaskResult::Unsolved:
-        std::cout << "unknown" << std::endl;
+        std::cout << "s UNKNOWN" << std::endl;
         break;
        case TaskResult::Satisfiable:
         {
@@ -91,12 +90,10 @@ main(int argc, char* argv[])
             std::cout << " " << (assignement[i] ? "-" : "") << i;
           }
           std ::cout << " 0\n";
-          return_code = 10;
         }
         break;
       case TaskResult::Unsatisfiable:
         std::cout << "s UNSATIFIABLE" << std::endl;
-        return_code = 20;
         break;
       default:
         std::cout << "s UNKNOWN" << std::endl;
@@ -109,5 +106,5 @@ main(int argc, char* argv[])
   PARACOOBA_LOG(logger, Trace) << "Solving took " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "s";
 
   PARACOOBA_LOG(logger, Trace) << "Ending paracooba.";
-  return return_code;
+  return EXIT_SUCCESS;
 }
