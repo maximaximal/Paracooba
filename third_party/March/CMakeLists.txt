@@ -1,6 +1,4 @@
 # March as ExternalProject
-cmake_minimum_required(VERSION 3.17)
-
 include(ExternalProject)
 
 ExternalProject_Add(March
