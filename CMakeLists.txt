@@ -149,6 +149,9 @@ endif()
 
 target_include_directories(parac PUBLIC ${libcadical_INCLUDE_DIRS})
 
+# March
+add_dependencies(paracooba March)
+
 # Installation logic.
 include(GNUInstallDirs)
 
