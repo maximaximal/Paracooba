@@ -93,7 +93,7 @@ main(int argc, char* argv[])
         }
         break;
       case TaskResult::Unsatisfiable:
-        std::cout << "s UNSATIFIABLE" << std::endl;
+        std::cout << "s UNSATISFIABLE" << std::endl;
         break;
       default:
         std::cout << "s UNKNOWN" << std::endl;
