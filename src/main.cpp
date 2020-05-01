@@ -99,7 +99,7 @@ main(int argc, char* argv[])
         return_code = 20;
         break;
       default:
-        std::cout << "invalid result" << std::endl;
+        std::cout << "s UNKNOWN" << std::endl;
         break;
     }
   } else {
