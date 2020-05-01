@@ -28,6 +28,8 @@ main(int argc, char* argv[])
   std::shared_ptr<Log> log = std::make_shared<Log>(config);
   auto logger = log->createLogger("main");
 
+  PARACOOBA_LOG(logger, Info) << "Paracooba version sc20.";
+
   PARACOOBA_LOG(logger, Trace)
     << "Starting paracooba \"" << config->getString(Config::LocalName)
     << "\" in " << (config->isDaemonMode() ? "daemon mode" : "client mode")
