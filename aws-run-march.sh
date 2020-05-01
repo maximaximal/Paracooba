@@ -13,7 +13,7 @@ else
     $DIR/build/parac --daemon --resplit-cubes --threads $DAEMON_THREADS $Q
 fi
 
-if [ $? -ne 0 ]; then
-    echo "Return code of parac was not successful! Try to print coredump."
-    coredumpctl dump
-fi
+# if [ $? -ne 0 ]; then
+#     echo "Return code of parac was not successful! Try to print coredump."
+#     coredumpctl dump
+# fi
