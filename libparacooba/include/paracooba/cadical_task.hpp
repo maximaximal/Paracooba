@@ -122,6 +122,7 @@ class CaDiCaLTask : public Task
   }
 
   TaskResult::Status lookahead(int, int);
+  TaskResult::Status callMarch();
 
   class FastSplit {
   public:
