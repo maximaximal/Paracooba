@@ -142,6 +142,8 @@ Config::Config()
      po::value<uint16_t>()->default_value((1 + static_cast<int>(std::log2(10*threadCount))) / 2)->value_name("int"), "Minimal initial size of the cubes when lookahead cubing is too slow (requires option --cadical-cubes) to have an efect.")
     (GetConfigNameFromEnum(Config::MarchCubes),
          po::bool_switch(&m_MarchCubes)->default_value(false)->value_name("bool"), "Call March to split cubes.")
+    (GetConfigNameFromEnum(Config::MarchPath),
+     po::value<std::string>()->default_value("./third_party/March/march_cu")->value_name("string"), "Path to March")
     ;
   // clang-format on
 }
@@ -293,6 +295,8 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::InitialCubeDepth);
   conditionallySetConfigOptionToArray<uint16_t>(
     vm, m_config.data(), Config::InitialMinimalCubeDepth);
+  conditionallySetConfigOptionToArray<std::string>(
+    vm, m_config.data(), Config::MarchPath);
 
   if(vm.count(GetConfigNameFromEnum(Id))) {
     m_config[Id] = generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());

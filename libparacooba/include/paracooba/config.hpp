@@ -64,6 +64,7 @@ class Config
     InitialMinimalCubeDepth,
 
     MarchCubes,
+    MarchPath,
 
     _KEY_COUNT
   };
@@ -376,6 +377,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "cadical-minimal-cubes-depth";
     case Config::MarchCubes:
       return "march-cubes";
+    case Config::MarchPath:
+      return "march-path";
     default:
       return "";
   }
