@@ -569,8 +569,8 @@ CaDiCaLTask::callMarch()
   std::string sourcePath{ m_config->getString(Config::InputFile) };
   std::string icnfPath{ sourcePath + ".icnf"};
   auto marchCall =
-    "./third_party/March/march_cu " + sourcePath + " -q " +
-    " > " + icnfPath;
+    std::string{m_config->getString(Config::MarchPath)} + " " + sourcePath +
+                                                          " -q > " + icnfPath;
   system(marchCall.c_str());
 
   std::ifstream icnfFile(icnfPath);
