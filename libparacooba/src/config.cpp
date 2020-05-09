@@ -140,7 +140,8 @@ Config::Config()
      po::value<uint16_t>()->default_value(1 + static_cast<int>(std::log2(10*threadCount)))->value_name("int"), "Initial size of the cubes (requires option --cadical-cubes) to have an efect.")
     (GetConfigNameFromEnum(Config::InitialMinimalCubeDepth),
      po::value<uint16_t>()->default_value((1 + static_cast<int>(std::log2(10*threadCount))) / 2)->value_name("int"), "Minimal initial size of the cubes when lookahead cubing is too slow (requires option --cadical-cubes) to have an efect.")
-
+    (GetConfigNameFromEnum(Config::MarchCubes),
+         po::bool_switch(&m_MarchCubes)->default_value(false)->value_name("bool"), "Call March to split cubes.")
     ;
   // clang-format on
 }

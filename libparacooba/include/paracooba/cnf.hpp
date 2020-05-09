@@ -205,6 +205,7 @@ class CNF
 
   /** @brief Use CaDiCaL to generate cubes */
   TaskResult::Status generateCubes(int, int);
+  TaskResult::Status generateMarchCubes();
 
   bool shouldResplitCubes();
 

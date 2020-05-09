@@ -63,6 +63,8 @@ class Config
     InitialCubeDepth,
     InitialMinimalCubeDepth,
 
+    MarchCubes,
+
     _KEY_COUNT
   };
 
@@ -216,6 +218,10 @@ class Config
     return !m_disableTCPAutoPortAssignment;
   }
 
+  /** @brief Check if March should be used to cube formulas. */
+  inline bool useMarchCubes() { return m_MarchCubes; }
+  inline void disableMarchCubes() { m_MarchCubes = false; }
+
   /** @brief Check if CaDiCaL should be used to cube formulas. */
   inline bool useCaDiCaLCubes() { return m_CaDiCaLCubes; }
   inline void disableCaDiCaLCubes() { m_CaDiCaLCubes = false; }
@@ -288,6 +294,7 @@ class Config
   bool m_useSTDOUTForLogging = false;
   bool m_limitedTreeDump = true;
   bool m_stopping = false;
+  bool m_MarchCubes = false;
   bool m_CaDiCaLCubes = false;
   bool m_resplitCubes = false;
 #ifdef ENABLE_INTERNAL_WEBSERVER
@@ -367,6 +374,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "cadical-cubes-depth";
     case Config::InitialMinimalCubeDepth:
       return "cadical-minimal-cubes-depth";
+    case Config::MarchCubes:
+      return "march-cubes";
     default:
       return "";
   }

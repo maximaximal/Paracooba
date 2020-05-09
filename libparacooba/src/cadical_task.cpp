@@ -3,6 +3,7 @@
 #include "../include/paracooba/cadical_mgr.hpp"
 #include "../include/paracooba/cnf.hpp"
 #include "../include/paracooba/communicator.hpp"
+#include "../include/paracooba/config.hpp"
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 #include <cassert>
@@ -558,6 +559,56 @@ CaDiCaLTask::lookahead(int depth, int min_depth)
 
   PARACOOBA_LOG((*m_logger), Trace)
     << "Generated " << cubes.cubes.size() << " cubes. Max depth = " << max_depth;
+  return TaskResult::Unknown;
+}
+
+TaskResult::Status
+CaDiCaLTask::callMarch()
+{
+
+  std::string sourcePath{ m_config->getString(Config::InputFile) };
+  std::string icnfPath{ sourcePath + ".icnf"};
+  auto marchCall =
+    "./third_party/March/march_cu " + sourcePath + " -q " +
+    " > " + icnfPath;
+  system(marchCall.c_str());
+
+  std::ifstream icnfFile(icnfPath);
+  if(icnfFile.is_open()) {
+
+    std::string c;
+    icnfFile >> c;
+    assert(c == "p");
+
+    icnfFile >> c;
+    assert(c == "inccnf");
+    int number_of_cubes;
+
+    while(icnfFile.good() && !icnfFile.eof()) {
+      std::string c;
+      icnfFile >> c;
+      if(icnfFile.eof())
+        break;
+
+      int lit;
+      do {
+        icnfFile >> lit;
+        m_pregeneratedCubes.push_back(lit);
+      } while (lit != 0);
+      ++number_of_cubes;
+    }
+
+    icnfFile.close();
+    system(std::string("rm -f " + icnfPath).c_str());
+
+    PARACOOBA_LOG((*m_logger), Trace)
+      << "Generated " << number_of_cubes << " cubes. ";
+  } else {
+    PARACOOBA_LOG((*m_logger), GlobalError) << "Cubing via March failed";
+    assert(false);
+  }
+
+
   return TaskResult::Unknown;
 }
 

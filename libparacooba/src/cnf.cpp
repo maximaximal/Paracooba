@@ -614,14 +614,22 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
         << "--cadical-cubes was given as argument on an icnf file. "
         << "Using the pregenerated cubes instead, NOT CaDiCaL to cube. ";
     }
-
-    if(m_config->useCaDiCaLCubes())
+    if(!m_rootTask->getPregeneratedCubes().empty() &&
+       m_config->useMarchCubes()) {
+      m_config->disableMarchCubes();
+      PARACOOBA_LOG(m_logger, GlobalWarning)
+        << "--march-cubes was given as argument on an icnf file. "
+        << "Using the pregenerated cubes instead, NOT March to cube. ";
+    }
+    if(m_config->useMarchCubes())
+      res = generateMarchCubes();
+    else if(m_config->useCaDiCaLCubes())
       res = generateCubes(m_config->getUint16(Config::InitialCubeDepth),
                       m_config->getUint16(Config::InitialMinimalCubeDepth));
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
     cuber::Registry::Mode m = cuber::Registry::LiteralFrequency;
-    if(m_config->useCaDiCaLCubes()) {
+    if(m_config->useCaDiCaLCubes() || m_config->useMarchCubes()) {
       ji.initCaDiCaLCubes() = pregenCubes;
       m = cuber::Registry::CaDiCaLCubes;
       PARACOOBA_LOG(m_logger, Trace)
@@ -825,6 +833,13 @@ CNF::generateCubes(int depth, int min_depth)
 {
   return m_rootTask->lookahead(depth, min_depth);
 }
+
+TaskResult::Status
+CNF::generateMarchCubes()
+{
+  return m_rootTask->callMarch();
+}
+
 
 bool
 CNF::shouldResplitCubes()
