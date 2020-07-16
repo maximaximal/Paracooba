@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 
+#if __has_include(<charconv>)
+#define USE_CHARCONV
 #include <charconv>
+#endif
 
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -99,12 +102,18 @@ template<typename T>
 bool
 toNumber(const std::string_view& view, T& number)
 {
+#if USE_CHARCONV
   if(auto [p, ec] =
        std::from_chars(view.data(), view.data() + view.size(), number);
      ec == std::errc()) {
     return true;
   }
   return false;
+#else
+  std::string str(view);
+  number = std::atoi(str.c_str());
+  return true;
+#endif
 }
 
 bool
