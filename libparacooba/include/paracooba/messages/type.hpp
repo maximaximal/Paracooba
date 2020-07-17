@@ -12,6 +12,8 @@ enum class Type
   CNFTreeNodeStatusRequest,
   CNFTreeNodeStatusReply,
   NewRemoteConnected,
+  Ping,
+  Pong,
   Unknown
 };
 
@@ -33,6 +35,10 @@ TypeToStr(Type type)
       return "CNFTreeNodeStatusReply";
     case Type::NewRemoteConnected:
       return "NewRemoteConnected";
+    case Type::Ping:
+      return "Ping";
+    case Type::Pong:
+      return "Pong";
     case Type::Unknown:
       return "Unknown Type (Specified)";
   }

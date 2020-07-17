@@ -26,7 +26,8 @@ class Node
        uint32_t uptime,
        uint16_t udpListenPort,
        uint16_t tcpListenPort,
-       bool daemonMode)
+       bool daemonMode,
+       int64_t tracerOffset = 0)
     : name(name)
     , id(id)
     , availableWorkers(availableWorkers)
@@ -37,6 +38,7 @@ class Node
     , udpListenPort(udpListenPort)
     , tcpListenPort(tcpListenPort)
     , daemonMode(daemonMode)
+    , tracerOffset(tracerOffset)
   {}
   virtual ~Node() {}
 
@@ -64,6 +66,7 @@ class Node
   uint16_t getUdpListenPort() const { return udpListenPort; }
   uint16_t getTcpListenPort() const { return tcpListenPort; }
   bool getDaemonMode() const { return daemonMode; }
+  int64_t getTracerOffset() const { return tracerOffset; }
   const KnownPeersVector& getKnownPeers() const { return knownPeers; }
 
   void addKnownPeer(uint32_t ipAddress, uint16_t port, int64_t id)
@@ -90,7 +93,9 @@ class Node
   uint32_t uptime;
   uint16_t udpListenPort;
   uint16_t tcpListenPort;
-  bool daemonMode = false; /* TODO fixes 'invalid bool' from sanitizer. This could be a gcc bug*/
+  int64_t tracerOffset;
+  bool daemonMode = false; /* TODO fixes 'invalid bool' from sanitizer. This
+                              could be a gcc bug*/
   std::string name;
 
   KnownPeersVector knownPeers;
@@ -107,6 +112,7 @@ class Node
        CEREAL_NVP(uptime),
        CEREAL_NVP(udpListenPort),
        CEREAL_NVP(tcpListenPort),
+       CEREAL_NVP(tracerOffset),
        CEREAL_NVP(daemonMode),
        CEREAL_NVP(knownPeers));
   }

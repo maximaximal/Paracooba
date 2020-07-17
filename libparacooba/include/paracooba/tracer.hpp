@@ -26,12 +26,54 @@ enum class MessageKind
   JobResult,
   JobInitiator
 };
+constexpr const char*
+MessageKindToStr(MessageKind kind)
+{
+  switch(kind) {
+    case MessageKind::Unknown:
+      return "Unknown";
+    case MessageKind::CNF:
+      return "CNF";
+    case MessageKind::OnlineAnnouncement:
+      return "OnlineAnnouncement";
+    case MessageKind::OfflineAnnouncement:
+      return "OfflineAnnouncement";
+    case MessageKind::AnnouncementRequest:
+      return "AnnouncementRequest";
+    case MessageKind::NodeStatus:
+      return "NodeStatus";
+    case MessageKind::CNFTreeNodeStatusRequest:
+      return "CNFTreeNodeStatusRequest";
+    case MessageKind::CNFTreeNodeStatusReply:
+      return "CNFTreeNodeStatusReply";
+    case MessageKind::NewRemoteConnected:
+      return "NewRemoteConnected";
+    case MessageKind::JobPath:
+      return "JobPath";
+    case MessageKind::JobResult:
+      return "JobResult";
+    case MessageKind::JobInitiator:
+      return "JobInitiator";
+  }
+}
 enum class TaskKind
 {
   NotSet,
   DecisionTask,
   SolverTask
 };
+constexpr const char*
+TaskKindToStr(TaskKind kind)
+{
+  switch(kind) {
+    case TaskKind::NotSet:
+      return "NotSet";
+    case TaskKind::DecisionTask:
+      return "DecisionTask";
+    case TaskKind::SolverTask:
+      return "SolverTask";
+  }
+}
 
 struct ClientBegin
 {
@@ -126,6 +168,33 @@ enum class Kind
   ConnectionEstablished,
   ConnectionDropped
 };
+constexpr const char*
+KindToStr(Kind kind)
+{
+  switch(kind) {
+    case Kind::ClientBegin:
+      return "ClientBegin";
+    case Kind::ComputeNodeDescription:
+      return "ComputeNodeDescription";
+    case Kind::SendMsg:
+      return "SendMsg";
+    case Kind::RecvMsg:
+      return "RecvMsg";
+    case Kind::OffloadTask:
+      return "OffloadTask";
+    case Kind::ReceiveTask:
+      return "ReceiveTask";
+    case Kind::StartProcessingTask:
+      return "StartProcessingTask";
+    case Kind::FinishProcessingTask:
+      return "FinishProcessingTask";
+    case Kind::ConnectionEstablished:
+      return "ConnectionEstablished";
+    case Kind::ConnectionDropped:
+      return "ConnectionDropped";
+  }
+}
+
 #define PARACOOBA_TRACEENTRY_BODY_INIT(TYPE, MEMBER) \
   Body(const TYPE& MEMBER)                           \
     : MEMBER(MEMBER)                                 \
@@ -170,20 +239,26 @@ struct TraceEntry
   traceentry::Body body;
 };
 
-#define PARACOOBA_TRACER_LOG(TYPE)                                         \
-  static void log(ID originId, const traceentry::TYPE& body)               \
-  {                                                                        \
-    using namespace std::chrono;                                           \
-    auto& self = get();                                                    \
-    if(self.m_active) {                                                    \
-      self.logEntry(TraceEntry{                                            \
-        self.m_thisId,                                                     \
-        originId,                                                          \
-        duration_cast<nanoseconds>(steady_clock::now() - self.m_startTime) \
-          .count(),                                                        \
-        traceentry::Kind::TYPE,                                            \
-        traceentry::Body(body) });                                         \
-    }                                                                      \
+inline std::ostream&
+operator<<(std::ostream& o, const TraceEntry& e)
+{
+  return o << "ns=" + std::to_string(e.nsSinceStart) +
+                " id=" + std::to_string(e.thisId) +
+                " originId=" + std::to_string(e.originId) +
+                " kind=" + traceentry::KindToStr(e.kind);
+}
+
+#define PARACOOBA_TRACER_LOG(TYPE)                           \
+  static void log(ID originId, const traceentry::TYPE& body) \
+  {                                                          \
+    auto& self = get();                                      \
+    if(self.m_active) {                                      \
+      self.logEntry(TraceEntry{ self.m_thisId,               \
+                                originId,                    \
+                                self.getCurrentOffset(),     \
+                                traceentry::Kind::TYPE,      \
+                                traceentry::Body(body) });   \
+    }                                                        \
   }
 
 class Tracer
@@ -195,12 +270,14 @@ class Tracer
     return tracer;
   }
 
-  void setActivated(bool activated);
+  void setActive(bool activated) { m_active = activated; }
   void setOutputPath(const std::string_view& path);
   void setThisId(ID thisId);
   bool isActive() const { return m_active; }
 
   void logEntry(const TraceEntry& e);
+
+  static void resetStart(uint64_t offset);
 
   PARACOOBA_TRACER_LOG(ClientBegin)
   PARACOOBA_TRACER_LOG(ComputeNodeDescription)
@@ -215,16 +292,25 @@ class Tracer
   PARACOOBA_TRACER_LOG(ConnectionEstablished)
   PARACOOBA_TRACER_LOG(ConnectionDropped)
 
+  inline int64_t getCurrentOffset()
+  {
+    using namespace std::chrono;
+    return duration_cast<nanoseconds>(steady_clock::now().time_since_epoch())
+             .count() -
+           m_startTime;
+  }
+
   private:
   Tracer();
   ~Tracer();
 
   std::string m_outputPath = "";
   ID m_thisId = 0;
-  bool m_active;
+  bool m_active = false;
 
-  std::chrono::time_point<std::chrono::steady_clock> m_startTime =
-    std::chrono::steady_clock::now();
+  int64_t m_startTime = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                          std::chrono::steady_clock::now().time_since_epoch())
+                          .count();
 
   struct OutHandle
   {

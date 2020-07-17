@@ -168,7 +168,8 @@ Runner::worker(uint32_t workerId)
                     traceentry::StartProcessingTask{
                       workerId,
                       static_cast<uint64_t>(m_taskQueue->size()),
-                      static_cast<uint64_t>(entry->factory->getSize()),
+                      static_cast<uint64_t>(
+                        entry->factory ? entry->factory->getSize() : 0),
                       entry->task->m_taskKind });
 #endif
 
@@ -192,20 +193,21 @@ Runner::worker(uint32_t workerId)
         }
         --m_numberOfRunningTasks;
         m_currentlyRunningTasks[workerId] = nullptr;
-        if(result) {
-          result->setTask(std::move(entry->task));
-          result->getTask().finish(*result);
-          entry->result.set_value(std::move(result));
-        }
 
 #ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
         Tracer::log(entry->originator,
                     traceentry::FinishProcessingTask{
                       workerId,
                       static_cast<uint64_t>(m_taskQueue->size()),
-                      static_cast<uint64_t>(entry->factory->getSize()),
+                      static_cast<uint64_t>(
+                        entry->factory ? entry->factory->getSize() : 0),
                       entry->task->m_taskKind });
 #endif
+        if(result) {
+          result->setTask(std::move(entry->task));
+          result->getTask().finish(*result);
+          entry->result.set_value(std::move(result));
+        }
       } else {
         PARACOOBA_LOG(logger, LocalError)
           << "Worker " << workerId

@@ -13,6 +13,7 @@
 #include "node_status.hpp"
 #include "offline_announcement.hpp"
 #include "online_announcement.hpp"
+#include "ping_pong.hpp"
 #include "type.hpp"
 
 #define PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(NAME)             \
@@ -68,6 +69,10 @@ class Message
       return Type::CNFTreeNodeStatusReply;
     if(std::holds_alternative<NewRemoteConnected>(body))
       return Type::NewRemoteConnected;
+    if(std::holds_alternative<Ping>(body))
+      return Type::Ping;
+    if(std::holds_alternative<Pong>(body))
+      return Type::Pong;
 
     return Type::Unknown;
   }
@@ -79,6 +84,8 @@ class Message
   PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(CNFTreeNodeStatusRequest)
   PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(CNFTreeNodeStatusReply)
   PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(NewRemoteConnected)
+  PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(Ping)
+  PARACOOBA_MESSAGES_MESSAGE_GETSET_BODY(Pong)
 
   using MessageBodyVariant = std::variant<NodeStatus,
                                           OnlineAnnouncement,
@@ -86,7 +93,9 @@ class Message
                                           AnnouncementRequest,
                                           CNFTreeNodeStatusRequest,
                                           CNFTreeNodeStatusReply,
-                                          NewRemoteConnected>;
+                                          NewRemoteConnected,
+                                          Ping,
+                                          Pong>;
 
   int64_t getTarget() const { return target; }
   int64_t getOrigin() const { return origin; }

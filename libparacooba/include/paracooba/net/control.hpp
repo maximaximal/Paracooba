@@ -2,6 +2,7 @@
 #define PARACOOBA_NET_CONTROL
 
 #include <boost/asio/io_service.hpp>
+#include <chrono>
 
 #include "../log.hpp"
 #include "../messages/message_receiver.hpp"
@@ -53,8 +54,12 @@ class Control : public messages::MessageReceiver
                                     NetworkedNode& conn);
   void handleNewRemoteConnected(const messages::Message& msg,
                                 NetworkedNode& conn);
+  void handlePing(const messages::Message& msg, NetworkedNode& conn);
+  void handlePong(const messages::Message& msg, NetworkedNode& conn);
 
   private:
+  void sendPing(NetworkedNode& conn, int64_t offset, bool daemon);
+
   boost::asio::io_service& m_ioService;
   ClusterNodeStore& m_clusterNodeStore;
   ConfigPtr m_config;
@@ -62,6 +67,15 @@ class Control : public messages::MessageReceiver
   Logger m_logger;
   messages::JobDescriptionReceiverProvider* m_jobDescriptionReceiverProvider =
     nullptr;
+
+  struct PingHandle
+  {
+    std::chrono::time_point<std::chrono::steady_clock> sent;
+    int64_t offset = 0;
+    bool setOffset = false;
+    bool alreadySent = false;
+  };
+  std::map<ID, PingHandle> m_pings;
 };
 }
 }

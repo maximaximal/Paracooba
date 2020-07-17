@@ -8,7 +8,12 @@
 #include "../../include/paracooba/net/connection.hpp"
 #include "../../include/paracooba/networked_node.hpp"
 
+#include <chrono>
 #include <regex>
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+#include "../../include/paracooba/tracer.hpp"
+#endif
 
 namespace paracooba {
 namespace net {
@@ -54,6 +59,12 @@ Control::receiveMessage(const messages::Message& msg, NetworkedNode& nn)
     case messages::Type::NewRemoteConnected:
       handleNewRemoteConnected(msg, nn);
       break;
+    case messages::Type::Ping:
+      handlePing(msg, nn);
+      break;
+    case messages::Type::Pong:
+      handlePong(msg, nn);
+      break;
     case messages::Type::Unknown:
       // Nothing to do on unknown messages.
       break;
@@ -81,6 +92,9 @@ Control::handleOnlineAnnouncement(const messages::Message& msg,
     msg.getOnlineAnnouncement();
   const messages::Node& messageNode = onlineAnnouncement.getNode();
 
+  // Always ping.
+  sendPing(nn, messageNode.getTracerOffset(), messageNode.getDaemonMode());
+
   int64_t id = msg.getOrigin();
 
   auto [clusterNode, inserted] = m_clusterNodeStore.getOrCreateNode(id);
@@ -104,6 +118,11 @@ Control::handleAnnouncementRequest(const messages::Message& msg,
   const messages::AnnouncementRequest& announcementRequest =
     msg.getAnnouncementRequest();
   const messages::Node& requester = announcementRequest.getRequester();
+
+  // Always ping.
+  sendPing(nn, requester.getTracerOffset(), requester.getDaemonMode());
+
+  int64_t id = msg.getOrigin();
 
   assert(msg.getOrigin() == requester.getId());
 
@@ -282,6 +301,55 @@ Control::handleNewRemoteConnected(const messages::Message& msg,
                         *this,
                         *m_jobDescriptionReceiverProvider);
   connection.connect(newRemoteConnected.getRemote());
+}
+
+void
+Control::handlePing(const messages::Message& msg, NetworkedNode& conn)
+{
+  messages::Message answer = conn.buildMessage(*m_config);
+  answer.insert(messages::Pong(msg.getPing()));
+  conn.transmitMessage(answer, conn);
+}
+void
+Control::handlePong(const messages::Message& msg, NetworkedNode& conn)
+{
+  PingHandle& handle = m_pings[conn.getId()];
+  int64_t pingTimeNs = (std::chrono::steady_clock::now() - handle.sent).count();
+
+  PARACOOBA_LOG(m_logger, Trace)
+    << "Ping to remote " << conn << " returned with delay of " << pingTimeNs
+    << "ns";
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  if(handle.setOffset && m_config->isDaemonMode()) {
+    // Reset tracer offset and automatically activate, if not yet active.
+    if(!Tracer::get().isActive()) {
+      Tracer::resetStart(handle.offset + pingTimeNs / 2);
+
+      PARACOOBA_LOG(m_logger, Debug)
+        << "Reset tracer start time to match connected client. Offset is "
+        << handle.offset + pingTimeNs / 2 << "ns (Ping = " << pingTimeNs
+        << "ns)";
+    }
+  }
+#endif
+  m_pings.erase(conn.getId());
+}
+
+void
+Control::sendPing(NetworkedNode& conn, int64_t offset, bool daemon)
+{
+  PingHandle& handle = m_pings[conn.getId()];
+  if(!handle.alreadySent) {
+    handle.alreadySent = true;
+    handle.sent = std::chrono::steady_clock::now();
+    handle.offset = offset;
+    handle.setOffset = !daemon;
+
+    messages::Message pingMsg = conn.buildMessage(*m_config);
+    pingMsg.insert(messages::Ping(conn.getId()));
+    conn.transmitMessage(pingMsg, conn);
+  }
 }
 }
 }

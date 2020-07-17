@@ -338,6 +338,11 @@ Config::buildNode() const
   uint64_t maxCPUFreq = 0;
   uint64_t workQueueSize = getCommunicator()->getRunner()->getWorkQueueSize();
   uint32_t uptime = 0;
+  int64_t tracerOffset = 0;
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  tracerOffset = Tracer::get().getCurrentOffset();
+#endif
 
   messages::Node node(std::string(getString(Key::LocalName)),
                       getInt64(Key::Id),
@@ -348,7 +353,8 @@ Config::buildNode() const
                       uptime,
                       getUint16(Key::UDPListenPort),
                       getUint16(Key::TCPListenPort),
-                      isDaemonMode());
+                      isDaemonMode(),
+                      tracerOffset);
 
   // Populate known hosts from cluster statistics, if available.
   if(m_communicator && m_communicator->getClusterStatistics()) {

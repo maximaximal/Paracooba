@@ -38,8 +38,9 @@ Tracer::logEntry(const TraceEntry& e)
 {
   if(!m_outHandle.outStream.is_open()) {
     m_outHandle.path =
-      m_outputPath +
-      std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+      m_outputPath + "paracooba_thread_trace_" +
+      std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id())) +
+      ".bin";
     m_outHandle.outStream.open(m_outHandle.path,
                                std::ofstream::out | std::ofstream::app);
   }
@@ -47,6 +48,20 @@ Tracer::logEntry(const TraceEntry& e)
   // Just directly write the binary structure to the file for the current
   // thread.
   m_outHandle.outStream.write(reinterpret_cast<const char*>(&e), sizeof(e));
+}
+
+void
+Tracer::resetStart(uint64_t offset)
+{
+  // Reset the start time to be now with the specified offset. This is called on
+  // first contact with a client, to synchronize the daemon clock with the
+  // client.
+  get().m_startTime = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch())
+                        .count() -
+                      offset;
+
+  get().m_active = get().m_outputPath != "";
 }
 }
 

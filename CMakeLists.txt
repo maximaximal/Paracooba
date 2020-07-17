@@ -23,7 +23,7 @@ find_package(Threads)
 # Enable LTO.
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported_result)
-if(ipo_supported_result)
+if(ipo_supported_result AND NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
     message(STATUS "LTO supported. Enable Link Time Optimization on all targets.")
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
@@ -35,7 +35,7 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost COMPONENTS log program_options thread filesystem system REQUIRED)
+find_package(Boost COMPONENTS log program_options thread filesystem system iostreams REQUIRED)
 
 # Try to include beast headers. They are required for the internal webserver.
 find_file(BOOST_BEAST_HEADER "boost/beast/core.hpp" PATHS ${Boost_INCLUDE_DIRS})
@@ -100,6 +100,11 @@ endif()
 # Logalyzer
 if(DEBUG_ENABLE_BUILD_LOGALYZER)
     add_subdirectory(logalyzer)
+endif()
+
+# Tracealyzer
+if(ENABLE_TRACING_SUPPORT)
+    add_subdirectory(tracealyzer)
 endif()
 
 # Basenames for logging

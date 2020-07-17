@@ -65,6 +65,10 @@ main(int argc, char* argv[])
     << "Trace support enabled and trace "
     << (Tracer::get().isActive() ? "active" : "inactive");
 
+  if(config->isDaemonMode()) {
+    Tracer::get().setActive(false);
+  }
+
   Tracer::log(config->getId(),
               traceentry::ComputeNodeDescription{
                 config->getUint32(Config::ThreadCount) });
