@@ -156,9 +156,13 @@ class TraceFile
       TraceEntry& first = (*this)[0];
       if(first.kind != traceentry::Kind::ClientBegin ||
          !first.body.clientBegin.sorted) {
-        clog << "Begin sorting... ";
         sort();
-        clog << " sorting finished!" << endl;
+        if(first.kind != traceentry::Kind::ClientBegin) {
+          cerr << "!! First entry not of kind ClientBegin! Is the data correct?"
+               << endl;
+        } else {
+          first.body.clientBegin.sorted = true;
+        }
       }
     }
   }
@@ -180,7 +184,13 @@ class TraceFile
     return *reinterpret_cast<const TraceEntry*>(
       &sink.const_data()[index * sizeof(TraceEntry)]);
   }
-  void sort() { std::sort(begin(), end()); }
+
+  void sort()
+  {
+    clog << "Begin sorting... ";
+    std::sort(begin(), end());
+    clog << " sorting finished! " << endl;
+  }
 
   TraceEntryIterator begin() { return TraceEntryIterator(&(*this)[0]); }
   TraceEntryIterator end() { return TraceEntryIterator(&(*this)[0] + entries); }
@@ -201,6 +211,7 @@ main(int argc, char* argv[])
   // clang-format off
   desc.add_options()
     ("help", "produce help message")
+    ("force-sort", po::value<bool>(), "force re-sorting the events")
     ("trace", po::value<std::string>(), "concatenated trace file")
   ;
   posDesc.add("trace", -1);
@@ -242,8 +253,8 @@ main(int argc, char* argv[])
 
   TraceFile traceFile(trace);
 
-  for(auto& e : traceFile) {
-    cout << e << endl;
+  if(vm.count("force-sort") && vm["force-sort"].as<bool>()) {
+    traceFile.sort();
   }
 
   return EXIT_SUCCESS;
