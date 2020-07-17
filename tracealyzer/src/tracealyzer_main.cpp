@@ -34,6 +34,110 @@ BytePrettyPrint(size_t bytes)
 class TraceFile
 {
   public:
+  // Taken from https://stackoverflow.com/a/31886483
+  template<typename Type>
+  class Iterator : public std::iterator<std::random_access_iterator_tag, Type>
+  {
+    public:
+    using difference_type =
+      typename std::iterator<std::random_access_iterator_tag,
+                             Type>::difference_type;
+
+    Iterator()
+      : _ptr(nullptr)
+    {}
+    Iterator(Type* rhs)
+      : _ptr(rhs)
+    {}
+    Iterator(const Iterator& rhs)
+      : _ptr(rhs._ptr)
+    {}
+    /* inline Iterator& operator=(Type* rhs) {_ptr = rhs; return *this;} */
+    /* inline Iterator& operator=(const Iterator &rhs) {_ptr = rhs._ptr; return
+     * *this;} */
+    inline Iterator& operator+=(difference_type rhs)
+    {
+      _ptr += rhs;
+      return *this;
+    }
+    inline Iterator& operator-=(difference_type rhs)
+    {
+      _ptr -= rhs;
+      return *this;
+    }
+    inline Type& operator*() const { return *_ptr; }
+    inline Type* operator->() const { return _ptr; }
+    inline Type& operator[](difference_type rhs) const { return _ptr[rhs]; }
+
+    inline Iterator& operator++()
+    {
+      ++_ptr;
+      return *this;
+    }
+    inline Iterator& operator--()
+    {
+      --_ptr;
+      return *this;
+    }
+    inline Iterator operator++(int) const
+    {
+      Iterator tmp(*this);
+      ++_ptr;
+      return tmp;
+    }
+    inline Iterator operator--(int) const
+    {
+      Iterator tmp(*this);
+      --_ptr;
+      return tmp;
+    }
+    /* inline Iterator operator+(const Iterator& rhs) {return
+     * Iterator(_ptr+rhs.ptr);} */
+    inline difference_type operator-(const Iterator& rhs) const
+    {
+      return _ptr - rhs._ptr;
+    }
+    inline Iterator operator+(difference_type rhs) const
+    {
+      return Iterator(_ptr + rhs);
+    }
+    inline Iterator operator-(difference_type rhs) const
+    {
+      return Iterator(_ptr - rhs);
+    }
+    friend inline Iterator operator+(difference_type lhs, const Iterator& rhs)
+    {
+      return Iterator(lhs + rhs._ptr);
+    }
+    friend inline Iterator operator-(difference_type lhs, const Iterator& rhs)
+    {
+      return Iterator(lhs - rhs._ptr);
+    }
+
+    inline bool operator==(const Iterator& rhs) const
+    {
+      return _ptr == rhs._ptr;
+    }
+    inline bool operator!=(const Iterator& rhs) const
+    {
+      return _ptr != rhs._ptr;
+    }
+    inline bool operator>(const Iterator& rhs) const { return _ptr > rhs._ptr; }
+    inline bool operator<(const Iterator& rhs) const { return _ptr < rhs._ptr; }
+    inline bool operator>=(const Iterator& rhs) const
+    {
+      return _ptr >= rhs._ptr;
+    }
+    inline bool operator<=(const Iterator& rhs) const
+    {
+      return _ptr <= rhs._ptr;
+    }
+
+    private:
+    Type* _ptr;
+  };
+  using TraceEntryIterator = Iterator<TraceEntry>;
+
   TraceFile(const std::string& path)
   {
     sink.open(path);
@@ -47,6 +151,16 @@ class TraceFile
 
     clog << "-> Opened trace of size " << BytePrettyPrint(byteSize)
          << ", containing " << entries << " trace entries." << endl;
+
+    if(size() > 0) {
+      TraceEntry& first = (*this)[0];
+      if(first.kind != traceentry::Kind::ClientBegin ||
+         !first.body.clientBegin.sorted) {
+        clog << "Begin sorting... ";
+        sort();
+        clog << " sorting finished!" << endl;
+      }
+    }
   }
   ~TraceFile() {}
 
@@ -66,6 +180,12 @@ class TraceFile
     return *reinterpret_cast<const TraceEntry*>(
       &sink.const_data()[index * sizeof(TraceEntry)]);
   }
+  void sort() { std::sort(begin(), end()); }
+
+  TraceEntryIterator begin() { return TraceEntryIterator(&(*this)[0]); }
+  TraceEntryIterator end() { return TraceEntryIterator(&(*this)[0] + entries); }
+
+  inline size_t size() const { return entries; }
 
   private:
   boost::iostreams::mapped_file sink;
@@ -122,7 +242,9 @@ main(int argc, char* argv[])
 
   TraceFile traceFile(trace);
 
-  cout << traceFile[0] << endl;
+  for(auto& e : traceFile) {
+    cout << e << endl;
+  }
 
   return EXIT_SUCCESS;
 }

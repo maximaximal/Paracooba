@@ -22,6 +22,8 @@ enum class MessageKind
   CNFTreeNodeStatusRequest,
   CNFTreeNodeStatusReply,
   NewRemoteConnected,
+  Ping,
+  Pong,
   JobPath,
   JobResult,
   JobInitiator
@@ -54,6 +56,10 @@ MessageKindToStr(MessageKind kind)
       return "JobResult";
     case MessageKind::JobInitiator:
       return "JobInitiator";
+    case MessageKind::Ping:
+      return "Ping";
+    case MessageKind::Pong:
+      return "Pong";
   }
 }
 enum class TaskKind
@@ -192,6 +198,10 @@ KindToStr(Kind kind)
       return "ConnectionEstablished";
     case Kind::ConnectionDropped:
       return "ConnectionDropped";
+    case Kind::SendResult:
+      return "SendResult";
+    case Kind::ReceiveResult:
+      return "ReceiveResult";
   }
 }
 
@@ -237,6 +247,8 @@ struct TraceEntry
   int64_t nsSinceStart = 0;
   traceentry::Kind kind = traceentry::Kind::ClientBegin;
   traceentry::Body body;
+
+  bool operator<(TraceEntry& o) { return nsSinceStart < o.nsSinceStart; }
 };
 
 inline std::ostream&

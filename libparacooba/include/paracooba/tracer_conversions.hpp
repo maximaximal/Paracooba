@@ -37,6 +37,10 @@ MessageTypeToTraceMessageKind(messages::Type type)
       return traceentry::MessageKind::CNFTreeNodeStatusRequest;
     case messages::Type::NewRemoteConnected:
       return traceentry::MessageKind::NewRemoteConnected;
+    case messages::Type::Ping:
+      return traceentry::MessageKind::Ping;
+    case messages::Type::Pong:
+      return traceentry::MessageKind::Pong;
     default:
       return traceentry::MessageKind::Unknown;
   }
