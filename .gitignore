@@ -131,4 +131,5 @@ build-gcc/
 build-fresh/
 build-*/
 clangd
+.clangd
 .ccls-cache

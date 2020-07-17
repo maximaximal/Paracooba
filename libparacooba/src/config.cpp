@@ -17,6 +17,10 @@
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+#include "../include/paracooba/tracer.hpp"
+#endif
+
 namespace paracooba {
 Config::Config()
   : m_optionsCLI("CLI-only options")
@@ -120,6 +124,9 @@ Config::Config()
     (GetConfigNameFromEnum(Config::DaemonHost),
      po::value<std::string>()->default_value("127.0.0.1")->value_name("string"),
          "Initial peer to connect to. Should should be a long-running daemon.")
+    (GetConfigNameFromEnum(Config::TraceOutputPath),
+     po::value<std::string>()->default_value("")->value_name("string"),
+         "Output path for binary traces which can be analyzed in greater quantities than regular log files. See documentation about binary traces. Only generated if output path is defined. Path is a new directory to be created.")
     ("debug,d", po::bool_switch(&m_debugMode)->default_value(false)->value_name("bool"), "debug mode (activate DEBG output)")
     ("trace,t", po::bool_switch(&m_traceMode)->default_value(false)->value_name("bool"), "trace mode (activate TRCE output)")
     ("network-debug,nd", po::bool_switch(&m_networkDebugMode)->default_value(false)->value_name("bool"), "network debug mode (NDBG output)")
@@ -297,10 +304,17 @@ Config::processCommonParameters(const boost::program_options::variables_map& vm)
     vm, m_config.data(), Config::InitialMinimalCubeDepth);
   conditionallySetConfigOptionToArray<std::string>(
     vm, m_config.data(), Config::MarchPath);
+  conditionallySetConfigOptionToArray<std::string>(
+    vm, m_config.data(), Config::TraceOutputPath);
 
   if(vm.count(GetConfigNameFromEnum(Id))) {
     m_config[Id] = generateId(vm[GetConfigNameFromEnum(Id)].as<int64_t>());
   }
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  Tracer::get().setThisId(getId());
+  Tracer::get().setOutputPath(getString(TraceOutputPath));
+#endif
 
   return true;
 }

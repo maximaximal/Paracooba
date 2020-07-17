@@ -20,6 +20,11 @@
 #include <cereal/archives/binary.hpp>
 #include <sstream>
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+#include "../../include/paracooba/tracer.hpp"
+#include "../../include/paracooba/tracer_conversions.hpp"
+#endif
+
 namespace paracooba {
 namespace net {
 
@@ -264,6 +269,27 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
       connectionEstablished() = true;
       // should not be required and may lead to issues.
       // writeHandler();
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+      {
+        auto address = socket().remote_endpoint().address();
+
+        if(address.is_v6()) {
+          Tracer::log(-1,
+                      traceentry::ConnectionEstablished{
+                        remoteId(),
+                        0,
+                        address.to_v6().to_bytes(),
+                        socket().remote_endpoint().port() });
+        } else {
+          Tracer::log(-1,
+                      traceentry::ConnectionEstablished{
+                        remoteId(),
+                        address.to_v4().to_uint(),
+                        { 0 },
+                        socket().remote_endpoint().port() });
+        }
+      }
+#endif
 
       // Now set the connection to ready in the networked node.
       if(auto nn = remoteNN().lock()) {
@@ -315,6 +341,26 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
   } else if(ec == boost::asio::error::eof) {
     // Socket has been closed, connection ended. This can happen on purpose
     // (closed client session)
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+    auto address = socket().remote_endpoint().address();
+
+    if(address.is_v6()) {
+      Tracer::log(
+        -1,
+        traceentry::ConnectionDropped{ remoteId(),
+                                       0,
+                                       address.to_v6().to_bytes(),
+                                       socket().remote_endpoint().port() });
+    } else {
+      Tracer::log(
+        -1,
+        traceentry::ConnectionDropped{ remoteId(),
+                                       address.to_v4().to_uint(),
+                                       { 0 },
+                                       socket().remote_endpoint().port() });
+    }
+#endif
 
     if(resumeMode() == RestartAfterShutdown) {
       PARACOOBA_LOG(logger(), LocalWarning)
@@ -380,6 +426,13 @@ Connection::writeHandler(boost::system::error_code ec, size_t bytes_transferred)
             << "Now sending CNF with size " << BytePrettyPrint(sendSize())
             << ".";
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+          Tracer::log(
+            (*cnf)->getOriginId(),
+            traceentry::SendMsg{
+              remoteId(), sendSize(), false, traceentry::MessageKind::CNF });
+#endif
+
           // Let sending of potentially huge CNF be handled by the CNF class
           // internally.
           assert(*cnf);
@@ -393,16 +446,36 @@ Connection::writeHandler(boost::system::error_code ec, size_t bytes_transferred)
             std::ostream outStream(&sendStreambuf());
             cereal::BinaryOutputArchive oa(outStream);
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+            traceentry::MessageKind messageKind =
+              traceentry::MessageKind::Unknown;
+            ID originID = -1;
+#endif
+
             if((jd = std::get_if<messages::JobDescription>(
                   currentSendItem().get()))) {
               oa(*jd);
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+              originID = jd->getOriginatorID();
+              messageKind = JobDescriptionKindToTraceMessageKind(jd->getKind());
+#endif
             } else if((msg = std::get_if<messages::Message>(
                          currentSendItem().get()))) {
               oa(*msg);
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+              messageKind = MessageTypeToTraceMessageKind(msg->getType());
+#endif
             }
+
+            sendSize() = boost::asio::buffer_size(sendStreambuf().data());
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+            Tracer::log(originID,
+                        traceentry::SendMsg{
+                          remoteId(), sendSize(), false, messageKind });
+#endif
           }
 
-          sendSize() = boost::asio::buffer_size(sendStreambuf().data());
           yield async_write(socket(), BUF(sendSize), wh);
 
           PARACOOBA_LOG(logger(), NetTrace)
@@ -621,6 +694,15 @@ Connection::receiveSerializedMessage(size_t bytes_received)
           auto kind = jd.getKind();
           receiver->receiveJobDescription(std::move(jd), nn);
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+          Tracer::log(
+            jd.getOriginatorID(),
+            traceentry::RecvMsg{ remoteId(),
+                                 bytes_received,
+                                 false,
+                                 JobDescriptionKindToTraceMessageKind(kind) });
+#endif
+
           if(context()) {
             // This is a connection between a Master and a Daemon. So the
             // context for this formula can be notified of this JD.
@@ -653,6 +735,15 @@ Connection::receiveSerializedMessage(size_t bytes_received)
         messages::Message msg;
         ia(msg);
         messageReceiver().receiveMessage(msg, *nn);
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+        Tracer::log(
+          -1,
+          traceentry::RecvMsg{ remoteId(),
+                               bytes_received,
+                               false,
+                               MessageTypeToTraceMessageKind(msg.getType()) });
+#endif
 
         if(msg.getType() == messages::Type::OfflineAnnouncement) {
           resumeMode() = EndAfterShutdown;

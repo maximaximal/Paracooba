@@ -13,6 +13,8 @@ option(DEBUG_ENABLE_BUILD_LOGALYZER "enable logalyzer tool to be built. Makes fi
 option(DEBUG_ENABLE_CLANG_TIDY "enable clang-tidy check of source code" OFF)
 option(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX "allow clang-tidy to modify source files and automatically fix issues. Very likely leads to uncompilable code, use selectively." OFF)
 
+option(ENABLE_TRACING_SUPPORT "enable support for writing binary event traces to be able to debug the distributed Paracooba more efficiently." ON)
+
 option(ENABLE_TESTS "enable building and integrating unit tests" ON)
 
 # Libraries
@@ -54,7 +56,7 @@ if(NOT CLANG_TIDY_EXE)
     message(STATUS "clang-tidy not found.")
 else()
     message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE} - Enable checking with -DDEBUG_ENABLE_CLANG_TIDY=ON in CMake. Warning: Compilation Overhead!")
-    
+
     set(CLANG_TIDY_ARG_FIX "")
     if(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX)
         set(CLANG_TIDY_ARG_FIX "-fix")

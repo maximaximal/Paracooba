@@ -5,6 +5,10 @@
 #include "taskresult.hpp"
 #include <boost/signals2/signal.hpp>
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+#include "tracer.hpp"
+#endif
+
 namespace paracooba {
 class Runner;
 class Communicator;
@@ -53,7 +57,7 @@ class Task
   inline FinishedSignal& getFinishedSignal() { return m_finishedSignal; }
 
   const TaskFactory* getTaskFactory() const { return m_factory; }
-  virtual void shouldFastSplit (bool) {};
+  virtual void shouldFastSplit(bool){};
 
   protected:
   friend class Runner;
@@ -91,6 +95,12 @@ class Task
   /// not the source of the whole query (not the same as rootCNF ID), but the
   /// compute node before this one.
   int64_t m_originator = 0;
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  /// The kind of the task. This is used when tracing what is executed. Must be
+  /// set in derived classes.
+  traceentry::TaskKind m_taskKind = traceentry::TaskKind::NotSet;
+#endif
 };
 }
 

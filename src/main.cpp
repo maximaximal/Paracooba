@@ -1,3 +1,4 @@
+#include "paracooba/taskresult.hpp"
 #include <iostream>
 
 #include <boost/exception/all.hpp>
@@ -13,6 +14,10 @@
 
 namespace po = boost::program_options;
 using namespace paracooba;
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+#include <paracooba/tracer.hpp>
+#endif
 
 int
 main(int argc, char* argv[])
@@ -43,9 +48,29 @@ main(int argc, char* argv[])
   if(config->isDaemonMode()) {
     daemon = std::make_unique<Daemon>(config, log, communicator);
   } else {
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+    Tracer::log(config->getId(),
+                traceentry::ClientBegin{
+                  std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::system_clock::now().time_since_epoch())
+                    .count(),
+                  false });
+#endif
     client = std::make_unique<Client>(config, log, communicator);
     client->solve();
   }
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  PARACOOBA_LOG(logger, Debug)
+    << "Trace support enabled and trace "
+    << (Tracer::get().isActive() ? "active" : "inactive");
+
+  Tracer::log(config->getId(),
+              traceentry::ComputeNodeDescription{
+                config->getUint32(Config::ThreadCount) });
+#else
+  PARACOOBA_LOG(logger, Debug) << "Trace support disabled";
+#endif
 
   try {
     communicator->run();
@@ -59,7 +84,6 @@ main(int argc, char* argv[])
       << "Encountered exception which was not catched until main()! Message: "
       << e.what();
   }
-
 
   if(!config->isDaemonMode()) {
     // Client mode. There should be some action.
@@ -79,19 +103,17 @@ main(int argc, char* argv[])
       case TaskResult::Unsolved:
         std::cout << "s UNKNOWN" << std::endl;
         break;
-       case TaskResult::Satisfiable:
-        {
-          std::cout << "s SATISFIABLE";
-          auto assignement { *client->getSatAssignment() };
-          for(auto i = 1; i < assignement.size(); ++i) {
-            if(i % 10 == 1) {
-              std::cout << "\nv";
-            }
-            std::cout << " " << (assignement[i] ? "-" : "") << i;
+      case TaskResult::Satisfiable: {
+        std::cout << "s SATISFIABLE";
+        auto assignement{ *client->getSatAssignment() };
+        for(auto i = 1; i < assignement.size(); ++i) {
+          if(i % 10 == 1) {
+            std::cout << "\nv";
           }
-          std ::cout << " 0\n";
+          std::cout << " " << (assignement[i] ? "-" : "") << i;
         }
-        break;
+        std ::cout << " 0\n";
+      } break;
       case TaskResult::Unsatisfiable:
         std::cout << "s UNSATISFIABLE" << std::endl;
         break;
@@ -103,7 +125,10 @@ main(int argc, char* argv[])
   }
 
   auto end = std::chrono::system_clock::now();
-  PARACOOBA_LOG(logger, Trace) << "Solving took " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "s";
+  PARACOOBA_LOG(logger, Trace)
+    << "Solving took "
+    << std::chrono::duration_cast<std::chrono::seconds>(end - start).count()
+    << "s";
 
   PARACOOBA_LOG(logger, Trace) << "Ending paracooba.";
   return EXIT_SUCCESS;

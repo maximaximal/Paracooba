@@ -20,6 +20,7 @@ set(PARACOOBA_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/cnftree.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/networked_node.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tracer.cpp
 
     ${CUBER_SRCS}
     ${WEBSERVER_SRCS}

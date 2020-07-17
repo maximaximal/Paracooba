@@ -7,6 +7,11 @@
 
 #include <algorithm>
 #include <chrono>
+#include <limits>
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+#include "../include/paracooba/tracer.hpp"
+#endif
 
 namespace paracooba {
 Runner::Runner(Communicator* communicator, ConfigPtr config, LogPtr log)
@@ -130,13 +135,14 @@ Runner::worker(uint32_t workerId)
       checkTaskFactories();
       conditionallySetAutoShutdownTimer();
       std::unique_lock<std::mutex> lock(m_taskQueue->getMutex());
-      while(m_running && !m_newTasksVerifier && m_taskQueue->size() == 0) {
+      while(m_running && !m_newTasksVerifier && m_taskQueue &&
+            m_taskQueue->size() == 0) {
         PARACOOBA_LOG(logger, Trace)
           << "Worker " << workerId << " waiting for tasks.";
         m_newTasks.wait(lock);
       }
 
-      if(m_taskQueue->size() > 0) {
+      if(m_taskQueue && m_taskQueue->size() > 0) {
         entry = m_taskQueue->popNoLock();
         m_newTasksVerifier = false;
       }
@@ -157,6 +163,15 @@ Runner::worker(uint32_t workerId)
         entry->task->m_originator = entry->originator;
         entry->task->m_workerId = workerId;
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+        Tracer::log(entry->originator,
+                    traceentry::StartProcessingTask{
+                      workerId,
+                      static_cast<uint64_t>(m_taskQueue->size()),
+                      static_cast<uint64_t>(entry->factory->getSize()),
+                      entry->task->m_taskKind });
+#endif
+
         auto factory{ entry->task->m_factory };
         m_currentlyRunningTasks[workerId] = entry->task.get();
         ++m_numberOfRunningTasks;
@@ -165,7 +180,8 @@ Runner::worker(uint32_t workerId)
           {
 
             std::unique_lock<std::mutex> lock(m_taskQueue->getMutex());
-            entry->task->shouldFastSplit(m_taskQueue->size() < m_currentlyRunningTasks.size());
+            entry->task->shouldFastSplit(m_taskQueue->size() <
+                                         m_currentlyRunningTasks.size());
           }
           result = std::move(entry->task->execute());
         } catch(const std::exception& e) {
@@ -181,6 +197,15 @@ Runner::worker(uint32_t workerId)
           result->getTask().finish(*result);
           entry->result.set_value(std::move(result));
         }
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+        Tracer::log(entry->originator,
+                    traceentry::FinishProcessingTask{
+                      workerId,
+                      static_cast<uint64_t>(m_taskQueue->size()),
+                      static_cast<uint64_t>(entry->factory->getSize()),
+                      entry->task->m_taskKind });
+#endif
       } else {
         PARACOOBA_LOG(logger, LocalError)
           << "Worker " << workerId

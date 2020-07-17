@@ -4,12 +4,13 @@
 #include "../include/paracooba/cnf.hpp"
 #include "../include/paracooba/communicator.hpp"
 #include "../include/paracooba/config.hpp"
+#include "paracooba/tracer.hpp"
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 #include <cassert>
 
-#include <iostream>
 #include <algorithm>
+#include <iostream>
 
 using std::cout;
 using std::endl;
@@ -44,8 +45,13 @@ CaDiCaLTask::CaDiCaLTask(const CaDiCaLTask& other)
 {
   copyFromCaDiCaLTask(other);
   m_name = "CaDiCaL Task (copied)";
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  m_taskKind = traceentry::TaskKind::SolverTask;
+#endif
 }
-CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service, const TaskResult& result)
+CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service,
+                         const TaskResult& result)
   : CaDiCaLTask(io_service, nullptr, ParseAndSolve)
 {
   Task& otherTask = result.getTask();
@@ -56,6 +62,10 @@ CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service, const TaskResult& 
     // task result is given to this constructor.
     assert(false);
   }
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  m_taskKind = traceentry::TaskKind::SolverTask;
+#endif
 }
 CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
   : m_terminator(std::move(other.m_terminator))
@@ -68,10 +78,15 @@ CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
 {
   m_terminator->setCaDiCaLTask(this);
   m_name = "CaDiCaL Task (moved)";
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  m_taskKind = traceentry::TaskKind::SolverTask;
+#endif
 }
 
-
-CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service, uint32_t* varCount, Mode mode)
+CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service,
+                         uint32_t* varCount,
+                         Mode mode)
   : m_terminator(std::make_unique<Terminator>(this))
   , m_varCount(varCount)
   , m_mode(mode)
@@ -80,6 +95,10 @@ CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service, uint32_t* varCount
   , m_io_service(io_service)
 {
   m_name = "CaDiCaL Task (completely new)";
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  m_taskKind = traceentry::TaskKind::SolverTask;
+#endif
 }
 
 CaDiCaLTask::~CaDiCaLTask() {}
@@ -151,8 +170,8 @@ CaDiCaLTask::applyCubeFromCuber(Path p, cuber::Cuber& cuber)
   cube.reserve(CNFTree::getDepth(p));
   cuber.getCube(p, cube);
 
-  PARACOOBA_LOG((*m_logger), Trace)
-    << "Applying from supplied cube " << CNFTree::pathToStrNoAlloc(m_path) << " ";
+  PARACOOBA_LOG((*m_logger), Trace) << "Applying from supplied cube "
+                                    << CNFTree::pathToStrNoAlloc(m_path) << " ";
 
   for(int lit : cube) {
     m_solver->assume(lit);
@@ -164,7 +183,6 @@ CaDiCaLTask::applyCubeFromCuber(Path p, cuber::Cuber& cuber)
   m_finishedSignal.connect(
     std::bind(&CNF::solverFinishedSlot, m_cnf, std::placeholders::_1, p));
 }
-
 
 void
 CaDiCaLTask::readDIMACSFile(std::string_view sourcePath)
@@ -243,16 +261,17 @@ CaDiCaLTask::execute()
   m_internalVarCount = m_solver->vars();
 
   if(m_mode & Mode::Solve) {
-    std::chrono::duration<double> average_time = std::chrono::duration_cast<std::chrono::milliseconds>(m_cnf->averageSolvingTime());
+    std::chrono::duration<double> average_time =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+        m_cnf->averageSolvingTime());
     fastSplit.tick(!m_cnf->isTaskFactoryNonEmpty());
     const int multiplication_factor = fastSplit ? 1 : 2;
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       average_time * multiplication_factor);
     PARACOOBA_LOG((*m_logger), Trace)
       << "Start solving CNF formula using CaDiCaL CNF solver "
-      << "for roughly "
-      << duration.count()
-      << "ms (fastSplit = " << fastSplit << ").";
+      << "for roughly " << duration.count() << "ms (fastSplit = " << fastSplit
+      << ").";
 
     m_interrupt_solving = false;
     if(m_cnf->shouldResplitCubes() &&
@@ -260,7 +279,7 @@ CaDiCaLTask::execute()
       m_autoStopTimer.expires_from_now(duration);
       m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
         std::lock_guard lock(m_solverMutex);
-        if(errc != boost::asio::error::operation_aborted && m_solver){
+        if(errc != boost::asio::error::operation_aborted && m_solver) {
           PARACOOBA_LOG((*m_logger), Cubes)
             << "CNF formula for path " << CNFTree::pathToStrNoAlloc(m_path)
             << " will be interrupted.";
@@ -277,14 +296,17 @@ CaDiCaLTask::execute()
     PARACOOBA_LOG((*m_logger), Cubes)
       << "Stopped solving CNF formula using CaDiCaL CNF solver "
       << "after roughly "
-      << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
-         1'000 * (end - start))).count()
+      << std::chrono::duration<double>(
+           std::chrono::duration_cast<std::chrono::milliseconds>(1'000 *
+                                                                 (end - start)))
+           .count()
       << "ms.";
 
     auto duration_solving =
       std::chrono::duration_cast<std::chrono::milliseconds>((end - start));
     if(solveResult != 0) {
-      m_cnf->update_averageSolvingTime(std::chrono::duration<double>(duration_solving));
+      m_cnf->update_averageSolvingTime(
+        std::chrono::duration<double>(duration_solving));
     }
 
     if(!m_interrupt_solving) {
@@ -294,8 +316,7 @@ CaDiCaLTask::execute()
     }
 
     switch(solveResult) {
-    case 0:
-      {
+      case 0: {
         m_interrupt_solving = false;
         auto start = std::chrono::steady_clock::now();
         auto new_cubes = resplit(duration, fastSplit);
@@ -303,8 +324,11 @@ CaDiCaLTask::execute()
         auto end = std::chrono::steady_clock::now();
         PARACOOBA_LOG((*m_logger), Cubes)
           << " splitting took "
-          << std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
-              1'000 * (end - start))).count() << "ms";
+          << std::chrono::duration<double>(
+               std::chrono::duration_cast<std::chrono::milliseconds>(
+                 1'000 * (end - start)))
+               .count()
+          << "ms";
 
         auto duration_splitting =
           std::chrono::duration_cast<std::chrono::milliseconds>((end - start));
@@ -318,21 +342,21 @@ CaDiCaLTask::execute()
           m_cnf->getCNFTree().setStateFromLocal(m_path, CNFTree::Working);
           for(auto&& [path, cube] : new_cubes)
             m_cnf->addPath(path, m_originator, cube);
-        } else // very unlikely, but still
+        } else// very unlikely, but still
           status = TaskResult::Unsatisfiable;
         auto result = std::make_unique<TaskResult>(status);
         return std::move(result);
         break;
       }
-    case 10:
-      status = TaskResult::Satisfiable;
-      break;
-    case 20:
-      status = TaskResult::Unsatisfiable;
-      break;
-    default:
-      status = TaskResult::Unsolved;
-      break;
+      case 10:
+        status = TaskResult::Satisfiable;
+        break;
+      case 20:
+        status = TaskResult::Unsatisfiable;
+        break;
+      default:
+        status = TaskResult::Unsolved;
+        break;
     }
   }
 
@@ -350,14 +374,13 @@ CaDiCaLTask::resplit_once(Path path, Cube literals)
 
   Cube literals2(literals);
   for(auto lit : literals) {
-    PARACOOBA_LOG((*m_logger), Cubes)
-      << "cube lit: " << lit;
+    PARACOOBA_LOG((*m_logger), Cubes) << "cube lit: " << lit;
     m_solver->assume(lit);
   }
 
   Literal lit_to_split = m_solver->lookahead();
   m_solver->reset_assumptions();
-  if (lit_to_split == 0) {
+  if(lit_to_split == 0) {
     if(m_solver->state() == CaDiCaL::SATISFIED) {
       m_cnf->getCNFTree().setStateFromLocal(path, CNFTree::SAT);
       return std::vector<std::pair<Path, Cube>>{};
@@ -375,46 +398,46 @@ CaDiCaLTask::resplit_once(Path path, Cube literals)
   literals.push_back(lit_to_split);
   literals2.push_back(-lit_to_split);
   m_solver->reset_assumptions();
-  return std::vector<std::pair<Path, Cube>>
-    {{CNFTree::getNextLeftPath(path), literals},
-     {CNFTree::getNextRightPath(path), literals2}};
+  return std::vector<std::pair<Path, Cube>>{
+    { CNFTree::getNextLeftPath(path), literals },
+    { CNFTree::getNextRightPath(path), literals2 }
+  };
 }
 
 std::vector<std::pair<Path, Cube>>
-CaDiCaLTask::resplit_depth(Path path, Cube literals,
-			   std::chrono::duration<long int, std::ratio<1, 1000000000> > duration,
-			   int depth)
+CaDiCaLTask::resplit_depth(
+  Path path,
+  Cube literals,
+  std::chrono::duration<long int, std::ratio<1, 1000000000>> duration,
+  int depth)
 {
   Cube literals2(literals);
   PARACOOBA_LOG((*m_logger), Cubes)
-    << "Cubing path " << CNFTree::pathToStrNoAlloc(path)
-    << " at depth "<< depth;
+    << "Cubing path " << CNFTree::pathToStrNoAlloc(path) << " at depth "
+    << depth;
   for(auto lit : literals) {
-    PARACOOBA_LOG((*m_logger), Cubes)
-      << "cube lit" << lit;
+    PARACOOBA_LOG((*m_logger), Cubes) << "cube lit" << lit;
     m_solver->assume(lit);
   }
 
-  std::vector<std::pair<Path, Cube>> cubes{resplit_once(path, literals)};
+  std::vector<std::pair<Path, Cube>> cubes{ resplit_once(path, literals) };
 
   auto path_depth = 1 + CNFTree::getDepth(path);
   for(int i = path_depth;
-      i < depth && i < CNFTree::maxPathDepth - 1 &&
-        !m_interrupt_solving;
+      i < depth && i < CNFTree::maxPathDepth - 1 && !m_interrupt_solving;
       ++i) {
     PARACOOBA_LOG((*m_logger), Cubes)
-      << "Cubing path " << CNFTree::pathToStrNoAlloc(path) << " at depth "
-      << i;
-    auto cubes2{std::move(cubes)};
+      << "Cubing path " << CNFTree::pathToStrNoAlloc(path) << " at depth " << i;
+    auto cubes2{ std::move(cubes) };
     cubes.clear();
     for(auto&& [p, cube] : cubes2) {
       m_cnf->getCNFTree().setStateFromLocal(p, CNFTree::Working);
-      for(auto &&pcube : resplit_once(p, cube))
+      for(auto&& pcube : resplit_once(p, cube))
         cubes.push_back(pcube);
     }
     PARACOOBA_LOG((*m_logger), Cubes)
       << "CNF recubing from path " << CNFTree::pathToStrNoAlloc(path)
-      << " at depth " << 1+i << " is finished.";
+      << " at depth " << 1 + i << " is finished.";
   }
 
   m_autoStopTimer.cancel();
@@ -422,7 +445,9 @@ CaDiCaLTask::resplit_depth(Path path, Cube literals,
 }
 
 std::vector<std::pair<Path, Cube>>
-CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> > duration, bool fastResplit)
+CaDiCaLTask::resplit(
+  std::chrono::duration<long int, std::ratio<1, 1000000000>> duration,
+  bool fastResplit)
 {
   assert(m_solver);
   PARACOOBA_LOG((*m_logger), Cubes)
@@ -432,7 +457,7 @@ CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> >
   m_autoStopTimer.expires_from_now(duration);
   m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
     std::lock_guard lock(m_solverMutex);
-    if(errc != boost::asio::error::operation_aborted && m_solver){
+    if(errc != boost::asio::error::operation_aborted && m_solver) {
       PARACOOBA_LOG((*m_logger), Cubes)
         << "CNF lookahead for path " << CNFTree::pathToStrNoAlloc(m_path)
         << " will be interrupted.";
@@ -447,7 +472,7 @@ CaDiCaLTask::resplit(std::chrono::duration<long int, std::ratio<1, 1000000000> >
     Cube literals;
     m_cuber->getCube(m_path, literals);
     auto cubes = resplit_depth(m_path, literals, full_duration, depth);
-    m_autoStopTimer.cancel ();
+    m_autoStopTimer.cancel();
     return cubes;
   } else {
     assert(m_optionalCube.has_value());
@@ -465,8 +490,7 @@ CaDiCaLTask::terminate()
   // Terminating resets the cadical manager, as it no longer exists at this
   // point.
 
-  PARACOOBA_LOG((*m_logger), Trace)
-    << "Terminating instance";
+  PARACOOBA_LOG((*m_logger), Trace) << "Terminating instance";
   m_cadicalMgr = nullptr;
   m_interrupt_solving = true;
   m_terminate = true;
@@ -530,17 +554,15 @@ CaDiCaLTask::lookahead(int depth, int min_depth)
   assert(m_solver);
   assert(m_pregeneratedCubes.empty());
   m_autoStopTimer.expires_from_now(30s);
-  m_autoStopTimer.async_wait(
-    [this](const boost::system::error_code& errc) {
-      std::lock_guard lock(m_solverMutex);
-      if(errc != boost::asio::error::operation_aborted && m_solver) {
-        PARACOOBA_LOG((*m_logger), Cubes)
-          << "CNF cubing will be interrupted.";
-        m_solver->terminate();
-        m_interrupt_solving = true;
-      }
-    });
-  auto cubes {m_solver->generate_cubes(depth, min_depth)};
+  m_autoStopTimer.async_wait([this](const boost::system::error_code& errc) {
+    std::lock_guard lock(m_solverMutex);
+    if(errc != boost::asio::error::operation_aborted && m_solver) {
+      PARACOOBA_LOG((*m_logger), Cubes) << "CNF cubing will be interrupted.";
+      m_solver->terminate();
+      m_interrupt_solving = true;
+    }
+  });
+  auto cubes{ m_solver->generate_cubes(depth, min_depth) };
   m_autoStopTimer.cancel();
   m_interrupt_solving = false;
   if(cubes.status == 20)
@@ -550,15 +572,16 @@ CaDiCaLTask::lookahead(int depth, int min_depth)
   std::vector<int> flatCubes;
   size_t max_depth = 0;
 
-  for(const auto & cube : cubes.cubes) {
-    std::for_each(begin(cube), end(cube),
-                  [this](int lit) {m_pregeneratedCubes.emplace_back(lit);});
+  for(const auto& cube : cubes.cubes) {
+    std::for_each(begin(cube), end(cube), [this](int lit) {
+      m_pregeneratedCubes.emplace_back(lit);
+    });
     m_pregeneratedCubes.emplace_back(0);
     max_depth = std::max(max_depth, cube.size());
   }
 
-  PARACOOBA_LOG((*m_logger), Trace)
-    << "Generated " << cubes.cubes.size() << " cubes. Max depth = " << max_depth;
+  PARACOOBA_LOG((*m_logger), Trace) << "Generated " << cubes.cubes.size()
+                                    << " cubes. Max depth = " << max_depth;
   return TaskResult::Unknown;
 }
 
@@ -567,10 +590,9 @@ CaDiCaLTask::callMarch()
 {
 
   std::string sourcePath{ m_config->getString(Config::InputFile) };
-  std::string icnfPath{ sourcePath + ".icnf"};
-  auto marchCall =
-    std::string{m_config->getString(Config::MarchPath)} + " " + sourcePath +
-                                                          " -q > " + icnfPath;
+  std::string icnfPath{ sourcePath + ".icnf" };
+  auto marchCall = std::string{ m_config->getString(Config::MarchPath) } + " " +
+                   sourcePath + " -q > " + icnfPath;
   system(marchCall.c_str());
 
   std::ifstream icnfFile(icnfPath);
@@ -594,7 +616,7 @@ CaDiCaLTask::callMarch()
       do {
         icnfFile >> lit;
         m_pregeneratedCubes.push_back(lit);
-      } while (lit != 0);
+      } while(lit != 0);
       ++number_of_cubes;
     }
 
@@ -607,7 +629,6 @@ CaDiCaLTask::callMarch()
     PARACOOBA_LOG((*m_logger), GlobalError) << "Cubing via March failed";
     assert(false);
   }
-
 
   return TaskResult::Unknown;
 }

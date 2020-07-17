@@ -11,6 +11,7 @@
 #include "../include/paracooba/readywaiter.hpp"
 #include "../include/paracooba/runner.hpp"
 #include "../include/paracooba/task_factory.hpp"
+#include "paracooba/taskresult.hpp"
 
 namespace paracooba {
 Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
@@ -20,6 +21,14 @@ Client::Client(ConfigPtr config, LogPtr log, CommunicatorPtr communicator)
   , m_communicator(communicator)
 {
   m_config->m_client = this;
+
+  if(getDIMACSSourcePathFromConfig() == "") {
+    m_status = TaskResult::FileNotFound;
+    PARACOOBA_LOG(m_logger, LocalWarning) << "No input file given! Exiting.";
+    m_communicator->getIOService().post([this]() { m_communicator->exit(); });
+    return;
+  }
+
   m_rootCNF = std::make_shared<CNF>(config,
                                     log,
                                     config->getInt64(Config::Id),
@@ -100,11 +109,6 @@ std::string_view
 Client::getDIMACSSourcePathFromConfig()
 {
   std::string_view sourcePath = m_config->getString(Config::InputFile);
-  if(sourcePath == "") {
-    static const char* errorMsg = "No input file given!";
-    PARACOOBA_LOG(m_logger, LocalWarning) << errorMsg;
-    return errorMsg;
-  }
   return sourcePath;
 }
 
@@ -112,6 +116,10 @@ void
 Client::solve()
 {
   CaDiCaLTask::Mode mode = CaDiCaLTask::Parse;
+
+  if(m_status == TaskResult::FileNotFound) {
+    return;
+  }
 
   // Result found signal.
   m_rootCNF->getResultFoundSignal().connect([this](CNF::Result* result) {
@@ -179,8 +187,7 @@ Client::solve()
       auto cubingres = m_rootCNF->setRootTask(std::move(rootTaskMutPtr));
       if(cubingres != TaskResult::Unknown) {
         PARACOOBA_LOG(m_logger, Trace)
-          << "Solution found while splitting "
-          << cubingres;
+          << "Solution found while splitting " << cubingres;
         m_status = cubingres;
         return;
       }

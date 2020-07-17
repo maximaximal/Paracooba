@@ -18,6 +18,10 @@ DecisionTask::DecisionTask(std::shared_ptr<CNF> rootCNF,
   , m_optionalCube(optionalCube)
 {
   m_name = "DecisionTask for Path " + CNFTree::pathToStdString(p);
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  m_taskKind = traceentry::TaskKind::DecisionTask;
+#endif
 }
 DecisionTask::~DecisionTask() {}
 

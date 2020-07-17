@@ -19,9 +19,9 @@ class JobResult
 
   enum State
   {
-    SAT,
-    UNSAT,
-    UNKNOWN
+    SAT = 0,
+    UNSAT = 1,
+    UNKNOWN = 2
   };
 
   JobResult() {}

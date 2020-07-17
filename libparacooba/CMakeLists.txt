@@ -12,7 +12,11 @@ target_include_directories(paracooba PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 if(BOOST_BEAST_AVAILABLE)
     target_include_directories(paracooba PRIVATE ${BOOST_BEAST_INCLUDE_DIRS})
-    target_compile_definitions(paracooba PRIVATE ENABLE_INTERNAL_WEBSERVER)
+    target_compile_definitions(paracooba PUBLIC ENABLE_INTERNAL_WEBSERVER)
+endif()
+
+if(ENABLE_TRACING_SUPPORT)
+    target_compile_definitions(paracooba PUBLIC PARACOOBA_ENABLE_TRACING_SUPPORT)
 endif()
 
 target_link_libraries(paracooba PUBLIC ${CMAKE_THREAD_LIBS_INIT})

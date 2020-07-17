@@ -35,7 +35,8 @@ class TaskResult
     Unsatisfiable,
     Resplitted,
     Parsed,
-    Unknown
+    Unknown,
+    FileNotFound
   };
 
   /** @brief Create a task result with an assigned status. */

@@ -31,6 +31,10 @@ extern "C"
 #include <sys/types.h>
 }
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+#include "../include/paracooba/tracer.hpp"
+#endif
+
 namespace paracooba {
 static const size_t CNFStatisticsNodeWindowSize = 10;
 
@@ -254,6 +258,12 @@ CNF::sendResult(NetworkedNode& nn, Path p, SendFinishedCB finishedCallback)
   auto jd = messages::JobDescription(m_originId);
   jd.insert(jobResult);
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  Tracer::log(getOriginId(),
+              traceentry::SendResult{
+                nn.getId(), p, static_cast<uint8_t>(jobResultState) });
+#endif
+
   nn.transmitJobDescription(
     std::move(jd), nn, [this, finishedCallback, p, &nn](bool success) {
       if(success) {
@@ -306,6 +316,10 @@ CNF::receiveJobDescription(messages::JobDescription&& jd,
       auto p = CNFTree::cleanupPath(jp.getPath());
       m_cnfTree->insertNodeFromRemote(p, nn);
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+      Tracer::log(getOriginId(), traceentry::ReceiveTask{ nn->getId(), p });
+#endif
+
       // As a new path has been received, the number of unanswered remote work
       // increases. It is decreased again once a result is sent. This is
       // especially important for auto shutdown.
@@ -327,6 +341,13 @@ CNF::receiveJobDescription(messages::JobDescription&& jd,
       const auto jr = jd.getJobResult();
 
       Result* res = nullptr;
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+      Tracer::log(
+        getOriginId(),
+        traceentry::ReceiveResult{
+          nn->getId(), jr.getPath(), static_cast<uint8_t>(jr.getState()) });
+#endif
 
       {
         std::unique_lock lock(m_resultsMutex);
@@ -625,7 +646,7 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
       res = generateMarchCubes();
     else if(m_config->useCaDiCaLCubes())
       res = generateCubes(m_config->getUint16(Config::InitialCubeDepth),
-                      m_config->getUint16(Config::InitialMinimalCubeDepth));
+                          m_config->getUint16(Config::InitialMinimalCubeDepth));
     const auto& pregenCubes = m_rootTask->getPregeneratedCubes();
     messages::JobInitiator ji;
     cuber::Registry::Mode m = cuber::Registry::LiteralFrequency;
@@ -643,11 +664,10 @@ CNF::setRootTask(std::unique_ptr<CaDiCaLTask> root)
       m = cuber::Registry::PregeneratedCubes;
     }
 
-      // The cuber registry may already have been created if this is a daemon
-      // node. It can then just be re-used, as the daemon cuber registry did not
-      // need the root node to be created.
-      m_cuberRegistry =
-        std::make_unique<cuber::Registry>(m_config, m_log, *this);
+    // The cuber registry may already have been created if this is a daemon
+    // node. It can then just be re-used, as the daemon cuber registry did not
+    // need the root node to be created.
+    m_cuberRegistry = std::make_unique<cuber::Registry>(m_config, m_log, *this);
 
     if(!m_cuberRegistry->init(m, &ji)) {
       PARACOOBA_LOG(m_logger, Fatal) << "Could not initialise cuber registry!";
@@ -839,7 +859,6 @@ CNF::generateMarchCubes()
 {
   return m_rootTask->callMarch();
 }
-
 
 bool
 CNF::shouldResplitCubes()

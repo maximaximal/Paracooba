@@ -14,6 +14,10 @@
 #include <stdexcept>
 #include <string>
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+#include "../include/paracooba/tracer.hpp"
+#endif
+
 namespace paracooba {
 ClusterStatistics::ClusterStatistics(ConfigPtr config, LogPtr log)
   : m_config(config)
@@ -81,13 +85,12 @@ ClusterNodeStore::ClusterNodeCreationPair
 ClusterStatistics::getOrCreateNode(ID id)
 {
   assert(m_statelessMessageTransmitter);
-  auto [it, inserted] =
-    m_nodeMap.try_emplace(id,
-                          m_changed,
-                          m_thisNode->getId(),
-                          id,
-                          *m_statelessMessageTransmitter,
-                          *this);
+  auto [it, inserted] = m_nodeMap.try_emplace(id,
+                                              m_changed,
+                                              m_thisNode->getId(),
+                                              id,
+                                              *m_statelessMessageTransmitter,
+                                              *this);
 
   if(inserted) {
     PARACOOBA_LOG(m_logger, Trace) << "Added new node with id " << id << ".";
@@ -214,6 +217,14 @@ ClusterStatistics::handlePathOnNode(int64_t originator,
 
   // Local node should be handled externally, without using this function.
   assert(&node != m_thisNode);
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  Tracer::log(rootCNF->getOriginId(),
+              traceentry::OffloadTask{ node.getId(),
+                                       p,
+                                       getThisNode().getWorkQueueSize(),
+                                       node.getWorkQueueSize() });
+#endif
 
   TaskFactory* taskFactory = rootCNF->getTaskFactory();
   assert(taskFactory);

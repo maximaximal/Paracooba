@@ -56,6 +56,7 @@ class Config
     KnownRemotes,
     NetworkTimeout,
     ShortNetworkTimeout,
+    TraceOutputPath,
 
     FreqCuberCutoff,
     CaDiCaLCubes,
@@ -379,6 +380,8 @@ GetConfigNameFromEnum(Config::Key key)
       return "march-cubes";
     case Config::MarchPath:
       return "march-path";
+    case Config::TraceOutputPath:
+      return "trace-output-path";
     default:
       return "";
   }
