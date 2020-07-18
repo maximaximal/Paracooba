@@ -149,9 +149,9 @@ class TraceFile
          !first.body.clientBegin.sorted) {
         sort();
         if(first.kind != traceentry::Kind::ClientBegin) {
-          std::cerr
-            << "!! First entry not of kind ClientBegin! Is the data correct?"
-            << std::endl;
+          std::cerr << "!! First entry not of kind ClientBegin! Is the data "
+                       "correct? Entry: "
+                    << first << std::endl;
         } else {
           first.body.clientBegin.sorted = true;
         }

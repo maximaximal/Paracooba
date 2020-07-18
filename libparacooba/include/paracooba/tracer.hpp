@@ -158,6 +158,14 @@ struct ConnectionDropped
   std::array<uint8_t, 16> ipv6 = { 0 };
   uint16_t remotePort;
 };
+struct WorkerIdle
+{
+  uint32_t workerId;
+};
+struct WorkerWorking
+{
+  uint32_t workerId;
+};
 
 enum class Kind
 {
@@ -172,7 +180,9 @@ enum class Kind
   StartProcessingTask,
   FinishProcessingTask,
   ConnectionEstablished,
-  ConnectionDropped
+  ConnectionDropped,
+  WorkerIdle,
+  WorkerWorking
 };
 constexpr const char*
 KindToStr(Kind kind)
@@ -202,6 +212,10 @@ KindToStr(Kind kind)
       return "SendResult";
     case Kind::ReceiveResult:
       return "ReceiveResult";
+    case Kind::WorkerIdle:
+      return "WorkerIdle";
+    case Kind::WorkerWorking:
+      return "WorkerWorking";
   }
 }
 
@@ -224,6 +238,8 @@ union Body
   traceentry::FinishProcessingTask finishProcessingTask;
   traceentry::ConnectionEstablished connectionEstablished;
   traceentry::ConnectionDropped connectionDropped;
+  traceentry::WorkerIdle workerIdle;
+  traceentry::WorkerWorking workerWorking;
 
   PARACOOBA_TRACEENTRY_BODY_INIT(ClientBegin, clientBegin)
   PARACOOBA_TRACEENTRY_BODY_INIT(ComputeNodeDescription, computeNodeDescription)
@@ -237,6 +253,8 @@ union Body
   PARACOOBA_TRACEENTRY_BODY_INIT(FinishProcessingTask, finishProcessingTask)
   PARACOOBA_TRACEENTRY_BODY_INIT(ConnectionEstablished, connectionEstablished)
   PARACOOBA_TRACEENTRY_BODY_INIT(ConnectionDropped, connectionDropped)
+  PARACOOBA_TRACEENTRY_BODY_INIT(WorkerIdle, workerIdle)
+  PARACOOBA_TRACEENTRY_BODY_INIT(WorkerWorking, workerWorking)
 };
 }
 
@@ -303,6 +321,8 @@ class Tracer
   PARACOOBA_TRACER_LOG(FinishProcessingTask)
   PARACOOBA_TRACER_LOG(ConnectionEstablished)
   PARACOOBA_TRACER_LOG(ConnectionDropped)
+  PARACOOBA_TRACER_LOG(WorkerIdle)
+  PARACOOBA_TRACER_LOG(WorkerWorking)
 
   inline int64_t getCurrentOffset()
   {

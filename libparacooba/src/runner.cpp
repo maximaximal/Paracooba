@@ -127,6 +127,11 @@ Runner::worker(uint32_t workerId)
   std::string threadName = "Worker" + std::to_string(workerId);
   m_log->initLocalThread(threadName);
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  bool tracerNotifiedOfIdle = false;
+  bool tracerNotifiedOfWorking = false;
+#endif
+
   auto logger = m_log->createLogger("Worker", std::to_string(workerId));
   PARACOOBA_LOG(logger, Trace) << "Worker " << workerId << " started.";
   while(m_running) {
@@ -139,12 +144,28 @@ Runner::worker(uint32_t workerId)
             m_taskQueue->size() == 0) {
         PARACOOBA_LOG(logger, Trace)
           << "Worker " << workerId << " waiting for tasks.";
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+        if(!tracerNotifiedOfIdle) {
+          tracerNotifiedOfIdle = true;
+          tracerNotifiedOfWorking = false;
+          Tracer::log(-1, traceentry::WorkerIdle{ workerId });
+        }
+#endif
         m_newTasks.wait(lock);
       }
 
       if(m_taskQueue && m_taskQueue->size() > 0) {
         entry = m_taskQueue->popNoLock();
         m_newTasksVerifier = false;
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+        if(!tracerNotifiedOfWorking) {
+          tracerNotifiedOfIdle = false;
+          tracerNotifiedOfWorking = true;
+          Tracer::log(entry->originator, traceentry::WorkerWorking{ workerId });
+        }
+#endif
       }
     }
 

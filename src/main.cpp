@@ -38,6 +38,17 @@ main(int argc, char* argv[])
     << "\" in " << (config->isDaemonMode() ? "daemon mode" : "client mode")
     << "with ID = " << config->getId();
 
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  if(!config->isDaemonMode()) {
+    Tracer::log(config->getId(),
+                traceentry::ClientBegin{
+                  std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::system_clock::now().time_since_epoch())
+                    .count(),
+                  false });
+  }
+#endif
+
   CommunicatorPtr communicator = std::make_shared<Communicator>(config, log);
 
   communicator->startRunner();
@@ -48,14 +59,6 @@ main(int argc, char* argv[])
   if(config->isDaemonMode()) {
     daemon = std::make_unique<Daemon>(config, log, communicator);
   } else {
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-    Tracer::log(config->getId(),
-                traceentry::ClientBegin{
-                  std::chrono::duration_cast<std::chrono::seconds>(
-                    std::chrono::system_clock::now().time_since_epoch())
-                    .count(),
-                  false });
-#endif
     client = std::make_unique<Client>(config, log, communicator);
     client->solve();
   }
@@ -67,11 +70,12 @@ main(int argc, char* argv[])
 
   if(config->isDaemonMode()) {
     Tracer::get().setActive(false);
+  } else {
+    Tracer::log(config->getId(),
+                traceentry::ComputeNodeDescription{
+                  config->getUint32(Config::ThreadCount) });
   }
 
-  Tracer::log(config->getId(),
-              traceentry::ComputeNodeDescription{
-                config->getUint32(Config::ThreadCount) });
 #else
   PARACOOBA_LOG(logger, Debug) << "Trace support disabled";
 #endif

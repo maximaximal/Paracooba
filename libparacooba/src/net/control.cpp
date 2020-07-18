@@ -326,6 +326,10 @@ Control::handlePong(const messages::Message& msg, NetworkedNode& conn)
     if(!Tracer::get().isActive()) {
       Tracer::resetStart(handle.offset + pingTimeNs / 2);
 
+      Tracer::log(msg.getOrigin(),
+                  traceentry::ComputeNodeDescription{
+                    m_config->getUint32(Config::ThreadCount) });
+
       PARACOOBA_LOG(m_logger, Debug)
         << "Reset tracer start time to match connected client. Offset is "
         << handle.offset + pingTimeNs / 2 << "ns (Ping = " << pingTimeNs
