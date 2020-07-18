@@ -319,13 +319,13 @@ operator<<(std::ostream& o, const ConnectionDropped& v)
 inline std::ostream&
 operator<<(std::ostream& o, const SendResult& v)
 {
-  return o << "target=" << v.target << " state=" << v.state
+  return o << "target=" << v.target << " state=" << static_cast<int>(v.state)
            << " path=" << v.path;
 }
 inline std::ostream&
 operator<<(std::ostream& o, const ReceiveResult& v)
 {
-  return o << "target=" << v.source << " state=" << v.state
+  return o << "source=" << v.source << " state=" << static_cast<int>(v.state)
            << " path=" << v.path;
 }
 inline std::ostream&
@@ -400,13 +400,11 @@ operator<<(std::ostream& o, const TraceEntry& e)
   static void log(ID originId, const traceentry::TYPE& body) \
   {                                                          \
     auto& self = get();                                      \
-    if(self.m_active) {                                      \
-      self.logEntry(TraceEntry{ self.m_thisId,               \
-                                originId,                    \
-                                self.getCurrentOffset(),     \
-                                traceentry::Kind::TYPE,      \
-                                traceentry::Body(body) });   \
-    }                                                        \
+    self.logEntry(TraceEntry{ self.m_thisId,                 \
+                              originId,                      \
+                              self.getCurrentOffset(),       \
+                              traceentry::Kind::TYPE,        \
+                              traceentry::Body(body) });     \
   }
 
 class Tracer
@@ -457,6 +455,8 @@ class Tracer
   std::string m_outputPath = "";
   ID m_thisId = 0;
   bool m_active = false;
+  bool m_wouldBeActive = false;
+  int64_t m_cacheEntryOffset = 0;
 
   int64_t m_startTime = std::chrono::duration_cast<std::chrono::nanoseconds>(
                           std::chrono::steady_clock::now().time_since_epoch())
@@ -466,6 +466,7 @@ class Tracer
   {
     std::string path;
     std::ofstream outStream;
+    std::forward_list<TraceEntry> cache;
   };
 
   static thread_local OutHandle m_outHandle;

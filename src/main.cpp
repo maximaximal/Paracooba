@@ -54,11 +54,10 @@ main(int argc, char* argv[])
 
   if(config->isDaemonMode()) {
     Tracer::get().setActive(false);
-  } else {
-    Tracer::log(config->getId(),
-                traceentry::ComputeNodeDescription{
-                  config->getUint32(Config::ThreadCount) });
   }
+  Tracer::log(config->getId(),
+              traceentry::ComputeNodeDescription{
+                config->getUint32(Config::ThreadCount) });
 
 #else
   PARACOOBA_LOG(logger, Debug) << "Trace support disabled";

@@ -180,14 +180,14 @@ TraceFile::causalFixup(size_t i)
           assert(possibleMatch.kind == traceentry::Kind::OffloadTask);
           matchFound =
             possibleMatch.body.offloadTask.path == e.body.receiveTask.path &&
-            possibleMatch.body.offloadTask.target == e.body.receiveTask.source;
+            possibleMatch.body.offloadTask.target == e.thisId;
           break;
         case traceentry::Kind::ReceiveResult:
           assert(possibleMatch.kind == traceentry::Kind::SendResult);
           matchFound =
             possibleMatch.body.sendResult.path == e.body.receiveResult.path &&
             possibleMatch.body.sendResult.state == e.body.receiveResult.state &&
-            possibleMatch.body.sendResult.target == e.body.receiveResult.source;
+            possibleMatch.body.sendResult.target == e.thisId;
           break;
         default:
           break;
@@ -249,6 +249,9 @@ TraceFile::printNetworkLog()
   for(auto& e : (*this)) {
     switch(e.kind) {
       case traceentry::Kind::ComputeNodeDescription:
+        clog << e << endl;
+        break;
+      case traceentry::Kind::ClientBegin:
         clog << e << endl;
         break;
       case traceentry::Kind::SendMsg:

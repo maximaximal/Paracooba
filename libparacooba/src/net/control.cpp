@@ -376,10 +376,6 @@ Control::conditionallySetTracerOffset(ID id)
     if(!Tracer::get().isActive()) {
       Tracer::resetStart(handle.offset + handle.pingTimeNs / 2);
 
-      Tracer::log(id,
-                  traceentry::ComputeNodeDescription{
-                    m_config->getUint32(Config::ThreadCount) });
-
       PARACOOBA_LOG(m_logger, Debug)
         << "Reset tracer start time to match connected client. Offset is "
         << handle.offset + handle.pingTimeNs / 2
