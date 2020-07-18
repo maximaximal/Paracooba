@@ -840,6 +840,17 @@ Connection::initRemoteNN()
         // The message must be built locally and not be sent using the
         // NetworkedNode, because the networked node is to be activated outside
         // of this function.
+        //
+        // Before sending the announcement request, which immediately would
+        // trigger a CNF to be sent from clients, a ping message is sent. This
+        // determines the connection latency between the two peers. This must
+        // also be registered in the message receiver, so it can track when the
+        // ping has been transmitted and the answer received.
+        messageReceiver().handlePingSent(remoteId());
+        messages::Message pingMessage(config()->getId());
+        pingMessage.insert(messages::Ping(remoteId()));
+        sendMessage(pingMessage);
+
         messages::Message msg(config()->getId());
         msg.insert(messages::AnnouncementRequest(config()->buildNode()));
         sendMessage(msg);

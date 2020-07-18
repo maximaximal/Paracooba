@@ -16,6 +16,7 @@ class MessageReceiver
 {
   public:
   virtual void receiveMessage(const Message& msg, NetworkedNode& nn) = 0;
+  virtual void handlePingSent(ID remoteID) {}
 };
 
 class MessageTransmitter

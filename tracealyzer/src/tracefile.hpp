@@ -1,6 +1,7 @@
 #ifndef PARACOOBA_TRACEALYZER_TRACEFILE
 #define PARACOOBA_TRACEALYZER_TRACEFILE
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -10,6 +11,8 @@
 #include "../../libparacooba/include/paracooba/tracer.hpp"
 
 namespace paracooba::tracealyzer {
+class TraceFileView;
+
 // Copied over from util.cpp so there is no link required.
 inline std::string
 BytePrettyPrint(size_t bytes)
@@ -129,38 +132,10 @@ class TraceFile
   };
   using TraceEntryIterator = Iterator<TraceEntry>;
 
-  TraceFile(const std::string& path)
-  {
-    sink.open(path);
-    if(!sink.is_open()) {
-      std::cerr << "!! Could not open file as memory mapped file!" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+  TraceFile(const std::string& path);
+  ~TraceFile();
 
-    byteSize = sink.size();
-    entries = byteSize / sizeof(TraceEntry);
-
-    std::clog << "-> Opened trace of size " << BytePrettyPrint(byteSize)
-              << ", containing " << entries << " trace entries." << std::endl;
-
-    if(size() > 0) {
-      TraceEntry& first = (*this)[0];
-      if(first.kind != traceentry::Kind::ClientBegin ||
-         !first.body.clientBegin.sorted) {
-        sort();
-        if(first.kind != traceentry::Kind::ClientBegin) {
-          std::cerr << "!! First entry not of kind ClientBegin! Is the data "
-                       "correct? Entry: "
-                    << first << std::endl;
-        } else {
-          first.body.clientBegin.sorted = true;
-        }
-      }
-    }
-  }
-  ~TraceFile() {}
-
-  TraceEntry& operator[](size_t index)
+  inline TraceEntry& operator[](size_t index)
   {
     assert(index < entries);
     assert(sink.is_open());
@@ -168,7 +143,7 @@ class TraceFile
     return *reinterpret_cast<TraceEntry*>(
       &sink.data()[index * sizeof(TraceEntry)]);
   }
-  const TraceEntry& operator[](size_t index) const
+  inline const TraceEntry& operator[](size_t index) const
   {
     assert(index < entries);
     assert(sink.is_open());
@@ -177,22 +152,32 @@ class TraceFile
       &sink.const_data()[index * sizeof(TraceEntry)]);
   }
 
-  void sort()
+  void sort();
+
+  inline TraceEntryIterator begin() { return TraceEntryIterator(&(*this)[0]); }
+  inline TraceEntryIterator end()
   {
-    std::clog << "Begin sorting... ";
-    std::sort(begin(), end());
-    std::clog << " sorting finished! " << std::endl;
+    return TraceEntryIterator(&(*this)[0] + entries);
   }
 
-  TraceEntryIterator begin() { return TraceEntryIterator(&(*this)[0]); }
-  TraceEntryIterator end() { return TraceEntryIterator(&(*this)[0] + entries); }
-
   inline size_t size() const { return entries; }
+
+  TraceFileView getOnlyTraceKind(traceentry::Kind kind);
+
+  void printUtilizationLog();
+  void printNetworkLog();
+
+  void swap(size_t i1, size_t i2);
+
+  size_t forwardSearchForKind(size_t start, traceentry::Kind kind);
 
   private:
   boost::iostreams::mapped_file sink;
   size_t byteSize = 0;
   size_t entries = 0;
+
+  void causalSort();
+  bool causalFixup(size_t i);
 };
 }
 

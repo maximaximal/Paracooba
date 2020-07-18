@@ -221,7 +221,7 @@ ClusterStatistics::handlePathOnNode(int64_t originator,
 #ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
   Tracer::log(rootCNF->getOriginId(),
               traceentry::OffloadTask{ node.getId(),
-                                       p,
+                                       CNFTree::cleanupPath(p),
                                        getThisNode().getWorkQueueSize(),
                                        node.getWorkQueueSize() });
 #endif

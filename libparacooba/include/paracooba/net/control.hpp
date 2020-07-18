@@ -57,7 +57,11 @@ class Control : public messages::MessageReceiver
   void handlePing(const messages::Message& msg, NetworkedNode& conn);
   void handlePong(const messages::Message& msg, NetworkedNode& conn);
 
+  virtual void handlePingSent(ID id);
+
   private:
+
+  void conditionallySetTracerOffset(ID id);
   void sendPing(NetworkedNode& conn, int64_t offset, bool daemon);
 
   boost::asio::io_service& m_ioService;
@@ -71,9 +75,12 @@ class Control : public messages::MessageReceiver
   struct PingHandle
   {
     std::chrono::time_point<std::chrono::steady_clock> sent;
+    std::chrono::time_point<std::chrono::steady_clock> answered;
+    uint64_t pingTimeNs;
     int64_t offset = 0;
     bool setOffset = false;
     bool alreadySent = false;
+    bool waitingForFullyKnown = false;
   };
   std::map<ID, PingHandle> m_pings;
 };

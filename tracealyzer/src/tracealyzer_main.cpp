@@ -11,6 +11,7 @@
 
 #include "mainwindow.hpp"
 #include "tracefile.hpp"
+#include "tracefileview.hpp"
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -24,12 +25,18 @@ using namespace paracooba::tracealyzer;
 int
 main(int argc, char* argv[])
 {
+  bool force_re_sort = false;
+  bool generate_utilization_data = false;
+  bool generate_network_data = false;
+
   po::options_description desc("Allowed options");
   po::positional_options_description posDesc;
   // clang-format off
   desc.add_options()
     ("help", "produce help message")
-    ("force-sort", po::value<bool>(), "force re-sorting the events")
+    ("force-sort", po::bool_switch(&force_re_sort)->default_value(false), "force re-sorting the events")
+    ("generate-utilization-data", po::bool_switch(&generate_utilization_data)->default_value(false), "print worker utilization data and exit")
+    ("generate-network-data", po::bool_switch(&generate_network_data)->default_value(false), "print network usage data and exit")
     ("trace", po::value<std::string>(), "concatenated trace file")
   ;
   posDesc.add("trace", -1);
@@ -71,12 +78,21 @@ main(int argc, char* argv[])
 
   TraceFile traceFile(trace);
 
-  if(vm.count("force-sort") && vm["force-sort"].as<bool>()) {
+  if(force_re_sort) {
     traceFile.sort();
   }
 
-  auto app =
-    Gtk::Application::create("at.jku.fmv.paracooba.tracealyzer");
+  if(generate_utilization_data) {
+    traceFile.printUtilizationLog();
+    return EXIT_SUCCESS;
+  }
+
+  if(generate_network_data) {
+    traceFile.printNetworkLog();
+    return EXIT_SUCCESS;
+  }
+
+  auto app = Gtk::Application::create("at.jku.fmv.paracooba.tracealyzer");
 
   MainWindow mainWindow(traceFile);
 

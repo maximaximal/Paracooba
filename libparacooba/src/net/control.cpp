@@ -92,10 +92,19 @@ Control::handleOnlineAnnouncement(const messages::Message& msg,
     msg.getOnlineAnnouncement();
   const messages::Node& messageNode = onlineAnnouncement.getNode();
 
-  // Always ping.
-  sendPing(nn, messageNode.getTracerOffset(), messageNode.getDaemonMode());
-
   int64_t id = msg.getOrigin();
+
+  if(m_pings.count(id)) {
+    PingHandle& handle = m_pings[id];
+    if(handle.offset == -1) {
+      handle.offset = messageNode.getTracerOffset();
+    }
+    handle.setOffset = m_config->isDaemonMode() && !messageNode.getDaemonMode();
+    handle.waitingForFullyKnown = false;
+    conditionallySetTracerOffset(id);
+  } else {
+    sendPing(nn, messageNode.getTracerOffset(), messageNode.getDaemonMode());
+  }
 
   auto [clusterNode, inserted] = m_clusterNodeStore.getOrCreateNode(id);
 
@@ -164,6 +173,10 @@ Control::handleNodeStatus(const messages::Message& msg, NetworkedNode& nn)
   clusterNode.applyNodeStatusMessage(nodeStatus);
 
   if(!clusterNode.getFullyKnown()) {
+    // Once a node status arrives and the remote is not yet fully known, it must
+    // be pinged first.
+    sendPing(nn, -1, msg.getNodeStatus().isDaemon());
+
     // Try the default target port as last hope to get to know the other node.
     NetworkedNode* nn = clusterNode.getNetworkedNode();
     nn->setUdpPort(m_config->getUint16(Config::UDPTargetPort));
@@ -313,33 +326,27 @@ Control::handlePing(const messages::Message& msg, NetworkedNode& conn)
 void
 Control::handlePong(const messages::Message& msg, NetworkedNode& conn)
 {
-  PingHandle& handle = m_pings[conn.getId()];
-  int64_t pingTimeNs = (std::chrono::steady_clock::now() - handle.sent).count();
+  PingHandle& handle = m_pings[msg.getOrigin()];
+  handle.answered = std::chrono::steady_clock::now();
+  handle.pingTimeNs = (handle.answered - handle.sent).count();
 
   PARACOOBA_LOG(m_logger, Trace)
-    << "Ping to remote " << conn << " returned with delay of " << pingTimeNs
-    << "ns";
+    << "Ping to remote " << conn << " returned with delay of "
+    << handle.pingTimeNs << "ns";
 
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-  if(handle.setOffset && m_config->isDaemonMode()) {
-    // Reset tracer offset and automatically activate, if not yet active.
-    if(!Tracer::get().isActive()) {
-      Tracer::resetStart(handle.offset + pingTimeNs / 2);
-
-      Tracer::log(msg.getOrigin(),
-                  traceentry::ComputeNodeDescription{
-                    m_config->getUint32(Config::ThreadCount) });
-
-      PARACOOBA_LOG(m_logger, Debug)
-        << "Reset tracer start time to match connected client. Offset is "
-        << handle.offset + pingTimeNs / 2 << "ns (Ping = " << pingTimeNs
-        << "ns)";
-    }
-  }
-#endif
-  m_pings.erase(conn.getId());
+  // Will not be erased, but ping will be stored.
+  conditionallySetTracerOffset(msg.getOrigin());
 }
-
+void
+Control::handlePingSent(ID id)
+{
+  PingHandle& handle = m_pings[id];
+  handle.alreadySent = true;
+  handle.sent = std::chrono::steady_clock::now();
+  handle.offset = -1;
+  handle.setOffset = false;
+  handle.waitingForFullyKnown = true;
+}
 void
 Control::sendPing(NetworkedNode& conn, int64_t offset, bool daemon)
 {
@@ -349,11 +356,37 @@ Control::sendPing(NetworkedNode& conn, int64_t offset, bool daemon)
     handle.sent = std::chrono::steady_clock::now();
     handle.offset = offset;
     handle.setOffset = !daemon;
+    handle.waitingForFullyKnown = false;
 
     messages::Message pingMsg = conn.buildMessage(*m_config);
     pingMsg.insert(messages::Ping(conn.getId()));
     conn.transmitMessage(pingMsg, conn);
   }
+}
+
+void
+Control::conditionallySetTracerOffset(ID id)
+{
+  PingHandle& handle = m_pings[id];
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  if(handle.setOffset && m_config->isDaemonMode() && handle.offset != -1 &&
+     !handle.waitingForFullyKnown) {
+    // Reset tracer offset and automatically activate, if not yet active.
+    if(!Tracer::get().isActive()) {
+      Tracer::resetStart(handle.offset + handle.pingTimeNs / 2);
+
+      Tracer::log(id,
+                  traceentry::ComputeNodeDescription{
+                    m_config->getUint32(Config::ThreadCount) });
+
+      PARACOOBA_LOG(m_logger, Debug)
+        << "Reset tracer start time to match connected client. Offset is "
+        << handle.offset + handle.pingTimeNs / 2
+        << "ns (Ping = " << handle.pingTimeNs / 1000 / 1000 / 1000 << "ms)";
+    }
+  }
+#endif
 }
 }
 }

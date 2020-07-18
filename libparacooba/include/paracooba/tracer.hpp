@@ -256,6 +256,123 @@ union Body
   PARACOOBA_TRACEENTRY_BODY_INIT(WorkerIdle, workerIdle)
   PARACOOBA_TRACEENTRY_BODY_INIT(WorkerWorking, workerWorking)
 };
+
+inline std::ostream&
+operator<<(std::ostream& o, const ClientBegin& v)
+{
+  return o << "timestamp=" << v.timestamp << " sorted=" << v.sorted;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const ComputeNodeDescription& v)
+{
+  return o << "workercount=" << v.workerCount;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const SendMsg& v)
+{
+  return o << "udp=" << v.udp << " target=" << v.target << " size=" << v.size
+           << " kind=" << MessageKindToStr(v.kind);
+}
+inline std::ostream&
+operator<<(std::ostream& o, const RecvMsg& v)
+{
+  return o << "udp=" << v.udp << " sender=" << v.sender << " size=" << v.size
+           << " kind=" << MessageKindToStr(v.kind);
+}
+inline std::ostream&
+operator<<(std::ostream& o, const OffloadTask& v)
+{
+  return o << "path=" << v.path << " target=" << v.target
+           << " localWorkQueueSize=" << v.localWorkQueueSize
+           << " perceivedRemoteWorkQueueSize="
+           << v.perceivedRemoteWorkQueueSize;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const ReceiveTask& v)
+{
+  return o << "path=" << v.path << " target=" << v.source;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const StartProcessingTask& v)
+{
+  return o << "kind=" << TaskKindToStr(v.kind) << " workerId=" << v.workerId
+           << " localRealizedQueueSize=" << v.localRealizedQueueSize
+           << " localUnrealizedQueueSize=" << v.localUnrealizedQueueSize;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const FinishProcessingTask& v)
+{
+  return o << "kind=" << TaskKindToStr(v.kind) << " workerId=" << v.workerId
+           << " localRealizedQueueSize=" << v.localRealizedQueueSize
+           << " localUnrealizedQueueSize=" << v.localUnrealizedQueueSize;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const ConnectionEstablished& v)
+{
+  return o << "remoteId=" << v.remoteId << " remotePort=" << v.remotePort;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const ConnectionDropped& v)
+{
+  return o << "remoteId=" << v.remoteId << " remotePort=" << v.remotePort;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const SendResult& v)
+{
+  return o << "target=" << v.target << " state=" << v.state
+           << " path=" << v.path;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const ReceiveResult& v)
+{
+  return o << "target=" << v.source << " state=" << v.state
+           << " path=" << v.path;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const WorkerIdle& v)
+{
+  return o << "workerId=" << v.workerId;
+}
+inline std::ostream&
+operator<<(std::ostream& o, const WorkerWorking& v)
+{
+  return o << "workerId=" << v.workerId;
+}
+
+inline std::ostream&
+BodyToOstream(std::ostream& o, const Body& body, Kind kind)
+{
+  switch(kind) {
+    case Kind::ClientBegin:
+      return o << body.clientBegin;
+    case Kind::ComputeNodeDescription:
+      return o << body.computeNodeDescription;
+    case Kind::SendMsg:
+      return o << body.sendMsg;
+    case Kind::RecvMsg:
+      return o << body.recvMsg;
+    case Kind::OffloadTask:
+      return o << body.offloadTask;
+    case Kind::ReceiveTask:
+      return o << body.receiveTask;
+    case Kind::StartProcessingTask:
+      return o << body.startProcessingTask;
+    case Kind::FinishProcessingTask:
+      return o << body.finishProcessingTask;
+    case Kind::ConnectionEstablished:
+      return o << body.connectionEstablished;
+    case Kind::ConnectionDropped:
+      return o << body.connectionDropped;
+    case Kind::SendResult:
+      return o << body.sendResult;
+    case Kind::ReceiveResult:
+      return o << body.receiveResult;
+    case Kind::WorkerIdle:
+      return o << body.workerIdle;
+    case Kind::WorkerWorking:
+      return o << body.workerWorking;
+  }
+}
 }
 
 struct TraceEntry
@@ -272,10 +389,11 @@ struct TraceEntry
 inline std::ostream&
 operator<<(std::ostream& o, const TraceEntry& e)
 {
-  return o << "ns=" + std::to_string(e.nsSinceStart) +
-                " id=" + std::to_string(e.thisId) +
-                " originId=" + std::to_string(e.originId) +
-                " kind=" + traceentry::KindToStr(e.kind);
+  o << "ns=" << std::to_string(e.nsSinceStart)
+    << " id=" << std::to_string(e.thisId)
+    << " originId=" << std::to_string(e.originId)
+    << " kind=" << traceentry::KindToStr(e.kind) << " ";
+  return traceentry::BodyToOstream(o, e.body, e.kind);
 }
 
 #define PARACOOBA_TRACER_LOG(TYPE)                           \

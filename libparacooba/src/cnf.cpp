@@ -260,8 +260,9 @@ CNF::sendResult(NetworkedNode& nn, Path p, SendFinishedCB finishedCallback)
 
 #ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
   Tracer::log(getOriginId(),
-              traceentry::SendResult{
-                nn.getId(), p, static_cast<uint8_t>(jobResultState) });
+              traceentry::SendResult{ nn.getId(),
+                                      CNFTree::cleanupPath(p),
+                                      static_cast<uint8_t>(jobResultState) });
 #endif
 
   nn.transmitJobDescription(
@@ -345,8 +346,9 @@ CNF::receiveJobDescription(messages::JobDescription&& jd,
 #ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
       Tracer::log(
         getOriginId(),
-        traceentry::ReceiveResult{
-          nn->getId(), jr.getPath(), static_cast<uint8_t>(jr.getState()) });
+        traceentry::ReceiveResult{ nn->getId(),
+                                   CNFTree::cleanupPath(jr.getPath()),
+                                   static_cast<uint8_t>(jr.getState()) });
 #endif
 
       {

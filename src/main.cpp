@@ -47,23 +47,7 @@ main(int argc, char* argv[])
                     .count(),
                   false });
   }
-#endif
 
-  CommunicatorPtr communicator = std::make_shared<Communicator>(config, log);
-
-  communicator->startRunner();
-
-  std::unique_ptr<Client> client;
-  std::unique_ptr<Daemon> daemon;
-
-  if(config->isDaemonMode()) {
-    daemon = std::make_unique<Daemon>(config, log, communicator);
-  } else {
-    client = std::make_unique<Client>(config, log, communicator);
-    client->solve();
-  }
-
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
   PARACOOBA_LOG(logger, Debug)
     << "Trace support enabled and trace "
     << (Tracer::get().isActive() ? "active" : "inactive");
@@ -79,6 +63,20 @@ main(int argc, char* argv[])
 #else
   PARACOOBA_LOG(logger, Debug) << "Trace support disabled";
 #endif
+
+  CommunicatorPtr communicator = std::make_shared<Communicator>(config, log);
+
+  communicator->startRunner();
+
+  std::unique_ptr<Client> client;
+  std::unique_ptr<Daemon> daemon;
+
+  if(config->isDaemonMode()) {
+    daemon = std::make_unique<Daemon>(config, log, communicator);
+  } else {
+    client = std::make_unique<Client>(config, log, communicator);
+    client->solve();
+  }
 
   try {
     communicator->run();
