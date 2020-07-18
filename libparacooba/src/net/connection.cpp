@@ -311,6 +311,14 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
           if(!getLocalCNF())
             return;
           yield async_read(socket(), BUF(size), rh);
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+          Tracer::log(
+            cnf()->getOriginId(),
+            traceentry::RecvMsg{
+              remoteId(), size(), false, traceentry::MessageKind::CNF });
+#endif
+
           do {
             yield async_read(
               socket(),
@@ -692,7 +700,6 @@ Connection::receiveSerializedMessage(size_t bytes_received)
       if(receiver) {
         if(auto nn = remoteNN().lock()) {
           auto kind = jd.getKind();
-          receiver->receiveJobDescription(std::move(jd), nn);
 
 #ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
           Tracer::log(
@@ -702,6 +709,8 @@ Connection::receiveSerializedMessage(size_t bytes_received)
                                  false,
                                  JobDescriptionKindToTraceMessageKind(kind) });
 #endif
+
+          receiver->receiveJobDescription(std::move(jd), nn);
 
           if(context()) {
             // This is a connection between a Master and a Daemon. So the
@@ -734,7 +743,6 @@ Connection::receiveSerializedMessage(size_t bytes_received)
       if(auto nn = remoteNN().lock()) {
         messages::Message msg;
         ia(msg);
-        messageReceiver().receiveMessage(msg, *nn);
 
 #ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
         Tracer::log(
@@ -744,6 +752,8 @@ Connection::receiveSerializedMessage(size_t bytes_received)
                                false,
                                MessageTypeToTraceMessageKind(msg.getType()) });
 #endif
+
+        messageReceiver().receiveMessage(msg, *nn);
 
         if(msg.getType() == messages::Type::OfflineAnnouncement) {
           resumeMode() = EndAfterShutdown;

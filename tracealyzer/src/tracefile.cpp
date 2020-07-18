@@ -99,33 +99,19 @@ void
 TraceFile::causalSort()
 {
   std::list<traceentry::Kind> openedKinds;
-  std::set<ID> knownHosts;
 
   for(size_t i = 0; i < entries; ++i) {
     TraceEntry& e = (*this)[i];
 
     switch(e.kind) {
-      case traceentry::Kind::ComputeNodeDescription:
-        knownHosts.insert(e.thisId);
-        break;
-
       case traceentry::Kind::SendMsg:
       case traceentry::Kind::SendResult:
       case traceentry::Kind::OffloadTask:
-        if(!knownHosts.count(getRegardingID(e))) {
-          continue;
-        }
         openedKinds.push_front(e.kind);
         break;
       case traceentry::Kind::RecvMsg:
       case traceentry::Kind::ReceiveTask:
       case traceentry::Kind::ReceiveResult:
-        // If the remote ID is not yet known, the entry is not causally sorted,
-        // as there will be no swap target.
-        if(!knownHosts.count(getRegardingID(e))) {
-          continue;
-        }
-
         // No specific check is carried out if a fitting entry was first opened,
         // as this should be the normal case. The basic ping mechanism already
         // brings the time close together.
@@ -135,16 +121,12 @@ TraceFile::causalSort()
           if(it != openedKinds.end()) {
             openedKinds.erase(it);
           } else {
-            clog << "   -> Causal fixup required for early " << e << "..."
-                 << endl;
+            clog << "   -> Causal fixup possibly required for early " << e << "...";
             if(causalFixup(i)) {
               // As the two are now swapped, e.kind is now the correct one and
               // that kind can be used to open a new scope.
               openedKinds.push_front(e.kind);
-            } else {
-              cerr
-                << "!! Could not find matching entry to causally fixup early "
-                << e << "!" << endl;
+              clog << " inserted causal fixup to " << e << endl;
             }
           }
         }
@@ -163,6 +145,7 @@ TraceFile::causalFixup(size_t i)
 
   size_t searchPos = i + 1;
   bool matchFound = false;
+
   while(!matchFound && searchPos != 0) {
     searchPos = forwardSearchForKind(searchPos, inverseKind(e.kind));
 
@@ -174,7 +157,8 @@ TraceFile::causalFixup(size_t i)
           assert(possibleMatch.kind == traceentry::Kind::SendMsg);
           matchFound = possibleMatch.body.sendMsg.kind == e.body.recvMsg.kind &&
                        possibleMatch.body.sendMsg.udp == e.body.recvMsg.udp &&
-                       possibleMatch.thisId == e.body.recvMsg.sender;
+                       possibleMatch.thisId == e.body.recvMsg.sender &&
+                       possibleMatch.body.sendMsg.size == e.body.recvMsg.size;
           break;
         case traceentry::Kind::ReceiveTask:
           assert(possibleMatch.kind == traceentry::Kind::OffloadTask);
@@ -193,7 +177,8 @@ TraceFile::causalFixup(size_t i)
           break;
       }
 
-      ++searchPos;
+      if(!matchFound)
+        ++searchPos;
     }
   }
 
