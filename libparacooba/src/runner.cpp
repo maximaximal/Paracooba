@@ -191,7 +191,8 @@ Runner::worker(uint32_t workerId)
                       static_cast<uint64_t>(m_taskQueue->size()),
                       static_cast<uint64_t>(
                         entry->factory ? entry->factory->getSize() : 0),
-                      entry->task->m_taskKind });
+                      entry->task->m_taskKind,
+                      entry->task->m_taskPath });
 #endif
 
         auto factory{ entry->task->m_factory };
@@ -222,7 +223,8 @@ Runner::worker(uint32_t workerId)
                       static_cast<uint64_t>(m_taskQueue->size()),
                       static_cast<uint64_t>(
                         entry->factory ? entry->factory->getSize() : 0),
-                      entry->task->m_taskKind });
+                      entry->task->m_taskKind,
+                      entry->task->m_taskPath });
 #endif
         if(result) {
           result->setTask(std::move(entry->task));

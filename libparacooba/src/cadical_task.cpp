@@ -48,6 +48,7 @@ CaDiCaLTask::CaDiCaLTask(const CaDiCaLTask& other)
 
 #ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
   m_taskKind = traceentry::TaskKind::SolverTask;
+  m_taskPath = other.m_path;
 #endif
 }
 CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service,
@@ -57,15 +58,16 @@ CaDiCaLTask::CaDiCaLTask(boost::asio::io_service& io_service,
   Task& otherTask = result.getTask();
   if(CaDiCaLTask* otherCaDiCaLTask = dynamic_cast<CaDiCaLTask*>(&otherTask)) {
     copyFromCaDiCaLTask(*otherCaDiCaLTask);
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+    m_taskKind = traceentry::TaskKind::SolverTask;
+    m_taskPath = otherCaDiCaLTask->m_path;
+#endif
   } else {
     // This should never happen, programmer has to make sure, only a CaDiCaL
     // task result is given to this constructor.
     assert(false);
   }
-
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-  m_taskKind = traceentry::TaskKind::SolverTask;
-#endif
 }
 CaDiCaLTask::CaDiCaLTask(CaDiCaLTask&& other)
   : m_terminator(std::move(other.m_terminator))
@@ -126,6 +128,10 @@ CaDiCaLTask::applyCubeFromCuberDeferred(Path p, cuber::Cuber& cuber)
   m_path = p;
   m_cuber = &cuber;
   m_optionalCube = std::nullopt;
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  m_taskPath = m_path;
+#endif
 }
 
 void
@@ -136,6 +142,10 @@ CaDiCaLTask::applyCubeDeferred(Path p, const Cube& cube)
   m_path = p;
   m_optionalCube = cube;
   m_cuber = nullptr;
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  m_taskPath = m_path;
+#endif
 }
 
 void
@@ -157,6 +167,10 @@ CaDiCaLTask::applyCube(Path p, const Cube& cube)
   assert(m_cnf);
   m_finishedSignal.connect(
     std::bind(&CNF::solverFinishedSlot, m_cnf, std::placeholders::_1, p));
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  m_taskPath = m_path;
+#endif
 }
 
 void
@@ -182,6 +196,10 @@ CaDiCaLTask::applyCubeFromCuber(Path p, cuber::Cuber& cuber)
   assert(m_cnf);
   m_finishedSignal.connect(
     std::bind(&CNF::solverFinishedSlot, m_cnf, std::placeholders::_1, p));
+
+#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
+  m_taskPath = m_path;
+#endif
 }
 
 void

@@ -1,6 +1,7 @@
 #include "tracefile.hpp"
 #include "tracefileview.hpp"
 #include <algorithm>
+#include <chrono>
 #include <list>
 #include <numeric>
 #include <set>
@@ -284,6 +285,59 @@ TraceFile::printUtilizationLog()
         stats.printLine(e.nsSinceStart - 1);
         stats.nodes[e.thisId].working[e.body.workerIdle.workerId] = true;
         stats.printLine(e.nsSinceStart);
+        break;
+      default:
+        continue;
+    }
+  }
+}
+
+void
+TraceFile::printTaskRuntimeLog()
+{
+  struct Stats
+  {
+    std::map<Path, int64_t> currentlyTrackedPaths;
+
+    void pathProcessingStart(Path p, int64_t ns)
+    {
+      currentlyTrackedPaths[p] = ns;
+    }
+    void pathProcessingEnd(Path p, int64_t ns)
+    {
+      if(!currentlyTrackedPaths.count(p)) {
+        cerr << "!! Path " << p << " never started!" << endl;
+        return;
+      }
+
+      // Nanoseconds to Seconds: / 1000 / 1000 / 1000
+      double diffNS = ns - currentlyTrackedPaths[p];
+      currentlyTrackedPaths.erase(p);
+
+      double diffSeconds = diffNS / 1000 / 1000 / 1000;
+      cout << diffSeconds << " " << p << endl;
+    }
+  };
+
+  Stats stats;
+
+  cout << "Runtime Path" << endl;
+
+  for(auto& e : (*this)) {
+    switch(e.kind) {
+      case traceentry::Kind::StartProcessingTask:
+        if(e.body.startProcessingTask.kind ==
+           traceentry::TaskKind::SolverTask) {
+          stats.pathProcessingStart(e.body.startProcessingTask.path,
+                                    e.nsSinceStart);
+        }
+        break;
+      case traceentry::Kind::FinishProcessingTask:
+        if(e.body.finishProcessingTask.kind ==
+           traceentry::TaskKind::SolverTask) {
+          stats.pathProcessingEnd(e.body.finishProcessingTask.path,
+                                  e.nsSinceStart);
+        }
         break;
       default:
         continue;

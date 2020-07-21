@@ -165,6 +165,7 @@ class TraceFile
   TraceFileView getOnlyTraceKind(traceentry::Kind kind);
 
   void printUtilizationLog();
+  void printTaskRuntimeLog();
   void printNetworkLog();
 
   void swap(size_t i1, size_t i2);

@@ -29,6 +29,7 @@ main(int argc, char* argv[])
 {
   bool force_re_sort = false;
   bool generate_utilization_data = false;
+  bool generate_taskruntime_data = false;
   bool generate_network_data = false;
 
   po::options_description desc("Allowed options");
@@ -38,6 +39,7 @@ main(int argc, char* argv[])
     ("help", "produce help message")
     ("force-sort", po::bool_switch(&force_re_sort)->default_value(false), "force re-sorting the events")
     ("generate-utilization-data", po::bool_switch(&generate_utilization_data)->default_value(false), "print worker utilization data and exit")
+    ("generate-taskruntime-data", po::bool_switch(&generate_taskruntime_data)->default_value(false), "print task runtime data (unsorted!) in format Runtime Path and exit")
     ("generate-network-data", po::bool_switch(&generate_network_data)->default_value(false), "print network usage data and exit")
     ("trace", po::value<std::string>(), "concatenated trace file")
   ;
@@ -86,6 +88,11 @@ main(int argc, char* argv[])
 
   if(generate_utilization_data) {
     traceFile.printUtilizationLog();
+    return EXIT_SUCCESS;
+  }
+
+  if(generate_taskruntime_data) {
+    traceFile.printTaskRuntimeLog();
     return EXIT_SUCCESS;
   }
 

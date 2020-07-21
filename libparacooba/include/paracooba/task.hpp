@@ -100,6 +100,10 @@ class Task
   /// The kind of the task. This is used when tracing what is executed. Must be
   /// set in derived classes.
   traceentry::TaskKind m_taskKind = traceentry::TaskKind::NotSet;
+
+  /// The path this task is processing on. Needed when tracing and usually
+  /// required for solver tasks.
+  Path m_taskPath = 0;
 #endif
 };
 }
