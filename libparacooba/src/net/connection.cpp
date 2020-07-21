@@ -284,7 +284,7 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
           Tracer::log(-1,
                       traceentry::ConnectionEstablished{
                         remoteId(),
-                        address.to_v4().to_uint(),
+                        address.to_v4().to_ulong(),
                         { 0 },
                         socket().remote_endpoint().port() });
         }
@@ -364,7 +364,7 @@ Connection::readHandler(boost::system::error_code ec, size_t bytes_received)
       Tracer::log(
         -1,
         traceentry::ConnectionDropped{ remoteId(),
-                                       address.to_v4().to_uint(),
+                                       address.to_v4().to_ulong(),
                                        { 0 },
                                        socket().remote_endpoint().port() });
     }

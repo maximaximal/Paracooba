@@ -149,14 +149,14 @@ struct FinishProcessingTask
 struct ConnectionEstablished
 {
   ID remoteId;
-  uint32_t ipv4 = 0;
+  long unsigned int ipv4 = 0;
   std::array<uint8_t, 16> ipv6 = { 0 };
   uint16_t remotePort;
 };
 struct ConnectionDropped
 {
   ID remoteId;
-  uint32_t ipv4 = 0;
+  long unsigned int ipv4 = 0;
   std::array<uint8_t, 16> ipv6 = { 0 };
   uint16_t remotePort;
 };
