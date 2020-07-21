@@ -378,7 +378,7 @@ Control::conditionallySetTracerOffset(ID id)
 
       PARACOOBA_LOG(m_logger, Debug)
         << "Reset tracer start time to match connected client. Offset is "
-        << handle.offset + handle.pingTimeNs / 2
+        << handle.offset + (handle.pingTimeNs - 100000) / 2
         << "ns (Ping = " << handle.pingTimeNs / 1000 / 1000 / 1000 << "ms)";
     }
   }

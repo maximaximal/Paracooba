@@ -2,6 +2,7 @@
 #include "tracefileview.hpp"
 #include <algorithm>
 #include <list>
+#include <numeric>
 #include <set>
 
 using std::cerr;
@@ -121,7 +122,8 @@ TraceFile::causalSort()
           if(it != openedKinds.end()) {
             openedKinds.erase(it);
           } else {
-            clog << "   -> Causal fixup possibly required for early " << e << "...";
+            clog << "   -> Causal fixup possibly required for early " << e
+                 << "...";
             if(causalFixup(i)) {
               // As the two are now swapped, e.kind is now the correct one and
               // that kind can be used to open a new scope.
@@ -211,16 +213,75 @@ TraceFile::getOnlyTraceKind(traceentry::Kind kind)
 void
 TraceFile::printUtilizationLog()
 {
+  struct ComputeNode
+  {
+    using WorkingMap = std::map<uint32_t, bool>;
+    WorkingMap working;
+
+    float utilization()
+    {
+      return std::accumulate(
+               working.begin(),
+               working.end(),
+               0,
+               [](float sum, auto& e) { return sum + e.second; }) /
+             static_cast<float>(working.size());
+    }
+
+    void reserve(size_t count)
+    {
+      for(size_t i = 0; i < count; ++i) {
+        working[i] = false;
+      }
+    }
+  };
+
+  struct Stats
+  {
+    std::map<ID, ComputeNode> nodes;
+
+    void printFirstLine()
+    {
+      cout << "NS";
+      for(auto& node : nodes) {
+        cout << " " << node.first;
+      }
+      cout << endl;
+    }
+
+    void printLine(int64_t ns)
+    {
+      cout << ns;
+      for(auto& node : nodes) {
+        cout << " " << node.second.utilization();
+      }
+      cout << endl;
+    }
+  };
+  Stats stats;
+
+  // Plot using plot for [col=2:*] file using 0:col with lines title
+  // columnheader
+
+  // First, scan for all compute node descriptions. Afterwards, generate
+  // statistics.
+  for(auto& e : (*this)) {
+    if(e.kind == traceentry::Kind::ComputeNodeDescription) {
+      stats.nodes[e.thisId].reserve(e.body.computeNodeDescription.workerCount);
+    }
+  }
+
+  stats.printFirstLine();
+
   for(auto& e : (*this)) {
     switch(e.kind) {
-      case traceentry::Kind::ComputeNodeDescription:
-        clog << e << endl;
-        break;
       case traceentry::Kind::WorkerIdle:
-        clog << e << endl;
+        stats.nodes[e.thisId].working[e.body.workerIdle.workerId] = false;
+        stats.printLine(e.nsSinceStart);
         break;
       case traceentry::Kind::WorkerWorking:
-        clog << e << endl;
+        stats.nodes[e.thisId].working[e.body.workerIdle.workerId] = true;
+        stats.printLine(e.nsSinceStart);
         break;
       default:
         continue;
