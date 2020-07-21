@@ -276,10 +276,12 @@ TraceFile::printUtilizationLog()
   for(auto& e : (*this)) {
     switch(e.kind) {
       case traceentry::Kind::WorkerIdle:
+        stats.printLine(e.nsSinceStart - 1);
         stats.nodes[e.thisId].working[e.body.workerIdle.workerId] = false;
         stats.printLine(e.nsSinceStart);
         break;
       case traceentry::Kind::WorkerWorking:
+        stats.printLine(e.nsSinceStart - 1);
         stats.nodes[e.thisId].working[e.body.workerIdle.workerId] = true;
         stats.printLine(e.nsSinceStart);
         break;
