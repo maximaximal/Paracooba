@@ -41,7 +41,7 @@ main(int argc, char* argv[])
 
 #ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
   if(!config->isDaemonMode()) {
-    Tracer::log(std::numeric_limits<int64_t>::min() + 1,
+    Tracer::log(std::numeric_limits<int64_t>::min() / 2,
                 config->getId(),
                 traceentry::ClientBegin{
                   std::chrono::duration_cast<std::chrono::seconds>(
