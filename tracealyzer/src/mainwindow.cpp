@@ -1,3 +1,5 @@
+#ifdef ENABLE_INTERACTIVE_VIEWER
+
 #include "mainwindow.hpp"
 #include "tracefile.hpp"
 
@@ -11,3 +13,5 @@ MainWindow::MainWindow(TraceFile& traceFile)
 MainWindow::~MainWindow() {}
 
 }
+
+#endif

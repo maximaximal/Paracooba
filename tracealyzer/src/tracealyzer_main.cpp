@@ -7,7 +7,9 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/program_options.hpp>
 
+#ifdef ENABLE_INTERACTIVE_VIEWER
 #include <gtkmm-3.0/gtkmm/application.h>
+#endif
 
 #include "mainwindow.hpp"
 #include "tracefile.hpp"
@@ -92,9 +94,15 @@ main(int argc, char* argv[])
     return EXIT_SUCCESS;
   }
 
+#ifdef ENABLE_INTERACTIVE_VIEWER
   auto app = Gtk::Application::create("at.jku.fmv.paracooba.tracealyzer");
 
   MainWindow mainWindow(traceFile);
 
   return app->run(mainWindow);
+#else
+  cerr << "!! Interactive viewer not available in this build! Specify offline "
+          "analysis method instead."
+       << endl;
+#endif
 }

@@ -1,5 +1,6 @@
 #ifndef PARACOOBA_TRACEALYZER_MAINWINDOW
 #define PARACOOBA_TRACEALYZER_MAINWINDOW
+#ifdef ENABLE_INTERACTIVE_VIEWER
 
 #include <gtkmm-3.0/gtkmm/window.h>
 
@@ -17,4 +18,5 @@ class MainWindow : public Gtk::Window
 };
 }
 
+#endif
 #endif
