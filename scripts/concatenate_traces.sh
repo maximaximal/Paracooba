@@ -10,7 +10,11 @@ OUT=${@: -1}
 {
     while (( $# > 1 ))
     do
-        cat $1/*.bin
-        shift
+        if compgen -G "$1/*.bin" > /dev/null; then
+            cat $1/*.bin
+            shift
+        else
+            shift
+        fi
     done
 } > $OUT
