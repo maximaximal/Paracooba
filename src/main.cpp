@@ -4,6 +4,7 @@
 #include <boost/exception/all.hpp>
 #include <boost/program_options.hpp>
 
+#include <limits>
 #include <paracooba/client.hpp>
 #include <paracooba/cnf.hpp>
 #include <paracooba/communicator.hpp>
@@ -40,7 +41,8 @@ main(int argc, char* argv[])
 
 #ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
   if(!config->isDaemonMode()) {
-    Tracer::log(config->getId(),
+    Tracer::log(std::numeric_limits<int64_t>::min() + 1,
+                config->getId(),
                 traceentry::ClientBegin{
                   std::chrono::duration_cast<std::chrono::seconds>(
                     std::chrono::system_clock::now().time_since_epoch())

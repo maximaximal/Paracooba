@@ -400,15 +400,24 @@ operator<<(std::ostream& o, const TraceEntry& e)
   return traceentry::BodyToOstream(o, e.body, e.kind);
 }
 
-#define PARACOOBA_TRACER_LOG(TYPE)                           \
-  static void log(ID originId, const traceentry::TYPE& body) \
-  {                                                          \
-    auto& self = get();                                      \
-    self.logEntry(TraceEntry{ self.m_thisId,                 \
-                              originId,                      \
-                              self.getCurrentOffset(),       \
-                              traceentry::Kind::TYPE,        \
-                              traceentry::Body(body) });     \
+#define PARACOOBA_TRACER_LOG(TYPE)                                       \
+  static void log(ID originId, const traceentry::TYPE& body)             \
+  {                                                                      \
+    auto& self = get();                                                  \
+    self.logEntry(TraceEntry{ self.m_thisId,                             \
+                              originId,                                  \
+                              self.getCurrentOffset(),                   \
+                              traceentry::Kind::TYPE,                    \
+                              traceentry::Body(body) });                 \
+  }                                                                      \
+  static void log(int64_t ns, ID originId, const traceentry::TYPE& body) \
+  {                                                                      \
+    auto& self = get();                                                  \
+    self.logEntry(TraceEntry{ self.m_thisId,                             \
+                              originId,                                  \
+                              ns,                                        \
+                              traceentry::Kind::TYPE,                    \
+                              traceentry::Body(body) });                 \
   }
 
 class Tracer
