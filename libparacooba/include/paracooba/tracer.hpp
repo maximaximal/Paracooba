@@ -61,6 +61,7 @@ MessageKindToStr(MessageKind kind)
     case MessageKind::Pong:
       return "Pong";
   }
+  return "";
 }
 enum class TaskKind
 {
@@ -79,6 +80,7 @@ TaskKindToStr(TaskKind kind)
     case TaskKind::SolverTask:
       return "SolverTask";
   }
+  return "";
 }
 
 struct ClientBegin
@@ -217,6 +219,7 @@ KindToStr(Kind kind)
     case Kind::WorkerWorking:
       return "WorkerWorking";
   }
+  return "";
 }
 
 #define PARACOOBA_TRACEENTRY_BODY_INIT(TYPE, MEMBER) \
@@ -372,6 +375,7 @@ BodyToOstream(std::ostream& o, const Body& body, Kind kind)
     case Kind::WorkerWorking:
       return o << body.workerWorking;
   }
+  return o;
 }
 }
 
