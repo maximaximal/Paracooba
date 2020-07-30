@@ -133,3 +133,4 @@ build-*/
 clangd
 .clangd
 .ccls-cache
+/doc/plantuml/architecture/architecture.png

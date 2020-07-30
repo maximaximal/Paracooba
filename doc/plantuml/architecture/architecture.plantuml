@@ -1,0 +1,129 @@
+@startuml
+
+!pragma teoz true
+
+skinparam titleFontSize 36
+skinparam titleFontStyle bold
+
+scale 3000 height
+scale 3000 width
+
+title Modularized Paracooba Architecture
+
+hide members
+
+package Common {
+    class Path
+    interface TaskStore
+    class TaskStoreAdapter implements TaskStore
+    interface ComputeNodeStore
+    class ComputeNodeStoreAdapter implements ComputeNodeStore
+    interface ComputeNode
+    class Tracer
+    class TwoWayMessageQueue
+    class Log
+    class Config
+    abstract Task
+    class Message
+
+    TaskStoreAdapter *.. TaskStore
+    ComputeNodeStoreAdapter *.. ComputeNodeStore
+    TwoWayMessageQueue -- Message
+    Task -- Path
+}
+
+package Broker {
+    class TaskDeque implements TaskStore
+
+    'note bottom of TaskDeque
+    '    Tags which tasks may be offloaded without
+    '    reparenting to simulate two queues. So tasks
+    '    that were received have to be marked as such.
+    'end note
+
+    class ComputeNodeImpl implements ComputeNode
+
+    class ComputeNodeMap implements ComputeNodeStore
+
+    class BrokerModule << (M,#FF7700) Module >>
+    BrokerModule *-- TaskDeque
+    BrokerModule *-- ComputeNodeMap
+    ComputeNodeMap "1" *-- "0..*" ComputeNodeImpl
+    TaskDeque -- ComputeNodeImpl : offload >
+    TaskDeque -- ComputeNodeImpl : insert <
+}
+
+package Communicator {
+    class Connection
+
+    class TCPAcceptor
+
+    class AutoDiscovery
+
+    TCPAcceptor "1" *-- "0..*" Connection
+
+    class CommunicatorModule << (M,#FF7700) Module >>
+    CommunicatorModule *-- TCPAcceptor
+    CommunicatorModule *-- AutoDiscovery
+
+    Connection -- ComputeNodeStoreAdapter
+    (Connection,ComputeNodeImpl) -- TwoWayMessageQueue
+
+    AutoDiscovery -- Connection : spawns >
+}
+
+package Runner {
+    class Worker
+
+    class Overseer
+
+    class RunnerModule << (M,#FF7700) Module >>
+    RunnerModule *-- Overseer
+    Overseer "1" *-- "1..*" Worker
+}
+
+package "Solver (1x / Input Formula)" {
+    class SATSolverManager
+
+    abstract class SATSolver
+
+    class SolverTask extends Task
+
+    class CNF
+
+    class CubeTree
+
+    class SolverModule << (M,#FF7700) Module >>
+    CNF *-- CubeTree
+    SolverModule *-- CNF
+    SolverModule *-- SATSolverManager
+
+    SATSolverManager "1" --+ "1..w" SATSolver : Loads & Instantiates >
+
+    SolverTask "0..*" -- "1" SATSolverManager
+    (SolverTask, SATSolverManager) .. SATSolver
+
+    SolverTask -- CubeTree : Inserts results >
+
+    CubeTree -- TaskStoreAdapter : Spawns tasks >
+    (CubeTree, TaskStoreAdapter) .. SolverTask
+}
+
+
+package Executable {
+    class Loader
+
+    class CLI
+
+    CLI - Loader
+}
+
+Loader --+ "1" CommunicatorModule
+Loader --+ "1" BrokerModule
+Loader --+ "1" RunnerModule
+Loader --+ "0..*" SolverModule
+
+Worker -- TaskStoreAdapter : retreives <
+(Worker, TaskStoreAdapter) .. Task
+
+@enduml
