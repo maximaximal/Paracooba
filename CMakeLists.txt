@@ -28,6 +28,15 @@ if(ipo_supported_result AND NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if ( CMAKE_COMPILER_IS_GNUCC )
+        set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+    endif()
+    if ( MSVC )
+        set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /W4")
+    endif()
+endif()
+
 # Ubuntu standard package is lame.
 # set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_LIBS OFF)
@@ -88,14 +97,10 @@ if(DEBUG_ENABLE_ADDRESS_SANITIZER)
     set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
 endif()
 
-add_subdirectory(libparacooba)
+add_library(parac_headers INTERFACE)
+target_include_directories(parac_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Files
-add_subdirectory(src)
-
-if(ENABLE_TESTS)
-    add_subdirectory(test)
-endif()
+add_subdirectory(modules)
 
 # Logalyzer
 if(DEBUG_ENABLE_BUILD_LOGALYZER)
@@ -124,48 +129,6 @@ function(define_file_basename_for_sources targetname)
 	    PROPERTY COMPILE_DEFINITIONS ${defs})
     endforeach()
 endfunction()
-
-# Executable
-add_executable(parac ${SRCS})
-set_property(TARGET parac PROPERTY CXX_STANDARD 17)
-
-define_file_basename_for_sources(paracooba)
-define_file_basename_for_sources(parac)
-
-target_link_libraries(parac PUBLIC paracooba)
-target_link_libraries(parac PUBLIC ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(parac PUBLIC Boost::log Boost::program_options)
-
-if(CLANG_TIDY_EXE AND DEBUG_ENABLE_CLANG_TIDY)
-    set_target_properties(
-        paracooba PROPERTIES
-        CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
-    )
-    set_target_properties(
-        parac PROPERTIES
-        CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
-    )
-
-    if(DEBUG_ENABLE_BUILD_LOGALYZER)
-        set_target_properties(
-            parac_logalyzer PROPERTIES
-            CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
-        )
-    endif()
-endif()
-
-target_include_directories(parac PUBLIC ${libcadical_INCLUDE_DIRS})
-
-# March
-add_dependencies(paracooba March)
-
-# Installation logic.
-include(GNUInstallDirs)
-
-install(TARGETS parac
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static)
 
 # Documentation
 find_package(Doxygen)
