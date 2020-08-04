@@ -20,6 +20,9 @@ option(ENABLE_TESTS "enable building and integrating unit tests" ON)
 # Libraries
 find_package(Threads)
 
+# Generate Export Header
+include(GenerateExportHeader)
+
 # Enable LTO.
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported_result)
@@ -83,8 +86,9 @@ endif()
 
 # Add Catch2 unit testing framework.
 if(ENABLE_TESTS)
+    cmake_policy(SET CMP0079 NEW)
     include(CTest)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/catch/Catch2-2.9.2/contrib/Catch.cmake)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/catch/Catch2-2.13.0/contrib/Catch.cmake)
     enable_testing()
 endif()
 
@@ -100,7 +104,13 @@ endif()
 add_library(parac_headers INTERFACE)
 target_include_directories(parac_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+set(test_libs  "" CACHE INTERNAL "Libraries for Tests")
+
 add_subdirectory(modules)
+
+if(ENABLE_TESTS)
+    add_subdirectory(test)
+endif()
 
 # Logalyzer
 if(DEBUG_ENABLE_BUILD_LOGALYZER)

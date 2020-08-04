@@ -32,9 +32,9 @@ parac_message_kind_to_str(parac_message_kind kind);
 
 #include <iostream>
 
-std::ostream&
+inline std::ostream&
 operator<<(std::ostream& o, parac_message_kind kind) {
-  return o << parac_message_kind_parac_message_kind_to_str(kind);
+  return o << parac_message_kind_to_str(kind);
 }
 
 #endif

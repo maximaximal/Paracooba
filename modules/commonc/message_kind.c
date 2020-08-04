@@ -1,6 +1,8 @@
 #include <paracooba/common/message_kind.h>
 
-const char*
+#include <parac_common_export.h>
+
+PARAC_COMMON_EXPORT const char*
 parac_message_kind_to_str(parac_message_kind kind) {
   switch(kind) {
     case PARAC_MESSAGE_UNKNOWN:

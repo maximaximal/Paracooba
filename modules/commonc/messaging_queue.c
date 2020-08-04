@@ -3,6 +3,8 @@
 #include <paracooba/common/messaging_queue.h>
 #include <paracooba/common/status.h>
 
+#include <parac_common_export.h>
+
 static void
 cursorpp(parac_messaging_queue* queue) {
   assert(queue);
@@ -12,7 +14,7 @@ cursorpp(parac_messaging_queue* queue) {
   }
 }
 
-void
+PARAC_COMMON_EXPORT void
 parac_messaging_queue_init(parac_messaging_queue* queue) {
   assert(queue);
   for(size_t i = 0; i < PARAC_MESSAGING_QUEUE_SIZE; ++i) {
@@ -23,29 +25,30 @@ parac_messaging_queue_init(parac_messaging_queue* queue) {
   queue->forward = NULL;
 }
 
-bool
+PARAC_COMMON_EXPORT bool
 parac_messaging_queue_empty(const parac_messaging_queue* queue) {
   assert(queue);
   return queue->entries == 0;
 }
 
-parac_message*
+PARAC_COMMON_EXPORT parac_message*
 parac_messaging_queue_pop(parac_messaging_queue* queue) {
   assert(queue);
   if(parac_messaging_queue_empty(queue)) {
     return NULL;
   }
 
-  assert(queue->entries < PARAC_MESSAGING_QUEUE_SIZE);
+  assert(queue->entries <= PARAC_MESSAGING_QUEUE_SIZE);
 
   parac_message* entry = &queue->entry[queue->cursor];
 
   cursorpp(queue);
+  --queue->entries;
 
   return entry;
 }
 
-parac_status
+PARAC_COMMON_EXPORT parac_status
 parac_messaging_queue_push(parac_messaging_queue* queue, parac_message* data) {
   assert(queue);
 
@@ -53,7 +56,7 @@ parac_messaging_queue_push(parac_messaging_queue* queue, parac_message* data) {
     queue->forward(data);
   }
 
-  if(queue->entries >= PARAC_MESSAGING_QUEUE_SIZE - 1) {
+  if(queue->entries >= PARAC_MESSAGING_QUEUE_SIZE) {
     return PARAC_QUEUE_FULL;
   }
 
