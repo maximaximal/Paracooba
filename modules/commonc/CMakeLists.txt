@@ -3,6 +3,8 @@ add_library(parac_common SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/messaging_queue.c
     ${CMAKE_CURRENT_SOURCE_DIR}/message_kind.c
     ${CMAKE_CURRENT_SOURCE_DIR}/status.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/task_store_adapter.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/compute_node_store_adapter.c
 )
 
 target_link_libraries(parac_common parac_headers)
@@ -16,6 +18,8 @@ if(ENABLE_TESTS)
     add_library(parac_common_test SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/test_messaging_queue.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/test_path.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_task_store_adapter.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_compute_node_store_adapter.cpp
     )
     target_link_libraries(parac_common_test PUBLIC parac_common Catch2::Catch2)
 
