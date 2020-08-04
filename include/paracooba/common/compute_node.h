@@ -5,15 +5,23 @@
 extern "C" {
 #endif
 
-#include "two_way_messaging_queue.h"
 #include "types.h"
 
+struct parac_compute_node;
+struct parac_message;
+
+typedef void (*parac_compute_node_message_func)(
+  struct parac_compute_node* compute_node,
+  struct parac_message* msg);
+
 typedef struct parac_compute_node {
-  parac_two_way_messaging_queue messaging_queue;
+  parac_compute_node_message_func send_message_to;     /// Set by Communicator.
+  parac_compute_node_message_func receive_message_from;/// Set by Broker.
 
   parac_id id;
 
-  void* userdata;
+  void* broker_userdata;      /// Set by Broker.
+  void* communicator_userdata;/// Set by Communicator.
 } parac_compute_node;
 
 #ifdef __cplusplus

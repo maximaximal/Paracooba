@@ -20,7 +20,6 @@ package Common {
     class ComputeNodeStoreAdapter implements ComputeNodeStore
     interface ComputeNode
     class Tracer
-    class TwoWayMessageQueue
     class Log
     class Config
     abstract Task
@@ -28,7 +27,6 @@ package Common {
 
     TaskStoreAdapter *.. TaskStore
     ComputeNodeStoreAdapter *.. ComputeNodeStore
-    TwoWayMessageQueue -- Message
     Task -- Path
 }
 
@@ -67,7 +65,8 @@ package Communicator {
     CommunicatorModule *-- AutoDiscovery
 
     Connection -- ComputeNodeStoreAdapter
-    (Connection,ComputeNodeImpl) -- TwoWayMessageQueue
+
+    Connection -- ComputeNode
 
     AutoDiscovery -- Connection : spawns >
 }
