@@ -7,7 +7,8 @@ extern "C" {
 
 typedef enum parac_status {
   PARAC_OK,
-  PARAC_QUEUE_FULL,
+  PARAC_FULL,
+  PARAC_OUT_OF_MEMORY,
   PARAC_INVALID_CHAR_ENCOUNTERED,
   PARAC_GENERIC_ERROR
 } parac_status;

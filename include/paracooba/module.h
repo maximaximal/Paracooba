@@ -21,16 +21,17 @@ typedef struct parac_module* (*parac_module_prepare)(
 typedef enum parac_status (*parac_module_register)(struct parac_handle* handle,
                                                    struct parac_module* module);
 
-typedef struct parac_version
-{
+typedef enum parac_status (*parac_module_pre_init)(struct parac_module* module);
+typedef enum parac_status (*parac_module_init)(struct parac_module* module);
+
+typedef struct parac_version {
   int major;
   int minor;
   int patch;
   int tweak;
 } parac_version;
 
-typedef enum parac_module_type
-{
+typedef enum parac_module_type {
   PARAC_MOD_BROKER,
   PARAC_MOD_RUNNER,
   PARAC_MOD_COMMUNICATOR,
@@ -44,16 +45,20 @@ typedef enum parac_module_type
  * for userdata. Is always given to other functions related to the module, so
  * the userdata is always available to the module.
  */
-typedef struct parac_module
-{
+typedef struct parac_module {
   const char* name;
   parac_version version;
   parac_module_type type;
   void* userdata;
   struct parac_handle* handle;
 
-  union
-  {
+  parac_module_pre_init pre_init;/// Called before module may fully initialize.
+                                 /// Config must be setup here.
+  parac_module_init
+    init;/// Called after config has been parsed. Module may now fully use
+         /// configuration to setup data structures, etc. on its own.
+
+  union {
     struct parac_module_broker* broker;
     struct parac_module_runner* runner;
     struct parac_module_solver* solver;
@@ -68,10 +73,10 @@ typedef struct parac_module
  * userdata. Is always given to other functions related to the handle, so
  * the userdata is always available to Paracooba.
  */
-typedef struct parac_handle
-{
+typedef struct parac_handle {
   parac_version version;
   void* userdata;
+  struct parac_config* config;
 
   parac_module_exit exit;
   parac_module_prepare prepare;
