@@ -1,0 +1,62 @@
+#ifndef PARAC_COMMON_THREAD_REGISTRY_H
+#define PARAC_COMMON_THREAD_REGISTRY_H
+
+#include "status.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdbool.h>
+#include <stdint.h>
+
+struct parac_thread_regitstry;
+struct parac_thread_registry_handle;
+
+typedef int (*parac_thread_registry_start_func)(
+  struct parac_thread_registry_handle*);
+
+typedef void (*parac_thread_registry_new_thread_starting_cb)(
+  struct parac_thread_registry_handle*);
+
+typedef void (*parac_thread_registry_stop_notifier)(
+  struct parac_thread_registry_handle*);
+
+typedef struct parac_thread_registry {
+  struct parac_thread_registry_handle_list* threads;
+  struct parac_thread_registry_new_thread_starting_cb_list*
+    new_thread_starting_cbs;
+} parac_thread_registry;
+
+typedef struct parac_thread_registry_handle {
+  uint16_t thread_id;
+  bool stop;
+  bool running;
+  parac_status exit_status;
+  struct parac_module* starter;
+  void* userdata;
+  parac_thread_registry_stop_notifier stop_notifier;
+} parac_thread_registry_handle;
+
+void
+parac_thread_registry_init(parac_thread_registry* registry);
+
+void
+parac_thread_registry_free(parac_thread_registry* registry);
+
+parac_status
+parac_thread_registry_create(parac_thread_registry* registry,
+                             struct parac_module* starter,
+                             parac_thread_registry_start_func start_func);
+
+void
+parac_thread_registry_stop(parac_thread_registry* registry);
+
+void
+parac_thread_registry_wait_for_exit(parac_thread_registry* registry);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
