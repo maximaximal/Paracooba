@@ -23,7 +23,7 @@ typedef void (*parac_thread_registry_stop_notifier)(
   struct parac_thread_registry_handle*);
 
 typedef struct parac_thread_registry {
-  struct parac_thread_registry_handle_list* threads;
+  struct parac_thread_handle_list* threads;
   struct parac_thread_registry_new_thread_starting_cb_list*
     new_thread_starting_cbs;
 } parac_thread_registry;
@@ -32,9 +32,10 @@ typedef struct parac_thread_registry_handle {
   uint16_t thread_id;
   bool stop;
   bool running;
-  parac_status exit_status;
+  int exit_status;// Should be of type parac_status
   struct parac_module* starter;
   void* userdata;
+  parac_thread_registry_start_func start_func;
   parac_thread_registry_stop_notifier stop_notifier;
 } parac_thread_registry_handle;
 
@@ -47,7 +48,8 @@ parac_thread_registry_free(parac_thread_registry* registry);
 parac_status
 parac_thread_registry_create(parac_thread_registry* registry,
                              struct parac_module* starter,
-                             parac_thread_registry_start_func start_func);
+                             parac_thread_registry_start_func start_func,
+                             parac_thread_registry_handle** out_handle);
 
 void
 parac_thread_registry_stop(parac_thread_registry* registry);
