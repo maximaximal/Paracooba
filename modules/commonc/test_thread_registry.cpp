@@ -25,12 +25,15 @@ TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
     [](parac_thread_registry_handle* handle) {
       REQUIRE(handle->running);
       REQUIRE(handle->thread_id == 1);
-      REQUIRE(!handle->stop);
       return 10;
     },
     &handle);
   REQUIRE(status == PARAC_OK);
   REQUIRE(passed);
+
+  REQUIRE(!handle->stop);
+  parac_thread_registry_stop(&registry);
+  REQUIRE(handle->stop);
 
   parac_thread_registry_wait_for_exit(&registry);
 
