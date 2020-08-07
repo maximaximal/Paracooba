@@ -8,6 +8,17 @@ TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
 
   parac_thread_registry_handle* handle = nullptr;
 
+  static bool passed = false;
+
+  parac_thread_registry_add_starting_callback(
+    &registry, [](parac_thread_registry_handle* handle) {
+      REQUIRE(!handle->running);
+      REQUIRE(handle->thread_id == 1);
+      passed = true;
+    });
+
+  REQUIRE(!passed);
+
   parac_status status = parac_thread_registry_create(
     &registry,
     nullptr,
@@ -19,6 +30,7 @@ TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
     },
     &handle);
   REQUIRE(status == PARAC_OK);
+  REQUIRE(passed);
 
   parac_thread_registry_wait_for_exit(&registry);
 

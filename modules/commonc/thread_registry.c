@@ -111,6 +111,24 @@ parac_thread_registry_create(parac_thread_registry* registry,
 }
 
 PARAC_COMMON_EXPORT
+parac_status
+parac_thread_registry_add_starting_callback(
+  parac_thread_registry* registry,
+  parac_thread_registry_new_thread_starting_cb cb) {
+  assert(registry);
+  assert(registry->new_thread_starting_cbs);
+  assert(cb);
+
+  parac_thread_registry_new_thread_starting_cb* internal_cb =
+    parac_thread_registry_new_thread_starting_cb_list_alloc_new(
+      registry->new_thread_starting_cbs);
+  if(!internal_cb)
+    return PARAC_OUT_OF_MEMORY;
+  *internal_cb = cb;
+  return PARAC_OK;
+}
+
+PARAC_COMMON_EXPORT
 void
 parac_thread_registry_stop(parac_thread_registry* registry) {
   struct parac_thread_handle_list_entry* handle = registry->threads->first;

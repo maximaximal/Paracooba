@@ -51,6 +51,11 @@ parac_thread_registry_create(parac_thread_registry* registry,
                              parac_thread_registry_start_func start_func,
                              parac_thread_registry_handle** out_handle);
 
+parac_status
+parac_thread_registry_add_starting_callback(
+  parac_thread_registry* registry,
+  parac_thread_registry_new_thread_starting_cb cb);
+
 void
 parac_thread_registry_stop(parac_thread_registry* registry);
 
