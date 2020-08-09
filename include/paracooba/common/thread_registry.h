@@ -64,6 +64,13 @@ parac_thread_registry_wait_for_exit(parac_thread_registry* registry);
 
 #ifdef __cplusplus
 }
+
+namespace paracooba {
+struct ThreadRegistryWrapper : public parac_thread_registry {
+  ThreadRegistryWrapper() { parac_thread_registry_init(this); }
+  ~ThreadRegistryWrapper() { parac_thread_registry_free(this); }
+};
+}
 #endif
 
 #endif

@@ -2,6 +2,7 @@
 #define PARACOOBA_COMMON_PATH_H
 
 #include "paracooba/common/status.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

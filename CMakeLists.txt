@@ -47,7 +47,7 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost COMPONENTS log program_options thread filesystem system iostreams REQUIRED)
+find_package(Boost COMPONENTS log program_options thread filesystem system iostreams coroutine context REQUIRED)
 
 # Try to include beast headers. They are required for the internal webserver.
 find_file(BOOST_BEAST_HEADER "boost/beast/core.hpp" PATHS ${Boost_INCLUDE_DIRS})
@@ -97,6 +97,7 @@ add_subdirectory(third_party)
 # Address Sanitizer for Debug Builds
 if(DEBUG_ENABLE_ADDRESS_SANITIZER)
     set(CMAKE_BUILD_TYPE Debug)
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DBOOST_USE_ASAN")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
     set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
 endif()
@@ -107,6 +108,12 @@ target_include_directories(parac_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/i
 set(test_libs  "" CACHE INTERNAL "Libraries for Tests")
 
 add_subdirectory(modules)
+add_subdirectory(executable)
+
+add_executable(parac ${PARAC_EXECUTABLE_SRCS})
+set_target_properties(parac PROPERTIES CXX_STANDARD 17)
+target_compile_definitions(parac PRIVATE "-DPARAC_LOG_INCLUDE_FMT")
+target_link_libraries(parac parac_common Boost::filesystem Boost::coroutine Boost::context ${CMAKE_DL_LIBS} fmt)
 
 if(ENABLE_TESTS)
     add_subdirectory(test)
