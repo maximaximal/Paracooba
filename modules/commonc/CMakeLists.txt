@@ -17,7 +17,8 @@ target_link_libraries(parac_common PUBLIC parac_headers parac_modules Threads::T
 target_link_libraries(parac_common PRIVATE Boost::log fmt::fmt)
 
 set_target_properties(parac_common PROPERTIES C_STANDARD 11)
-set_target_properties(parac_common PROPERTIES CXX_STANDARD 17)
+
+target_compile_features(parac_common PUBLIC cxx_std_17)
 
 generate_export_header(parac_common)
 target_include_directories(parac_common PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

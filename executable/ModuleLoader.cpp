@@ -60,7 +60,7 @@ ModuleLoader::ModuleLoader() {
 }
 ModuleLoader::~ModuleLoader() {}
 
-void
+bool
 ModuleLoader::load(parac_module_type type) {
 
   PathSource pathSource(type);
@@ -69,13 +69,22 @@ ModuleLoader::load(parac_module_type type) {
     std::string name = std::string("parac_") + parac_module_type_to_str(type);
     try {
       auto imported = ImportModuleDiscoverFunc(path, name);
-      parac_log(PARAC_LOADER,
-                PARAC_DEBUG,
-                "{} loaded with parameter {}",
-                parac_module_type_to_str(type),
-                (path / name).string());
       imported(&m_handle);
-      return;
+
+      auto& mod = *m_modules[type];
+
+      parac_log(PARAC_LOADER,
+                PARAC_INFO,
+                "{} named '{}' version {}.{}.{}:{} loaded with from (generic) "
+                "SO-path {}",
+                parac_module_type_to_str(type),
+                mod.name,
+                mod.version.major,
+                mod.version.minor,
+                mod.version.patch,
+                mod.version.tweak,
+                (path / name).string());
+      return true;
     } catch(boost::system::system_error& err) {
       (void)err;
       // Ignoring failed loads, because multiple locations are tried.
@@ -91,14 +100,22 @@ ModuleLoader::load(parac_module_type type) {
             PARAC_FATAL,
             "{} could not be loaded!",
             parac_module_type_to_str(type));
+  return false;
 }
 
-void
+bool
 ModuleLoader::load() {
   for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
     parac_module_type type = static_cast<parac_module_type>(i);
     load(type);
   }
+
+  if(!isComplete()) {
+    parac_log(
+      PARAC_LOADER, PARAC_FATAL, "Cannot load all required paracooba modules!");
+  }
+
+  return isComplete();
 }
 
 bool
@@ -108,19 +125,19 @@ ModuleLoader::isComplete() {
 
 bool
 ModuleLoader::hasSolver() {
-  return m_modules[PARAC_MOD_SOLVER] && m_mod_solver;
+  return (bool)m_modules[PARAC_MOD_SOLVER];
 }
 bool
 ModuleLoader::hasBroker() {
-  return m_modules[PARAC_MOD_BROKER] && m_mod_broker;
+  return (bool)m_modules[PARAC_MOD_BROKER];
 }
 bool
 ModuleLoader::hasRunner() {
-  return m_modules[PARAC_MOD_RUNNER] && m_mod_runner;
+  return (bool)m_modules[PARAC_MOD_RUNNER];
 }
 bool
 ModuleLoader::hasCommunicator() {
-  return m_modules[PARAC_MOD_COMMUNICATOR] && m_mod_communicator;
+  return (bool)m_modules[PARAC_MOD_COMMUNICATOR];
 }
 
 parac_module*

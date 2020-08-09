@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <paracooba/common/log.h>
 #include <paracooba/common/thread_registry.h>
 
@@ -21,5 +22,9 @@ main(int argc, char* argv[]) {
   parac_log(PARAC_GENERAL, PARAC_INFO, "Starting Paracooba");
 
   ModuleLoader loader;
-  loader.load();
+  if(!loader.load()) {
+    return EXIT_FAILURE;
+  }
+
+  return EXIT_SUCCESS;
 }

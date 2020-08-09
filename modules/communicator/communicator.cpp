@@ -4,7 +4,7 @@
 
 #include <parac_communicator_export.h>
 
-#define COMMUNICATOR_NAME "cpp_taskpuller"
+#define COMMUNICATOR_NAME "cpp_asio_tcpconnections"
 #define COMMUNICATOR_VERSION_MAJOR 1
 #define COMMUNICATOR_VERSION_MINOR 0
 #define COMMUNICATOR_VERSION_PATCH 0

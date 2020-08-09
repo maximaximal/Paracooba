@@ -17,7 +17,7 @@ class ModuleLoader {
   ModuleLoader();
   ~ModuleLoader();
 
-  void load();
+  bool load();
 
   bool isComplete();
 
@@ -38,14 +38,9 @@ class ModuleLoader {
 
   std::array<std::unique_ptr<parac_module>, PARAC_MOD__COUNT> m_modules;
 
-  std::unique_ptr<parac_module_solver> m_mod_solver;
-  std::unique_ptr<parac_module_runner> m_mod_runner;
-  std::unique_ptr<parac_module_communicator> m_mod_communicator;
-  std::unique_ptr<parac_module_broker> m_mod_broker;
-
   parac_handle m_handle;
 
-  void load(parac_module_type type);
+  bool load(parac_module_type type);
 };
 }
 
