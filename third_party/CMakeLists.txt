@@ -6,3 +6,4 @@ set(libcadical_LIBRARIES ${libcadical_LIBRARIES} PARENT_SCOPE)
 
 add_subdirectory(cereal)
 add_subdirectory(March)
+add_subdirectory(fmt)

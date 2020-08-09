@@ -7,11 +7,17 @@ add_library(parac_common SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/thread_registry.c
     ${CMAKE_CURRENT_SOURCE_DIR}/task_store_adapter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/compute_node_store_adapter.c
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
 )
 
-target_link_libraries(parac_common PUBLIC parac_headers Threads::Threads)
+target_link_libraries(parac_common PUBLIC parac_headers parac_modules Threads::Threads)
+
+# Logging Support
+target_link_libraries(parac_common PRIVATE Boost::log fmt::fmt)
 
 set_target_properties(parac_common PROPERTIES C_STANDARD 11)
+set_target_properties(parac_common PROPERTIES CXX_STANDARD 17)
 
 generate_export_header(parac_common)
 target_include_directories(parac_common PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
