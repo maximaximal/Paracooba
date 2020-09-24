@@ -18,7 +18,7 @@
 static parac_status
 pre_init(parac_module* mod) {
   assert(mod);
-  assert(mod->runner);
+  assert(mod->broker);
   assert(mod->handle);
   assert(mod->handle->config);
 
@@ -28,7 +28,7 @@ pre_init(parac_module* mod) {
 static parac_status
 init(parac_module* mod) {
   assert(mod);
-  assert(mod->runner);
+  assert(mod->broker);
   assert(mod->handle);
   assert(mod->handle->config);
   assert(mod->handle->thread_registry);

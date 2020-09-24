@@ -15,7 +15,6 @@ class ModuleLoader {
   ~ModuleLoader();
 
   bool load();
-
   bool pre_init();
   bool init();
 
@@ -34,6 +33,10 @@ class ModuleLoader {
   parac_handle& handle();
 
   private:
+  struct Internal;
+
+  std::unique_ptr<Internal> m_internal;
+
   static parac_module* prepare(parac_handle* handle, parac_module_type type);
 
   std::array<std::unique_ptr<parac_module>, PARAC_MOD__COUNT> m_modules;

@@ -91,15 +91,17 @@ if(ENABLE_TESTS)
     enable_testing()
 endif()
 
-add_subdirectory(third_party)
-
 # Address Sanitizer for Debug Builds
 if(DEBUG_ENABLE_ADDRESS_SANITIZER)
     set(CMAKE_BUILD_TYPE Debug)
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DBOOST_USE_ASAN")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
     set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
 endif()
+
+add_subdirectory(third_party)
 
 add_library(parac_headers INTERFACE)
 target_include_directories(parac_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)

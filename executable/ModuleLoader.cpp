@@ -54,8 +54,20 @@ struct PathSource : public boost::asio::coroutine {
 };
 
 namespace paracooba {
+struct ModuleLoader::Internal {
+  std::vector<
+    boost::dll::detail::import_type<decltype(parac_module_discover)>::type>
+    imports;
+
+  parac_module_broker broker;
+  parac_module_runner runner;
+  parac_module_solver solver;
+  parac_module_communicator communicator;
+};
+
 ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
-                           struct parac_config& config) {
+                           struct parac_config& config)
+  : m_internal(std::make_unique<Internal>()) {
   m_handle.userdata = this;
   m_handle.prepare = &ModuleLoader::prepare;
   m_handle.thread_registry = &thread_registry;
@@ -87,6 +99,9 @@ ModuleLoader::load(parac_module_type type) {
                 mod.version.patch,
                 mod.version.tweak,
                 (path / name).string());
+
+      m_internal->imports.push_back(std::move(imported));
+
       return true;
     } catch(boost::system::system_error& err) {
       (void)err;
@@ -106,6 +121,23 @@ ModuleLoader::load(parac_module_type type) {
   return false;
 }
 
+struct parac_module_solver*
+ModuleLoader::solver() {
+  return &m_internal->solver;
+}
+struct parac_module_runner*
+ModuleLoader::runner() {
+  return &m_internal->runner;
+}
+struct parac_module_communicator*
+ModuleLoader::communicator() {
+  return &m_internal->communicator;
+}
+struct parac_module_broker*
+ModuleLoader::broker() {
+  return &m_internal->broker;
+}
+
 bool
 ModuleLoader::load() {
   for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
@@ -113,12 +145,97 @@ ModuleLoader::load() {
     load(type);
   }
 
-  if(!isComplete()) {
+  if(isComplete()) {
+    for(auto& mod : m_modules) {
+      mod->broker = broker();
+      mod->runner = runner();
+      mod->communicator = communicator();
+      mod->solver = solver();
+      mod->handle = &m_handle;
+    }
+  } else {
     parac_log(
       PARAC_LOADER, PARAC_FATAL, "Cannot load all required paracooba modules!");
   }
 
   return isComplete();
+}
+
+bool
+ModuleLoader::pre_init() {
+  parac_log(
+    PARAC_LOADER, PARAC_DEBUG, "Running pre_init routines of loaded modules.");
+
+  bool success = true;
+  for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
+    parac_module_type type = static_cast<parac_module_type>(i);
+    auto& ptr = m_modules[type];
+    if(!ptr || !ptr->pre_init) {
+      parac_log(PARAC_LOADER,
+                PARAC_FATAL,
+                "Cannot run pre_init of unloaded or incompletely initialized "
+                "module {}! Skipping, to find "
+                "further errors.",
+                type);
+      success = false;
+      continue;
+    }
+    parac_log(
+      PARAC_LOADER, PARAC_TRACE, "Running pre_init of module {}...", type);
+    parac_status s = ptr->pre_init(ptr.get());
+    if(s != PARAC_OK) {
+      parac_log(PARAC_LOADER,
+                PARAC_FATAL,
+                "Error while running pre_init of module {}! Error: {}, "
+                "Skipping, to find "
+                "further errors.",
+                type,
+                s);
+    }
+    success = false;
+  }
+  parac_log(PARAC_LOADER,
+            PARAC_DEBUG,
+            "Successfully ran all pre_init routines of modules.");
+  return success;
+}
+
+bool
+ModuleLoader::init() {
+  parac_log(
+    PARAC_LOADER, PARAC_DEBUG, "Running pre_init routines of loaded modules.");
+
+  bool success = true;
+  for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
+    parac_module_type type = static_cast<parac_module_type>(i);
+    auto& ptr = m_modules[type];
+    if(!ptr || !ptr->init) {
+      parac_log(PARAC_LOADER,
+                PARAC_FATAL,
+                "Cannot run init of unloaded or incompletely initialized "
+                "module {}! Skipping, to find "
+                "further errors.",
+                type);
+      success = false;
+      continue;
+    }
+    parac_log(PARAC_LOADER, PARAC_TRACE, "Running init of module {}...", type);
+    parac_status s = ptr->init(ptr.get());
+    if(s != PARAC_OK) {
+      parac_log(PARAC_LOADER,
+                PARAC_FATAL,
+                "Error while running init of module {}! Error: {}, "
+                "Skipping, to find "
+                "further errors.",
+                type,
+                s);
+    }
+    success = false;
+  }
+  parac_log(PARAC_LOADER,
+            PARAC_DEBUG,
+            "Successfully ran all init routines of modules.");
+  return success;
 }
 
 bool
@@ -159,6 +276,9 @@ ModuleLoader::prepare(parac_handle* handle, parac_module_type type) {
   }
 
   ptr = std::make_unique<parac_module>();
+
+  ptr->pre_init = nullptr;
+  ptr->init = nullptr;
 
   return ptr.get();
 }

@@ -70,6 +70,7 @@ operator<<(std::ostream& o, parac_log_channel channel) {
 }
 
 #ifdef PARAC_LOG_INCLUDE_FMT
+#include <fmt/ostream.h>
 #include <fmt/format.h>
 
 template<typename FormatString,
