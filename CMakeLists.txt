@@ -8,7 +8,6 @@ set(BUILD_URL "" CACHE STRING "Unique URL to identify this build.")
 set(VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}+${BUILD_NUMBER})
 
 option(DEBUG_ENABLE_ADDRESS_SANITIZER "enable address sanitizer (GCC)" OFF)
-option(DEBUG_ENABLE_BUILD_LOGALYZER "enable logalyzer tool to be built. Makes finding missed transfers easier" OFF)
 option(DEBUG_ENABLE_CLANG_TIDY "enable clang-tidy check of source code" OFF)
 option(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX "allow clang-tidy to modify source files and automatically fix issues. Very likely leads to uncompilable code, use selectively." OFF)
 
@@ -118,16 +117,6 @@ target_link_libraries(parac parac_common Boost::filesystem Boost::coroutine Boos
 
 if(ENABLE_TESTS)
     add_subdirectory(test)
-endif()
-
-# Logalyzer
-if(DEBUG_ENABLE_BUILD_LOGALYZER)
-    add_subdirectory(logalyzer)
-endif()
-
-# Tracealyzer
-if(ENABLE_TRACING_SUPPORT)
-    add_subdirectory(tracealyzer)
 endif()
 
 # Basenames for logging
