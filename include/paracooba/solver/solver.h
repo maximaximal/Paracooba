@@ -11,7 +11,10 @@ extern "C" {
 struct parac_module;
 struct parac_solver_instance;
 
-typedef void (*parac_solver_parse_cnf)(struct parac_module*);
+typedef parac_status (*parac_solver_instance_parse_file)(struct parac_module*,
+                                                         const char* path);
+typedef parac_status (*parac_solver_instance_start_solving)(
+  struct parac_module*);
 
 typedef struct parac_solver_instance* (
   *parac_solver_add_instance)(struct parac_module*, parac_id originator_id);
@@ -21,9 +24,12 @@ typedef parac_status (*parac_solver_remove_instance)(
 
 typedef struct parac_module_solver_instance {
   parac_id originator_id;
-  parac_solver_parse_cnf parse_cnf;
 
-  void *userdata;
+  parac_solver_instance_parse_file
+    parse_file;/// Called on Masters and on Daemons.
+  parac_solver_instance_start_solving start_solving;/// Only called on Masters.
+
+  void* userdata;
 } parac_module_solver_instance;
 
 typedef struct parac_module_solver {

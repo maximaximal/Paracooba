@@ -54,9 +54,12 @@ struct PathSource : public boost::asio::coroutine {
 };
 
 namespace paracooba {
-ModuleLoader::ModuleLoader() {
+ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
+                           struct parac_config& config) {
   m_handle.userdata = this;
   m_handle.prepare = &ModuleLoader::prepare;
+  m_handle.thread_registry = &thread_registry;
+  m_handle.config = &config;
 }
 ModuleLoader::~ModuleLoader() {}
 
@@ -74,7 +77,7 @@ ModuleLoader::load(parac_module_type type) {
       auto& mod = *m_modules[type];
 
       parac_log(PARAC_LOADER,
-                PARAC_INFO,
+                PARAC_DEBUG,
                 "{} named '{}' version {}.{}.{}:{} loaded with from (generic) "
                 "SO-path {}",
                 parac_module_type_to_str(type),

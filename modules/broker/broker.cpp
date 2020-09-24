@@ -1,4 +1,9 @@
+#include "paracooba/common/config.h"
+#include "paracooba/common/types.h"
 #include <paracooba/module.h>
+
+#define PARAC_LOG_INCLUDE_FMT
+#include "paracooba/common/log.h"
 
 #include <cassert>
 

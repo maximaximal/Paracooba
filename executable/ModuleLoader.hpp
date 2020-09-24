@@ -4,20 +4,20 @@
 #include <array>
 #include <memory>
 
+#include "paracooba/common/config.h"
 #include "paracooba/module.h"
-
-struct parac_module_broker;
-struct parac_module_runner;
-struct parac_module_communicator;
-struct parac_module_solver;
 
 namespace paracooba {
 class ModuleLoader {
   public:
-  ModuleLoader();
+  ModuleLoader(struct parac_thread_registry& thread_registry,
+               struct parac_config& config);
   ~ModuleLoader();
 
   bool load();
+
+  bool pre_init();
+  bool init();
 
   bool isComplete();
 

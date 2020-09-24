@@ -131,6 +131,9 @@ class Log
   {
     return m_severityConfig[static_cast<size_t>(severity)];
   }
+  inline void setLogLevelEnabled(Severity severity, bool enabled) {
+    m_severityConfig[static_cast<size_t>(severity)] = enabled;
+  }
 
   struct ThreadLocalData
   {

@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.9)
 project(paracooba
     VERSION 0.1.0)
 
-
 set(BUILD_NUMBER "0" CACHE STRING "Build-Number")
 set(BUILD_URL "" CACHE STRING "Unique URL to identify this build.")
 
@@ -113,7 +112,7 @@ add_subdirectory(executable)
 add_executable(parac ${PARAC_EXECUTABLE_SRCS})
 set_target_properties(parac PROPERTIES CXX_STANDARD 17)
 target_compile_definitions(parac PRIVATE "-DPARAC_LOG_INCLUDE_FMT")
-target_link_libraries(parac parac_common Boost::filesystem Boost::coroutine Boost::context ${CMAKE_DL_LIBS} fmt)
+target_link_libraries(parac parac_common Boost::filesystem Boost::coroutine Boost::context Boost::program_options ${CMAKE_DL_LIBS} fmt)
 
 if(ENABLE_TESTS)
     add_subdirectory(test)
