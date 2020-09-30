@@ -7,6 +7,7 @@ set(BUILD_URL "" CACHE STRING "Unique URL to identify this build.")
 
 set(VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}+${BUILD_NUMBER})
 
+option(STATIC_BUILDS "also build static executable with included modules" ON)
 option(DEBUG_ENABLE_ADDRESS_SANITIZER "enable address sanitizer (GCC)" OFF)
 option(DEBUG_ENABLE_CLANG_TIDY "enable clang-tidy check of source code" OFF)
 option(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX "allow clang-tidy to modify source files and automatically fix issues. Very likely leads to uncompilable code, use selectively." OFF)
@@ -114,7 +115,9 @@ macro(parac_static_shared_combined NAME SRCS SHARED_EXTRA_SRCS)
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
     add_library(${NAME} SHARED $<TARGET_OBJECTS:${NAME}_obj> ${SHARED_EXTRA_SRCS})
-    add_library(${NAME}_static STATIC $<TARGET_OBJECTS:${NAME}_obj>)
+    if(STATIC_BUILDS)
+        add_library(${NAME}_static STATIC $<TARGET_OBJECTS:${NAME}_obj>)
+    endif()
 
     target_include_directories(${NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_link_libraries(${NAME} PRIVATE parac_modules)
@@ -131,14 +134,17 @@ macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
     set_target_properties(${NAME}_obj PROPERTIES C_VISIBILITY_PRESET hidden)
     set_target_properties(${NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(${NAME} PROPERTIES C_VISIBILITY_PRESET hidden)
-    set_target_properties(${NAME}_static PROPERTIES CXX_VISIBILITY_PRESET hidden)
-    set_target_properties(${NAME}_static PROPERTIES C_VISIBILITY_PRESET hidden)
 
     target_compile_definitions(${NAME}_obj PRIVATE "-DPARAC_LOG_INCLUDE_FMT")
-    target_compile_definitions(${NAME}_static PUBLIC "-DPARAC_USE_STATIC_${NAME}")
 
     target_link_libraries(${NAME}_obj PUBLIC parac_common parac_modules fmt::fmt)
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+    if(STATIC_BUILDS)
+        set_target_properties(${NAME}_static PROPERTIES CXX_VISIBILITY_PRESET hidden)
+        set_target_properties(${NAME}_static PROPERTIES C_VISIBILITY_PRESET hidden)
+        target_compile_definitions(${NAME}_static PUBLIC "-DPARAC_USE_STATIC_${NAME}")
+    endif()
 endmacro()
 
 set(test_libs  "" CACHE INTERNAL "Libraries for Tests")
@@ -150,10 +156,12 @@ add_executable(parac $<TARGET_OBJECTS:parac_executable>
     ${CMAKE_CURRENT_SOURCE_DIR}/executable/StaticModuleLoader.cpp)
 target_link_libraries(parac PUBLIC parac_common parac_modules Boost::filesystem Boost::coroutine Boost::context Boost::program_options ${CMAKE_DL_LIBS} fmt)
 
-add_executable(paracs $<TARGET_OBJECTS:parac_executable>
-    ${CMAKE_CURRENT_SOURCE_DIR}/executable/StaticModuleLoader.cpp)
-target_link_libraries(paracs parac_common_static parac_modules fmt::fmt Boost::filesystem Boost::coroutine Boost::log Boost::context Boost::program_options ${CMAKE_DL_LIBS})
-target_link_libraries(paracs parac_communicator_static parac_broker_static parac_runner_static parac_solver_static)
+if(STATIC_BUILDS)
+    add_executable(paracs $<TARGET_OBJECTS:parac_executable>
+        ${CMAKE_CURRENT_SOURCE_DIR}/executable/StaticModuleLoader.cpp)
+    target_link_libraries(paracs parac_common_static parac_modules fmt::fmt Boost::filesystem Boost::coroutine Boost::log Boost::context Boost::program_options ${CMAKE_DL_LIBS})
+    target_link_libraries(paracs parac_communicator_static parac_broker_static parac_runner_static parac_solver_static)
+endif()
 
 if(ENABLE_TESTS)
     add_subdirectory(test)

@@ -19,12 +19,15 @@ set_target_properties(parac_common_obj PROPERTIES C_STANDARD 11)
 target_include_directories(parac_common_obj PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
 target_include_directories(parac_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
-target_include_directories(parac_common_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
 target_link_libraries(parac_common PRIVATE Boost::log fmt::fmt)
 
 target_compile_features(parac_common PUBLIC cxx_std_17)
-target_compile_features(parac_common_static PUBLIC cxx_std_17)
+
+if(STATIC_BUILDS)
+    target_compile_features(parac_common_static PUBLIC cxx_std_17)
+    target_include_directories(parac_common_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+endif()
 
 if(ENABLE_TESTS)
     add_library(parac_common_test SHARED
