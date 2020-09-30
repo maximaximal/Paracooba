@@ -30,7 +30,8 @@ class ModuleLoader {
   struct parac_module_communicator* communicator();
   struct parac_module_broker* broker();
 
-  parac_handle& handle();
+  parac_handle& handle() { return m_handle; }
+  const parac_handle& handle() const { return m_handle; }
 
   private:
   struct Internal;

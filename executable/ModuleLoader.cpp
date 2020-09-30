@@ -76,6 +76,8 @@ ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
   m_handle.prepare = &ModuleLoader::prepare;
   m_handle.thread_registry = &thread_registry;
   m_handle.config = &config;
+  m_handle.offsetNS = 0;
+  m_handle.distrac = nullptr;
 }
 ModuleLoader::~ModuleLoader() {}
 

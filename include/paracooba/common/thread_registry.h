@@ -69,6 +69,8 @@ namespace paracooba {
 struct ThreadRegistryWrapper : public parac_thread_registry {
   ThreadRegistryWrapper() { parac_thread_registry_init(this); }
   ~ThreadRegistryWrapper() { parac_thread_registry_free(this); }
+
+  void wait() { parac_thread_registry_wait_for_exit(this); }
 };
 }
 #endif

@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
+
 typedef enum parac_module_type {
   PARAC_MOD_BROKER,
   PARAC_MOD_RUNNER,
@@ -85,7 +87,10 @@ typedef struct parac_handle {
   struct parac_config* config;
   struct parac_thread_registry*
     thread_registry;/// Should only be used from main thread.
+
   struct distrac_handle* distrac;
+  int64_t offsetNS;// Offset in nanoseconds to central initiator node, used for
+                   // distrac.
 
   parac_module_prepare prepare;
   parac_module_register register_module;

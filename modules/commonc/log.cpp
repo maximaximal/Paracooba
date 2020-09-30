@@ -61,9 +61,10 @@ parac_log_init(parac_thread_registry* thread_registry) {
 
     global_console_sink = add_console_log(std::clog);
     global_console_sink->set_formatter(
-      expressions::stream << "[" << expressions::attr<std::string>("LocalName")
-                          << "|" << expressions::attr<parac_id>("LocalID")
-                          << "] [" << parac_logger_timestamp << "] ["
+      expressions::stream << "c ["
+                          << expressions::attr<std::string>("LocalName") << "|"
+                          << expressions::attr<parac_id>("LocalID") << "] ["
+                          << parac_logger_timestamp << "] ["
                           << expressions::attr<parac_log_severity>("Severity")
                           << "] ["
                           << expressions::attr<parac_log_channel>("Channel")

@@ -20,6 +20,7 @@ class CLI {
 
   parac_id getId() const { return m_id; };
   const std::string& getInputFile() const { return m_inputFile; }
+  bool isMainNode() const { return getInputFile() != ""; }
 
   bool distracEnabled() const { return m_enableDistrac; }
   const std::string& getDistracOutput() const { return m_distracOutput; }
