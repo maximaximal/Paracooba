@@ -85,6 +85,7 @@ typedef struct parac_handle {
   struct parac_config* config;
   struct parac_thread_registry*
     thread_registry;/// Should only be used from main thread.
+  struct distrac_handle* distrac;
 
   parac_module_prepare prepare;
   parac_module_register register_module;

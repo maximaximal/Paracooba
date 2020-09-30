@@ -6,6 +6,8 @@
 
 #include <random>
 
+#include <boost/asio/ip/host_name.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/program_options.hpp>
 
 namespace po = boost::program_options;
@@ -13,20 +15,33 @@ namespace po = boost::program_options;
 namespace paracooba {
 CLI::CLI(struct parac_config& config)
   : m_config(config) {
+  using namespace boost::posix_time;
+  using namespace boost::gregorian;
 
   std::random_device dev;
   std::mt19937_64 rng(dev());
   std::uniform_int_distribution<std::mt19937_64::result_type> dist_mac(
     -((int64_t)1 << 47), ((int64_t)1 << 47) - 1);
 
+  std::string generatedLocalName =
+    boost::asio::ip::host_name() + "_" + std::to_string(getpid());
+
+  std::string generatedTracefileName =
+    generatedLocalName + "_" +
+    to_iso_extended_string(second_clock::universal_time()) + ".distrac-trace";
+
   // clang-format off
   m_globalOptions.add_options()
     ("help", "produce help message for all available options")
-    ("id", po::value<int64_t>()->default_value(dist_mac(rng))->value_name("int"), "Unique Number (only 48 Bit) (can be MAC address)")
+    ("id", po::value<parac_id>()->default_value(generateId(dist_mac(rng)))->value_name("int"), "Unique number for local ID")
     ("input-file", po::value<std::string>()->default_value("")->value_name("string"), "Input CNF file in DIMACS format")
+    ("local-name,n", po::value<std::string>()->default_value(generatedLocalName)->value_name("string"), "Local name of this node")
     ("trace,t", po::bool_switch(&m_traceMode)->default_value(false)->value_name("bool"), "debug mode (set severity >= TRACE)")
     ("debug,d", po::bool_switch(&m_debugMode)->default_value(false)->value_name("bool"), "debug mode (set severity >= DEBG)")
     ("info,i", po::bool_switch(&m_infoMode)->default_value(false)->value_name("bool"), "debug mode (set severity >= INFO)")
+
+    ("distrac-enable", po::bool_switch(&m_enableDistrac)->default_value(false)->value_name("bool"), "enable distrac tracing")
+    ("distrac-output", po::value<std::string>()->default_value(generatedTracefileName)->value_name("string"), "distrac tracefile output")
     ;
   // clang-format on
 }
@@ -164,6 +179,21 @@ CLI::parseGlobalArgs(int argc, char* argv[]) {
     parac_log_set_severity(PARAC_TRACE);
   }
 
+  if(vm.count("input-file")) {
+    m_inputFile = vm["input-file"].as<std::string>();
+  }
+  if(vm.count("local-name")) {
+    m_localName = vm["local-name"].as<std::string>();
+    parac_log_set_local_name(m_localName.c_str());
+  }
+  if(vm.count("id")) {
+    m_id = vm["id"].as<parac_id>();
+    parac_log_set_local_id(m_id);
+  }
+  if(vm.count("distrac-output")) {
+    m_distracOutput = vm["distrac-output"].as<std::string>();
+  }
+
   return true;
 }
 
@@ -265,7 +295,7 @@ CLI::parseModuleArgs(int argc, char* argv[]) {
   return true;
 }
 
-int64_t
+parac_id
 CLI::generateId(int64_t uniqueNumber) {
   int16_t pid = std::abs(static_cast<int16_t>(::getpid()));
   return ((int64_t)pid << 48) | uniqueNumber;

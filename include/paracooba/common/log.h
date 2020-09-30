@@ -2,6 +2,7 @@
 #define PARACOOBA_COMMON_PATH_H
 
 #include "paracooba/common/status.h"
+#include "paracooba/common/types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +40,12 @@ parac_log_set_severity(parac_log_severity severity);
 void
 parac_log_set_channel_active(parac_log_channel channel, bool active);
 
+void
+parac_log_set_local_id(parac_id id);
+
+void
+parac_log_set_local_name(const char* name);
+
 const char*
 parac_log_severity_to_str(parac_log_severity severity);
 
@@ -70,8 +77,8 @@ operator<<(std::ostream& o, parac_log_channel channel) {
 }
 
 #ifdef PARAC_LOG_INCLUDE_FMT
-#include <fmt/ostream.h>
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 
 template<typename FormatString,
          typename std::enable_if<fmt::is_compile_string<FormatString>::value,

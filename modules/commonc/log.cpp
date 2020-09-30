@@ -4,6 +4,7 @@
 #include <paracooba/common/thread_registry.h>
 
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/log/attributes/constant.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/sinks/sync_frontend.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
@@ -25,11 +26,13 @@ static boost::shared_ptr<boost::log::sinks::synchronous_sink<
   boost::log::sinks::basic_text_ostream_backend<char>>>
   global_console_sink;
 
-static LoggerMT global_logger(
-  boost::log::keywords::channel = PARAC_GENERAL);
+static LoggerMT global_logger(boost::log::keywords::channel = PARAC_GENERAL);
 
 static parac_log_severity global_severity = PARAC_INFO;
 static std::array<bool, PARAC_CHANNEL_COUNT> global_channels;
+
+static std::string local_name = "Unnamed";
+static parac_id local_id = 0;
 
 using namespace boost::log;
 
@@ -58,7 +61,9 @@ parac_log_init(parac_thread_registry* thread_registry) {
 
     global_console_sink = add_console_log(std::clog);
     global_console_sink->set_formatter(
-      expressions::stream << "[" << parac_logger_timestamp << "] ["
+      expressions::stream << "[" << expressions::attr<std::string>("LocalName")
+                          << "|" << expressions::attr<parac_id>("LocalID")
+                          << "] [" << parac_logger_timestamp << "] ["
                           << expressions::attr<parac_log_severity>("Severity")
                           << "] ["
                           << expressions::attr<parac_log_channel>("Channel")
@@ -81,6 +86,19 @@ parac_log_set_severity(parac_log_severity severity) {
 PARAC_COMMON_EXPORT void
 parac_log_set_channel_active(parac_log_channel channel, bool active) {
   global_channels[channel] = active;
+}
+
+PARAC_COMMON_EXPORT void
+parac_log_set_local_id(parac_id id) {
+  local_id = id;
+  global_logger.add_attribute("LocalID", attributes::make_constant(local_id));
+}
+
+PARAC_COMMON_EXPORT void
+parac_log_set_local_name(const char* name) {
+  local_name = name;
+  global_logger.add_attribute("LocalName",
+                              attributes::make_constant(local_name));
 }
 
 PARAC_COMMON_EXPORT void

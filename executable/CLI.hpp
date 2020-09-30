@@ -18,8 +18,13 @@ class CLI {
   bool parseGlobalArgs(int argc, char* argv[]);
   bool parseModuleArgs(int argc, char* argv[]);
 
-  int64_t getId() const { return m_id; };
+  parac_id getId() const { return m_id; };
   const std::string& getInputFile() const { return m_inputFile; }
+
+  bool distracEnabled() const { return m_enableDistrac; }
+  const std::string& getDistracOutput() const { return m_distracOutput; }
+
+  const std::string& getLocalName() const { return m_localName; }
 
   private:
   boost::program_options::options_description m_globalOptions{
@@ -39,14 +44,17 @@ class CLI {
 
   void parseConfigEntry(struct parac_config_entry& e);
 
-  int64_t generateId(int64_t uniqueNumber);
-  int64_t m_id = 0;
+  parac_id generateId(int64_t uniqueNumber);
+  parac_id m_id = 0;
 
   std::string m_inputFile;
+  std::string m_distracOutput;
+  std::string m_localName;
 
   bool m_traceMode = false;
   bool m_debugMode = false;
   bool m_infoMode = false;
+  bool m_enableDistrac = false;
 };
 }
 

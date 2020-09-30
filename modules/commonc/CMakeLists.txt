@@ -18,6 +18,8 @@ target_link_libraries(parac_common_obj PRIVATE Boost::log fmt::fmt)
 set_target_properties(parac_common_obj PROPERTIES C_STANDARD 11)
 target_include_directories(parac_common_obj PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
+target_link_libraries(parac_common_obj PUBLIC distrac)
+
 target_include_directories(parac_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
 target_link_libraries(parac_common PRIVATE Boost::log fmt::fmt)
