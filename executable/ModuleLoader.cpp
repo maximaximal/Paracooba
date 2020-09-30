@@ -203,7 +203,7 @@ ModuleLoader::pre_init() {
 bool
 ModuleLoader::init() {
   parac_log(
-    PARAC_LOADER, PARAC_DEBUG, "Running pre_init routines of loaded modules.");
+    PARAC_LOADER, PARAC_DEBUG, "Running init routines of loaded modules.");
 
   bool success = true;
   for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {

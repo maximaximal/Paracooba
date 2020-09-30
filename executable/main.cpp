@@ -50,5 +50,7 @@ main(int argc, char* argv[]) {
 
   parac_log(PARAC_GENERAL, PARAC_INFO, "Starting Paracooba");
 
+  loader.init();
+
   return EXIT_SUCCESS;
 }
