@@ -128,7 +128,7 @@ macro(parac_module_def NAME SRCS)
 endmacro()
 
 macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
-    parac_static_shared_combined(${NAME} ${SRCS} ${DISCOVER_SRC_FILE})
+    parac_static_shared_combined(${NAME} "${SRCS}" ${DISCOVER_SRC_FILE})
 
     set_target_properties(${NAME}_obj PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(${NAME}_obj PROPERTIES C_VISIBILITY_PRESET hidden)

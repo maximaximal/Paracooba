@@ -177,10 +177,22 @@ ModuleLoader::load() {
 
   if(isComplete()) {
     for(auto& mod : m_modules) {
-      mod->broker = broker();
-      mod->runner = runner();
-      mod->communicator = communicator();
-      mod->solver = solver();
+      switch(mod->type) {
+        case PARAC_MOD_BROKER:
+          mod->broker = broker();
+          break;
+        case PARAC_MOD_RUNNER:
+          mod->runner = runner();
+          break;
+        case PARAC_MOD_SOLVER:
+          mod->solver = solver();
+          break;
+        case PARAC_MOD_COMMUNICATOR:
+          mod->communicator = communicator();
+          break;
+        case PARAC_MOD__COUNT:
+          assert(false);
+      }
       mod->handle = &m_handle;
     }
   } else {

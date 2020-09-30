@@ -1,3 +1,4 @@
+#include "service.hpp"
 #include <paracooba/module.h>
 
 #include <cassert>
@@ -10,12 +11,22 @@
 #define COMMUNICATOR_VERSION_PATCH 0
 #define COMMUNICATOR_VERSION_TWEAK 0
 
+struct CommunicatorUserdata {
+  CommunicatorUserdata(parac_handle& handle)
+    : service(handle) {}
+
+  parac::communicator::Service service;
+};
+
 static parac_status
 pre_init(parac_module* mod) {
   assert(mod);
   assert(mod->runner);
   assert(mod->handle);
   assert(mod->handle->config);
+
+  CommunicatorUserdata* userdata = new CommunicatorUserdata(*mod->handle);
+  mod->userdata = static_cast<void*>(userdata);
 
   return PARAC_OK;
 }
@@ -28,7 +39,8 @@ init(parac_module* mod) {
   assert(mod->handle->config);
   assert(mod->handle->thread_registry);
 
-  return PARAC_OK;
+  CommunicatorUserdata *userdata = static_cast<CommunicatorUserdata*>(mod->userdata);
+  return userdata->service.start();
 }
 
 extern "C" PARAC_COMMUNICATOR_EXPORT parac_status

@@ -5,7 +5,7 @@
 TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
   paracooba::ThreadRegistryWrapper registry;
 
-  parac_thread_registry_handle* handle = nullptr;
+  parac_thread_registry_handle handle;
 
   static bool passed = false;
 
@@ -30,12 +30,12 @@ TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
   REQUIRE(status == PARAC_OK);
   REQUIRE(passed);
 
-  REQUIRE(!handle->stop);
+  REQUIRE(!handle.stop);
   parac_thread_registry_stop(&registry);
-  REQUIRE(handle->stop);
+  REQUIRE(handle.stop);
 
   parac_thread_registry_wait_for_exit(&registry);
 
-  REQUIRE(handle->exit_status == 10);
-  REQUIRE(!handle->running);
+  REQUIRE(handle.exit_status == 10);
+  REQUIRE(!handle.running);
 }

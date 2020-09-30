@@ -16,7 +16,7 @@
 #endif
 
 typedef struct thread_handle {
-  parac_thread_registry_handle registry_handle;
+  parac_thread_registry_handle *registry_handle;
   thrd_t thread;
 } thread_handle;
 
@@ -70,7 +70,7 @@ parac_status
 parac_thread_registry_create(parac_thread_registry* registry,
                              struct parac_module* starter,
                              parac_thread_registry_start_func start_func,
-                             parac_thread_registry_handle** out_handle) {
+                             parac_thread_registry_handle* handle) {
   assert(registry);
   assert(start_func);
 
@@ -80,12 +80,14 @@ parac_thread_registry_create(parac_thread_registry* registry,
     return PARAC_OUT_OF_MEMORY;
   }
 
-  parac_thread_registry_handle* handle = &thandle->registry_handle;
+  thandle->registry_handle = handle;
+
   handle->stop = false;
   handle->running = false;
   handle->thread_id = registry->threads->size;
   handle->starter = starter;
   handle->start_func = start_func;
+
 
   struct parac_thread_registry_new_thread_starting_cb_list_entry* cb =
     registry->new_thread_starting_cbs->first;
@@ -99,9 +101,6 @@ parac_thread_registry_create(parac_thread_registry* registry,
   int success =
     thrd_create(&thandle->thread, (int (*)(void*))run_wrapper, handle);
   if(success == thrd_success) {
-    if(out_handle) {
-      *out_handle = handle;
-    }
     return PARAC_OK;
   } else if(success == thrd_nomem) {
     return PARAC_OUT_OF_MEMORY;
@@ -133,7 +132,7 @@ void
 parac_thread_registry_stop(parac_thread_registry* registry) {
   struct parac_thread_handle_list_entry* handle = registry->threads->first;
   while(handle) {
-    handle->entry.registry_handle.stop = true;
+    handle->entry.registry_handle->stop = true;
     handle = handle->next;
   }
 }
@@ -143,7 +142,7 @@ void
 parac_thread_registry_wait_for_exit(parac_thread_registry* registry) {
   struct parac_thread_handle_list_entry* handle = registry->threads->first;
   while(handle) {
-    thrd_join(handle->entry.thread, &handle->entry.registry_handle.exit_status);
+    thrd_join(handle->entry.thread, &handle->entry.registry_handle->exit_status);
     handle = handle->next;
   }
 }

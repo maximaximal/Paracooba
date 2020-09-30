@@ -49,7 +49,7 @@ parac_status
 parac_thread_registry_create(parac_thread_registry* registry,
                              struct parac_module* starter,
                              parac_thread_registry_start_func start_func,
-                             parac_thread_registry_handle** out_handle);
+                             parac_thread_registry_handle* handle);
 
 parac_status
 parac_thread_registry_add_starting_callback(

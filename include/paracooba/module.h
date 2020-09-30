@@ -94,6 +94,7 @@ typedef struct parac_handle {
 
   parac_module_prepare prepare;
   parac_module_register register_module;
+  parac_module* modules[PARAC_MOD__COUNT];
 } parac_handle;
 
 enum parac_status
