@@ -1,4 +1,4 @@
-add_library(parac_common SHARED
+set(PARAC_COMMON_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/path.c
     ${CMAKE_CURRENT_SOURCE_DIR}/message.c
     ${CMAKE_CURRENT_SOURCE_DIR}/message_kind.c
@@ -9,19 +9,22 @@ add_library(parac_common SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/compute_node_store_adapter.c
 
     ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
-)
+    )
 
-target_link_libraries(parac_common PUBLIC parac_headers parac_modules Threads::Threads)
+parac_module_def(parac_common "${PARAC_COMMON_SRCS}")
+target_link_libraries(parac_common_obj PUBLIC parac_headers parac_modules Threads::Threads)
+target_compile_features(parac_common_obj PUBLIC cxx_std_17)
+target_link_libraries(parac_common_obj PRIVATE Boost::log fmt::fmt)
+set_target_properties(parac_common_obj PROPERTIES C_STANDARD 11)
+target_include_directories(parac_common_obj PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
-# Logging Support
+target_include_directories(parac_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+target_include_directories(parac_common_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+
 target_link_libraries(parac_common PRIVATE Boost::log fmt::fmt)
 
-set_target_properties(parac_common PROPERTIES C_STANDARD 11)
-
 target_compile_features(parac_common PUBLIC cxx_std_17)
-
-generate_export_header(parac_common)
-target_include_directories(parac_common PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_compile_features(parac_common_static PUBLIC cxx_std_17)
 
 if(ENABLE_TESTS)
     add_library(parac_common_test SHARED

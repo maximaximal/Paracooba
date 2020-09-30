@@ -15,6 +15,10 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/system/system_error.hpp>
 
+typedef parac_status (*parac_module_discover_func)(parac_handle*);
+extern parac_module_discover_func
+parac_static_module_discover(parac_module_type mod);
+
 auto
 ImportModuleDiscoverFunc(boost::filesystem::path path,
                          const std::string& name) {
@@ -83,24 +87,48 @@ ModuleLoader::load(parac_module_type type) {
     boost::filesystem::path path = pathSource();
     std::string name = std::string("parac_") + parac_module_type_to_str(type);
     try {
-      auto imported = ImportModuleDiscoverFunc(path, name);
-      imported(&m_handle);
+      // First, try to discover module in statically linked modules. Afterwards,
+      // try dynamically loading.
 
-      auto& mod = *m_modules[type];
+      parac_status status;
 
-      parac_log(PARAC_LOADER,
-                PARAC_DEBUG,
-                "{} named '{}' version {}.{}.{}:{} loaded with from (generic) "
-                "SO-path {}",
-                parac_module_type_to_str(type),
-                mod.name,
-                mod.version.major,
-                mod.version.minor,
-                mod.version.patch,
-                mod.version.tweak,
-                (path / name).string());
+      auto static_discover_func = parac_static_module_discover(type);
+      if(static_discover_func) {
+        status = static_discover_func(&m_handle);
+        auto& mod = *m_modules[type];
 
-      m_internal->imports.push_back(std::move(imported));
+        parac_log(PARAC_LOADER,
+                  PARAC_DEBUG,
+                  "{} named '{}' version {}.{}.{}:{} loaded from statically "
+                  "linked library with status {}",
+                  parac_module_type_to_str(type),
+                  mod.name,
+                  mod.version.major,
+                  mod.version.minor,
+                  mod.version.patch,
+                  mod.version.tweak,
+                  status);
+      } else {
+        auto imported = ImportModuleDiscoverFunc(path, name);
+        status = imported(&m_handle);
+        m_internal->imports.push_back(std::move(imported));
+
+        auto& mod = *m_modules[type];
+
+        parac_log(
+          PARAC_LOADER,
+          PARAC_DEBUG,
+          "{} named '{}' version {}.{}.{}:{} loaded with from (generic) "
+          "SO-path {} with status {}",
+          parac_module_type_to_str(type),
+          mod.name,
+          mod.version.major,
+          mod.version.minor,
+          mod.version.patch,
+          mod.version.tweak,
+          (path / name).string(),
+          status);
+      }
 
       return true;
     } catch(boost::system::system_error& err) {

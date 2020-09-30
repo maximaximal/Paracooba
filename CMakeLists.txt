@@ -105,15 +105,55 @@ add_subdirectory(third_party)
 add_library(parac_headers INTERFACE)
 target_include_directories(parac_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+macro(parac_static_shared_combined NAME SRCS SHARED_EXTRA_SRCS)
+    add_library(${NAME}_obj OBJECT ${SRCS})
+    set_property(TARGET ${NAME}_obj PROPERTY POSITION_INDEPENDENT_CODE ON)
+    generate_export_header(${NAME}_obj
+        BASE_NAME ${NAME}
+    )
+    target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+    add_library(${NAME} SHARED $<TARGET_OBJECTS:${NAME}_obj> ${SHARED_EXTRA_SRCS})
+    add_library(${NAME}_static STATIC $<TARGET_OBJECTS:${NAME}_obj>)
+
+    target_include_directories(${NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    target_link_libraries(${NAME} PRIVATE parac_modules)
+endmacro()
+
+macro(parac_module_def NAME SRCS)
+    parac_static_shared_combined(${NAME} "${SRCS}" "")
+endmacro()
+
+macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
+    parac_static_shared_combined(${NAME} ${SRCS} ${DISCOVER_SRC_FILE})
+
+    set_target_properties(${NAME}_obj PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    set_target_properties(${NAME}_obj PROPERTIES C_VISIBILITY_PRESET hidden)
+    set_target_properties(${NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    set_target_properties(${NAME} PROPERTIES C_VISIBILITY_PRESET hidden)
+    set_target_properties(${NAME}_static PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    set_target_properties(${NAME}_static PROPERTIES C_VISIBILITY_PRESET hidden)
+
+    target_compile_definitions(${NAME}_obj PRIVATE "-DPARAC_LOG_INCLUDE_FMT")
+    target_compile_definitions(${NAME}_static PUBLIC "-DPARAC_USE_STATIC_${NAME}")
+
+    target_link_libraries(${NAME}_obj PUBLIC parac_common parac_modules fmt::fmt)
+    target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+endmacro()
+
 set(test_libs  "" CACHE INTERNAL "Libraries for Tests")
 
 add_subdirectory(modules)
 add_subdirectory(executable)
 
-add_executable(parac ${PARAC_EXECUTABLE_SRCS})
-set_target_properties(parac PROPERTIES CXX_STANDARD 17)
-target_compile_definitions(parac PRIVATE "-DPARAC_LOG_INCLUDE_FMT")
-target_link_libraries(parac parac_common Boost::filesystem Boost::coroutine Boost::context Boost::program_options ${CMAKE_DL_LIBS} fmt)
+add_executable(parac $<TARGET_OBJECTS:parac_executable>
+    ${CMAKE_CURRENT_SOURCE_DIR}/executable/StaticModuleLoader.cpp)
+target_link_libraries(parac PUBLIC parac_common parac_modules Boost::filesystem Boost::coroutine Boost::context Boost::program_options ${CMAKE_DL_LIBS} fmt)
+
+add_executable(paracs $<TARGET_OBJECTS:parac_executable>
+    ${CMAKE_CURRENT_SOURCE_DIR}/executable/StaticModuleLoader.cpp)
+target_link_libraries(paracs parac_common_static parac_modules fmt::fmt Boost::filesystem Boost::coroutine Boost::log Boost::context Boost::program_options ${CMAKE_DL_LIBS})
+target_link_libraries(paracs parac_communicator_static parac_broker_static parac_runner_static parac_solver_static)
 
 if(ENABLE_TESTS)
     add_subdirectory(test)

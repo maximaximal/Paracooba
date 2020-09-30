@@ -31,8 +31,8 @@ init(parac_module* mod) {
   return PARAC_OK;
 }
 
-PARAC_RUNNER_EXPORT parac_status
-parac_module_discover(parac_handle* handle) {
+extern "C" PARAC_RUNNER_EXPORT parac_status
+parac_module_discover_runner(parac_handle* handle) {
   assert(handle);
 
   parac_module* mod = handle->prepare(handle, PARAC_MOD_RUNNER);

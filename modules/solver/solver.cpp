@@ -31,7 +31,7 @@ init(parac_module* mod) {
   return PARAC_OK;
 }
 
-PARAC_SOLVER_EXPORT parac_status
+extern "C" PARAC_SOLVER_EXPORT parac_status
 parac_module_discover_solver(parac_handle* handle) {
   assert(handle);
 
@@ -48,9 +48,4 @@ parac_module_discover_solver(parac_handle* handle) {
   mod->init = init;
 
   return PARAC_OK;
-}
-
-PARAC_SOLVER_EXPORT parac_status
-parac_module_discover(parac_handle* handle) {
-  return parac_module_discover_solver(handle);
 }

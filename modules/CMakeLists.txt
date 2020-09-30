@@ -4,7 +4,7 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
 add_subdirectory(commonc)
 
-add_library(parac_modules SHARED
+add_library(parac_modules STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/module.c
     )
 

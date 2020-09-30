@@ -2,7 +2,6 @@
 #include "paracooba/common/types.h"
 #include <paracooba/module.h>
 
-#define PARAC_LOG_INCLUDE_FMT
 #include "paracooba/common/log.h"
 
 #include <cassert>
@@ -36,7 +35,7 @@ init(parac_module* mod) {
   return PARAC_OK;
 }
 
-PARAC_BROKER_EXPORT parac_status
+extern "C" PARAC_BROKER_EXPORT parac_status
 parac_module_discover_broker(parac_handle* handle) {
   assert(handle);
 
@@ -53,9 +52,4 @@ parac_module_discover_broker(parac_handle* handle) {
   mod->init = init;
 
   return PARAC_OK;
-}
-
-PARAC_BROKER_EXPORT parac_status
-parac_module_discover(parac_handle* handle) {
-  return parac_module_discover_broker(handle);
 }
