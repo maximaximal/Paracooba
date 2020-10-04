@@ -1,0 +1,22 @@
+@startuml
+
+!pragma teoz true
+
+skinparam titleFontSize 36
+skinparam titleFontStyle bold
+
+scale 3000 height
+scale 3000 width
+
+title Solving a CNF in Paracooba
+
+(*) --> "parse parameters"
+--> "create new <i>solver</i> instance"
+--> "read DIMACS file"
+--> "start solving"
+--> "<i>runner</i> works on created tasks from <i>solver</i>"
+--> "<i>communicator</i> checks for connections"
+--> "<i>solver</i> runs, until root task is solved"
+--> (*)
+
+@enduml
