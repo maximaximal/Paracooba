@@ -134,8 +134,14 @@ CLI::parseConfigEntry(parac_config_entry& e) {
                       e.description);
       break;
     case PARAC_TYPE_STR:
-      o.add_options()(
-        e.name, po::value<std::string>()->value_name("string"), e.description);
+      if(e.default_value.string == nullptr)
+        e.default_value.string = "";
+
+      o.add_options()(e.name,
+                      po::value<std::string>()
+                        ->default_value(e.default_value.string)
+                        ->value_name("string"),
+                      e.description);
       break;
     case PARAC_TYPE_VECTOR_STR:
       o.add_options()(e.name,

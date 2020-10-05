@@ -79,7 +79,9 @@ ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
   m_handle.offsetNS = 0;
   m_handle.distrac = nullptr;
 }
-ModuleLoader::~ModuleLoader() {}
+ModuleLoader::~ModuleLoader() {
+  exit();
+}
 
 bool
 ModuleLoader::load(parac_module_type type) {
