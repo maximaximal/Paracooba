@@ -15,21 +15,6 @@
 #define COMMUNICATOR_VERSION_PATCH 0
 #define COMMUNICATOR_VERSION_TWEAK 0
 
-namespace parac::communicator {
-enum Config {
-  LISTEN_ADDRESS,
-  BROADCAST_ADDRESS,
-  UDP_LISTEN_PORT,
-  UDP_TARGET_PORT,
-  TCP_LISTEN_PORT,
-  TCP_TARGET_PORT,
-  NETWORK_TIMEOUT,
-  CONNECTION_RETRIES,
-  KNOWN_REMOTES,
-  _COUNT
-};
-}
-
 struct CommunicatorUserdata {
   CommunicatorUserdata(parac_handle& handle)
     : service(handle) {}
@@ -128,6 +113,8 @@ pre_init(parac_module* mod) {
 
   CommunicatorUserdata* userdata =
     static_cast<CommunicatorUserdata*>(mod->userdata);
+
+  userdata->service.applyConfig(userdata->config_entries);
 
   return PARAC_OK;
 }

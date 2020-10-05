@@ -13,6 +13,8 @@ parac_status_to_str(parac_status status) {
       return "Out of Memory";
     case PARAC_INVALID_CHAR_ENCOUNTERED:
       return "Invalid Char Encountered";
+    case PARAC_INVALID_IP:
+      return "Provided IP address could not be parsed";
     case PARAC_GENERIC_ERROR:
       return "Generic Error";
   }

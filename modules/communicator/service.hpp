@@ -14,12 +14,28 @@ typedef io_service io_context;
 }
 
 struct parac_handle;
+struct parac_config_entry;
 
 namespace parac::communicator {
+enum Config {
+  LISTEN_ADDRESS,
+  BROADCAST_ADDRESS,
+  UDP_LISTEN_PORT,
+  UDP_TARGET_PORT,
+  TCP_LISTEN_PORT,
+  TCP_TARGET_PORT,
+  NETWORK_TIMEOUT,
+  CONNECTION_RETRIES,
+  KNOWN_REMOTES,
+  _COUNT
+};
+
 class Service {
   public:
   Service(parac_handle& handle);
   ~Service();
+
+  void applyConfig(parac_config_entry* e);
 
   parac_status start();
 
@@ -31,5 +47,6 @@ class Service {
   struct Internal;
   const std::unique_ptr<Internal> m_internal;
   const parac_handle& m_handle;
+  parac_config_entry* m_config = nullptr;
 };
 }

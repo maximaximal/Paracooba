@@ -10,6 +10,7 @@ typedef enum parac_status {
   PARAC_FULL,
   PARAC_OUT_OF_MEMORY,
   PARAC_INVALID_CHAR_ENCOUNTERED,
+  PARAC_INVALID_IP,
   PARAC_GENERIC_ERROR
 } parac_status;
 
