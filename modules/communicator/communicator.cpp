@@ -1,9 +1,12 @@
 #include "service.hpp"
+#include <paracooba/common/config.h>
 #include <paracooba/module.h>
 
 #include <cassert>
 
 #include <parac_communicator_export.h>
+
+#include <boost/asio/ip/tcp.hpp>
 
 #define COMMUNICATOR_NAME "cpp_asio_tcpconnections"
 #define COMMUNICATOR_VERSION_MAJOR 1
@@ -11,12 +14,109 @@
 #define COMMUNICATOR_VERSION_PATCH 0
 #define COMMUNICATOR_VERSION_TWEAK 0
 
+namespace parac::communicator {
+enum Config {
+  LISTEN_ADDRESS,
+  BROADCAST_ADDRESS,
+  UDP_LISTEN_PORT,
+  UDP_TARGET_PORT,
+  TCP_LISTEN_PORT,
+  TCP_TARGET_PORT,
+  NETWORK_TIMEOUT,
+  CONNECTION_RETRIES,
+  KNOWN_REMOTES,
+  _COUNT
+};
+}
+
 struct CommunicatorUserdata {
   CommunicatorUserdata(parac_handle& handle)
     : service(handle) {}
 
   parac::communicator::Service service;
+
+  std::string default_listen_address;
+  std::string default_broadcast_address;
+
+  parac_config_entry* config_entries;
 };
+
+static void
+init_config(CommunicatorUserdata* u) {
+  using parac::communicator::Config;
+  parac_config_entry* e = u->config_entries;
+
+  parac_config_entry_set_str(
+    &e[Config::LISTEN_ADDRESS],
+    "listen-address",
+    "Address to listen on for incoming UDP or TCP messages.");
+  e[Config::LISTEN_ADDRESS].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::LISTEN_ADDRESS].type = PARAC_TYPE_STR;
+
+  u->default_listen_address = boost::asio::ip::address_v4().to_string();
+  e[Config::LISTEN_ADDRESS].default_value.string =
+    u->default_listen_address.c_str();
+
+  parac_config_entry_set_str(&e[Config::BROADCAST_ADDRESS],
+                             "broadcast-address",
+                             "Address to broadcast UDP messages to.");
+  e[Config::BROADCAST_ADDRESS].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::BROADCAST_ADDRESS].type = PARAC_TYPE_STR;
+  u->default_broadcast_address =
+    boost::asio::ip::address_v4().broadcast().to_string();
+  e[Config::BROADCAST_ADDRESS].default_value.string =
+    u->default_broadcast_address.c_str();
+
+  parac_config_entry_set_str(&e[Config::UDP_LISTEN_PORT],
+                             "udp-listen-port",
+                             "Port to listen on for UDP messages.");
+  e[Config::UDP_LISTEN_PORT].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::UDP_LISTEN_PORT].type = PARAC_TYPE_UINT16;
+  e[Config::UDP_LISTEN_PORT].default_value.uint16 = 18001;
+
+  parac_config_entry_set_str(&e[Config::UDP_TARGET_PORT],
+                             "udp-target-port",
+                             "Port to send UDP messages to.");
+  e[Config::UDP_TARGET_PORT].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::UDP_TARGET_PORT].type = PARAC_TYPE_UINT16;
+  e[Config::UDP_TARGET_PORT].default_value.uint16 = 18001;
+
+  parac_config_entry_set_str(&e[Config::TCP_LISTEN_PORT],
+                             "tcp-listen-port",
+                             "Port to listen on for TCP connections.");
+  e[Config::TCP_LISTEN_PORT].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::TCP_LISTEN_PORT].type = PARAC_TYPE_UINT16;
+  e[Config::TCP_LISTEN_PORT].default_value.uint16 = 18001;
+
+  parac_config_entry_set_str(&e[Config::TCP_TARGET_PORT],
+                             "tcp-target-port",
+                             "Port to target TCP connections to.");
+  e[Config::TCP_TARGET_PORT].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::TCP_TARGET_PORT].type = PARAC_TYPE_UINT16;
+  e[Config::TCP_TARGET_PORT].default_value.uint16 = 18001;
+
+  parac_config_entry_set_str(&e[Config::NETWORK_TIMEOUT],
+                             "network-timeout",
+                             "Timeout (in ms) for network connections.");
+  e[Config::NETWORK_TIMEOUT].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::NETWORK_TIMEOUT].type = PARAC_TYPE_UINT32;
+  e[Config::NETWORK_TIMEOUT].default_value.uint32 = 10000;
+
+  parac_config_entry_set_str(&e[Config::CONNECTION_RETRIES],
+                             "connection-retries",
+                             "Number of times making a connection to a remote "
+                             "host should be retried after an error occurred.");
+  e[Config::CONNECTION_RETRIES].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::CONNECTION_RETRIES].type = PARAC_TYPE_UINT32;
+  e[Config::CONNECTION_RETRIES].default_value.uint32 = 30;
+
+  parac_config_entry_set_str(&e[Config::KNOWN_REMOTES],
+                             "known-remotes",
+                             "Known remote hosts to connect to at program "
+                             "startup. Deactivates UDP discovery.");
+  e[Config::KNOWN_REMOTES].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::KNOWN_REMOTES].type = PARAC_TYPE_VECTOR_STR;
+}
 
 static parac_status
 pre_init(parac_module* mod) {
@@ -24,9 +124,6 @@ pre_init(parac_module* mod) {
   assert(mod->runner);
   assert(mod->handle);
   assert(mod->handle->config);
-
-  CommunicatorUserdata* userdata = new CommunicatorUserdata(*mod->handle);
-  mod->userdata = static_cast<void*>(userdata);
 
   return PARAC_OK;
 }
@@ -39,16 +136,19 @@ init(parac_module* mod) {
   assert(mod->handle->config);
   assert(mod->handle->thread_registry);
 
-  CommunicatorUserdata *userdata = static_cast<CommunicatorUserdata*>(mod->userdata);
+  CommunicatorUserdata* userdata =
+    static_cast<CommunicatorUserdata*>(mod->userdata);
   return userdata->service.start();
 }
 
-static parac_status mod_exit(parac_module *mod) {
+static parac_status
+mod_exit(parac_module* mod) {
   assert(mod);
   assert(mod->communicator);
   assert(mod->handle);
 
-  CommunicatorUserdata *userdata = static_cast<CommunicatorUserdata*>(mod->userdata);
+  CommunicatorUserdata* userdata =
+    static_cast<CommunicatorUserdata*>(mod->userdata);
   if(userdata) {
     delete userdata;
   }
@@ -72,6 +172,17 @@ parac_module_discover_communicator(parac_handle* handle) {
   mod->pre_init = pre_init;
   mod->init = init;
   mod->exit = mod_exit;
+
+  using parac::communicator::Config;
+
+  CommunicatorUserdata* userdata = new CommunicatorUserdata(*handle);
+  mod->userdata = static_cast<void*>(userdata);
+
+  userdata->config_entries =
+    parac_config_reserve(handle->config, static_cast<size_t>(Config::_COUNT));
+  assert(userdata->config_entries);
+
+  init_config(userdata);
 
   return PARAC_OK;
 }
