@@ -154,12 +154,12 @@ add_subdirectory(executable)
 
 add_executable(parac $<TARGET_OBJECTS:parac_executable>
     ${CMAKE_CURRENT_SOURCE_DIR}/executable/StaticModuleLoader.cpp)
-target_link_libraries(parac PUBLIC distrac parac_common parac_modules Boost::filesystem Boost::coroutine Boost::context Boost::program_options ${CMAKE_DL_LIBS} fmt)
+target_link_libraries(parac PUBLIC distrac parac_common parac_modules Boost::filesystem Boost::coroutine Boost::context Boost::program_options Boost::date_time ${CMAKE_DL_LIBS} fmt)
 
 if(STATIC_BUILDS)
     add_executable(paracs $<TARGET_OBJECTS:parac_executable>
         ${CMAKE_CURRENT_SOURCE_DIR}/executable/StaticModuleLoader.cpp)
-    target_link_libraries(paracs parac_common_static parac_modules fmt::fmt Boost::filesystem Boost::coroutine Boost::log Boost::context Boost::program_options ${CMAKE_DL_LIBS})
+    target_link_libraries(paracs parac_common_static parac_modules fmt::fmt Boost::filesystem Boost::coroutine Boost::log Boost::context Boost::program_options Boost::date_time ${CMAKE_DL_LIBS})
     target_link_libraries(paracs parac_communicator_static parac_broker_static parac_runner_static parac_solver_static distrac)
 endif()
 
