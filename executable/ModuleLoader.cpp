@@ -247,8 +247,8 @@ RunFuncInAllModules(ModuleLoader::ModuleArray& modules,
                 functionName,
                 type,
                 s);
+      success = false;
     }
-    success = false;
   }
   parac_log(PARAC_LOADER,
             PARAC_DEBUG,

@@ -129,13 +129,31 @@ main(int argc, char* argv[]) {
     return EXIT_SUCCESS;
   }
 
-  loader.pre_init();
+  bool status = loader.pre_init();
 
-  parac_log(PARAC_GENERAL, PARAC_INFO, "Starting Paracooba.");
+  if(!status) {
+    parac_log(PARAC_GENERAL,
+              PARAC_FATAL,
+              "pre_init did not complete successfully with all modules!");
+    return EXIT_FAILURE;
+  }
+
+  parac_log(PARAC_GENERAL, PARAC_DEBUG, "Initializing Paracooba.");
 
   // Init also calls init of all modules, which may spawn threads in the
   // thread_registry which are also solved.
-  loader.init();
+  status = loader.init();
+
+  if(!status) {
+    parac_log(PARAC_GENERAL,
+              PARAC_FATAL,
+              "init did not complete successfully with all modules!");
+    return EXIT_FAILURE;
+  }
+
+  parac_log(PARAC_GENERAL,
+            PARAC_DEBUG,
+            "Fully initialized Paracooba, modules are running.");
 
   thread_registry.wait();
 
