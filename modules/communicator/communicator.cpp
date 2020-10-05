@@ -1,5 +1,6 @@
 #include "service.hpp"
 #include <paracooba/common/config.h>
+#include <paracooba/common/log.h>
 #include <paracooba/module.h>
 
 #include <cassert>
@@ -124,6 +125,9 @@ pre_init(parac_module* mod) {
   assert(mod->runner);
   assert(mod->handle);
   assert(mod->handle->config);
+
+  CommunicatorUserdata* userdata =
+    static_cast<CommunicatorUserdata*>(mod->userdata);
 
   return PARAC_OK;
 }

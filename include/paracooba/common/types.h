@@ -68,10 +68,56 @@ typedef union parac_type_union {
 #define _PARAC_TYPE_GET_ASSERT_string_vector(UNION, TYPE) \
   assert(TYPE == PARAC_TYPE_STRING_VECTOR);
 
-#define PARAC_TYPE_GET(UNION, TYPE, MEMBER) \
-  _PARAC_TYPE_GET_ASSERT_##MEMBER(UNION, TYPE) \ UNION.MEMBER
+#define PARAC_TYPE_GET(UNION, TYPE, MEMBER) UNION.MEMBER
+
+#define PARAC_TYPE_ASSERT(UNION, TYPE, MEMBER) \
+  _PARAC_TYPE_GET_ASSERT_##MEMBER(UNION, TYPE)
 
 #ifdef __cplusplus
+}
+
+#include <iostream>
+
+inline std::ostream&
+operator<<(std::ostream& o, const parac_string_vector& v) {
+  for(size_t i = 0; i < v.size; ++i) {
+    o << v.strings[i];
+    if(i + 1 < v.size) {
+      o << ", ";
+    }
+  }
+  return o;
+}
+
+template<typename Functor>
+void
+ApplyFuncToParacTypeUnion(parac_type t, parac_type_union u, Functor f) {
+  switch(t) {
+    case PARAC_TYPE_UINT64:
+      return f(u.uint64);
+    case PARAC_TYPE_INT64:
+      return f(u.int64);
+    case PARAC_TYPE_UINT32:
+      return f(u.uint32);
+    case PARAC_TYPE_INT32:
+      return f(u.int32);
+    case PARAC_TYPE_UINT16:
+      return f(u.uint16);
+    case PARAC_TYPE_INT16:
+      return f(u.int16);
+    case PARAC_TYPE_UINT8:
+      return f(u.uint8);
+    case PARAC_TYPE_INT8:
+      return f(u.int8);
+    case PARAC_TYPE_FLOAT:
+      return f(u.f);
+    case PARAC_TYPE_DOUBLE:
+      return f(u.d);
+    case PARAC_TYPE_STR:
+      return f(u.string);
+    case PARAC_TYPE_VECTOR_STR:
+      return f(u.string_vector);
+  }
 }
 #endif
 

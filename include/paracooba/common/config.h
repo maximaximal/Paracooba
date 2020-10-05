@@ -53,6 +53,12 @@ struct ConfigWrapper : public parac_config {
   ~ConfigWrapper() { parac_config_free(this); }
 };
 }
+
+inline std::ostream&
+operator<<(std::ostream& o, const parac_config_entry& e) {
+  ApplyFuncToParacTypeUnion(e.type, e.value, [&o](auto&& v) { o << v; });
+  return o;
+}
 #endif
 
 #endif

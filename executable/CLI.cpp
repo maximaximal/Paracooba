@@ -45,7 +45,15 @@ CLI::CLI(struct parac_config& config)
     ;
   // clang-format on
 }
-CLI::~CLI() {}
+CLI::~CLI() {
+  for(size_t i = 0; i < m_config.size; ++i) {
+    parac_config_entry& entry = m_config.entries[i];
+    if(entry.type == PARAC_TYPE_STR) {
+      // Was initiated in CLI and must be back-casted in order to be freed.
+      free(const_cast<char*>(entry.value.string));
+    }
+  }
+}
 
 void
 CLI::parseConfig() {
@@ -250,7 +258,7 @@ TryParsingCLIArgToConfigEntry(parac_config_entry& e,
       e.value.d = val.as<double>();
       break;
     case PARAC_TYPE_STR:
-      e.value.string = val.as<std::string>().c_str();
+      e.value.string = strdup(val.as<std::string>().c_str());
       break;
     case PARAC_TYPE_VECTOR_STR: {
       // References the strings in the m_vm member of CLI, so strings stay
