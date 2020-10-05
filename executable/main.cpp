@@ -127,6 +127,8 @@ main(int argc, char* argv[]) {
 
   parac_log(PARAC_GENERAL, PARAC_INFO, "All threads exited, ending Paracooba.");
 
+  loader.exit();
+
   if(cli.distracEnabled()) {
     distracWrapper.finalize(loader.handle().offsetNS);
 

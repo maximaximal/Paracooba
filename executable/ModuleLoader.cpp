@@ -203,34 +203,46 @@ ModuleLoader::load() {
   return isComplete();
 }
 
-bool
-ModuleLoader::pre_init() {
-  parac_log(
-    PARAC_LOADER, PARAC_DEBUG, "Running pre_init routines of loaded modules.");
+template<typename Functor>
+static bool
+RunFuncInAllModules(ModuleLoader::ModuleArray& modules,
+                    const char* functionName,
+                    Functor getFunc) {
+  parac_log(PARAC_LOADER,
+            PARAC_DEBUG,
+            "Running {} routines of loaded modules.",
+            functionName);
 
   bool success = true;
   for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
     parac_module_type type = static_cast<parac_module_type>(i);
-    auto& ptr = m_modules[type];
-    if(!ptr || !ptr->pre_init) {
+    auto& ptr = modules[type];
+
+    if(!ptr || !getFunc(ptr)) {
       parac_log(PARAC_LOADER,
                 PARAC_FATAL,
-                "Cannot run pre_init of unloaded or incompletely initialized "
+                "Cannot run {} of unloaded or incompletely initialized "
                 "module {}! Skipping, to find "
                 "further errors.",
+                functionName,
                 type);
       success = false;
       continue;
     }
-    parac_log(
-      PARAC_LOADER, PARAC_TRACE, "Running pre_init of module {}...", type);
-    parac_status s = ptr->pre_init(ptr.get());
+    parac_log(PARAC_LOADER,
+              PARAC_TRACE,
+              "Running {} of module {}...",
+              functionName,
+              type);
+    auto func = getFunc(ptr);
+    parac_status s = func(ptr.get());
     if(s != PARAC_OK) {
       parac_log(PARAC_LOADER,
                 PARAC_FATAL,
-                "Error while running pre_init of module {}! Error: {}, "
+                "Error while running {} of module {}! Error: {}, "
                 "Skipping, to find "
                 "further errors.",
+                functionName,
                 type,
                 s);
     }
@@ -238,46 +250,27 @@ ModuleLoader::pre_init() {
   }
   parac_log(PARAC_LOADER,
             PARAC_DEBUG,
-            "Successfully ran all pre_init routines of modules.");
+            "Successfully ran all {} routines of modules.",
+            functionName);
   return success;
 }
 
 bool
-ModuleLoader::init() {
-  parac_log(
-    PARAC_LOADER, PARAC_DEBUG, "Running init routines of loaded modules.");
+ModuleLoader::pre_init() {
+  return RunFuncInAllModules(
+    m_modules, "pre_init", [](auto& p) { return p->pre_init; });
+}
 
-  bool success = true;
-  for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
-    parac_module_type type = static_cast<parac_module_type>(i);
-    auto& ptr = m_modules[type];
-    if(!ptr || !ptr->init) {
-      parac_log(PARAC_LOADER,
-                PARAC_FATAL,
-                "Cannot run init of unloaded or incompletely initialized "
-                "module {}! Skipping, to find "
-                "further errors.",
-                type);
-      success = false;
-      continue;
-    }
-    parac_log(PARAC_LOADER, PARAC_TRACE, "Running init of module {}...", type);
-    parac_status s = ptr->init(ptr.get());
-    if(s != PARAC_OK) {
-      parac_log(PARAC_LOADER,
-                PARAC_FATAL,
-                "Error while running init of module {}! Error: {}, "
-                "Skipping, to find "
-                "further errors.",
-                type,
-                s);
-    }
-    success = false;
-  }
-  parac_log(PARAC_LOADER,
-            PARAC_DEBUG,
-            "Successfully ran all init routines of modules.");
-  return success;
+bool
+ModuleLoader::init() {
+  return RunFuncInAllModules(
+    m_modules, "init", [](auto& p) { return p->init; });
+}
+
+bool
+ModuleLoader::exit() {
+  return RunFuncInAllModules(
+    m_modules, "exit", [](auto& p) { return p->exit; });
 }
 
 bool
@@ -321,6 +314,7 @@ ModuleLoader::prepare(parac_handle* handle, parac_module_type type) {
 
   ptr->pre_init = nullptr;
   ptr->init = nullptr;
+  ptr->exit = nullptr;
 
   return ptr.get();
 }

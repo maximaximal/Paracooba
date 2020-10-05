@@ -43,6 +43,19 @@ init(parac_module* mod) {
   return userdata->service.start();
 }
 
+static parac_status mod_exit(parac_module *mod) {
+  assert(mod);
+  assert(mod->communicator);
+  assert(mod->handle);
+
+  CommunicatorUserdata *userdata = static_cast<CommunicatorUserdata*>(mod->userdata);
+  if(userdata) {
+    delete userdata;
+  }
+
+  return PARAC_OK;
+}
+
 extern "C" PARAC_COMMUNICATOR_EXPORT parac_status
 parac_module_discover_communicator(parac_handle* handle) {
   assert(handle);
@@ -58,6 +71,7 @@ parac_module_discover_communicator(parac_handle* handle) {
   mod->version.tweak = COMMUNICATOR_VERSION_TWEAK;
   mod->pre_init = pre_init;
   mod->init = init;
+  mod->exit = mod_exit;
 
   return PARAC_OK;
 }

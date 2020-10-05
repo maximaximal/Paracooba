@@ -10,6 +10,9 @@
 namespace paracooba {
 class ModuleLoader {
   public:
+  using ModuleArray =
+    std::array<std::unique_ptr<parac_module>, PARAC_MOD__COUNT>;
+
   ModuleLoader(struct parac_thread_registry& thread_registry,
                struct parac_config& config);
   ~ModuleLoader();
@@ -17,6 +20,7 @@ class ModuleLoader {
   bool load();
   bool pre_init();
   bool init();
+  bool exit();
 
   bool isComplete();
 
@@ -40,7 +44,7 @@ class ModuleLoader {
 
   static parac_module* prepare(parac_handle* handle, parac_module_type type);
 
-  std::array<std::unique_ptr<parac_module>, PARAC_MOD__COUNT> m_modules;
+  ModuleArray m_modules;
 
   parac_handle m_handle;
 
