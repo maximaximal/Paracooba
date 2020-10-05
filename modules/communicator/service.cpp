@@ -2,6 +2,7 @@
 
 #include <boost/asio/io_context.hpp>
 
+#include <paracooba/common/log.h>
 #include <paracooba/common/thread_registry.h>
 #include <paracooba/module.h>
 
@@ -35,6 +36,9 @@ Service::start() {
 
 parac_status
 Service::run() {
+  parac_log(
+    PARAC_COMMUNICATOR, PARAC_DEBUG, "Starting communicator io_context.");
+  m_internal->context.run();
   return PARAC_OK;
 }
 

@@ -16,7 +16,7 @@
 #endif
 
 typedef struct thread_handle {
-  parac_thread_registry_handle *registry_handle;
+  parac_thread_registry_handle* registry_handle;
   thrd_t thread;
 } thread_handle;
 
@@ -59,6 +59,17 @@ parac_thread_registry_free(parac_thread_registry* registry) {
 static int
 run_wrapper(parac_thread_registry_handle* handle) {
   int returncode = 0;
+
+  parac_thread_registry* registry = handle->registry;
+  struct parac_thread_registry_new_thread_starting_cb_list_entry* cb =
+    registry->new_thread_starting_cbs->first;
+  while(cb) {
+    if(cb->entry) {
+      cb->entry(handle);
+    }
+    cb = cb->next;
+  }
+
   handle->running = true;
   returncode = handle->start_func(handle);
   handle->running = false;
@@ -87,16 +98,7 @@ parac_thread_registry_create(parac_thread_registry* registry,
   handle->thread_id = registry->threads->size;
   handle->starter = starter;
   handle->start_func = start_func;
-
-
-  struct parac_thread_registry_new_thread_starting_cb_list_entry* cb =
-    registry->new_thread_starting_cbs->first;
-  while(cb) {
-    if(cb->entry) {
-      cb->entry(handle);
-    }
-    cb = cb->next;
-  }
+  handle->registry = registry;
 
   int success =
     thrd_create(&thandle->thread, (int (*)(void*))run_wrapper, handle);
@@ -142,7 +144,8 @@ void
 parac_thread_registry_wait_for_exit(parac_thread_registry* registry) {
   struct parac_thread_handle_list_entry* handle = registry->threads->first;
   while(handle) {
-    thrd_join(handle->entry.thread, &handle->entry.registry_handle->exit_status);
+    thrd_join(handle->entry.thread,
+              &handle->entry.registry_handle->exit_status);
     handle = handle->next;
   }
 }

@@ -28,13 +28,13 @@ TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
     },
     &handle);
   REQUIRE(status == PARAC_OK);
-  REQUIRE(passed);
 
   REQUIRE(!handle.stop);
   parac_thread_registry_stop(&registry);
   REQUIRE(handle.stop);
 
   parac_thread_registry_wait_for_exit(&registry);
+  REQUIRE(passed);
 
   REQUIRE(handle.exit_status == 10);
   REQUIRE(!handle.running);

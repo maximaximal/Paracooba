@@ -35,6 +35,7 @@ typedef struct parac_thread_registry_handle {
   int exit_status;// Should be of type parac_status
   struct parac_module* starter;
   void* userdata;
+  parac_thread_registry* registry;
   parac_thread_registry_start_func start_func;
   parac_thread_registry_stop_notifier stop_notifier;
 } parac_thread_registry_handle;
