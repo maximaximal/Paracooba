@@ -20,6 +20,7 @@ class ModuleLoader {
   bool load();
   bool pre_init();
   bool init();
+  bool request_exit();
   bool exit();
 
   bool isComplete();

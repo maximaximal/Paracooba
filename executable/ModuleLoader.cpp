@@ -270,6 +270,12 @@ ModuleLoader::init() {
 }
 
 bool
+ModuleLoader::request_exit() {
+  return RunFuncInAllModules(
+    m_modules, "request_exit", [](auto& p) { return p->request_exit; });
+}
+
+bool
 ModuleLoader::exit() {
   return RunFuncInAllModules(
     m_modules, "exit", [](auto& p) { return p->exit; });
@@ -316,6 +322,7 @@ ModuleLoader::prepare(parac_handle* handle, parac_module_type type) {
 
   ptr->pre_init = nullptr;
   ptr->init = nullptr;
+  ptr->request_exit = nullptr;
   ptr->exit = nullptr;
 
   return ptr.get();

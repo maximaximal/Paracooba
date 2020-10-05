@@ -31,7 +31,17 @@ init(parac_module* mod) {
   return PARAC_OK;
 }
 
-static parac_status mod_exit(parac_module *mod) {
+static parac_status
+mod_request_exit(parac_module* mod) {
+  assert(mod);
+  assert(mod->runner);
+  assert(mod->handle);
+
+  return PARAC_OK;
+}
+
+static parac_status
+mod_exit(parac_module* mod) {
   assert(mod);
   assert(mod->runner);
   assert(mod->handle);
@@ -54,6 +64,7 @@ parac_module_discover_runner(parac_handle* handle) {
   mod->version.tweak = RUNNER_VERSION_TWEAK;
   mod->pre_init = pre_init;
   mod->init = init;
+  mod->request_exit = mod_request_exit;
   mod->exit = mod_exit;
 
   return PARAC_OK;

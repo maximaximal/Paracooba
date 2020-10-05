@@ -10,7 +10,10 @@ UDPAcceptor::UDPAcceptor(const std::string& listenAddressStr,
   : m_internal(std::make_unique<Internal>())
   , m_listenAddressStr(listenAddressStr)
   , m_listenPort(listenPort) {}
-UDPAcceptor::~UDPAcceptor() {}
+
+UDPAcceptor::~UDPAcceptor() {
+  parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Destroy UDPAcceptor.");
+}
 
 parac_status
 UDPAcceptor::start(Service& service) {

@@ -22,7 +22,10 @@ TCPAcceptor::TCPAcceptor(const std::string& listenAddressStr,
   : m_internal(std::make_unique<Internal>())
   , m_listenAddressStr(listenAddressStr)
   , m_listenPort(listenPort) {}
-TCPAcceptor::~TCPAcceptor() {}
+
+TCPAcceptor::~TCPAcceptor() {
+  parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Destroy TCPAcceptor.");
+}
 
 parac_status
 TCPAcceptor::start(Service& service) {

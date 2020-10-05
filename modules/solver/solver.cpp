@@ -31,6 +31,14 @@ init(parac_module* mod) {
   return PARAC_OK;
 }
 
+static parac_status mod_request_exit(parac_module *mod) {
+  assert(mod);
+  assert(mod->solver);
+  assert(mod->handle);
+
+  return PARAC_OK;
+}
+
 static parac_status mod_exit(parac_module *mod) {
   assert(mod);
   assert(mod->solver);
@@ -54,6 +62,7 @@ parac_module_discover_solver(parac_handle* handle) {
   mod->version.tweak = SOLVER_VERSION_TWEAK;
   mod->pre_init = pre_init;
   mod->init = init;
+  mod->request_exit = mod_request_exit;
   mod->exit = mod_exit;
 
   return PARAC_OK;

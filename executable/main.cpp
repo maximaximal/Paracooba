@@ -1,4 +1,5 @@
 #include <boost/filesystem/operations.hpp>
+#include <csignal>
 #include <cstdlib>
 #include <paracooba/common/log.h>
 #include <paracooba/common/thread_registry.h>
@@ -69,6 +70,17 @@ isDirectoryEmpty(std::string path) {
     return false;
 }
 
+static ModuleLoader* GlobalModuleLoader = nullptr;
+
+static void
+InterruptHandler(int s) {
+  static bool exitRequested = false;
+  if(s == SIGINT && !exitRequested) {
+    exitRequested = true;
+    GlobalModuleLoader->request_exit();
+  }
+}
+
 int
 main(int argc, char* argv[]) {
   // Workaround for wonky locales.
@@ -96,6 +108,8 @@ main(int argc, char* argv[]) {
   }
 
   ModuleLoader loader(thread_registry, config);
+  GlobalModuleLoader = &loader;
+  signal(SIGINT, InterruptHandler);
 
   distrac_wrapper distracWrapper;
   if(cli.distracEnabled()) {

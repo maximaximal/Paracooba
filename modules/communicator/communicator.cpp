@@ -133,6 +133,20 @@ init(parac_module* mod) {
 }
 
 static parac_status
+mod_request_exit(parac_module* mod) {
+  assert(mod);
+  assert(mod->communicator);
+  assert(mod->handle);
+  assert(mod->userdata);
+
+  CommunicatorUserdata* userdata =
+    static_cast<CommunicatorUserdata*>(mod->userdata);
+  userdata->service.stop();
+
+  return PARAC_OK;
+}
+
+static parac_status
 mod_exit(parac_module* mod) {
   assert(mod);
   assert(mod->communicator);
@@ -162,6 +176,7 @@ parac_module_discover_communicator(parac_handle* handle) {
   mod->version.tweak = COMMUNICATOR_VERSION_TWEAK;
   mod->pre_init = pre_init;
   mod->init = init;
+  mod->request_exit = mod_request_exit;
   mod->exit = mod_exit;
 
   using parac::communicator::Config;

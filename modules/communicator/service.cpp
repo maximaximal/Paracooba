@@ -53,6 +53,13 @@ Service::start() {
     &m_internal->threadHandle);
 }
 
+void
+Service::stop() {
+  parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Stopping communicator service.");
+
+  ioContext().stop();
+}
+
 parac_status
 Service::run() {
   parac_log(

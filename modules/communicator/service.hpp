@@ -39,6 +39,8 @@ class Service {
 
   parac_status start();
 
+  void stop();
+
   boost::asio::io_context& ioContext();
 
   private:

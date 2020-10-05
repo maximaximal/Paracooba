@@ -35,6 +35,14 @@ init(parac_module* mod) {
   return PARAC_OK;
 }
 
+static parac_status mod_request_exit(parac_module *mod) {
+  assert(mod);
+  assert(mod->broker);
+  assert(mod->handle);
+
+  return PARAC_OK;
+}
+
 static parac_status mod_exit(parac_module *mod) {
   assert(mod);
   assert(mod->broker);
@@ -58,6 +66,7 @@ parac_module_discover_broker(parac_handle* handle) {
   mod->version.tweak = BROKER_VERSION_TWEAK;
   mod->pre_init = pre_init;
   mod->init = init;
+  mod->request_exit = mod_request_exit;
   mod->exit = mod_exit;
 
   return PARAC_OK;

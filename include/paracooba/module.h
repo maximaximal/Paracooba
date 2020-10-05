@@ -38,6 +38,8 @@ typedef enum parac_status (*parac_module_register)(struct parac_handle* handle,
 typedef enum parac_status (*parac_module_pre_init)(struct parac_module* module);
 typedef enum parac_status (*parac_module_init)(struct parac_module* module);
 typedef enum parac_status (*parac_module_exit)(struct parac_module* module);
+typedef enum parac_status (*parac_module_request_exit)(
+  struct parac_module* module);
 
 typedef struct parac_version {
   int major;
@@ -68,6 +70,9 @@ typedef struct parac_module {
 
   parac_module_exit exit;/// Called when module should be unloaded at the end of
                          /// running Paracooba.
+
+  parac_module_request_exit request_exit;/// Request the module to stop all
+                                         /// threads, so it can be destroyed.
 
   /// Inserted once pre_init is called. Not available in initial discovery.
   union {
