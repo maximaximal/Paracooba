@@ -177,8 +177,8 @@ ModuleLoader::load() {
     load(type);
   }
 
-  if(isComplete()) {
-    for(auto& mod : m_modules) {
+  for(auto& mod : m_modules) {
+    if(mod) {
       switch(mod->type) {
         case PARAC_MOD_BROKER:
           mod->broker = broker();
@@ -197,7 +197,8 @@ ModuleLoader::load() {
       }
       mod->handle = &m_handle;
     }
-  } else {
+  }
+  if(!isComplete()) {
     parac_log(
       PARAC_LOADER, PARAC_FATAL, "Cannot load all required paracooba modules!");
   }

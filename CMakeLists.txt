@@ -138,7 +138,10 @@ macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
     target_compile_definitions(${NAME}_obj PRIVATE "-DPARAC_LOG_INCLUDE_FMT")
 
     target_link_libraries(${NAME}_obj PUBLIC parac_common parac_modules fmt::fmt)
+    target_link_libraries(${NAME} PUBLIC parac_common parac_modules fmt::fmt)
+
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
     if(STATIC_BUILDS)
         set_target_properties(${NAME}_static PROPERTIES CXX_VISIBILITY_PRESET hidden)
