@@ -22,6 +22,8 @@ parac_static_module_discover(parac_module_type mod);
 auto
 ImportModuleDiscoverFunc(boost::filesystem::path path,
                          const std::string& name) {
+  // The line below leads to a UBSan runtime error with clang.
+  // Bug-report is online: https://github.com/boostorg/dll/issues/46
   return boost::dll::import<decltype(parac_module_discover)>(
     path / name,
     "parac_module_discover",
