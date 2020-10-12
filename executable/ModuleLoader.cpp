@@ -184,15 +184,19 @@ ModuleLoader::load() {
       switch(mod->type) {
         case PARAC_MOD_BROKER:
           mod->broker = broker();
+          m_handle.modules[PARAC_MOD_BROKER] = mod.get();
           break;
         case PARAC_MOD_RUNNER:
           mod->runner = runner();
+          m_handle.modules[PARAC_MOD_RUNNER] = mod.get();
           break;
         case PARAC_MOD_SOLVER:
           mod->solver = solver();
+          m_handle.modules[PARAC_MOD_SOLVER] = mod.get();
           break;
         case PARAC_MOD_COMMUNICATOR:
           mod->communicator = communicator();
+          m_handle.modules[PARAC_MOD_COMMUNICATOR] = mod.get();
           break;
         case PARAC_MOD__COUNT:
           assert(false);
