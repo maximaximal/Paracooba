@@ -1,5 +1,6 @@
 set(PARAC_COMMON_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/path.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/file.c
     ${CMAKE_CURRENT_SOURCE_DIR}/message.c
     ${CMAKE_CURRENT_SOURCE_DIR}/message_kind.c
     ${CMAKE_CURRENT_SOURCE_DIR}/status.c

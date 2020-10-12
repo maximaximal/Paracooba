@@ -43,12 +43,14 @@ class Service {
 
   boost::asio::io_context& ioContext();
 
+  int connectionRetries() const;
+
   private:
   parac_status run();
 
   struct Internal;
   const std::unique_ptr<Internal> m_internal;
-  const parac_handle& m_handle;
+  parac_handle& m_handle;
   parac_config_entry* m_config = nullptr;
 };
 }

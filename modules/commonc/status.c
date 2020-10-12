@@ -9,6 +9,8 @@ parac_status_to_str(parac_status status) {
       return "Ok";
     case PARAC_FULL:
       return "Full";
+    case PARAC_CONNECTION_CLOSED:
+      return "Connection Closed";
     case PARAC_OUT_OF_MEMORY:
       return "Out of Memory";
     case PARAC_INVALID_CHAR_ENCOUNTERED:

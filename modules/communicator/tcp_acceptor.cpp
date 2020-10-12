@@ -17,9 +17,11 @@ struct TCPAcceptor::Internal {
   boost::asio::coroutine coro;
 };
 
-TCPAcceptor::TCPAcceptor(const std::string& listenAddressStr,
+TCPAcceptor::TCPAcceptor(parac_handle& handle,
+                         const std::string& listenAddressStr,
                          uint16_t listenPort)
   : m_internal(std::make_unique<Internal>())
+  , m_handle(handle)
   , m_listenAddressStr(listenAddressStr)
   , m_listenPort(listenPort) {}
 

@@ -9,10 +9,15 @@ extern "C" {
 
 struct parac_compute_node;
 struct parac_message;
+struct parac_file;
 
 typedef void (*parac_compute_node_message_func)(
   struct parac_compute_node* compute_node,
   struct parac_message* msg);
+
+typedef void (*parac_compute_node_file_func)(
+  struct parac_compute_node* compute_node,
+  struct parac_file* msg);
 
 typedef void (*parac_compute_node_free_func)(
   struct parac_compute_node* compute_node);
@@ -30,6 +35,9 @@ parac_compute_node_state_to_str(parac_compute_node_state state);
 typedef struct parac_compute_node {
   parac_compute_node_message_func send_message_to;     /// Set by Communicator.
   parac_compute_node_message_func receive_message_from;/// Set by Broker.
+
+  parac_compute_node_file_func send_file_to;     /// Set by Communicator.
+  parac_compute_node_file_func receive_file_from;/// Set by Broker.
 
   parac_compute_node_free_func broker_free;      /// Set by Broker.
   parac_compute_node_free_func communicator_free;/// Set by Communicator.
@@ -50,6 +58,8 @@ class parac_compute_node_wrapper : public parac_compute_node {
   parac_compute_node_wrapper() {
     send_message_to = nullptr;
     receive_message_from = nullptr;
+    send_file_to = nullptr;
+    receive_file_from = nullptr;
     broker_free = nullptr;
     communicator_free = nullptr;
     id = 0;

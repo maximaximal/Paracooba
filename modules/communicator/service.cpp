@@ -20,7 +20,7 @@ struct Service::Internal {
   std::unique_ptr<UDPAcceptor> udpAcceptor;
 };
 
-Service::Service(struct parac_handle& handle)
+Service::Service(parac_handle& handle)
   : m_internal(std::make_unique<Internal>())
   , m_handle(handle) {
   m_internal->threadHandle.userdata = this;
@@ -33,7 +33,8 @@ Service::applyConfig(parac_config_entry* e) {
   m_config = e;
 
   m_internal->tcpAcceptor =
-    std::make_unique<TCPAcceptor>(m_config[LISTEN_ADDRESS].value.string,
+    std::make_unique<TCPAcceptor>(m_handle,
+                                  m_config[LISTEN_ADDRESS].value.string,
                                   m_config[TCP_LISTEN_PORT].value.uint16);
 
   m_internal->udpAcceptor =
@@ -77,5 +78,11 @@ Service::run() {
 io_context&
 Service::ioContext() {
   return m_internal->context;
+}
+
+int
+Service::connectionRetries() const {
+  assert(m_config);
+  return m_config[CONNECTION_RETRIES].value.uint32;
 }
 }
