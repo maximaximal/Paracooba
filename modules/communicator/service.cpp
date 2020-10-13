@@ -1,5 +1,6 @@
 #include "service.hpp"
 #include "tcp_acceptor.hpp"
+#include "tcp_connection_initiator.hpp"
 #include "udp_acceptor.hpp"
 
 #include <boost/asio/io_context.hpp>
@@ -71,8 +72,18 @@ Service::run() {
   if(m_internal->udpAcceptor)
     m_internal->udpAcceptor->start(*this);
 
+  connectToKnownRemotes();
+
   m_internal->context.run();
   return PARAC_OK;
+}
+
+void
+Service::connectToKnownRemotes() {
+  for(size_t i = 0; i < knownRemoteCount(); ++i) {
+    const char* remote = knownRemote(i);
+    TCPConnectionInitiator initiator(*this, remote);
+  }
 }
 
 io_context&
@@ -89,5 +100,17 @@ const char*
 Service::temporaryDirectory() const {
   assert(m_config);
   return m_config[TEMPORARY_DIRECTORY].value.string;
+}
+
+const char*
+Service::knownRemote(size_t i) const {
+  assert(m_config);
+  assert(m_config[KNOWN_REMOTES].value.string_vector.size);
+  return m_config[KNOWN_REMOTES].value.string_vector.strings[i];
+}
+size_t
+Service::knownRemoteCount() const {
+  assert(m_config);
+  return m_config[KNOWN_REMOTES].value.string_vector.size;
 }
 }

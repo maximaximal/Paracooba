@@ -1,5 +1,6 @@
 #include "CLI.hpp"
 #include "paracooba/common/log.h"
+#include "paracooba/common/types.h"
 #include <boost/program_options/variables_map.hpp>
 #include <paracooba/common/config.h>
 #include <paracooba/module.h>
@@ -51,6 +52,13 @@ CLI::~CLI() {
     if(entry.type == PARAC_TYPE_STR) {
       // Was initiated in CLI and must be back-casted in order to be freed.
       free(const_cast<char*>(entry.value.string));
+    }
+    if(entry.type == PARAC_TYPE_VECTOR_STR) {
+      // Was initiated in CLI and must be back-casted in order to be freed.
+      for(size_t i = 0; i < entry.value.string_vector.size; ++i) {
+        free(const_cast<char*>(entry.value.string_vector.strings[i]));
+      }
+      delete[] entry.value.string_vector.strings;
     }
   }
 }
@@ -213,7 +221,7 @@ CLI::parseGlobalArgs(int argc, char* argv[]) {
 
 static const char*
 ConvertStringToConstChar(const std::string& s) {
-  return s.c_str();
+  return strdup(s.c_str());
 }
 
 static void
@@ -264,13 +272,11 @@ TryParsingCLIArgToConfigEntry(parac_config_entry& e,
       // References the strings in the m_vm member of CLI, so strings stay
       // valid.
       const auto& src = val.as<std::vector<std::string>>();
-      std::vector<const char*> tgt;
-      std::transform(src.begin(),
-                     src.end(),
-                     std::back_inserter(tgt),
-                     ConvertStringToConstChar);
-      e.value.string_vector.strings = tgt.data();
-      e.value.string_vector.size = tgt.size();
+      const char** tgt = new const char*[src.size()];
+      std::transform(src.begin(), src.end(), tgt, ConvertStringToConstChar);
+
+      e.value.string_vector.strings = tgt;
+      e.value.string_vector.size = src.size();
     } break;
   }
 }

@@ -167,6 +167,7 @@ struct TCPConnection::State {
   PacketHeader readHeader;
   PacketFileHeader readFileHeader;
   InitiatorMessage readInitiatorMessage;
+  uint32_t sendMessageNumber = 0;
 
   struct FileOstream {
     std::fstream o;
@@ -237,6 +238,7 @@ void
 TCPConnection::send(SendQueueEntry&& e) {
   {
     std::lock_guard lock(m_state->sendQueueMutex);
+    e.header.number = m_state->sendMessageNumber++;
     m_state->sendQueue.push(std::move(e));
   }
   if(!m_state->currentlySending) {

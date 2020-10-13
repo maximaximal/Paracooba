@@ -67,10 +67,11 @@ mod_exit(parac_module* mod) {
   assert(mod);
   assert(mod->broker);
   assert(mod->handle);
-  assert(mod->userdata);
 
-  BrokerUserdata *userdata = static_cast<BrokerUserdata*>(mod->userdata);
-  delete userdata;
+  if(mod->userdata) {
+    BrokerUserdata* userdata = static_cast<BrokerUserdata*>(mod->userdata);
+    delete userdata;
+  }
 
   return PARAC_OK;
 }

@@ -47,10 +47,15 @@ class Service {
   int connectionRetries() const;
   const char* temporaryDirectory() const;
 
+  const char* knownRemote(size_t i) const;
+  size_t knownRemoteCount() const;
+
   parac_handle& handle() { return m_handle; }
 
   private:
   parac_status run();
+
+  void connectToKnownRemotes();
 
   struct Internal;
   const std::unique_ptr<Internal> m_internal;
