@@ -8,8 +8,11 @@
 
 #include <boost/asio/ip/tcp.hpp>
 
+#include <paracooba/common/status.h>
+
 struct parac_message;
 struct parac_file;
+struct parac_compute_node;
 
 namespace boost::system {
 class error_code;
@@ -17,6 +20,7 @@ class error_code;
 
 namespace parac::communicator {
 class Service;
+class PacketHeader;
 
 /** @brief Class representing a connection between two compute nodes.
  *
@@ -35,6 +39,7 @@ class TCPConnection {
   };
   enum ResumeMode { EndAfterShutdown, RestartAfterShutdown };
   struct EndTag;
+  struct ACKTag;
 
   /** @brief Initialize a paracooba connection on an opened socket.
    */
@@ -49,8 +54,10 @@ class TCPConnection {
   void send(parac_message&& message);
   void send(parac_file&& file);
   void send(EndTag&& end);
+  void sendACK(uint32_t id, parac_status status);
 
   private:
+  struct InitiatorMessage;
   struct SendQueueEntry;
   struct State;
   std::shared_ptr<State> m_state;
@@ -59,6 +66,22 @@ class TCPConnection {
 
   void readHandler(boost::system::error_code ec, size_t bytes_received);
   void writeHandler(boost::system::error_code ec, size_t bytes_sent);
+
+  bool shouldHandlerBeEnded();
+
+  bool handleInitiatorMessage(const InitiatorMessage& init);
+  bool handleReceivedACK(const PacketHeader& ack);
+  void handleReceivedMessage();
+  void handleReceivedFileStart();
+  void handleReceivedFileChunk();
+  void handleReceivedFile();
+
+  static void compute_node_free_func(parac_compute_node* n);
+  static void compute_node_func(parac_compute_node* n);
+  static void compute_node_send_message_to_func(parac_compute_node* n,
+                                                parac_message* msg);
+  static void compute_node_send_file_to_func(parac_compute_node* n,
+                                             parac_file* file);
 };
 
 constexpr const char*

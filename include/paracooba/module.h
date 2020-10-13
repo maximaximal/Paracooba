@@ -2,6 +2,7 @@
 #define PARACOOBA_MODULE_H
 
 #include <paracooba/common/status.h>
+#include <paracooba/common/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,6 +93,7 @@ typedef struct parac_module {
  */
 typedef struct parac_handle {
   parac_version version;
+  parac_id id;
   void* userdata;
   struct parac_config* config;
   struct parac_thread_registry*

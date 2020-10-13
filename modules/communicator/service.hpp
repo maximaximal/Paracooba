@@ -18,6 +18,7 @@ struct parac_config_entry;
 
 namespace parac::communicator {
 enum Config {
+  TEMPORARY_DIRECTORY,
   LISTEN_ADDRESS,
   BROADCAST_ADDRESS,
   UDP_LISTEN_PORT,
@@ -44,6 +45,9 @@ class Service {
   boost::asio::io_context& ioContext();
 
   int connectionRetries() const;
+  const char* temporaryDirectory() const;
+
+  parac_handle& handle() { return m_handle; }
 
   private:
   parac_status run();

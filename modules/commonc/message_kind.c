@@ -7,8 +7,6 @@ parac_message_kind_to_str(parac_message_kind kind) {
   switch(kind) {
     case PARAC_MESSAGE_UNKNOWN:
       return "Unknown";
-    case PARAC_MESSAGE_CNF:
-      return "CNF";
     case PARAC_MESSAGE_ONLINE_ANNOUNCEMENT:
       return "OnlineAnnouncement";
     case PARAC_MESSAGE_OFFLINE_ANNOUNCEMENT:
@@ -29,12 +27,12 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "JobResult";
     case PARAC_MESSAGE_JOB_INITIATOR:
       return "JobInitiator";
-    case PARAC_MESSAGE_PING:
-      return "Ping";
-    case PARAC_MESSAGE_PONG:
-      return "Pong";
+    case PARAC_MESSAGE_FILE:
+      return "File";
     case PARAC_MESSAGE_ACK:
       return "Ack";
+    case PARAC_MESSAGE_END:
+      return "End";
   }
   return "";
 }

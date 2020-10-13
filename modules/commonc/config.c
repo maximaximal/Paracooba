@@ -11,7 +11,6 @@ PARAC_COMMON_EXPORT
 void
 parac_config_init(parac_config* config) {
   assert(config);
-  config->id = 0;
   config->size = 0;
   config->reserved_size = 0;
   config->userdata = NULL;

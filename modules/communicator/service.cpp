@@ -85,4 +85,9 @@ Service::connectionRetries() const {
   assert(m_config);
   return m_config[CONNECTION_RETRIES].value.uint32;
 }
+const char*
+Service::temporaryDirectory() const {
+  assert(m_config);
+  return m_config[TEMPORARY_DIRECTORY].value.string;
+}
 }

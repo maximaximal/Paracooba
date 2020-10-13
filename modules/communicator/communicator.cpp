@@ -1,4 +1,5 @@
 #include "service.hpp"
+#include <boost/filesystem/operations.hpp>
 #include <paracooba/common/config.h>
 #include <paracooba/common/log.h>
 #include <paracooba/module.h>
@@ -21,6 +22,7 @@ struct CommunicatorUserdata {
 
   parac::communicator::Service service;
 
+  std::string temporary_directory;
   std::string default_listen_address;
   std::string default_broadcast_address;
 
@@ -31,6 +33,17 @@ static void
 init_config(CommunicatorUserdata* u) {
   using parac::communicator::Config;
   parac_config_entry* e = u->config_entries;
+
+  parac_config_entry_set_str(
+    &e[Config::TEMPORARY_DIRECTORY],
+    "temporary-directory",
+    "Directory to save temporary files (received formulas) in.");
+  e[Config::TEMPORARY_DIRECTORY].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::TEMPORARY_DIRECTORY].type = PARAC_TYPE_STR;
+
+  u->temporary_directory = boost::filesystem::temp_directory_path().string();
+  e[Config::TEMPORARY_DIRECTORY].default_value.string =
+    u->temporary_directory.c_str();
 
   parac_config_entry_set_str(
     &e[Config::LISTEN_ADDRESS],

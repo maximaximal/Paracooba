@@ -1,4 +1,9 @@
 #include "tcp_connection.hpp"
+#include "file_sender.hpp"
+#include "packet.hpp"
+#include "paracooba/broker/broker.h"
+#include "paracooba/common/message_kind.h"
+#include "paracooba/common/status.h"
 #include "paracooba/communicator/communicator.h"
 #include "service.hpp"
 #include "tcp_connection_initiator.hpp"
@@ -8,56 +13,98 @@
 #include <boost/asio/error.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/placeholders.hpp>
+#include <boost/filesystem/path.hpp>
 #include <chrono>
 #include <functional>
 #include <mutex>
 
 #include <boost/asio.hpp>
 #include <boost/asio/coroutine.hpp>
-#include <sstream>
+#include <fstream>
+#include <netinet/tcp.h>
 
 #include <paracooba/common/compute_node.h>
+#include <paracooba/common/compute_node_store.h>
 #include <paracooba/common/file.h>
 #include <paracooba/common/log.h>
 #include <paracooba/common/message.h>
 #include <paracooba/module.h>
 
-#define REC_BUF_SIZE static_cast<uint64_t>(4096)
+#define REC_BUF_SIZE 4096u
+#define MAX_BUF_SIZE 100000u
 
 namespace parac::communicator {
 struct TCPConnection::EndTag {
   void* userdata = nullptr;
   std::function<void(void*, parac_status)> cb;
 };
+struct TCPConnection::ACKTag {
+  void* userdata = nullptr;
+  std::function<void(void*, parac_status)> cb;
+};
+
+struct TCPConnection::InitiatorMessage {
+  parac_id sender_id;
+};
 
 struct TCPConnection::SendQueueEntry {
   SendQueueEntry(parac_message& msg)
-    : value(msg) {}
+    : value(msg) {
+    header.kind = msg.kind;
+  }
   SendQueueEntry(parac_message&& msg)
-    : value(std::move(msg)) {}
+    : value(std::move(msg)) {
+    header.kind = msg.kind;
+  }
 
   SendQueueEntry(parac_file& file)
-    : value(file) {}
+    : value(file) {
+    header.kind = PARAC_MESSAGE_FILE;
+    header.size = FileSender::file_size(file.path);
+  }
   SendQueueEntry(parac_file&& file)
-    : value(std::move(file)) {}
+    : value(std::move(file)) {
+    header.kind = PARAC_MESSAGE_FILE;
+    header.size = FileSender::file_size(file.path);
+  }
 
   SendQueueEntry(EndTag& end)
-    : value(end) {}
+    : value(end) {
+    header.kind = PARAC_MESSAGE_END;
+  }
   SendQueueEntry(EndTag&& end)
-    : value(std::move(end)) {}
+    : value(std::move(end)) {
+    header.kind = PARAC_MESSAGE_END;
+  }
+
+  SendQueueEntry(uint32_t id, parac_status status) {
+    header.kind = PARAC_MESSAGE_ACK;
+    header.ack_status = status;
+  }
 
   using value_type =
-    std::variant<parac_message_wrapper, parac_file_wrapper, EndTag>;
+    std::variant<parac_message_wrapper, parac_file_wrapper, EndTag, ACKTag>;
+  PacketHeader header;
   value_type value;
+  std::chrono::time_point<std::chrono::steady_clock> queued =
+    std::chrono::steady_clock::now();
+  std::chrono::time_point<std::chrono::steady_clock> sent;
 
-  ~SendQueueEntry() {
+  parac_message_wrapper& message() {
+    return std::get<parac_message_wrapper>(value);
+  }
+  parac_file_wrapper& file() { return std::get<parac_file_wrapper>(value); }
+
+  void operator()(parac_status status) {
     std::visit(
-      [this](auto&& v) {
+      [this, status](auto&& v) {
         if(v.cb)
-          v.cb(v.userdata, PARAC_CONNECTION_CLOSED);
+          v.cb(v.userdata, status);
       },
       value);
   }
+
+  ~SendQueueEntry() { (*this)(PARAC_CONNECTION_CLOSED); }
 };
 
 struct TCPConnection::State {
@@ -87,7 +134,7 @@ struct TCPConnection::State {
                       PARAC_TRACE,
                       "Reconnect to endpoint {} (remote id {}), try {}.",
                       socket.remote_endpoint(),
-                      remoteId,
+                      remoteId(),
                       connectionTry);
             TCPConnectionInitiator initiator(
               service, socket.remote_endpoint(), nullptr, ++connectionTry);
@@ -103,26 +150,37 @@ struct TCPConnection::State {
   Service& service;
   boost::asio::ip::tcp::socket socket;
 
-  boost::asio::streambuf recvStreambuf = boost::asio::streambuf();
+  std::vector<char> recvBuf;
   boost::asio::streambuf sendStreambuf = boost::asio::streambuf();
   boost::asio::steady_timer steadyTimer;
-
-  int64_t remoteId = 0;
-  int64_t thisId = 0;
-  uint64_t size = 0;
-  uint64_t sendSize = 0;
-  bool exit = false;
 
   TransmitMode transmitMode = TransmitInit;
   ResumeMode resumeMode = EndAfterShutdown;
 
+  boost::asio::coroutine writeCoro;
   std::mutex sendQueueMutex;
   std::queue<SendQueueEntry> sendQueue;
+  std::map<decltype(PacketHeader::number), SendQueueEntry> sentBuffer;
+  InitiatorMessage writeInitiatorMessage;
 
   boost::asio::coroutine readCoro;
-  boost::asio::coroutine writeCoro;
+  PacketHeader readHeader;
+  PacketFileHeader readFileHeader;
+  InitiatorMessage readInitiatorMessage;
+
+  struct FileOstream {
+    std::fstream o;
+    std::string path;
+  };
+  std::unique_ptr<FileOstream> readFileOstream;
 
   parac_compute_node* compute_node = nullptr;
+
+  parac_id remoteId() const {
+    if(compute_node)
+      return compute_node->id;
+    return 0;
+  }
 
   Lifecycle lifecycle = Initializing;
   std::atomic_bool currentlySending = true;
@@ -170,6 +228,10 @@ void
 TCPConnection::send(EndTag&& end) {
   send(SendQueueEntry(std::move(end)));
 }
+void
+TCPConnection::sendACK(uint32_t id, parac_status status) {
+  send(SendQueueEntry(id, status));
+}
 
 void
 TCPConnection::send(SendQueueEntry&& e) {
@@ -182,7 +244,174 @@ TCPConnection::send(SendQueueEntry&& e) {
   }
 }
 
-#define BUF(SOURCE) boost::asio::buffer(&SOURCE(), sizeof(SOURCE()))
+bool
+TCPConnection::shouldHandlerBeEnded() {
+  if(m_state->compute_node) {
+    auto s = m_state->compute_node->state;
+    if(s == PARAC_COMPUTE_NODE_TIMEOUT || s == PARAC_COMPUTE_NODE_EXITED) {
+      return true;
+    }
+  }
+  if(m_state->service.ioContext().stopped()) {
+    return true;
+  }
+  return false;
+}
+
+bool
+TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
+  if(init.sender_id == m_state->service.handle().id) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_DEBUG,
+              "Not accepting connection from same node.");
+    return false;
+  }
+
+  auto compute_node_store = m_state->service.handle()
+                              .modules[PARAC_MOD_BROKER]
+                              ->broker->compute_node_store;
+  m_state->compute_node =
+    compute_node_store->get(compute_node_store, init.sender_id);
+
+  if(!m_state->compute_node) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_LOCALERROR,
+              "Error when creating compute node {}!",
+              init.sender_id);
+    return false;
+  }
+
+  auto n = m_state->compute_node;
+  n->communicator_free = &TCPConnection::compute_node_free_func;
+  n->communicator_userdata = new TCPConnection(*this);
+
+  n->send_message_to = &TCPConnection::compute_node_send_message_to_func;
+  n->send_file_to = &TCPConnection::compute_node_send_file_to_func;
+
+  return true;
+}
+
+bool
+TCPConnection::handleReceivedACK(const PacketHeader& ack) {
+  std::unique_lock lock(m_state->sendQueueMutex);
+  auto it = m_state->sentBuffer.find(ack.number);
+  if(it == m_state->sentBuffer.end()) {
+    return false;
+  }
+  auto& sentItem = it->second;
+  sentItem(PARAC_OK);
+  m_state->sentBuffer.erase(it);
+  return true;
+}
+
+void
+TCPConnection::handleReceivedMessage() {
+  parac_message msg;
+  struct data {
+    parac_status status;
+    bool returned = false;
+  };
+  data d;
+
+  msg.kind = m_state->readHeader.kind;
+  msg.length = m_state->readHeader.size;
+  msg.data = static_cast<char*>(m_state->recvBuf.data());
+  msg.data_to_be_freed = false;
+  msg.cb = [](void* userdata, parac_status status) {
+    data* d = static_cast<data*>(userdata);
+    d->status = status;
+    d->returned = true;
+  };
+  msg.userdata = &d;
+  m_state->compute_node->receive_message_from(m_state->compute_node, &msg);
+
+  // Callback must be called immediately! This gives the status that is
+  // then passed back.
+  assert(d.returned);
+
+  sendACK(m_state->readHeader.number, d.status);
+}
+
+void
+TCPConnection::handleReceivedFileStart() {
+  std::string name = m_state->readFileHeader.name;
+
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_DEBUG,
+            "Start receiving file \"{}\"from {} ",
+            name,
+            m_state->remoteId());
+
+  boost::filesystem::path p(m_state->service.temporaryDirectory());
+  p /= name;
+
+  m_state->readFileOstream = std::make_unique<State::FileOstream>(
+    State::FileOstream{ { p, std::ios::binary }, p.string() });
+}
+
+void
+TCPConnection::handleReceivedFileChunk() {
+  auto& o = m_state->readFileOstream;
+  assert(o);
+  o->o.write(m_state->recvBuf.data(), m_state->recvBuf.size());
+}
+
+void
+TCPConnection::handleReceivedFile() {
+  parac_file file;
+  struct data {
+    parac_status status;
+    bool returned = false;
+  };
+  data d;
+
+  file.cb = [](void* userdata, parac_status status) {
+    data* d = static_cast<data*>(userdata);
+    d->status = status;
+    d->returned = true;
+  };
+  file.userdata = &d;
+  m_state->compute_node->receive_file_from(m_state->compute_node, &file);
+
+  // Callback must be called immediately! This gives the status that is
+  // then passed back.
+  assert(d.returned);
+
+  sendACK(m_state->readHeader.number, d.status);
+}
+
+void
+TCPConnection::compute_node_free_func(parac_compute_node* n) {
+  assert(n);
+  n->send_file_to = nullptr;
+  n->send_message_to = nullptr;
+  if(n->communicator_userdata) {
+    TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
+    delete conn;
+    n->communicator_userdata = nullptr;
+  }
+}
+
+void
+TCPConnection::compute_node_send_message_to_func(parac_compute_node* n,
+                                                 parac_message* msg) {
+  assert(n);
+  assert(n->communicator_userdata);
+  TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
+  conn->send(*msg);
+}
+
+void
+TCPConnection::compute_node_send_file_to_func(parac_compute_node* n,
+                                              parac_file* file) {
+  assert(n);
+  assert(n->communicator_userdata);
+  TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
+  conn->send(*file);
+}
+
+#define BUF(SOURCE) boost::asio::buffer(&SOURCE, sizeof(SOURCE))
+#define VBUF(SOURCE) boost::asio::buffer(SOURCE.data(), SOURCE.size())
 
 #include <boost/asio/yield.hpp>
 void
@@ -194,686 +423,268 @@ TCPConnection::readHandler(boost::system::error_code ec,
                       std::placeholders::_1,
                       std::placeholders::_2);
 
-  if(m_state->compute_node) {
-    if(nn->deletionRequested()) {
-      return;
-    }
+  if(shouldHandlerBeEnded()) {
+    return;
   }
 
-  if(!ec) {
-    reenter(&readCoro()) {
-      if(socket().available() >= sizeof(thisId())) {
-        read(socket(), BUF(remoteId));
-        yield async_write(socket(), BUF(thisId), rh);
-        currentlySending() = false;
-      } else {
-        yield async_write(socket(), BUF(thisId), rh);
-        currentlySending() = false;
-        yield async_read(socket(), BUF(remoteId), rh);
-      }
+  reenter(&m_state->readCoro) {
+    yield async_read(m_state->socket, BUF(m_state->readInitiatorMessage), rh);
 
-      if(remoteId() == thisId()) {
-        PARACOOBA_LOG(logger(), NetDebug)
-          << "Connection from same local ID, not accepting.";
-        resumeMode() = EndAfterShutdown;
-        yield break;
-      }
+    if(ec) {
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_LOCALERROR,
+                "Error in TCPConnection to endpoint {} readHandler when "
+                "reading initiator message: {}",
+                m_state->socket.remote_endpoint(),
+                ec);
+      return;
+    }
 
-      if(remoteId() == 0) {
-        PARACOOBA_LOG(logger(), NetDebug)
-          << "Remote ID is 0! Ending connection.";
-        resumeMode() = EndAfterShutdown;
-        yield break;
-      }
-      if(!initRemoteNN()) {
-        // Exit coroutine and connection. This connection is already
-        // established and is full duplex, the other direction is not
-        // required!
-        PARACOOBA_LOG(logger(), NetDebug)
-          << "Connection is already established from other side, connection "
-             "will be dropped.";
-        yield break;
-      }
+    if(!handleInitiatorMessage(m_state->readInitiatorMessage)) {
+      return;
+    }
 
-      if(auto nn = remoteNN().lock()) {
-        nn->addActiveTCPClient();
-      } else {
-        PARACOOBA_LOG(logger(), LocalError)
-          << "Connection established, remoteNN initialized, but no remoteNN "
-             "can be transformed into shared_ptr! Connection will be "
-             "dropped.";
+    while(true) {
+      if(ec) {
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_LOCALERROR,
+                  "Error in TCPConnection to endpoint {} readHandler before "
+                  "reading: {}",
+                  m_state->socket.remote_endpoint(),
+                  ec);
         return;
       }
-      connectionEstablished() = true;
-      // should not be required and may lead to issues.
-      // writeHandler();
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-      {
-        auto address = socket().remote_endpoint().address();
 
-        if(address.is_v6()) {
-          Tracer::log(-1,
-                      traceentry::ConnectionEstablished{
-                        remoteId(),
-                        0,
-                        address.to_v6().to_bytes(),
-                        socket().remote_endpoint().port() });
-        } else {
-          Tracer::log(-1,
-                      traceentry::ConnectionEstablished{
-                        remoteId(),
-                        address.to_v4().to_ulong(),
-                        { 0 },
-                        socket().remote_endpoint().port() });
+      yield async_read(m_state->socket, BUF(m_state->readHeader), rh);
+
+      if(ec) {
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_LOCALERROR,
+                  "Error in TCPConnection to endpoint {} readHandler when "
+                  "reading from socket: {}",
+                  m_state->socket.remote_endpoint(),
+                  ec);
+        return;
+      }
+
+      if(m_state->readHeader.kind == PARAC_MESSAGE_ACK) {
+        if(!handleReceivedACK(m_state->readHeader)) {
+          parac_log(PARAC_COMMUNICATOR,
+                    PARAC_LOCALERROR,
+                    "Error in TCPConnection to endpoint {} readHandler when "
+                    "reading ACK!",
+                    m_state->socket.remote_endpoint());
+          return;
         }
-      }
-#endif
+      } else if(m_state->readHeader.kind == PARAC_MESSAGE_FILE) {
+        yield async_read(m_state->socket, BUF(m_state->readFileHeader), rh);
+        if(ec) {
+          parac_log(PARAC_COMMUNICATOR,
+                    PARAC_LOCALERROR,
+                    "Error in TCPConnection to endpoint {} ({}) readHandler "
+                    "when reading "
+                    "file header from message number {}! Error: {}",
+                    m_state->socket.remote_endpoint(),
+                    m_state->remoteId(),
+                    m_state->readHeader.number,
+                    ec);
+          return;
+        }
 
-      // Now set the connection to ready in the networked node.
-      if(auto nn = remoteNN().lock()) {
-        nn->getConnectionReadyWaiter().setReady(nn->getConnection());
-      }
+        while(m_state->readHeader.size > 0) {
+          m_state->recvBuf.resize(
+            std::min((unsigned long)REC_BUF_SIZE, m_state->readHeader.size));
+          yield async_read(m_state->socket, VBUF(m_state->recvBuf), rh);
 
-      // Handshake finished, both sides know about the other side.
-      // Communication can begin now. Communication runs in a loop, as
-      // unlimited messages may be received over a connection.
-
-      for(;;) {
-        yield async_read(socket(), BUF(currentModeAsUint8), rh);
-
-        if(currentMode() == TransmitEndToken) {
-          // A successfully terminated connection does not need to be
-          // restarted immediately.
-          resumeMode() = EndAfterShutdown;
-        } else if(currentMode() == TransmitCNF) {
-          if(!getLocalCNF())
+          if(ec) {
+            parac_log(
+              PARAC_COMMUNICATOR,
+              PARAC_LOCALERROR,
+              "Error in TCPConnection to endpoint {} ({}) readHandler when "
+              "reading "
+              "file chunk from file message number {}! Bytes left: {}. Error: "
+              "{}",
+              m_state->socket.remote_endpoint(),
+              m_state->remoteId(),
+              m_state->readHeader.number,
+              m_state->readHeader.size,
+              ec);
             return;
-          yield async_read(socket(), BUF(size), rh);
-
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-          Tracer::log(
-            cnf()->getOriginId(),
-            traceentry::RecvMsg{
-              remoteId(), size(), false, traceentry::MessageKind::CNF });
-#endif
-
-          do {
-            yield async_read(
-              socket(),
-              recvStreambuf().prepare(std::min(size(), REC_BUF_SIZE)),
-              rh);
-            size() -= bytes_received;
-
-            receiveIntoCNF(bytes_received);
-          } while(size() > 0);
-          context()->start(Daemon::Context::State::FormulaReceived);
-        } else if(currentMode() == TransmitJobDescription ||
-                  currentMode() == TransmitControlMessage) {
-          yield async_read(socket(), BUF(size), rh);
-          yield async_read(socket(), recvStreambuf().prepare(size()), rh);
-
-          receiveSerializedMessage(bytes_received);
-        } else {
-          default:
-            PARACOOBA_LOG(logger(), LocalError)
-              << "Unknown message received! Connection must be restarted.";
-
-            resumeMode() = RestartAfterShutdown;
-            socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-            socket().close();
+          }
+          m_state->readHeader.size -= bytes_received;
+          handleReceivedFileChunk();
         }
+        handleReceivedFile();
+      } else if(m_state->readHeader.kind == PARAC_MESSAGE_END) {
+        m_state->resumeMode = EndAfterShutdown;
+        return;
+      } else {
+        // Read rest of message, then pass on to handler function from compute
+        // node.
+        if(!m_state->compute_node) {
+          parac_log(
+            PARAC_COMMUNICATOR,
+            PARAC_LOCALERROR,
+            "Error in TCPConnection to endpoint {} ({}) readHandler when "
+            "processing received message of kind {}, size {}, and number {}! "
+            "Compute node not defined!",
+            m_state->socket.remote_endpoint(),
+            m_state->remoteId(),
+            m_state->readHeader.kind,
+            m_state->readHeader.size,
+            m_state->readHeader.number);
+          return;
+        }
+
+        assert(m_state->compute_node->receive_message_from);
+
+        if(m_state->readHeader.size > MAX_BUF_SIZE) {
+          parac_log(
+            PARAC_COMMUNICATOR,
+            PARAC_LOCALERROR,
+            "Error in TCPConnection to endpoint {} ({}) readHandler when "
+            "reading message of kind {}, size {}, and number {}! "
+            "Too big, buffer would be larger than MAX_BUF_SIZE {}!",
+            m_state->socket.remote_endpoint(),
+            m_state->remoteId(),
+            m_state->readHeader.kind,
+            m_state->readHeader.size,
+            m_state->readHeader.number,
+            bytes_received,
+            MAX_BUF_SIZE);
+          return;
+        }
+        m_state->recvBuf.resize(m_state->readHeader.size);
+        yield async_read(m_state->socket, VBUF(m_state->recvBuf), rh);
+
+        if(ec || bytes_received != m_state->readHeader.size) {
+          parac_log(
+            PARAC_COMMUNICATOR,
+            PARAC_LOCALERROR,
+            "Error in TCPConnection to endpoint {} ({}) readHandler when "
+            "reading message of kind {}, size {}, and number {}! "
+            "Not enough bytes (only {}) read! Error: {}",
+            m_state->socket.remote_endpoint(),
+            m_state->remoteId(),
+            m_state->readHeader.kind,
+            m_state->readHeader.size,
+            m_state->readHeader.number,
+            bytes_received,
+            ec);
+          return;
+        }
+
+        handleReceivedMessage();
       }
     }
-  } else if(ec == boost::asio::error::eof) {
-    // Socket has been closed, connection ended. This can happen on purpose
-    // (closed client session)
-
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-    auto address = socket().remote_endpoint().address();
-
-    if(address.is_v6()) {
-      Tracer::log(
-        -1,
-        traceentry::ConnectionDropped{ remoteId(),
-                                       0,
-                                       address.to_v6().to_bytes(),
-                                       socket().remote_endpoint().port() });
-    } else {
-      Tracer::log(
-        -1,
-        traceentry::ConnectionDropped{ remoteId(),
-                                       address.to_v4().to_ulong(),
-                                       { 0 },
-                                       socket().remote_endpoint().port() });
-    }
-#endif
-
-    if(resumeMode() == RestartAfterShutdown) {
-      PARACOOBA_LOG(logger(), LocalWarning)
-        << "Connection ended! Retry after timeout." << ec.message();
-      reconnectAfterMS(config()->getUint32(Config::NetworkTimeout));
-    }
-  } else if(ec == boost::asio::error::connection_refused) {
-    PARACOOBA_LOG(logger(), LocalError)
-      << "Connection refused! Retry after short timeout." << ec.message();
-    reconnectAfterMS(config()->getUint32(Config::ShortNetworkTimeout));
-  } else {
-    PARACOOBA_LOG(logger(), LocalError)
-      << "Error in readHandler: " << ec.message();
   }
 }
 
 void
-Connection::writeHandler(boost::system::error_code ec,
-                         size_t bytes_transferred) {
+TCPConnection::writeHandler(boost::system::error_code ec,
+                            size_t bytes_transferred) {
   using namespace boost::asio;
-  auto wh = std::bind(&Connection::writeHandler,
+  auto wh = std::bind(&TCPConnection::writeHandler,
                       *this,
                       std::placeholders::_1,
                       std::placeholders::_2);
 
-  std::shared_ptr<CNF>* cnf;
-  messages::JobDescription* jd;
-  messages::Message* msg;
-  bool repeat;
+  SendQueueEntry* e = nullptr;
+  if(!m_state->sendQueue.empty()) {
+    e = &m_state->sendQueue.front();
+  }
 
-  if(!ec) {
-    reenter(&writeCoro()) {
-      while(true) {
-        while(!connectionEstablished()) {
-          yield;
-        }
+  // Defined up here in order to be created when sending files. When it is
+  // deleted, it has already been copied internally and carries on the reference
+  // to this connection's state.
+  std::unique_ptr<FileSender> sender;
 
-        while(!currentSendItem()) {
-          yield popNextSendItem();
-        }
-        currentlySending() = true;
+  reenter(m_state->writeCoro) {
+    m_state->currentlySending = true;
+    async_write(m_state->socket, BUF(m_state->writeInitiatorMessage), wh);
+    if(ec) {
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_LOCALERROR,
+                "Error when sending initiator packet to endpoint {}! Error: {}",
+                m_state->socket.remote_endpoint(),
+                ec);
+      return;
+    }
+    m_state->currentlySending = false;
 
-        sendMode() = getSendModeFromSendItem(*currentSendItem());
-        if(sendMode() == TransmitModeUnknown)
-          continue;
-
-        yield async_write(socket(), BUF(sendModeAsUint8), wh);
-
-        if(std::holds_alternative<EndTokenTag>(*currentSendItem())) {
-          // Nothing else needs to be done, the end token has no other
-          // payload. It is sent when the connection terminates normally, but
-          // it is no offline announcement.
-        } else if((cnf = std::get_if<std::shared_ptr<CNF>>(
-                     currentSendItem().get()))) {
-          sendSize() = (*cnf)->getSizeToBeSent();
-          yield async_write(socket(), BUF(sendSize), wh);
-
-          // Re-get CNF after yield.
-          cnf = &std::get<std::shared_ptr<CNF>>(*currentSendItem());
-
-          PARACOOBA_LOG(logger(), NetTrace)
-            << "Now sending CNF with size " << BytePrettyPrint(sendSize())
-            << ".";
-
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-          Tracer::log(
-            (*cnf)->getOriginId(),
-            traceentry::SendMsg{
-              remoteId(), sendSize(), false, traceentry::MessageKind::CNF });
-#endif
-
-          // Let sending of potentially huge CNF be handled by the CNF class
-          // internally.
-          assert(*cnf);
-          yield(*cnf)->send(&socket(),
-                            std::bind(&Connection::writeHandler,
-                                      *this,
-                                      boost::system::error_code(),
-                                      0));
-        } else {
-          {
-            std::ostream outStream(&sendStreambuf());
-            cereal::BinaryOutputArchive oa(outStream);
-
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-            traceentry::MessageKind messageKind =
-              traceentry::MessageKind::Unknown;
-            ID originID = -1;
-#endif
-
-            if((jd = std::get_if<messages::JobDescription>(
-                  currentSendItem().get()))) {
-              oa(*jd);
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-              originID = jd->getOriginatorID();
-              messageKind = JobDescriptionKindToTraceMessageKind(jd->getKind());
-#endif
-            } else if((msg = std::get_if<messages::Message>(
-                         currentSendItem().get()))) {
-              oa(*msg);
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-              messageKind = MessageTypeToTraceMessageKind(msg->getType());
-#endif
-            }
-
-            sendSize() = boost::asio::buffer_size(sendStreambuf().data());
-
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-            Tracer::log(originID,
-                        traceentry::SendMsg{
-                          remoteId(), sendSize(), false, messageKind });
-#endif
-          }
-
-          yield async_write(socket(), BUF(sendSize), wh);
-
-          PARACOOBA_LOG(logger(), NetTrace)
-            << "Now sending message of type " << sendMode() << " with size "
-            << BytePrettyPrint(sendSize()) << ".";
-
-          yield async_write(socket(), sendStreambuf(), wh);
-
-          if((msg = std::get_if<messages::Message>(currentSendItem().get()))) {
-            if(msg->getType() == messages::Type::OfflineAnnouncement) {
-              PARACOOBA_LOG(logger(), NetTrace)
-                << "This was an offline announcement, connection ends.";
-              if(auto nn = remoteNN().lock()) {
-                nn->resetConnection();
-              }
-              yield break;
-            }
-          }
-        }
-
-        if(currentSendFinishedCB()) {
-          currentSendFinishedCB()(true);
-        }
-        currentSendItem().reset();
-        currentlySending() = false;
+    while(true) {
+      while(m_state->sendQueue.empty()) {
+        yield;
       }
-    }
-  } else {
-    // Error during writing!
-    PARACOOBA_LOG(logger(), LocalError)
-      << "Error during sending! Error: " << ec.message();
-    if(currentSendFinishedCB()) {
-      currentSendFinishedCB()(false);
-    }
-    if(auto nn = remoteNN().lock()) {
-      nn->resetConnection();
+
+      assert(e);
+      m_state->currentlySending = true;
+      yield async_write(m_state->socket, BUF(e->header), wh);
+      m_state->currentlySending = false;
+
+      if(ec) {
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_LOCALERROR,
+                  "Error when sending packet header to remote ID {}! Error: {}",
+                  m_state->remoteId(),
+                  ec);
+        return;
+      }
+
+      if(e->header.kind == PARAC_MESSAGE_ACK ||
+         e->header.kind == PARAC_MESSAGE_END) {
+        // Nothing has to be done, message already finished.
+      } else if(e->header.kind == PARAC_MESSAGE_FILE) {
+        assert(e);
+
+        sender =
+          std::make_unique<FileSender>(e->file().path,
+                                       m_state->socket,
+                                       std::bind(&TCPConnection::writeHandler,
+                                                 *this,
+                                                 boost::system::error_code(),
+                                                 0));
+        // Handles the sending internally and calls the callback to this
+        // function when it's done. If there is some error, the connection is
+        // dropped and re-established.
+        m_state->currentlySending = true;
+        yield sender->send();
+        m_state->currentlySending = false;
+      } else {
+        m_state->currentlySending = true;
+        yield async_write(
+          m_state->socket, const_buffer(e->message().data, e->header.size), wh);
+        m_state->currentlySending = false;
+
+        if(ec) {
+          parac_log(PARAC_COMMUNICATOR,
+                    PARAC_LOCALERROR,
+                    "Error when sending message to remote ID {}! Error: {}",
+                    m_state->remoteId(),
+                    ec);
+          return;
+        }
+      }
+
+      {
+        std::unique_lock lock(m_state->sendQueueMutex);
+        auto n = e->header.number;
+        e->sent = std::chrono::steady_clock::now();
+        m_state->sentBuffer.try_emplace(n,
+                                        std::move(m_state->sendQueue.front()));
+        m_state->sendQueue.pop();
+      }
     }
   }
 }
 
 #undef BUF
+#undef VBUF
 
 #include <boost/asio/unyield.hpp>
 
-void
-Connection::connect(const NetworkedNodePtr& nn) {
-  // The initial peer that started the connection should also re-start the
-  // connection.
-  resumeMode() = RestartAfterShutdown;
-  remoteNN() = nn;
-  remoteId() = nn->getId();
-
-  uint16_t allowedRetries = config()->getUint16(Config::ConnectionRetries);
-
-  ++connectionTry();
-
-  if(getConnectionTries() < allowedRetries) {
-    PARACOOBA_LOG(logger(), NetDebug)
-      << "Trying to connect to " << nn->getRemoteTcpEndpoint()
-      << " (ID: " << nn->getId() << "), Try " << getConnectionTries();
-    socket().async_connect(
-      nn->getRemoteTcpEndpoint(),
-      boost::bind(
-        &Connection::readHandler, *this, boost::asio::placeholders::error, 0));
-  } else {
-    PARACOOBA_LOG(logger(), NetDebug)
-      << "Retries exhausted, no reconnect will be tried.";
-    resumeMode() = EndAfterShutdown;
-  }
-}
-
-void
-Connection::connect(const std::string& remote) {
-  std::string host = remote;
-  std::string port = std::to_string(config()->getUint16(Config::TCPTargetPort));
-
-  auto posOfColon = remote.find(":");
-  if(posOfColon != std::string::npos) {
-    host = remote.substr(0, posOfColon);
-    port = remote.substr(posOfColon + 1, std::string::npos);
-  }
-
-  std::string connectionString = host + ":" + port;
-
-  if(clusterNodeStore().remoteConnectionStringKnown(connectionString)) {
-    PARACOOBA_LOG(logger(), NetDebug)
-      << "Remote connection string \"" << remote
-      << "\" already known! Ending connection on connection try "
-      << getConnectionTries();
-    return;
-  }
-
-  resumeMode() = EndAfterShutdown;
-  this->remote() = connectionString;
-
-  uint16_t allowedRetries = config()->getUint16(Config::ConnectionRetries);
-  ++connectionTry();
-
-  if(getConnectionTries() < allowedRetries) {
-    PARACOOBA_LOG(logger(), NetDebug)
-      << "Trying to resolve " << remote << " (\"" << host << "\":\"" << port
-      << "\"), Try " << connectionTry();
-
-    Connection thisConn(*this);
-
-    resolver().async_resolve(
-      boost::asio::ip::tcp::resolver::query{ host, port },
-      [*this, host, port, remote](
-        const boost::system::error_code& ec,
-        boost::asio::ip::tcp::resolver::iterator endpointIt) mutable {
-        if(ec) {
-          PARACOOBA_LOG(logger(), LocalError)
-            << "Could not resolve " << remote << " (\"" << host << "\":\""
-            << port << "\")! Error: " << ec.message();
-          return;
-        }
-
-        boost::asio::ip::tcp::endpoint chosenEndpoint;
-        std::for_each(endpointIt,
-                      {},
-                      [*this, &chosenEndpoint, &host, &port, &remote](
-                        auto& endpointEntry) mutable {
-                        auto endpoint = endpointEntry.endpoint();
-                        PARACOOBA_LOG(logger(), NetDebug)
-                          << "Resolved " << remote << " (\"" << host << "\":\""
-                          << port << "\") to endpoint " << endpoint
-                          << " on try " << connectionTry();
-                        chosenEndpoint = endpoint;
-                      });
-
-        PARACOOBA_LOG(logger(), NetDebug)
-          << "Resolved " << remote << " (\"" << host << "\":\"" << port
-          << "\") to endpoint " << chosenEndpoint << " on try "
-          << connectionTry()
-          << " which was chosen for connection. Now connecting.";
-
-        socket().async_connect(chosenEndpoint,
-                               boost::bind(&Connection::readHandler,
-                                           *this,
-                                           boost::asio::placeholders::error,
-                                           0));
-      });
-  }
-}
-
-Connection::Mode
-Connection::getSendModeFromSendItem(const Connection::SendItem& sendItem) {
-  switch(sendItem.index()) {
-    case 0:
-      return Mode::TransmitCNF;
-    case 1:
-      return Mode::TransmitControlMessage;
-    case 2:
-      return Mode::TransmitJobDescription;
-    case 3:
-      return Mode::TransmitEndToken;
-  }
-  return Mode::TransmitModeUnknown;
-}
-
-bool
-Connection::getLocalCNF() {
-  if(config()->isDaemonMode()) {
-    auto [ctx, inserted] =
-      config()->getDaemon()->getOrCreateContext(remoteId());
-    context() = &ctx;
-    cnf() = context()->getRootCNF();
-  } else {
-    PARACOOBA_LOG(logger(), LocalWarning)
-      << "ReadBody should only ever be called on a daemon!";
-    return false;
-  }
-  return true;
-}
-
-void
-Connection::receiveIntoCNF(size_t bytes_received) {
-  recvStreambuf().commit(bytes_received);
-
-  std::stringstream ssOut;
-  boost::asio::streambuf::const_buffers_type constBuffer =
-    recvStreambuf().data();
-
-  std::copy(boost::asio::buffers_begin(constBuffer),
-            boost::asio::buffers_begin(constBuffer) + bytes_received,
-            std::ostream_iterator<uint8_t>(ssOut));
-
-  recvStreambuf().consume(bytes_received);
-
-  cnf()->receive(&socket(), ssOut.str().c_str(), bytes_received);
-}
-
-void
-Connection::receiveSerializedMessage(size_t bytes_received) {
-  recvStreambuf().commit(bytes_received);
-
-  std::istream inStream(&recvStreambuf());
-
-  try {
-    cereal::BinaryInputArchive ia(inStream);
-
-    if(currentMode() == TransmitJobDescription) {
-      messages::JobDescription jd;
-      ia(jd);
-      auto receiver =
-        jobDescriptionReceiverProvider().getJobDescriptionReceiver(
-          jd.getOriginatorID());
-      if(receiver) {
-        if(auto nn = remoteNN().lock()) {
-          auto kind = jd.getKind();
-
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-          Tracer::log(
-            jd.getOriginatorID(),
-            traceentry::RecvMsg{ remoteId(),
-                                 bytes_received,
-                                 false,
-                                 JobDescriptionKindToTraceMessageKind(kind) });
-#endif
-
-          receiver->receiveJobDescription(std::move(jd), nn);
-
-          if(context()) {
-            // This is a connection between a Master and a Daemon. So the
-            // context for this formula can be notified of this JD.
-            switch(kind) {
-              case messages::JobDescription::Initiator:
-                context()->start(Daemon::Context::State::AllowanceMapReceived);
-                break;
-              default:
-                if(!context()->getReadyForWork()) {
-                  PARACOOBA_LOG(logger(), GlobalError)
-                    << "Receive JobDescription while context is not ready "
-                       "for "
-                       "work!";
-                }
-                break;
-            }
-          }
-        } else {
-          PARACOOBA_LOG(logger(), LocalError)
-            << "Received a JobDescription from " << remoteId()
-            << " but no remoteNN in connection!";
-        }
-      } else {
-        PARACOOBA_LOG(logger(), GlobalError)
-          << "Received a JobDescription from " << remoteId()
-          << " but no JD Receiver for originator " << jd.getOriginatorID()
-          << " could be retrieved!";
-      }
-    } else if(currentMode() == TransmitControlMessage) {
-      if(auto nn = remoteNN().lock()) {
-        messages::Message msg;
-        ia(msg);
-
-#ifdef PARACOOBA_ENABLE_TRACING_SUPPORT
-        Tracer::log(
-          -1,
-          traceentry::RecvMsg{ remoteId(),
-                               bytes_received,
-                               false,
-                               MessageTypeToTraceMessageKind(msg.getType()) });
-#endif
-
-        messageReceiver().receiveMessage(msg, *nn);
-
-        if(msg.getType() == messages::Type::OfflineAnnouncement) {
-          resumeMode() = EndAfterShutdown;
-        }
-      } else {
-        PARACOOBA_LOG(logger(), LocalError)
-          << "Received a Serialized Message from " << remoteId()
-          << " but no remoteNN in connection!";
-      }
-    }
-  } catch(const cereal::Exception& e) {
-    PARACOOBA_LOG(logger(), GlobalError)
-      << "Exception during parsing of serialized message! Receive mode: "
-      << currentMode() << ", Error: " << e.what();
-    return;
-  }
-}
-
-Logger&
-Connection::logger() {
-  enrichLogger();
-  return m_state->logger;
-}
-
-void
-Connection::enrichLogger() {
-  if(!m_state->log->isLogLevelEnabled(Log::NetTrace) &&
-     !m_state->log->isLogLevelEnabled(Log::NetDebug))
-    return;
-
-  std::stringstream context;
-  context << "{";
-  context << "RID:'" << std::to_string(getRemoteId()) << "'";
-
-  if(remote() != "") {
-    context << ",R:'" << remote() << "'";
-  } else if(socket().is_open()) {
-    context << ",R:'" << socket().remote_endpoint() << "'";
-  }
-
-  if(socket().is_open()) {
-    context << ",L:'" << socket().local_endpoint() << "'";
-  }
-
-  context << "}";
-
-  m_state->logger.setMeta(context.str());
-}
-
-void
-Connection::popNextSendItem() {
-  std::lock_guard lock(sendQueueMutex());
-  if(currentSendItem()) {
-    // This may happen if called from multiple threads.
-    return;
-  }
-  if(sendQueue().empty())
-    return;
-  auto& queueFrontEntry = sendQueue().front();
-  currentSendItem() = std::move(queueFrontEntry.sendItem);
-  m_state->currentSendFinishedCB.swap(queueFrontEntry.sendFinishedCB);
-  sendQueue().pop();
-  writeHandler();
-}
-
-bool
-Connection::initRemoteNN() {
-  if(auto nn = remoteNN().lock()) {
-    // If the remote was already set from outside, this can return
-    // immediately. No new node needs to be created.
-    nn->assignConnection(*this);
-    return true;
-  }
-
-  auto [node, inserted] = clusterNodeStore().getOrCreateNode(remoteId());
-
-  if(node.getNetworkedNode()->assignConnection(*this)) {
-    auto nn = node.getNetworkedNodePtr();
-    remoteNN() = nn;
-
-    PARACOOBA_LOG(logger(), Trace)
-      << "Initiated Remote NN, connection established.";
-
-    if(inserted) {
-      if(remote() != "") {
-        // The side with specified remote is the one that originally started
-        // the connection. This makes it also the side that now sends an
-        // announcement request.
-        //
-        // The message must be built locally and not be sent using the
-        // NetworkedNode, because the networked node is to be activated
-        // outside of this function.
-        //
-        // Before sending the announcement request, which immediately would
-        // trigger a CNF to be sent from clients, a ping message is sent. This
-        // determines the connection latency between the two peers. This must
-        // also be registered in the message receiver, so it can track when
-        // the ping has been transmitted and the answer received.
-        messageReceiver().handlePingSent(remoteId());
-        messages::Message pingMessage(config()->getId());
-        pingMessage.insert(messages::Ping(remoteId()));
-        sendMessage(pingMessage);
-
-        messages::Message msg(config()->getId());
-        msg.insert(messages::AnnouncementRequest(config()->buildNode()));
-        sendMessage(msg);
-      }
-    }
-    return true;
-  } else {
-    return false;
-  }
-}
-
-void
-Connection::reconnect() {
-  socket().close();
-
-  if(auto nn = remoteNN().lock()) {
-    connect(nn);
-  } else if(remote() != "") {
-    connect(remote());
-  } else {
-    PARACOOBA_LOG(logger(), NetDebug)
-      << "Reconnect cancelled, as there is no remote defined.";
-  }
-}
-
-void
-Connection::reconnectAfterMS(uint32_t milliseconds) {
-  steadyTimer().expires_from_now(std::chrono::milliseconds(milliseconds));
-  steadyTimer().async_wait(
-    [*this](const boost::system::error_code& ec) mutable { reconnect(); });
-}
-
-boost::asio::ip::tcp::endpoint
-Connection::getRemoteTcpEndpoint() const {
-  return socket().remote_endpoint();
-}
-
 std::ostream&
-operator<<(std::ostream& o, Connection::Mode mode) {
-  return o << ConnectionModeToStr(mode);
-}
-
-std::ostream&
-operator<<(std::ostream& o, Connection::ResumeMode resumeMode) {
+operator<<(std::ostream& o, TCPConnection::ResumeMode resumeMode) {
   return o << ConnectionResumeModeToStr(resumeMode);
-}
 }
 }

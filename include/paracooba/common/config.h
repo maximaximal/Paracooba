@@ -24,7 +24,6 @@ typedef struct parac_config {
   size_t size;
   size_t reserved_size;
   parac_config_entry* entries;
-  parac_id id;
 
   void* userdata;/// Owned by Executor.
 } parac_config;
