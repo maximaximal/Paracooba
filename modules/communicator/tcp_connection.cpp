@@ -50,35 +50,42 @@ struct TCPConnection::InitiatorMessage {
 
 struct TCPConnection::SendQueueEntry {
   SendQueueEntry(parac_message& msg)
-    : value(msg) {
+    : value(msg)
+    , transmitMode(TransmitMessage) {
     header.kind = msg.kind;
   }
   SendQueueEntry(parac_message&& msg)
-    : value(std::move(msg)) {
+    : value(std::move(msg))
+    , transmitMode(TransmitMessage) {
     header.kind = msg.kind;
   }
 
   SendQueueEntry(parac_file& file)
-    : value(file) {
+    : value(file)
+    , transmitMode(TransmitFile) {
     header.kind = PARAC_MESSAGE_FILE;
     header.size = FileSender::file_size(file.path);
   }
   SendQueueEntry(parac_file&& file)
-    : value(std::move(file)) {
+    : value(std::move(file))
+    , transmitMode(TransmitFile) {
     header.kind = PARAC_MESSAGE_FILE;
     header.size = FileSender::file_size(file.path);
   }
 
   SendQueueEntry(EndTag& end)
-    : value(end) {
+    : value(end)
+    , transmitMode(TransmitEnd) {
     header.kind = PARAC_MESSAGE_END;
   }
   SendQueueEntry(EndTag&& end)
-    : value(std::move(end)) {
+    : value(std::move(end))
+    , transmitMode(TransmitEnd) {
     header.kind = PARAC_MESSAGE_END;
   }
 
-  SendQueueEntry(uint32_t id, parac_status status) {
+  SendQueueEntry(uint32_t id, parac_status status)
+    : transmitMode(TransmitACK) {
     header.kind = PARAC_MESSAGE_ACK;
     header.ack_status = status;
   }
@@ -87,6 +94,7 @@ struct TCPConnection::SendQueueEntry {
     std::variant<parac_message_wrapper, parac_file_wrapper, EndTag, ACKTag>;
   PacketHeader header;
   value_type value;
+  TransmitMode transmitMode;
   std::chrono::time_point<std::chrono::steady_clock> queued =
     std::chrono::steady_clock::now();
   std::chrono::time_point<std::chrono::steady_clock> sent;
@@ -115,7 +123,9 @@ struct TCPConnection::State {
     : service(service)
     , socket(std::move(socket))
     , steadyTimer(service.ioContext())
-    , connectionTry(connectionTry) {}
+    , connectionTry(connectionTry) {
+    writeInitiatorMessage.sender_id = service.handle().id;
+  }
 
   ~State() {
     if(compute_node) {
@@ -146,6 +156,17 @@ struct TCPConnection::State {
           break;
       }
     }
+
+    /*
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_TRACE,
+              "TCPConnection::State to {} destruct, connection dropping. "
+              "Position in readHandler {}, writeHandler {}.",
+              remoteId(),
+              *reinterpret_cast<int*>(
+                &readCoro),// Hacky reading for debugging purposes.
+              *reinterpret_cast<int*>(&writeCoro));
+    */
   }
 
   Service& service;
@@ -201,6 +222,18 @@ TCPConnection::TCPConnection(
 }
 
 TCPConnection::~TCPConnection() {
+  /*
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_TRACE,
+            "TCPConnection to {} destruct. State use count is {}. Position in "
+            "readHandler {}, writeHandler {}.",
+            m_state->remoteId(),
+            m_state.use_count(),
+            *reinterpret_cast<int*>(
+              &m_state->readCoro),// Hacky reading for debugging purposes.
+            *reinterpret_cast<int*>(&m_state->writeCoro));
+  */
+
   if(!m_state->service.ioContext().stopped()) {
     if(m_state->transmitMode != TransmitEnd && m_state.use_count() == 1) {
       // This is the last connection, so this is also the last one having a
@@ -614,13 +647,14 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
   reenter(m_state->writeCoro) {
     m_state->currentlySending = true;
-    async_write(*m_state->socket, BUF(m_state->writeInitiatorMessage), wh);
+    yield async_write(
+      *m_state->socket, BUF(m_state->writeInitiatorMessage), wh);
     if(ec) {
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_LOCALERROR,
                 "Error when sending initiator packet to endpoint {}! Error: {}",
                 m_state->socket->remote_endpoint(),
-                ec);
+                ec.message());
       return;
     }
     m_state->currentlySending = false;
@@ -632,6 +666,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
       assert(e);
       m_state->currentlySending = true;
+      m_state->transmitMode = e->transmitMode;
       yield async_write(*m_state->socket, BUF(e->header), wh);
       m_state->currentlySending = false;
 
@@ -640,7 +675,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
                   PARAC_LOCALERROR,
                   "Error when sending packet header to remote ID {}! Error: {}",
                   m_state->remoteId(),
-                  ec);
+                  ec.message());
         return;
       }
 

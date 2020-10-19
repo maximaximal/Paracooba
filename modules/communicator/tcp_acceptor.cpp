@@ -62,11 +62,6 @@ TCPAcceptor::start(Service& service,
   m_internal->acceptor->bind(m_internal->endpoint);
   m_internal->acceptor->listen();
 
-  if(ipAddress->is_v6()) {
-    boost::asio::ip::v6_only option(false);
-    m_internal->acceptor->set_option(option);
-  }
-
   loop(boost::system::error_code());
 
   return PARAC_OK;

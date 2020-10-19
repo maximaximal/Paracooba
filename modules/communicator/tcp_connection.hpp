@@ -35,6 +35,7 @@ class TCPConnection {
     TransmitInit,
     TransmitMessage,
     TransmitFile,
+    TransmitACK,
     TransmitEnd
   };
   enum ResumeMode { EndAfterShutdown, RestartAfterShutdown };
