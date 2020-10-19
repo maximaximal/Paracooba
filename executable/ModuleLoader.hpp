@@ -14,7 +14,8 @@ class ModuleLoader {
     std::array<std::unique_ptr<parac_module>, PARAC_MOD__COUNT>;
 
   ModuleLoader(struct parac_thread_registry& thread_registry,
-               struct parac_config& config);
+               struct parac_config& config,
+               parac_id id);
   ~ModuleLoader();
 
   bool load();

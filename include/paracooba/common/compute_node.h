@@ -65,6 +65,7 @@ class parac_compute_node_wrapper : public parac_compute_node {
     id = 0;
     broker_userdata = nullptr;
     communicator_userdata = nullptr;
+    state = PARAC_COMPUTE_NODE_NEW;
   }
   ~parac_compute_node_wrapper() {
     if(broker_free)

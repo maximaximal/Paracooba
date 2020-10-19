@@ -123,9 +123,8 @@ struct TCPConnection::State {
     : service(service)
     , socket(std::move(socket))
     , steadyTimer(service.ioContext())
-    , connectionTry(connectionTry) {
-    writeInitiatorMessage.sender_id = service.handle().id;
-  }
+    , connectionTry(connectionTry)
+    , writeInitiatorMessage({ service.handle().id }) {}
 
   ~State() {
     if(compute_node) {
@@ -303,10 +302,17 @@ TCPConnection::shouldHandlerBeEnded() {
 
 bool
 TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_TRACE,
+            "Handle initiator message on node {} from node {}.",
+            m_state->service.handle().id,
+            init.sender_id);
+
   if(init.sender_id == m_state->service.handle().id) {
     parac_log(PARAC_COMMUNICATOR,
               PARAC_DEBUG,
-              "Not accepting connection from same node.");
+              "Not accepting connection from same node ({}).",
+              init.sender_id);
     return false;
   }
 

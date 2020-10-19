@@ -72,7 +72,8 @@ struct ModuleLoader::Internal {
 };
 
 ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
-                           struct parac_config& config)
+                           struct parac_config& config,
+                           parac_id id)
   : m_internal(std::make_unique<Internal>()) {
   m_handle.userdata = this;
   m_handle.prepare = &ModuleLoader::prepare;
@@ -80,6 +81,7 @@ ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
   m_handle.config = &config;
   m_handle.offsetNS = 0;
   m_handle.distrac = nullptr;
+  m_handle.id = id;
 }
 ModuleLoader::~ModuleLoader() {
   exit();
