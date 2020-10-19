@@ -46,6 +46,7 @@ class Service {
 
   int connectionRetries() const;
   const char* temporaryDirectory() const;
+  uint16_t defaultTCPTargetPort() const;
 
   const char* knownRemote(size_t i) const;
   size_t knownRemoteCount() const;

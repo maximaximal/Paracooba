@@ -102,6 +102,12 @@ Service::temporaryDirectory() const {
   return m_config[TEMPORARY_DIRECTORY].value.string;
 }
 
+uint16_t
+Service::defaultTCPTargetPort() const {
+  assert(m_config);
+  return m_config[TCP_TARGET_PORT].value.uint16;
+}
+
 const char*
 Service::knownRemote(size_t i) const {
   assert(m_config);

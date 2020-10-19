@@ -1,3 +1,4 @@
+#include <limits>
 #include <variant>
 
 #include "paracooba/common/log.h"
@@ -11,10 +12,39 @@
 #include <boost/system/error_code.hpp>
 
 namespace parac::communicator {
+static uint16_t
+ExtractPortFromConnectionString(std::string& connectionString,
+                                uint16_t defaultPort) {
+  std::string port = std::to_string(defaultPort);
+
+  auto posOfColon = connectionString.find(":");
+  if(posOfColon != std::string::npos) {
+    port = connectionString.substr(posOfColon + 1, std::string::npos);
+    connectionString = connectionString.substr(0, posOfColon);
+  }
+
+  int portNum = std::atoi(port.c_str());
+
+  if(portNum < 1 || portNum > std::numeric_limits<uint16_t>::max()) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_LOCALERROR,
+              "Provided port {} for host {} is no valid port! Using default "
+              "TCP target port {} instead.",
+              port,
+              connectionString,
+              defaultPort);
+    portNum = defaultPort;
+  }
+
+  return portNum;
+}
+
 struct TCPConnectionInitiator::State {
   struct HostConnection {
     std::string host;
+    uint16_t port;
     boost::asio::ip::tcp::resolver resolver;
+    boost::asio::ip::tcp::resolver::query query;
   };
   struct EndpointConnection {
     boost::asio::ip::tcp::endpoint endpoint;
@@ -22,6 +52,7 @@ struct TCPConnectionInitiator::State {
 
   State(Service& service,
         const std::string& host,
+        uint16_t port,
         Callback cb,
         int connectionTry)
     : service(service)
@@ -30,8 +61,12 @@ struct TCPConnectionInitiator::State {
     , connectionTry(connectionTry)
     , conn(
         HostConnection{ host,
-                        boost::asio::ip::tcp::resolver(service.ioContext()) }) {
-  }
+                        port,
+                        boost::asio::ip::tcp::resolver(service.ioContext()),
+                        boost::asio::ip::tcp::resolver::query(
+                          host,
+                          std::to_string(port),
+                          boost::asio::ip::tcp::resolver::numeric_service) }) {}
   State(Service& service,
         boost::asio::ip::tcp::endpoint endpoint,
         Callback cb,
@@ -58,6 +93,10 @@ struct TCPConnectionInitiator::State {
     auto& c = std::get<HostConnection>(conn);
     return c.resolver;
   }
+  boost::asio::ip::tcp::resolver::query& query() {
+    auto& c = std::get<HostConnection>(conn);
+    return c.query;
+  }
   boost::asio::ip::tcp::endpoint& endpoint() {
     auto& c = std::get<EndpointConnection>(conn);
     return c.endpoint;
@@ -67,8 +106,13 @@ struct TCPConnectionInitiator::State {
 TCPConnectionInitiator::TCPConnectionInitiator(Service& service,
                                                const std::string& host,
                                                Callback cb,
-                                               int connectionTry)
-  : m_state(std::make_shared<State>(service, host, cb, connectionTry)) {
+                                               int connectionTry) {
+  std::string connectionString = host;
+  uint16_t port = ExtractPortFromConnectionString(
+    connectionString, service.defaultTCPTargetPort());
+
+  m_state =
+    std::make_shared<State>(service, connectionString, port, cb, connectionTry);
   try_connecting_to_host(boost::system::error_code(),
                          boost::asio::ip::tcp::resolver::iterator());
 }
@@ -93,9 +137,11 @@ TCPConnectionInitiator::try_connecting_to_host(
 
   reenter(&m_state->coro) {
     // Resolve Host and get iterator to all resolved endpoints.
-    parac_log(PARAC_COMMUNICATOR, PARAC_TRACE, "Resolving {}.", m_state->host());
+    parac_log(
+      PARAC_COMMUNICATOR, PARAC_TRACE, "Resolving {}.", m_state->host());
+
     yield m_state->resolver().async_resolve(
-      m_state->host(),
+      m_state->query(),
       boost::bind(&TCPConnectionInitiator::try_connecting_to_host,
                   *this,
                   boost::asio::placeholders::error,
@@ -106,7 +152,7 @@ TCPConnectionInitiator::try_connecting_to_host(
                 PARAC_LOCALERROR,
                 "Could not resolve {}! Error: {}",
                 m_state->host(),
-                ec);
+                ec.message());
       return;
     }
 
@@ -133,7 +179,7 @@ TCPConnectionInitiator::try_connecting_to_host(
                   "Resolved {} to endpoint {}. Connection error: {}",
                   m_state->host(),
                   m_state->socket.remote_endpoint(),
-                  ec);
+                  ec.message());
       } else {
         parac_log(PARAC_COMMUNICATOR,
                   PARAC_TRACE,
