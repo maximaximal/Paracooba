@@ -1,16 +1,18 @@
-#include <boost/asio/steady_timer.hpp>
 #include <chrono>
 #include <limits>
+#include <memory>
 #include <ratio>
 #include <variant>
 
 #include "paracooba/common/log.h"
 #include "service.hpp"
+#include "tcp_connection.hpp"
 #include "tcp_connection_initiator.hpp"
 
 #include <boost/asio/coroutine.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/placeholders.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/bind.hpp>
 #include <boost/system/error_code.hpp>
 
@@ -61,7 +63,8 @@ struct TCPConnectionInitiator::State {
         int connectionTry)
     : service(service)
     , connectionCB(cb)
-    , socket(service.ioContext())
+    , socket(
+        std::make_unique<boost::asio::ip::tcp::socket>(service.ioContext()))
     , timer(service.ioContext())
     , connectionTry(connectionTry)
     , conn(
@@ -78,7 +81,8 @@ struct TCPConnectionInitiator::State {
         int connectionTry)
     : service(service)
     , connectionCB(cb)
-    , socket(service.ioContext())
+    , socket(
+        std::make_unique<boost::asio::ip::tcp::socket>(service.ioContext()))
     , timer(service.ioContext())
     , connectionTry(connectionTry)
     , conn(EndpointConnection{ endpoint }) {}
@@ -86,7 +90,7 @@ struct TCPConnectionInitiator::State {
   Service& service;
   Callback connectionCB;
   boost::asio::coroutine coro;
-  boost::asio::ip::tcp::socket socket;
+  std::unique_ptr<boost::asio::ip::tcp::socket> socket;
   boost::asio::steady_timer timer;
   int connectionTry;
   bool retry = false;
@@ -157,8 +161,7 @@ TCPConnectionInitiator::~TCPConnectionInitiator() {
       "retry, because this connection was not successful. Using timeout {}ms",
       timeout);
 
-    m_state->timer.expires_from_now(
-      std::chrono::milliseconds(timeout));
+    m_state->timer.expires_from_now(std::chrono::milliseconds(timeout));
     m_state->timer.async_wait(
       std::bind(&TCPConnectionInitiator::retryConnection, *this));
   }
@@ -224,16 +227,16 @@ TCPConnectionInitiator::try_connecting_to_host(
     // does not exit on success, but function is not called anymore once
     // connection has been established.
     while(endpoint_iterator != boost::asio::ip::tcp::resolver::iterator()) {
+      m_state->currentEndpoint() = endpoint_iterator->endpoint();
+
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_TRACE,
                 "Resolved {} to endpoint {}. Trying to connect.",
                 m_state->host(),
-                endpoint_iterator->endpoint());
+                m_state->currentEndpoint());
 
-      m_state->currentEndpoint() = endpoint_iterator->endpoint();
-
-      yield m_state->socket.async_connect(
-        *endpoint_iterator,
+      yield m_state->socket->async_connect(
+        m_state->currentEndpoint(),
         boost::bind(&TCPConnectionInitiator::try_connecting_to_host,
                     *this,
                     boost::asio::placeholders::error,
@@ -246,22 +249,28 @@ TCPConnectionInitiator::try_connecting_to_host(
                   m_state->host(),
                   m_state->currentEndpoint(),
                   ec.message());
+        m_state->socket =
+          std::move(std::make_unique<boost::asio::ip::tcp::socket>(
+            m_state->service.ioContext()));
       } else {
         parac_log(PARAC_COMMUNICATOR,
                   PARAC_TRACE,
                   "Successfully connected socket to host {} (endpoint {}). "
                   "Starting Paracooba connection.",
                   m_state->host(),
-                  m_state->socket.remote_endpoint());
-      }
+                  m_state->socket->remote_endpoint());
 
-      parac_log(PARAC_COMMUNICATOR,
-                PARAC_LOCALERROR,
-                "Tried all resolved endpoints for host {} without successfully "
-                "establishing a connection.",
-                m_state->host());
-      m_state->retry = true;
+        TCPConnection(
+          m_state->service, std::move(m_state->socket), m_state->connectionTry);
+        return;
+      }
     }
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_LOCALERROR,
+              "Tried all resolved endpoints for host {} without successfully "
+              "establishing a connection.",
+              m_state->host());
+    m_state->retry = true;
   }
 }
 void
@@ -273,7 +282,7 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
               "Trying to connect to endpoint {}.",
               m_state->endpoint());
 
-    yield m_state->socket.async_connect(
+    yield m_state->socket->async_connect(
       m_state->endpoint(),
       boost::bind(&TCPConnectionInitiator::try_connecting_to_endpoint,
                   *this,
@@ -283,14 +292,14 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_LOCALERROR,
                 "Could not connect to endpoint {}! Connection error: {}",
-                m_state->socket.remote_endpoint(),
+                m_state->endpoint(),
                 ec);
     } else {
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_TRACE,
                 "Successfully connected socket to endpoint {}. "
                 "Starting Paracooba connection.",
-                m_state->socket.remote_endpoint());
+                m_state->socket->remote_endpoint());
     }
   }
 }

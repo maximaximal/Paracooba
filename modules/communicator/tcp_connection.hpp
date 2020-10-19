@@ -44,7 +44,7 @@ class TCPConnection {
   /** @brief Initialize a paracooba connection on an opened socket.
    */
   explicit TCPConnection(Service& service,
-                         boost::asio::ip::tcp::socket&& socket,
+                         std::unique_ptr<boost::asio::ip::tcp::socket> socket,
                          int connectionTry = 0);
   ~TCPConnection();
 

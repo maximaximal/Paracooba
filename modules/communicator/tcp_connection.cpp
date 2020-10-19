@@ -109,11 +109,11 @@ struct TCPConnection::SendQueueEntry {
 
 struct TCPConnection::State {
   explicit State(Service& service,
-                 boost::asio::ip::tcp::socket&& socket,
+                 std::unique_ptr<boost::asio::ip::tcp::socket> socket,
                  int connectionTry)
     : service(service)
     , socket(std::move(socket))
-    , steadyTimer(socket.get_executor())
+    , steadyTimer(service.ioContext())
     , connectionTry(connectionTry) {}
 
   ~State() {
@@ -133,11 +133,11 @@ struct TCPConnection::State {
             parac_log(PARAC_COMMUNICATOR,
                       PARAC_TRACE,
                       "Reconnect to endpoint {} (remote id {}), try {}.",
-                      socket.remote_endpoint(),
+                      socket->remote_endpoint(),
                       remoteId(),
                       connectionTry);
             TCPConnectionInitiator initiator(
-              service, socket.remote_endpoint(), nullptr, ++connectionTry);
+              service, socket->remote_endpoint(), nullptr, ++connectionTry);
           }
           break;
         }
@@ -148,7 +148,7 @@ struct TCPConnection::State {
   }
 
   Service& service;
-  boost::asio::ip::tcp::socket socket;
+  std::unique_ptr<boost::asio::ip::tcp::socket> socket;
 
   std::vector<char> recvBuf;
   boost::asio::streambuf sendStreambuf = boost::asio::streambuf();
@@ -188,9 +188,12 @@ struct TCPConnection::State {
   std::atomic_uint16_t connectionTry = 0;
 };
 
-TCPConnection::TCPConnection(Service& service,
-                             boost::asio::ip::tcp::socket&& socket,
-                             int connectionTry) {}
+TCPConnection::TCPConnection(
+  Service& service,
+  std::unique_ptr<boost::asio::ip::tcp::socket> socket,
+  int connectionTry)
+  : m_state(
+      std::make_shared<State>(service, std::move(socket), connectionTry)) {}
 
 TCPConnection::~TCPConnection() {
   if(!m_state->service.ioContext().stopped()) {
@@ -430,14 +433,14 @@ TCPConnection::readHandler(boost::system::error_code ec,
   }
 
   reenter(&m_state->readCoro) {
-    yield async_read(m_state->socket, BUF(m_state->readInitiatorMessage), rh);
+    yield async_read(*m_state->socket, BUF(m_state->readInitiatorMessage), rh);
 
     if(ec) {
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_LOCALERROR,
                 "Error in TCPConnection to endpoint {} readHandler when "
                 "reading initiator message: {}",
-                m_state->socket.remote_endpoint(),
+                m_state->socket->remote_endpoint(),
                 ec);
       return;
     }
@@ -452,19 +455,19 @@ TCPConnection::readHandler(boost::system::error_code ec,
                   PARAC_LOCALERROR,
                   "Error in TCPConnection to endpoint {} readHandler before "
                   "reading: {}",
-                  m_state->socket.remote_endpoint(),
+                  m_state->socket->remote_endpoint(),
                   ec);
         return;
       }
 
-      yield async_read(m_state->socket, BUF(m_state->readHeader), rh);
+      yield async_read(*m_state->socket, BUF(m_state->readHeader), rh);
 
       if(ec) {
         parac_log(PARAC_COMMUNICATOR,
                   PARAC_LOCALERROR,
                   "Error in TCPConnection to endpoint {} readHandler when "
                   "reading from socket: {}",
-                  m_state->socket.remote_endpoint(),
+                  m_state->socket->remote_endpoint(),
                   ec);
         return;
       }
@@ -475,18 +478,18 @@ TCPConnection::readHandler(boost::system::error_code ec,
                     PARAC_LOCALERROR,
                     "Error in TCPConnection to endpoint {} readHandler when "
                     "reading ACK!",
-                    m_state->socket.remote_endpoint());
+                    m_state->socket->remote_endpoint());
           return;
         }
       } else if(m_state->readHeader.kind == PARAC_MESSAGE_FILE) {
-        yield async_read(m_state->socket, BUF(m_state->readFileHeader), rh);
+        yield async_read(*m_state->socket, BUF(m_state->readFileHeader), rh);
         if(ec) {
           parac_log(PARAC_COMMUNICATOR,
                     PARAC_LOCALERROR,
                     "Error in TCPConnection to endpoint {} ({}) readHandler "
                     "when reading "
                     "file header from message number {}! Error: {}",
-                    m_state->socket.remote_endpoint(),
+                    m_state->socket->remote_endpoint(),
                     m_state->remoteId(),
                     m_state->readHeader.number,
                     ec);
@@ -496,7 +499,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
         while(m_state->readHeader.size > 0) {
           m_state->recvBuf.resize(
             std::min((unsigned long)REC_BUF_SIZE, m_state->readHeader.size));
-          yield async_read(m_state->socket, VBUF(m_state->recvBuf), rh);
+          yield async_read(*m_state->socket, VBUF(m_state->recvBuf), rh);
 
           if(ec) {
             parac_log(
@@ -506,7 +509,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
               "reading "
               "file chunk from file message number {}! Bytes left: {}. Error: "
               "{}",
-              m_state->socket.remote_endpoint(),
+              m_state->socket->remote_endpoint(),
               m_state->remoteId(),
               m_state->readHeader.number,
               m_state->readHeader.size,
@@ -530,7 +533,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
             "Error in TCPConnection to endpoint {} ({}) readHandler when "
             "processing received message of kind {}, size {}, and number {}! "
             "Compute node not defined!",
-            m_state->socket.remote_endpoint(),
+            m_state->socket->remote_endpoint(),
             m_state->remoteId(),
             m_state->readHeader.kind,
             m_state->readHeader.size,
@@ -547,7 +550,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
             "Error in TCPConnection to endpoint {} ({}) readHandler when "
             "reading message of kind {}, size {}, and number {}! "
             "Too big, buffer would be larger than MAX_BUF_SIZE {}!",
-            m_state->socket.remote_endpoint(),
+            m_state->socket->remote_endpoint(),
             m_state->remoteId(),
             m_state->readHeader.kind,
             m_state->readHeader.size,
@@ -557,7 +560,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
           return;
         }
         m_state->recvBuf.resize(m_state->readHeader.size);
-        yield async_read(m_state->socket, VBUF(m_state->recvBuf), rh);
+        yield async_read(*m_state->socket, VBUF(m_state->recvBuf), rh);
 
         if(ec || bytes_received != m_state->readHeader.size) {
           parac_log(
@@ -566,7 +569,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
             "Error in TCPConnection to endpoint {} ({}) readHandler when "
             "reading message of kind {}, size {}, and number {}! "
             "Not enough bytes (only {}) read! Error: {}",
-            m_state->socket.remote_endpoint(),
+            m_state->socket->remote_endpoint(),
             m_state->remoteId(),
             m_state->readHeader.kind,
             m_state->readHeader.size,
@@ -603,12 +606,12 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
   reenter(m_state->writeCoro) {
     m_state->currentlySending = true;
-    async_write(m_state->socket, BUF(m_state->writeInitiatorMessage), wh);
+    async_write(*m_state->socket, BUF(m_state->writeInitiatorMessage), wh);
     if(ec) {
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_LOCALERROR,
                 "Error when sending initiator packet to endpoint {}! Error: {}",
-                m_state->socket.remote_endpoint(),
+                m_state->socket->remote_endpoint(),
                 ec);
       return;
     }
@@ -621,7 +624,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
       assert(e);
       m_state->currentlySending = true;
-      yield async_write(m_state->socket, BUF(e->header), wh);
+      yield async_write(*m_state->socket, BUF(e->header), wh);
       m_state->currentlySending = false;
 
       if(ec) {
@@ -641,7 +644,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
         sender =
           std::make_unique<FileSender>(e->file().path,
-                                       m_state->socket,
+                                       *m_state->socket,
                                        std::bind(&TCPConnection::writeHandler,
                                                  *this,
                                                  boost::system::error_code(),
@@ -654,8 +657,9 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         m_state->currentlySending = false;
       } else {
         m_state->currentlySending = true;
-        yield async_write(
-          m_state->socket, const_buffer(e->message().data, e->header.size), wh);
+        yield async_write(*m_state->socket,
+                          const_buffer(e->message().data, e->header.size),
+                          wh);
         m_state->currentlySending = false;
 
         if(ec) {

@@ -33,10 +33,7 @@ void
 Service::applyConfig(parac_config_entry* e) {
   m_config = e;
 
-  m_internal->tcpAcceptor =
-    std::make_unique<TCPAcceptor>(m_handle,
-                                  m_config[LISTEN_ADDRESS].value.string,
-                                  m_config[TCP_LISTEN_PORT].value.uint16);
+  m_internal->tcpAcceptor = std::make_unique<TCPAcceptor>();
 
   m_internal->udpAcceptor =
     std::make_unique<UDPAcceptor>(m_config[LISTEN_ADDRESS].value.string,
@@ -68,7 +65,9 @@ Service::run() {
     PARAC_COMMUNICATOR, PARAC_DEBUG, "Starting communicator io_context.");
 
   if(m_internal->tcpAcceptor)
-    m_internal->tcpAcceptor->start(*this);
+    m_internal->tcpAcceptor->start(*this,
+                                   m_config[LISTEN_ADDRESS].value.string,
+                                   m_config[TCP_LISTEN_PORT].value.uint16);
   if(m_internal->udpAcceptor)
     m_internal->udpAcceptor->start(*this);
 

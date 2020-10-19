@@ -8,6 +8,11 @@ namespace parac::communicator {
 std::optional<boost::asio::ip::address>
 ParseIPAddress(const std::string& addressStr) {
   boost::system::error_code err;
+
+  if(addressStr == "") {
+    return boost::asio::ip::address_v6::any();
+  }
+
   auto address = boost::asio::ip::address::from_string(addressStr, err);
   if(err) {
     parac_log(PARAC_COMMUNICATOR,

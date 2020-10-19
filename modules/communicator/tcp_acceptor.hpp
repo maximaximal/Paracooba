@@ -17,21 +17,17 @@ class Service;
 
 class TCPAcceptor {
   public:
-  TCPAcceptor(parac_handle& handle,
-              const std::string& listenAddressStr,
-              uint16_t listenPort);
+  TCPAcceptor();
   ~TCPAcceptor();
 
-  parac_status start(Service& service);
+  parac_status start(Service& service,
+                     const std::string& listenAddressStr,
+                     uint16_t listenPort);
 
   private:
   struct Internal;
   std::unique_ptr<Internal> m_internal;
-  parac_handle& m_handle;
 
   void loop(const boost::system::error_code& ec);
-
-  std::string m_listenAddressStr;
-  uint16_t m_listenPort;
 };
 }

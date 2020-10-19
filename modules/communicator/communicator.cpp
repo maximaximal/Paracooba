@@ -52,7 +52,7 @@ init_config(CommunicatorUserdata* u) {
   e[Config::LISTEN_ADDRESS].registrar = PARAC_MOD_COMMUNICATOR;
   e[Config::LISTEN_ADDRESS].type = PARAC_TYPE_STR;
 
-  u->default_listen_address = boost::asio::ip::address_v4().to_string();
+  u->default_listen_address = "";
   e[Config::LISTEN_ADDRESS].default_value.string =
     u->default_listen_address.c_str();
 
