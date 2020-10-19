@@ -95,6 +95,7 @@ typedef struct parac_handle {
   parac_version version;
   parac_id id;
   void* userdata;
+  const char* input_file;
   struct parac_config* config;
   struct parac_thread_registry*
     thread_registry;/// Should only be used from main thread.

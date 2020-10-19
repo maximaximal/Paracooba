@@ -15,7 +15,8 @@ class ModuleLoader {
 
   ModuleLoader(struct parac_thread_registry& thread_registry,
                struct parac_config& config,
-               parac_id id);
+               parac_id id,
+               const char* inputFile);
   ~ModuleLoader();
 
   bool load();

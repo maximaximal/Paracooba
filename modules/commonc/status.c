@@ -9,6 +9,10 @@ parac_status_to_str(parac_status status) {
       return "Ok";
     case PARAC_FULL:
       return "Full";
+    case PARAC_PENDING:
+      return "Pending";
+    case PARAC_UNDEFINED:
+      return "Undefined";
     case PARAC_CONNECTION_CLOSED:
       return "Connection Closed";
     case PARAC_OUT_OF_MEMORY:

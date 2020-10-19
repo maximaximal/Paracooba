@@ -5,6 +5,7 @@ set(PARAC_COMMON_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/message_kind.c
     ${CMAKE_CURRENT_SOURCE_DIR}/status.c
     ${CMAKE_CURRENT_SOURCE_DIR}/config.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/task.c
     ${CMAKE_CURRENT_SOURCE_DIR}/thread_registry.c
     ${CMAKE_CURRENT_SOURCE_DIR}/task_store_adapter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/compute_node_store_adapter.c

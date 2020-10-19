@@ -32,7 +32,7 @@
 #include <paracooba/module.h>
 
 #define REC_BUF_SIZE 4096u
-#define MAX_BUF_SIZE 100000u
+#define MAX_BUF_SIZE 10000000u
 
 namespace parac::communicator {
 struct TCPConnection::EndTag {

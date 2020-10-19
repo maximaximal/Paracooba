@@ -107,7 +107,8 @@ main(int argc, char* argv[]) {
     return EXIT_SUCCESS;
   }
 
-  ModuleLoader loader(thread_registry, config, cli.getId());
+  ModuleLoader loader(
+    thread_registry, config, cli.getId(), cli.getInputFile().c_str());
   GlobalModuleLoader = &loader;
   signal(SIGINT, InterruptHandler);
 
@@ -127,6 +128,15 @@ main(int argc, char* argv[]) {
 
   if(!cli.parseModuleArgs(argc, argv)) {
     return EXIT_SUCCESS;
+  }
+
+  if(cli.getInputFile() != "" &&
+     !boost::filesystem::exists(cli.getInputFile())) {
+    parac_log(PARAC_GENERAL,
+              PARAC_FATAL,
+              "Input file \"{}\" does not exist!",
+              cli.getInputFile());
+    return EXIT_FAILURE;
   }
 
   bool status = loader.pre_init();

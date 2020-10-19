@@ -1,3 +1,4 @@
+#include "paracooba/common/log.h"
 #include <paracooba/module.h>
 
 #include <cassert>

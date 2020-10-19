@@ -171,16 +171,11 @@ CLI::parseConfigEntry(parac_config_entry& e) {
 
 bool
 CLI::parseGlobalArgs(int argc, char* argv[]) {
-
-  po::positional_options_description positionalOptions;
-  positionalOptions.add("input-file", 1);
-
   po::variables_map vm;
 
   try {
     po::store(po::command_line_parser(argc, argv)
                 .options(m_globalOptions)
-                .positional(positionalOptions)
                 .allow_unregistered()
                 .run(),
               vm);
@@ -201,9 +196,6 @@ CLI::parseGlobalArgs(int argc, char* argv[]) {
     parac_log_set_severity(PARAC_TRACE);
   }
 
-  if(vm.count("input-file")) {
-    m_inputFile = vm["input-file"].as<std::string>();
-  }
   if(vm.count("local-name")) {
     m_localName = vm["local-name"].as<std::string>();
     parac_log_set_local_name(m_localName.c_str());
@@ -283,6 +275,9 @@ TryParsingCLIArgToConfigEntry(parac_config_entry& e,
 
 bool
 CLI::parseModuleArgs(int argc, char* argv[]) {
+  po::positional_options_description positionalOptions;
+  positionalOptions.add("input-file", 1);
+
   po::options_description options;
   options.add(m_globalOptions)
     .add(m_moduleOptions[PARAC_MOD_BROKER])
@@ -291,12 +286,20 @@ CLI::parseModuleArgs(int argc, char* argv[]) {
     .add(m_moduleOptions[PARAC_MOD_COMMUNICATOR]);
 
   try {
-    po::store(po::command_line_parser(argc, argv).options(options).run(), m_vm);
+    po::store(po::command_line_parser(argc, argv)
+                .options(options)
+                .positional(positionalOptions)
+                .run(),
+              m_vm);
     po::notify(m_vm);
   } catch(const std::exception& e) {
     std::cerr << "Could not parse module CLI Parameters! Error: " << e.what()
               << std::endl;
     return false;
+  }
+
+  if(m_vm.count("input-file")) {
+    m_inputFile = m_vm["input-file"].as<std::string>();
   }
 
   if(m_vm.count("help")) {
