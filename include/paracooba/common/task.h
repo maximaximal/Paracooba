@@ -56,7 +56,7 @@ class parac_task_wrapper : public parac_task {
     result = PARAC_PENDING;
     leftResult = PARAC_PENDING;
     rightResult = PARAC_PENDING;
-    path = PARAC_PATH_EXPLICITLY_UNKNOWN;
+    path.rep = PARAC_PATH_EXPLICITLY_UNKNOWN;
     userdata = nullptr;
     work = nullptr;
     assess = nullptr;
@@ -65,12 +65,12 @@ class parac_task_wrapper : public parac_task {
 
   bool stateActive(parac_task_state s) const { return state & s; }
 
-  parac_status work() {
+  parac_status doWork() {
     if(!work)
       return PARAC_UNDEFINED;
     return work(this, userdata);
   }
-  parac_task_state assess() {
+  parac_task_state doAssess() {
     if(!assess)
       return PARAC_TASK_ERROR;
     return assess(this, userdata);

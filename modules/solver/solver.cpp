@@ -29,10 +29,24 @@ init(parac_module* mod) {
   assert(mod->handle->config);
   assert(mod->handle->thread_registry);
 
+  /* The solver is responsible to create the initial task and to announce the
+   * result All actual solving happens in this module.
+   *
+   * As everything is started now, the initial task can be created. This initial
+   * task is the ParserTask. Atferwards, SolverTask instances are created, that
+   * work according to the CubeTree concept. The CaDiCaLManager copies the
+   * original ParserTask to as many task instances as there are worker threads
+   * enabled and provides the solver instances to SolverTask instances. They
+   * then work and split on their stuff, accumulating data, propagating it
+   * upwards and are at the original solver task in the end. This original task
+   * then ends processing.
+   */
+
   return PARAC_OK;
 }
 
-static parac_status mod_request_exit(parac_module *mod) {
+static parac_status
+mod_request_exit(parac_module* mod) {
   assert(mod);
   assert(mod->solver);
   assert(mod->handle);
@@ -40,7 +54,8 @@ static parac_status mod_request_exit(parac_module *mod) {
   return PARAC_OK;
 }
 
-static parac_status mod_exit(parac_module *mod) {
+static parac_status
+mod_exit(parac_module* mod) {
   assert(mod);
   assert(mod->solver);
   assert(mod->handle);
