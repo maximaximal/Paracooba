@@ -14,6 +14,7 @@
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/placeholders.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/system/error_code.hpp>
 #include <chrono>
 #include <functional>
 #include <mutex>
@@ -193,7 +194,11 @@ TCPConnection::TCPConnection(
   std::unique_ptr<boost::asio::ip::tcp::socket> socket,
   int connectionTry)
   : m_state(
-      std::make_shared<State>(service, std::move(socket), connectionTry)) {}
+      std::make_shared<State>(service, std::move(socket), connectionTry)) {
+
+  writeHandler(boost::system::error_code(), 0);
+  readHandler(boost::system::error_code(), 0);
+}
 
 TCPConnection::~TCPConnection() {
   if(!m_state->service.ioContext().stopped()) {
@@ -392,7 +397,10 @@ TCPConnection::compute_node_free_func(parac_compute_node* n) {
   n->send_message_to = nullptr;
   if(n->communicator_userdata) {
     TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
-    delete conn;
+    if(conn->m_state->compute_node == n) {
+      conn->m_state->compute_node = nullptr;
+    }
+    conn->send(EndTag());
     n->communicator_userdata = nullptr;
   }
 }
