@@ -26,6 +26,7 @@ enum Config {
   TCP_LISTEN_PORT,
   TCP_TARGET_PORT,
   NETWORK_TIMEOUT,
+  RETRY_TIMEOUT,
   CONNECTION_RETRIES,
   KNOWN_REMOTES,
   _COUNT
@@ -47,6 +48,8 @@ class Service {
   int connectionRetries() const;
   const char* temporaryDirectory() const;
   uint16_t defaultTCPTargetPort() const;
+  uint32_t networkTimeoutMS() const;
+  uint32_t retryTimeoutMS() const;
 
   const char* knownRemote(size_t i) const;
   size_t knownRemoteCount() const;

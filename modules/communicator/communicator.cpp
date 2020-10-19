@@ -101,6 +101,13 @@ init_config(CommunicatorUserdata* u) {
   e[Config::NETWORK_TIMEOUT].type = PARAC_TYPE_UINT32;
   e[Config::NETWORK_TIMEOUT].default_value.uint32 = 10000;
 
+  parac_config_entry_set_str(&e[Config::RETRY_TIMEOUT],
+                             "retry-timeout",
+                             "Timeout (in ms) for network connection retries.");
+  e[Config::RETRY_TIMEOUT].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::RETRY_TIMEOUT].type = PARAC_TYPE_UINT32;
+  e[Config::RETRY_TIMEOUT].default_value.uint32 = 1000;
+
   parac_config_entry_set_str(&e[Config::CONNECTION_RETRIES],
                              "connection-retries",
                              "Number of times making a connection to a remote "

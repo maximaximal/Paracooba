@@ -36,5 +36,7 @@ class TCPConnectionInitiator {
   private:
   struct State;
   std::shared_ptr<State> m_state;
+
+  void retryConnection();
 };
 }

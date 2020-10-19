@@ -108,6 +108,18 @@ Service::defaultTCPTargetPort() const {
   return m_config[TCP_TARGET_PORT].value.uint16;
 }
 
+uint32_t
+Service::networkTimeoutMS() const {
+  assert(m_config);
+  return m_config[NETWORK_TIMEOUT].value.uint32;
+}
+
+uint32_t
+Service::retryTimeoutMS() const {
+  assert(m_config);
+  return m_config[RETRY_TIMEOUT].value.uint32;
+}
+
 const char*
 Service::knownRemote(size_t i) const {
   assert(m_config);
