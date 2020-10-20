@@ -29,6 +29,7 @@ enum Config {
   RETRY_TIMEOUT,
   CONNECTION_RETRIES,
   KNOWN_REMOTES,
+  AUTOMATIC_LISTEN_PORT_ASSIGNMENT,
   _COUNT
 };
 
@@ -50,6 +51,7 @@ class Service {
   uint16_t defaultTCPTargetPort() const;
   uint32_t networkTimeoutMS() const;
   uint32_t retryTimeoutMS() const;
+  bool automaticListenPortAssignment() const;
 
   const char* knownRemote(size_t i) const;
   size_t knownRemoteCount() const;

@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
+
 struct parac_compute_node;
 struct parac_message;
 struct parac_file;
@@ -18,6 +20,16 @@ typedef void (*parac_compute_node_message_func)(
 typedef void (*parac_compute_node_file_func)(
   struct parac_compute_node* compute_node,
   struct parac_file* msg);
+
+typedef void (*parac_compute_node_set_formula_parsed)(
+  struct parac_compute_node* compute_node,
+  parac_id originator,
+  bool formula_parsed);
+
+typedef void (*parac_compute_node_set_work_queue_size)(
+  struct parac_compute_node* compute_node,
+  parac_id originator,
+  uint64_t work_queue_size);
 
 typedef void (*parac_compute_node_free_func)(
   struct parac_compute_node* compute_node);

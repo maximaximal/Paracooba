@@ -1,3 +1,4 @@
+#include "paracooba/common/types.h"
 #include "service.hpp"
 #include <boost/filesystem/operations.hpp>
 #include <paracooba/common/config.h>
@@ -122,6 +123,15 @@ init_config(CommunicatorUserdata* u) {
                              "startup. Deactivates UDP discovery.");
   e[Config::KNOWN_REMOTES].registrar = PARAC_MOD_COMMUNICATOR;
   e[Config::KNOWN_REMOTES].type = PARAC_TYPE_VECTOR_STR;
+
+  parac_config_entry_set_str(
+    &e[Config::AUTOMATIC_LISTEN_PORT_ASSIGNMENT],
+    "disable-automatic-listen-port-assignment",
+    "Disables automatic port trial and error process and stops the program if "
+    "a supplied listen port is already bound.");
+  e[Config::AUTOMATIC_LISTEN_PORT_ASSIGNMENT].registrar =
+    PARAC_MOD_COMMUNICATOR;
+  e[Config::AUTOMATIC_LISTEN_PORT_ASSIGNMENT].type = PARAC_TYPE_SWITCH;
 }
 
 static parac_status
@@ -133,6 +143,8 @@ pre_init(parac_module* mod) {
 
   CommunicatorUserdata* userdata =
     static_cast<CommunicatorUserdata*>(mod->userdata);
+
+  assert(userdata->config_entries);
 
   userdata->service.applyConfig(userdata->config_entries);
 

@@ -19,9 +19,10 @@
 #define BROKER_VERSION_TWEAK 0
 
 struct BrokerUserdata {
-  BrokerUserdata(parac_module_broker& mod_broker)
-    : store(store_interface) {
-    mod_broker.compute_node_store = &store_interface;
+  BrokerUserdata(parac_handle& handle)
+    : store(handle, store_interface) {
+    handle.modules[PARAC_MOD_BROKER]->broker->compute_node_store =
+      &store_interface;
   }
 
   parac_compute_node_store store_interface;
@@ -35,7 +36,7 @@ pre_init(parac_module* mod) {
   assert(mod->handle);
   assert(mod->handle->config);
 
-  BrokerUserdata* userdata = new BrokerUserdata(*mod->broker);
+  BrokerUserdata* userdata = new BrokerUserdata(*mod->handle);
   mod->userdata = userdata;
 
   return PARAC_OK;

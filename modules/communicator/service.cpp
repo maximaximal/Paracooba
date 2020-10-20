@@ -33,6 +33,9 @@ void
 Service::applyConfig(parac_config_entry* e) {
   m_config = e;
 
+  assert(m_internal);
+  assert(e);
+
   m_internal->tcpAcceptor = std::make_unique<TCPAcceptor>();
 
   m_internal->udpAcceptor =
@@ -117,6 +120,14 @@ uint32_t
 Service::retryTimeoutMS() const {
   assert(m_config);
   return m_config[RETRY_TIMEOUT].value.uint32;
+}
+
+bool
+Service::automaticListenPortAssignment() const {
+  assert(m_config);
+  // The option is to disable (as the default is to enable it) and this function
+  // asks if it is enabled, so the ! is required.
+  return !m_config[AUTOMATIC_LISTEN_PORT_ASSIGNMENT].value.boolean_switch;
 }
 
 const char*

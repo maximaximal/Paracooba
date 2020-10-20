@@ -26,6 +26,7 @@ class CLI {
   const std::string& getDistracOutput() const { return m_distracOutput; }
 
   const std::string& getLocalName() const { return m_localName; }
+  const std::string& getHostName() const { return m_hostName; }
 
   private:
   boost::program_options::options_description m_globalOptions{
@@ -51,6 +52,7 @@ class CLI {
   std::string m_inputFile;
   std::string m_distracOutput;
   std::string m_localName;
+  std::string m_hostName;
 
   bool m_traceMode = false;
   bool m_debugMode = false;

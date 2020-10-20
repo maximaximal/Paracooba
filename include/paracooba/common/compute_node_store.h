@@ -24,6 +24,7 @@ typedef bool (*parac_compute_node_store_has)(struct parac_compute_node_store*,
 typedef struct parac_compute_node_store {
   parac_compute_node_store_get_or_create get;
   parac_compute_node_store_has has;
+  struct parac_compute_node* this_node;
 
   void* userdata;
 } parac_compute_node_store;

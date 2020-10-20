@@ -13,6 +13,8 @@ parac_status_to_str(parac_status status) {
       return "Pending";
     case PARAC_UNDEFINED:
       return "Undefined";
+    case PARAC_TO_BE_DELETED:
+      return "To be deleted";
     case PARAC_CONNECTION_CLOSED:
       return "Connection Closed";
     case PARAC_OUT_OF_MEMORY:

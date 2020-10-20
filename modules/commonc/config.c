@@ -84,3 +84,16 @@ parac_config_free(parac_config* config) {
     config->reserved_size = 0;
   }
 }
+
+PARAC_COMMON_EXPORT void
+parac_config_apply_default_values(parac_config* config) {
+  assert(config);
+  assert(config);
+
+  if(config->entries) {
+    for(size_t i = 0; i < config->reserved_size; ++i) {
+      parac_config_entry* e = &config->entries[i];
+      e->value = e->default_value;
+    }
+  }
+}

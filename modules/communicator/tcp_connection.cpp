@@ -35,14 +35,8 @@
 #define MAX_BUF_SIZE 10000000u
 
 namespace parac::communicator {
-struct TCPConnection::EndTag {
-  void* userdata = nullptr;
-  std::function<void(void*, parac_status)> cb;
-};
-struct TCPConnection::ACKTag {
-  void* userdata = nullptr;
-  std::function<void(void*, parac_status)> cb;
-};
+struct TCPConnection::EndTag {};
+struct TCPConnection::ACKTag {};
 
 struct TCPConnection::InitiatorMessage {
   parac_id sender_id;
@@ -107,8 +101,9 @@ struct TCPConnection::SendQueueEntry {
   void operator()(parac_status status) {
     std::visit(
       [this, status](auto&& v) {
-        if(v.cb)
-          v.cb(v.userdata, status);
+        using T = std::decay_t<decltype(v)>;
+        if constexpr(std::is_same_v<T, parac_message_wrapper>)
+          v.doCB(status);
       },
       value);
   }
@@ -366,7 +361,7 @@ TCPConnection::handleReceivedMessage() {
   msg.length = m_state->readHeader.size;
   msg.data = static_cast<char*>(m_state->recvBuf.data());
   msg.data_to_be_freed = false;
-  msg.cb = [](void* userdata, parac_status status) {
+  msg.cb = [](parac_message* msg, void* userdata, parac_status status) {
     data* d = static_cast<data*>(userdata);
     d->status = status;
     d->returned = true;

@@ -30,9 +30,13 @@ typedef enum parac_task_state {
 } parac_task_state;
 
 struct parac_task;
+struct parac_message;
 
 typedef parac_status (*parac_task_work_func)(struct parac_task*, void*);
 typedef parac_task_state (*parac_task_assess_func)(struct parac_task*, void*);
+typedef parac_status (*parac_task_serialize_func)(struct parac_task*,
+                                                  void*,
+                                                  struct parac_message*);
 
 typedef struct parac_task {
   parac_task_state state;
@@ -44,6 +48,7 @@ typedef struct parac_task {
   void* userdata;
   parac_task_work_func work;
   parac_task_assess_func assess;
+  parac_task_serialize_func serialize;
 } parac_task;
 
 #ifdef __cplusplus
@@ -74,6 +79,11 @@ class parac_task_wrapper : public parac_task {
     if(!assess)
       return PARAC_TASK_ERROR;
     return assess(this, userdata);
+  }
+  parac_status doSerialize(parac_message& msg) {
+    if(!serialize)
+      return PARAC_UNDEFINED;
+    return serialize(this, userdata, &msg);
   }
 };
 #endif

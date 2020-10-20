@@ -44,6 +44,11 @@ parac_config_entry_set_str(parac_config_entry* e,
                            const char* name,
                            const char* description);
 
+/** @brief Apply default values to all inputs, without any other complication.
+ */
+void
+parac_config_apply_default_values(parac_config* config);
+
 #ifdef __cplusplus
 }
 namespace paracooba {

@@ -5,6 +5,7 @@
 PARAC_COMMON_EXPORT const char*
 parac_message_kind_to_str(parac_message_kind kind) {
   switch(kind) {
+    case PARAC_MESSAGE__COUNT:
     case PARAC_MESSAGE_UNKNOWN:
       return "Unknown";
     case PARAC_MESSAGE_ONLINE_ANNOUNCEMENT:
@@ -21,12 +22,14 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "CNFTreeNodeStatusReply";
     case PARAC_MESSAGE_NEW_REMOTE_CONNECTED:
       return "NewRemoteConnected";
-    case PARAC_MESSAGE_JOB_PATH:
-      return "JobPath";
-    case PARAC_MESSAGE_JOB_RESULT:
-      return "JobResult";
-    case PARAC_MESSAGE_JOB_INITIATOR:
-      return "JobInitiator";
+    case PARAC_MESSAGE_NEW_SOLVER_INSTANCE:
+      return "NewSolverInstance";
+    case PARAC_MESSAGE_SOLVER_INITIATOR:
+      return "Solver-Initiator";
+    case PARAC_MESSAGE_SOLVER_TASK_PATH:
+      return "Solver-TaskPath";
+    case PARAC_MESSAGE_SOLVER_TASK_RESULT:
+      return "Solver-TaskResult";
     case PARAC_MESSAGE_FILE:
       return "File";
     case PARAC_MESSAGE_ACK:

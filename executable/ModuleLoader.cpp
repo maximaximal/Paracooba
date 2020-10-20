@@ -73,7 +73,10 @@ struct ModuleLoader::Internal {
 
 ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
                            struct parac_config& config,
-                           parac_id id, const char *inputFile)
+                           parac_id id,
+                           const char* localName,
+                           const char* hostName,
+                           const char* inputFile)
   : m_internal(std::make_unique<Internal>()) {
   m_handle.userdata = this;
   m_handle.prepare = &ModuleLoader::prepare;
@@ -82,6 +85,8 @@ ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
   m_handle.offsetNS = 0;
   m_handle.distrac = nullptr;
   m_handle.id = id;
+  m_handle.local_name = localName;
+  m_handle.host_name = hostName;
   m_handle.input_file = inputFile;
 }
 ModuleLoader::~ModuleLoader() {

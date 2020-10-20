@@ -2,7 +2,8 @@
 #define PARAC_COMMON_MESSAGE_H
 
 #include "message_kind.h"
-#include "paracooba/common/status.h"
+#include "status.h"
+#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,22 +12,19 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef void (*parac_message_cb)(void*, parac_status);
+struct parac_message;
+
+typedef void (*parac_message_cb)(struct parac_message*, void*, parac_status);
 
 typedef struct parac_message {
   parac_message_kind kind;
   char* data;
   bool data_to_be_freed;
   size_t length;
+  parac_id origin;
   void* userdata;
   parac_message_cb cb;
 } parac_message;
-
-/** @brief Free data in messages, if boolean flag is set.
- *
- * Also safe to call if not set.*/
-void
-parac_message_free(parac_message* msg);
 
 #ifdef __cplusplus
 }
@@ -49,7 +47,9 @@ class parac_message_wrapper : public parac_message {
     userdata = msg.userdata;
     cb = msg.cb;
   }
-  ~parac_message_wrapper() { parac_message_free(this); }
+  ~parac_message_wrapper() { doCB(PARAC_TO_BE_DELETED); }
+
+  void doCB(parac_status status) { cb(this, userdata, status); }
 };
 #endif
 

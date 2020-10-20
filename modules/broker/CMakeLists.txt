@@ -5,3 +5,5 @@ set(PARACOOBA_BROKER_SRCS
     )
 
 parac_module(parac_broker "${PARACOOBA_BROKER_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
+
+target_link_libraries(parac_broker_obj PRIVATE cereal)

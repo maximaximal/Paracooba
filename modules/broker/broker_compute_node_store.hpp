@@ -8,13 +8,14 @@
 struct parac_compute_node_store;
 struct parac_compute_node;
 struct parac_compute_node_wrapper;
+struct parac_handle;
 
 namespace parac::broker {
 struct ComputeNode;
 
 class ComputeNodeStore {
   public:
-  ComputeNodeStore(parac_compute_node_store& store);
+  ComputeNodeStore(parac_handle& handle, parac_compute_node_store& store);
   ~ComputeNodeStore();
 
   /** @brief Get a pointer to the specified compute node.
@@ -38,5 +39,7 @@ class ComputeNodeStore {
 
   struct Internal;
   std::unique_ptr<Internal> m_internal;
+
+  parac_handle &m_handle;
 };
 }

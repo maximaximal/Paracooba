@@ -107,8 +107,12 @@ main(int argc, char* argv[]) {
     return EXIT_SUCCESS;
   }
 
-  ModuleLoader loader(
-    thread_registry, config, cli.getId(), cli.getInputFile().c_str());
+  ModuleLoader loader(thread_registry,
+                      config,
+                      cli.getId(),
+                      cli.getLocalName().c_str(),
+                      cli.getHostName().c_str(),
+                      cli.getInputFile().c_str());
   GlobalModuleLoader = &loader;
   signal(SIGINT, InterruptHandler);
 

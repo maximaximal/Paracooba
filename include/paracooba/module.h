@@ -95,6 +95,8 @@ typedef struct parac_handle {
   parac_version version;
   parac_id id;
   void* userdata;
+  const char* local_name;
+  const char* host_name;
   const char* input_file;
   struct parac_config* config;
   struct parac_thread_registry*
@@ -104,8 +106,8 @@ typedef struct parac_handle {
   int64_t offsetNS;// Offset in nanoseconds to central initiator node, used for
                    // distrac.
 
-  parac_module_prepare prepare;
-  parac_module_register register_module;
+  parac_module_prepare prepare;// Returns a parac_module object to insert module
+                               // commands into. Can only be called once.
   parac_module* modules[PARAC_MOD__COUNT];
 } parac_handle;
 

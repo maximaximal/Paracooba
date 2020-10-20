@@ -10,11 +10,11 @@ extern "C" {
 
 struct parac_module;
 struct parac_solver_instance;
+struct parac_message;
 
-typedef parac_status (*parac_solver_instance_parse_file)(struct parac_module*,
-                                                         const char* path);
-typedef parac_status (*parac_solver_instance_start_solving)(
-  struct parac_module*);
+typedef parac_status (*parac_solver_instance_make_task)(
+  struct parac_module_solver_instance*,
+  struct parac_message*);
 
 typedef struct parac_solver_instance* (
   *parac_solver_add_instance)(struct parac_module*, parac_id originator_id);
@@ -25,9 +25,9 @@ typedef parac_status (*parac_solver_remove_instance)(
 typedef struct parac_module_solver_instance {
   parac_id originator_id;
 
-  parac_solver_instance_parse_file
-    parse_file;/// Called on Masters and on Daemons.
-  parac_solver_instance_start_solving start_solving;/// Only called on Masters.
+  parac_solver_instance_make_task
+    make_task;/// Called by Broker to create tasks from serialized tasks in
+              /// messages.
 
   void* userdata;
 } parac_module_solver_instance;

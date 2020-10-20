@@ -24,6 +24,8 @@ CLI::CLI(struct parac_config& config)
   std::uniform_int_distribution<std::mt19937_64::result_type> dist_mac(
     -((int64_t)1 << 47), ((int64_t)1 << 47) - 1);
 
+  m_hostName = boost::asio::ip::host_name();
+
   std::string generatedLocalName =
     boost::asio::ip::host_name() + "_" + std::to_string(getpid());
 
@@ -149,6 +151,13 @@ CLI::parseConfigEntry(parac_config_entry& e) {
                         ->value_name("float"),
                       e.description);
       break;
+    case PARAC_TYPE_SWITCH:
+      o.add_options()(e.name,
+                      po::bool_switch()
+                        ->default_value(false)
+                        ->value_name("bool"),
+                      e.description);
+      break;
     case PARAC_TYPE_STR:
       if(e.default_value.string == nullptr)
         e.default_value.string = "";
@@ -256,6 +265,9 @@ TryParsingCLIArgToConfigEntry(parac_config_entry& e,
       break;
     case PARAC_TYPE_DOUBLE:
       e.value.d = val.as<double>();
+      break;
+    case PARAC_TYPE_SWITCH:
+      e.value.boolean_switch = val.as<bool>();
       break;
     case PARAC_TYPE_STR:
       e.value.string = strdup(val.as<std::string>().c_str());

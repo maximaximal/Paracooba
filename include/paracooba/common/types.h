@@ -7,6 +7,7 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef uint64_t parac_id;
 
@@ -26,6 +27,7 @@ typedef enum parac_type {
   PARAC_TYPE_INT8,
   PARAC_TYPE_FLOAT,
   PARAC_TYPE_DOUBLE,
+  PARAC_TYPE_SWITCH,
   PARAC_TYPE_STR,
   PARAC_TYPE_VECTOR_STR,
 } parac_type;
@@ -41,6 +43,7 @@ typedef union parac_type_union {
   int8_t int8;
   float f;
   double d;
+  bool boolean_switch;
   const char* string;
   parac_string_vector string_vector;
 } parac_type_union;
@@ -115,6 +118,8 @@ ApplyFuncToParacTypeUnion(parac_type t, parac_type_union u, Functor f) {
       return f(u.d);
     case PARAC_TYPE_STR:
       return f(u.string);
+    case PARAC_TYPE_SWITCH:
+      return f(u.boolean_switch);
     case PARAC_TYPE_VECTOR_STR:
       return f(u.string_vector);
   }
