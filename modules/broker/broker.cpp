@@ -1,5 +1,6 @@
 #include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/config.h"
+#include "paracooba/common/task_store.h"
 #include "paracooba/common/types.h"
 #include <paracooba/broker/broker.h>
 #include <paracooba/module.h>
@@ -11,6 +12,7 @@
 #include <parac_broker_export.h>
 
 #include "broker_compute_node_store.hpp"
+#include "broker_task_store.hpp"
 
 #define BROKER_NAME "cpp_nodemap_keepstocked"
 #define BROKER_VERSION_MAJOR 1
@@ -20,13 +22,18 @@
 
 struct BrokerUserdata {
   BrokerUserdata(parac_handle& handle)
-    : store(handle, store_interface) {
+    : computeNodeStore(handle, compute_node_store_interface)
+    , taskStore(task_store_interface) {
     handle.modules[PARAC_MOD_BROKER]->broker->compute_node_store =
-      &store_interface;
+      &compute_node_store_interface;
+    handle.modules[PARAC_MOD_BROKER]->broker->task_store =
+      &task_store_interface;
   }
 
-  parac_compute_node_store store_interface;
-  parac::broker::ComputeNodeStore store;
+  parac_compute_node_store compute_node_store_interface;
+  parac_task_store task_store_interface;
+  parac::broker::ComputeNodeStore computeNodeStore;
+  parac::broker::TaskStore taskStore;
 };
 
 static parac_status

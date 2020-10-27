@@ -23,11 +23,13 @@ ExternalProject_Add_Step (
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/cadical-out/build/)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/cadical-out/include)
 
-set(libcadical_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/cadical-out/include/ PARENT_SCOPE)
+set(libcadical_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/cadical-out/include/")
+set(libcadical_INCLUDE_DIRS "${libcadical_INCLUDE_DIRS}" PARENT_SCOPE)
 set(libcadical_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/cadical-out/build/${CMAKE_STATIC_LIBRARY_PREFIX}cadical${CMAKE_STATIC_LIBRARY_SUFFIX})
 
 add_library(libcadical STATIC IMPORTED GLOBAL)
-#target_include_directories(libcadical INTERFACE ${libcadical_INCLUDE_DIRS})
+message(STATUS ${libcadical_INCLUDE_DIRS})
+target_include_directories(libcadical INTERFACE ${libcadical_INCLUDE_DIRS})
 set_target_properties(libcadical PROPERTIES IMPORTED_LOCATION ${libcadical_LIBRARIES})
 
 add_dependencies(libcadical cadical)

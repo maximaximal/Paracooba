@@ -7,8 +7,6 @@ set(PARAC_COMMON_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/config.c
     ${CMAKE_CURRENT_SOURCE_DIR}/task.c
     ${CMAKE_CURRENT_SOURCE_DIR}/thread_registry.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/task_store_adapter.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/compute_node_store_adapter.c
 
     ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
     )
@@ -36,8 +34,6 @@ endif()
 if(ENABLE_TESTS)
     add_library(parac_common_test SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/test_path.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_task_store_adapter.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_compute_node_store_adapter.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/test_config.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/test_linked_list.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/test_thread_registry.cpp

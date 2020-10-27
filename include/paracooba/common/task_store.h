@@ -11,21 +11,22 @@ extern "C" {
 
 struct parac_task_store;
 struct parac_task;
+struct parac_path;
 
 typedef bool (*parac_task_store_empty)(struct parac_task_store*);
 typedef size_t (*parac_task_store_get_size)(struct parac_task_store*);
-typedef void (*parac_task_store_push)(struct parac_task_store*,
-                                      const struct parac_task*);
+typedef struct parac_task* (
+  *parac_task_store_new_task)(struct parac_task_store*, parac_path, parac_id);
 
-typedef void (*parac_task_store_pop_top)(struct parac_task_store*,
-                                         struct parac_task*);
-typedef void (*parac_task_store_pop_bottom)(struct parac_task_store*,
-                                            struct parac_task*);
+typedef struct parac_task* (*parac_task_store_pop_top)(
+  struct parac_task_store*);
+typedef struct parac_task* (*parac_task_store_pop_bottom)(
+  struct parac_task_store*);
 
 typedef struct parac_task_store {
   parac_task_store_empty empty;
   parac_task_store_get_size get_size;
-  parac_task_store_push push;
+  parac_task_store_new_task new_task;
   parac_task_store_pop_top pop_top;
   parac_task_store_pop_bottom pop_bottom;
 
