@@ -1,6 +1,7 @@
 #include "paracooba/common/config.h"
 #include "paracooba/common/log.h"
 #include "paracooba/common/thread_registry.h"
+#include "paracooba/common/types.h"
 #include "paracooba/module.h"
 
 #include "paracooba/broker/broker.h"
@@ -11,19 +12,22 @@
 #include <catch2/catch.hpp>
 #include <cstring>
 
+#include <chrono>
+#include <thread>
+
 typedef parac_status (*parac_module_discover_func)(parac_handle*);
 extern parac_module_discover_func
 parac_static_module_discover(parac_module_type mod);
 
 class ParacoobaMock : public parac_handle {
   public:
-  ParacoobaMock() {
+  ParacoobaMock(parac_id id, ParacoobaMock* knownRemote = nullptr) {
     version.major = 0;
     version.minor = 0;
     version.patch = 0;
     version.tweak = 0;
 
-    id = 1;
+    this->id = id;
     userdata = this;
     local_name = "Mock";
     host_name = "Mock";
@@ -71,6 +75,12 @@ class ParacoobaMock : public parac_handle {
       auto mod = &m_modules[i];
       mod->init(mod);
     }
+
+    if(knownRemote) {
+      auto c = m_modules[PARAC_MOD_COMMUNICATOR].communicator;
+      c->connect_to_remote(&m_modules[PARAC_MOD_COMMUNICATOR],
+                           knownRemote->getConnectionString().c_str());
+    }
   }
   ~ParacoobaMock() {
     for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
@@ -93,6 +103,21 @@ class ParacoobaMock : public parac_handle {
     parac_status status = func(this);
     REQUIRE(status == PARAC_OK);
   }
+
+  const std::string getConnectionString() {
+    while(
+      !m_modules[PARAC_MOD_COMMUNICATOR].communicator->tcp_acceptor_active) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return "localhost:" +
+           std::to_string(
+             m_modules[PARAC_MOD_COMMUNICATOR].communicator->tcp_listen_port);
+  }
+
+  parac_module_runner& getRunner() { return m_runner; }
+  parac_module_communicator& getCommunicator() { return m_communicator; }
+  parac_module_solver& getSolver() { return m_solver; }
+  parac_module_broker& getBroker() { return m_broker; }
 
   private:
   paracooba::ConfigWrapper m_config;

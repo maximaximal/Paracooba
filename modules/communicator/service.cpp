@@ -84,8 +84,13 @@ void
 Service::connectToKnownRemotes() {
   for(size_t i = 0; i < knownRemoteCount(); ++i) {
     const char* remote = knownRemote(i);
-    TCPConnectionInitiator initiator(*this, remote);
+    connectToRemote(remote);
   }
+}
+
+void
+Service::connectToRemote(const std::string& remote) {
+  TCPConnectionInitiator initiator(*this, remote);
 }
 
 io_context&

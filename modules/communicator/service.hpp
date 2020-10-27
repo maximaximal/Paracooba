@@ -58,6 +58,8 @@ class Service {
 
   parac_handle& handle() { return m_handle; }
 
+  void connectToRemote(const std::string &remote);
+
   private:
   parac_status run();
 

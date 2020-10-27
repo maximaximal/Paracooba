@@ -5,6 +5,8 @@
 #include <paracooba/common/log.h>
 #include <paracooba/module.h>
 
+#include <paracooba/communicator/communicator.h>
+
 #include <cassert>
 
 #include <parac_communicator_export.h>
@@ -29,6 +31,13 @@ struct CommunicatorUserdata {
 
   parac_config_entry* config_entries;
 };
+
+static void connect_to_remote (parac_module *mod, const char *remote) {
+  assert(mod);
+  assert(mod->userdata);
+  CommunicatorUserdata *userdata = static_cast<CommunicatorUserdata*>(mod->userdata);
+  userdata->service.connectToRemote(remote);
+}
 
 static void
 init_config(CommunicatorUserdata* u) {
@@ -137,9 +146,12 @@ init_config(CommunicatorUserdata* u) {
 static parac_status
 pre_init(parac_module* mod) {
   assert(mod);
-  assert(mod->runner);
+  assert(mod->communicator);
   assert(mod->handle);
   assert(mod->handle->config);
+
+  mod->communicator->tcp_acceptor_active = false;
+  mod->communicator->connect_to_remote = &connect_to_remote;
 
   CommunicatorUserdata* userdata =
     static_cast<CommunicatorUserdata*>(mod->userdata);

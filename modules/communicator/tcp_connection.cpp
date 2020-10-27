@@ -82,6 +82,7 @@ struct TCPConnection::SendQueueEntry {
     : transmitMode(TransmitACK) {
     header.kind = PARAC_MESSAGE_ACK;
     header.ack_status = status;
+    header.number = id;
   }
 
   using value_type =
@@ -167,6 +168,7 @@ struct TCPConnection::State {
   std::unique_ptr<boost::asio::ip::tcp::socket> socket;
 
   std::vector<char> recvBuf;
+  std::atomic_uint16_t connectionTry = 0;
   boost::asio::streambuf sendStreambuf = boost::asio::streambuf();
   boost::asio::steady_timer steadyTimer;
 
@@ -201,7 +203,6 @@ struct TCPConnection::State {
 
   Lifecycle lifecycle = Initializing;
   std::atomic_bool currentlySending = true;
-  std::atomic_uint16_t connectionTry = 0;
 };
 
 TCPConnection::TCPConnection(
@@ -435,6 +436,7 @@ TCPConnection::compute_node_free_func(parac_compute_node* n) {
       conn->m_state->compute_node = nullptr;
     }
     conn->send(EndTag());
+    delete conn;
     n->communicator_userdata = nullptr;
   }
 }

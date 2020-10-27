@@ -25,11 +25,11 @@ struct TCPAcceptor::Internal {
   std::unique_ptr<boost::asio::ip::tcp::acceptor> acceptor;
   std::unique_ptr<boost::asio::ip::tcp::socket> newSocket;
 
-  std::string listenAddress;
-  uint16_t listenPort;
-
   Service& service;
   boost::asio::coroutine coro;
+
+  std::string listenAddress;
+  uint16_t listenPort;
 };
 
 TCPAcceptor::TCPAcceptor() {}
@@ -55,8 +55,9 @@ TCPAcceptor::start(Service& service,
   m_internal->acceptor = std::make_unique<boost::asio::ip::tcp::acceptor>(
     service.ioContext(), m_internal->endpoint.protocol());
 
+  auto comm = service.handle().modules[PARAC_MOD_COMMUNICATOR]->communicator;
+
   if(service.automaticListenPortAssignment()) {
-    auto comm = service.handle().modules[PARAC_MOD_COMMUNICATOR]->communicator;
     bool portFound = false;
 
     for(auto port = m_internal->endpoint.port();
@@ -113,6 +114,8 @@ TCPAcceptor::start(Service& service,
             PARAC_DEBUG,
             "Starting TCPAcceptor on endpoint {}.",
             m_internal->endpoint);
+
+  comm->tcp_acceptor_active = true;
 
   loop(boost::system::error_code());
 
