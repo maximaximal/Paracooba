@@ -402,6 +402,7 @@ TCPConnection::handleReceivedMessage() {
     d->status = status;
     d->returned = true;
   };
+  assert(msg.data);
   m_state->compute_node->receive_message_from(m_state->compute_node, &msg);
 
   // Callback must be called immediately! This gives the status that is
@@ -494,7 +495,7 @@ TCPConnection::compute_node_send_file_to_func(parac_compute_node* n,
 }
 
 #define BUF(SOURCE) boost::asio::buffer(&SOURCE, sizeof(SOURCE))
-#define VBUF(SOURCE) boost::asio::buffer(SOURCE.data(), SOURCE.size())
+#define VBUF(SOURCE) boost::asio::buffer(SOURCE)
 
 #include <boost/asio/yield.hpp>
 void
@@ -644,7 +645,8 @@ TCPConnection::readHandler(boost::system::error_code ec,
         m_state->recvBuf.resize(m_state->readHeader.size);
         yield async_read(*m_state->socket, VBUF(m_state->recvBuf), rh);
 
-        if(ec || bytes_received != m_state->readHeader.size) {
+        if(ec || bytes_received != m_state->readHeader.size ||
+           bytes_received != m_state->recvBuf.size()) {
           parac_log(
             PARAC_COMMUNICATOR,
             PARAC_LOCALERROR,

@@ -58,6 +58,11 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   n2->receive_message_from = [](parac_compute_node* remote,
                                 parac_message* msg) {
     (void)remote;
+    assert(remote);
+    assert(msg->data);
+    assert(msg->data[0] == 1);
+    assert(msg->data[1] == 2);
+    assert(msg->data[2] == 3);
     msg->cb(msg, PARAC_OK);
   };
 

@@ -54,14 +54,8 @@ class parac_message_wrapper : public parac_message {
     data_to_be_freed = msg.data_to_be_freed;
     userdata = msg.userdata;
     cb = msg.cb;
-
-    msg.data = nullptr;
-    msg.cb = nullptr;
-    msg.length = 0;
-    msg.data_to_be_freed = false;
-    msg.userdata = nullptr;
   }
-  ~parac_message_wrapper() {}
+  ~parac_message_wrapper() = default;
 
   void doCB(parac_status status) {
     if(cb)
