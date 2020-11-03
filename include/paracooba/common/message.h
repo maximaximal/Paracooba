@@ -14,7 +14,7 @@ extern "C" {
 
 struct parac_message;
 
-typedef void (*parac_message_cb)(struct parac_message*, void*, parac_status);
+typedef void (*parac_message_cb)(struct parac_message*, parac_status);
 
 typedef struct parac_message {
   parac_message_kind kind;
@@ -47,9 +47,26 @@ class parac_message_wrapper : public parac_message {
     userdata = msg.userdata;
     cb = msg.cb;
   }
-  ~parac_message_wrapper() { doCB(PARAC_TO_BE_DELETED); }
+  parac_message_wrapper(parac_message&& msg) noexcept {
+    kind = msg.kind;
+    data = msg.data;
+    length = msg.length;
+    data_to_be_freed = msg.data_to_be_freed;
+    userdata = msg.userdata;
+    cb = msg.cb;
 
-  void doCB(parac_status status) { cb(this, userdata, status); }
+    msg.data = nullptr;
+    msg.cb = nullptr;
+    msg.length = 0;
+    msg.data_to_be_freed = false;
+    msg.userdata = nullptr;
+  }
+  ~parac_message_wrapper() {}
+
+  void doCB(parac_status status) {
+    if(cb)
+      cb(this, status);
+  }
 };
 #endif
 

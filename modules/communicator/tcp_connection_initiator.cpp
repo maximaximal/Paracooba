@@ -94,6 +94,9 @@ struct TCPConnectionInitiator::State {
   boost::asio::steady_timer timer;
   int connectionTry;
   bool retry = false;
+  using TCPConnectionPayloadPtr =
+    std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>;
+  TCPConnectionPayloadPtr payload = TCPConnectionPayloadPtr(nullptr, nullptr);
 
   std::variant<HostConnection, EndpointConnection> conn;
 
@@ -165,6 +168,12 @@ TCPConnectionInitiator::~TCPConnectionInitiator() {
     m_state->timer.async_wait(
       std::bind(&TCPConnectionInitiator::retryConnection, *this));
   }
+}
+
+void
+TCPConnectionInitiator::setTCPConnectionPayload(
+  State::TCPConnectionPayloadPtr payload) {
+  m_state->payload = std::move(payload);
 }
 
 void
@@ -260,8 +269,10 @@ TCPConnectionInitiator::try_connecting_to_host(
                   m_state->host(),
                   m_state->socket->remote_endpoint());
 
-        TCPConnection(
-          m_state->service, std::move(m_state->socket), m_state->connectionTry);
+        TCPConnection(m_state->service,
+                      std::move(m_state->socket),
+                      m_state->connectionTry,
+                      std::move(m_state->payload));
         return;
       }
     }

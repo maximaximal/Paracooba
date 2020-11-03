@@ -16,6 +16,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/system/error_code.hpp>
 #include <chrono>
+#include <cstdarg>
 #include <functional>
 #include <mutex>
 
@@ -42,40 +43,45 @@ struct TCPConnection::InitiatorMessage {
   parac_id sender_id;
 };
 
+using TCPConnectionSendQueue = std::queue<TCPConnection::SendQueueEntry>;
+using TCPConnectionSentMap =
+  std::map<decltype(PacketHeader::number), TCPConnection::SendQueueEntry>;
+
+struct TCPConnectionPayload {
+  TCPConnectionPayload(TCPConnectionSendQueue&& q, TCPConnectionSentMap&& m)
+    : queue(std::move(q))
+    , map(std::move(m)) {}
+
+  TCPConnectionSendQueue queue;
+  TCPConnectionSentMap map;
+};
+
+void
+TCPConnectionPayloadDestruct(TCPConnectionPayload* payload) {
+  delete payload;
+}
+
 struct TCPConnection::SendQueueEntry {
-  SendQueueEntry(parac_message& msg)
-    : value(msg)
-    , transmitMode(TransmitMessage) {
-    header.kind = msg.kind;
-  }
-  SendQueueEntry(parac_message&& msg)
+  SendQueueEntry(const SendQueueEntry& e) = delete;
+  SendQueueEntry(SendQueueEntry&& e) = default;
+
+  SendQueueEntry(parac_message&& msg) noexcept
     : value(std::move(msg))
     , transmitMode(TransmitMessage) {
     header.kind = msg.kind;
+    header.size = msg.length;
   }
-
-  SendQueueEntry(parac_file& file)
-    : value(file)
-    , transmitMode(TransmitFile) {
-    header.kind = PARAC_MESSAGE_FILE;
-    header.size = FileSender::file_size(file.path);
-  }
-  SendQueueEntry(parac_file&& file)
+  SendQueueEntry(parac_file&& file) noexcept
     : value(std::move(file))
     , transmitMode(TransmitFile) {
     header.kind = PARAC_MESSAGE_FILE;
     header.size = FileSender::file_size(file.path);
   }
-
-  SendQueueEntry(EndTag& end)
-    : value(end)
-    , transmitMode(TransmitEnd) {
-    header.kind = PARAC_MESSAGE_END;
-  }
-  SendQueueEntry(EndTag&& end)
+  SendQueueEntry(EndTag&& end) noexcept
     : value(std::move(end))
     , transmitMode(TransmitEnd) {
     header.kind = PARAC_MESSAGE_END;
+    header.size = 0;
   }
 
   SendQueueEntry(uint32_t id, parac_status status)
@@ -83,10 +89,12 @@ struct TCPConnection::SendQueueEntry {
     header.kind = PARAC_MESSAGE_ACK;
     header.ack_status = status;
     header.number = id;
+    header.size = 0;
   }
 
   using value_type =
     std::variant<parac_message_wrapper, parac_file_wrapper, EndTag, ACKTag>;
+
   PacketHeader header;
   value_type value;
   TransmitMode transmitMode;
@@ -100,16 +108,16 @@ struct TCPConnection::SendQueueEntry {
   parac_file_wrapper& file() { return std::get<parac_file_wrapper>(value); }
 
   void operator()(parac_status status) {
-    std::visit(
-      [this, status](auto&& v) {
-        using T = std::decay_t<decltype(v)>;
-        if constexpr(std::is_same_v<T, parac_message_wrapper>)
-          v.doCB(status);
-      },
-      value);
+    switch(transmitMode) {
+      case TransmitMessage:
+        message().doCB(status);
+        break;
+      default:
+        break;
+    }
   }
 
-  ~SendQueueEntry() { (*this)(PARAC_CONNECTION_CLOSED); }
+  ~SendQueueEntry() {}
 };
 
 struct TCPConnection::State {
@@ -121,6 +129,17 @@ struct TCPConnection::State {
     , steadyTimer(service.ioContext())
     , connectionTry(connectionTry)
     , writeInitiatorMessage({ service.handle().id }) {}
+  explicit State(Service& service,
+                 std::unique_ptr<boost::asio::ip::tcp::socket> socket,
+                 int connectionTry,
+                 TCPConnectionPayloadPtr ptr)
+    : service(service)
+    , socket(std::move(socket))
+    , steadyTimer(service.ioContext())
+    , connectionTry(connectionTry)
+    , writeInitiatorMessage({ service.handle().id })
+    , sendQueue(std::move(ptr->queue))
+    , sentBuffer(std::move(ptr->map)) {}
 
   ~State() {
     if(compute_node) {
@@ -144,10 +163,21 @@ struct TCPConnection::State {
                       connectionTry);
             TCPConnectionInitiator initiator(
               service, socket->remote_endpoint(), nullptr, ++connectionTry);
+
+            initiator.setTCPConnectionPayload(generatePayload());
           }
           break;
         }
         case EndAfterShutdown:
+          // Notify all items still in queue that the connection has been closed
+          // and transmission was unsuccessful.
+          while(!sendQueue.empty()) {
+            sendQueue.front()(PARAC_CONNECTION_CLOSED);
+            sendQueue.pop();
+          }
+          for(auto& e : sentBuffer) {
+            e.second(PARAC_CONNECTION_CLOSED);
+          }
           break;
       }
     }
@@ -168,17 +198,14 @@ struct TCPConnection::State {
   std::unique_ptr<boost::asio::ip::tcp::socket> socket;
 
   std::vector<char> recvBuf;
-  std::atomic_uint16_t connectionTry = 0;
-  boost::asio::streambuf sendStreambuf = boost::asio::streambuf();
   boost::asio::steady_timer steadyTimer;
+  std::atomic_uint16_t connectionTry = 0;
 
   TransmitMode transmitMode = TransmitInit;
   ResumeMode resumeMode = EndAfterShutdown;
 
   boost::asio::coroutine writeCoro;
   std::mutex sendQueueMutex;
-  std::queue<SendQueueEntry> sendQueue;
-  std::map<decltype(PacketHeader::number), SendQueueEntry> sentBuffer;
   InitiatorMessage writeInitiatorMessage;
 
   boost::asio::coroutine readCoro;
@@ -201,16 +228,31 @@ struct TCPConnection::State {
     return 0;
   }
 
+  TCPConnectionPayloadPtr generatePayload() {
+    return TCPConnectionPayloadPtr(
+      new TCPConnectionPayload(std::move(sendQueue), std::move(sentBuffer)),
+      &TCPConnectionPayloadDestruct);
+  }
+
   Lifecycle lifecycle = Initializing;
   std::atomic_bool currentlySending = true;
+
+  std::queue<SendQueueEntry> sendQueue;
+  std::map<decltype(PacketHeader::number), SendQueueEntry> sentBuffer;
 };
 
 TCPConnection::TCPConnection(
   Service& service,
   std::unique_ptr<boost::asio::ip::tcp::socket> socket,
-  int connectionTry)
-  : m_state(
-      std::make_shared<State>(service, std::move(socket), connectionTry)) {
+  int connectionTry,
+  TCPConnectionPayloadPtr ptr) {
+  if(ptr) {
+    m_state = std::make_shared<State>(
+      service, std::move(socket), connectionTry, std::move(ptr));
+  } else {
+    m_state =
+      std::make_shared<State>(service, std::move(socket), connectionTry);
+  }
 
   writeHandler(boost::system::error_code(), 0);
   readHandler(boost::system::error_code(), 0);
@@ -242,20 +284,9 @@ TCPConnection::~TCPConnection() {
 }
 
 void
-TCPConnection::send(parac_message& message) {
-  send(std::move(SendQueueEntry(message)));
-}
-void
-TCPConnection::send(parac_file& file) {
-  send(SendQueueEntry(file));
-}
-void
-TCPConnection::send(EndTag& end) {
-  send(SendQueueEntry(end));
-}
-void
-TCPConnection::send(parac_message&& file) {
-  send(SendQueueEntry(std::move(file)));
+TCPConnection::send(parac_message&& message) {
+  assert(message.cb);
+  send(SendQueueEntry(std::move(message)));
 }
 void
 TCPConnection::send(parac_file&& file) {
@@ -274,8 +305,10 @@ void
 TCPConnection::send(SendQueueEntry&& e) {
   {
     std::lock_guard lock(m_state->sendQueueMutex);
-    e.header.number = m_state->sendMessageNumber++;
-    m_state->sendQueue.push(std::move(e));
+    if(e.header.kind != PARAC_MESSAGE_ACK) {
+      e.header.number = m_state->sendMessageNumber++;
+    }
+    m_state->sendQueue.emplace(std::move(e));
   }
   if(!m_state->currentlySending) {
     writeHandler(boost::system::error_code(), 0);
@@ -344,7 +377,8 @@ TCPConnection::handleReceivedACK(const PacketHeader& ack) {
     return false;
   }
   auto& sentItem = it->second;
-  sentItem(PARAC_OK);
+  sentItem(ack.ack_status);
+  sentItem(PARAC_TO_BE_DELETED);
   m_state->sentBuffer.erase(it);
   return true;
 }
@@ -362,12 +396,12 @@ TCPConnection::handleReceivedMessage() {
   msg.length = m_state->readHeader.size;
   msg.data = static_cast<char*>(m_state->recvBuf.data());
   msg.data_to_be_freed = false;
-  msg.cb = [](parac_message* msg, void* userdata, parac_status status) {
-    data* d = static_cast<data*>(userdata);
+  msg.userdata = &d;
+  msg.cb = [](parac_message* msg, parac_status status) {
+    data* d = static_cast<data*>(msg->userdata);
     d->status = status;
     d->returned = true;
   };
-  msg.userdata = &d;
   m_state->compute_node->receive_message_from(m_state->compute_node, &msg);
 
   // Callback must be called immediately! This gives the status that is
@@ -447,7 +481,7 @@ TCPConnection::compute_node_send_message_to_func(parac_compute_node* n,
   assert(n);
   assert(n->communicator_userdata);
   TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
-  conn->send(*msg);
+  conn->send(std::move(*msg));
 }
 
 void
@@ -456,7 +490,7 @@ TCPConnection::compute_node_send_file_to_func(parac_compute_node* n,
   assert(n);
   assert(n->communicator_userdata);
   TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
-  conn->send(*file);
+  conn->send(std::move(*file));
 }
 
 #define BUF(SOURCE) boost::asio::buffer(&SOURCE, sizeof(SOURCE))
@@ -474,6 +508,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
 
   if(shouldHandlerBeEnded()) {
     return;
+  }
+
+  if(m_state->compute_node) {
+    m_state->compute_node->bytes_received += bytes_received;
   }
 
   reenter(&m_state->readCoro) {
@@ -643,6 +681,10 @@ TCPConnection::writeHandler(boost::system::error_code ec,
     e = &m_state->sendQueue.front();
   }
 
+  if(m_state->compute_node) {
+    m_state->compute_node->bytes_sent += bytes_transferred;
+  }
+
   // Defined up here in order to be created when sending files. When it is
   // deleted, it has already been copied internally and carries on the reference
   // to this connection's state.
@@ -713,7 +755,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
                     PARAC_LOCALERROR,
                     "Error when sending message to remote ID {}! Error: {}",
                     m_state->remoteId(),
-                    ec);
+                    ec.message());
           return;
         }
       }

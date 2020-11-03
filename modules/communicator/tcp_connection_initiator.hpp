@@ -12,6 +12,7 @@ class error_code;
 namespace parac::communicator {
 class Service;
 class TCPConnection;
+struct TCPConnectionPayload;
 
 class TCPConnectionInitiator {
   public:
@@ -32,6 +33,10 @@ class TCPConnectionInitiator {
     const ::boost::system::error_code& ec,
     ::boost::asio::ip::tcp::resolver::iterator endpoint_iterator);
   void try_connecting_to_endpoint(const ::boost::system::error_code& ec);
+
+  void setTCPConnectionPayload(
+    std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>
+      payload);
 
   private:
   struct State;

@@ -21,6 +21,9 @@ class error_code;
 namespace parac::communicator {
 class Service;
 class PacketHeader;
+struct TCPConnectionPayload;
+using TCPConnectionPayloadPtr =
+  std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>;
 
 /** @brief Class representing a connection between two compute nodes.
  *
@@ -44,22 +47,22 @@ class TCPConnection {
 
   /** @brief Initialize a paracooba connection on an opened socket.
    */
-  explicit TCPConnection(Service& service,
-                         std::unique_ptr<boost::asio::ip::tcp::socket> socket,
-                         int connectionTry = 0);
+  explicit TCPConnection(
+    Service& service,
+    std::unique_ptr<boost::asio::ip::tcp::socket> socket,
+    int connectionTry = 0,
+    TCPConnectionPayloadPtr ptr = TCPConnectionPayloadPtr(nullptr, nullptr));
   ~TCPConnection();
 
-  void send(parac_message& message);
-  void send(parac_file& file);
-  void send(EndTag& end);
   void send(parac_message&& message);
   void send(parac_file&& file);
   void send(EndTag&& end);
   void sendACK(uint32_t id, parac_status status);
 
+  struct SendQueueEntry;
+
   private:
   struct InitiatorMessage;
-  struct SendQueueEntry;
   struct State;
   std::shared_ptr<State> m_state;
 

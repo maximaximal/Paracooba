@@ -59,6 +59,9 @@ typedef struct parac_compute_node {
 
   void* broker_userdata;      /// Set by Broker.
   void* communicator_userdata;/// Set by Communicator.
+
+  uint32_t bytes_sent;
+  uint32_t bytes_received;
 } parac_compute_node;
 
 #ifdef __cplusplus

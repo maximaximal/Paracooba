@@ -17,6 +17,8 @@ target_link_libraries(parac_executable PUBLIC distrac parac_modules Boost::files
 target_include_directories(parac_executable PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_include_directories(parac_executable PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/../)
 
+add_dependencies(parac_executable distrac distrac-codegen)
+
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/../distrac_paracooba.h
     MAIN_DEPENDENCY ${CMAKE_CURRENT_BINARY_DIR}/../../Paracooba.distracdef

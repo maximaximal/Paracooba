@@ -26,7 +26,7 @@ if(STATIC_BUILDS)
     # other paracooba modules, so testing code is
     # linked to all other modules.
     target_link_libraries(parac_test
-        parac_communicator
+        parac_modules
         parac_broker_static
         parac_runner_static
         parac_solver_static
