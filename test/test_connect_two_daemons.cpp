@@ -36,7 +36,7 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   REQUIRE(n1->send_message_to);
   REQUIRE(n2->send_message_to);
 
-  bool message_cb_called[3] = {false, false, false};
+  bool message_cb_called[3] = { false, false, false };
 
   parac_message_wrapper msg;
   char data[3] = { 1, 2, 3 };
@@ -60,11 +60,13 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
     (void)remote;
     assert(remote);
     assert(msg->data);
+    assert(msg->length == 3);
     assert(msg->data[0] == 1);
     assert(msg->data[1] == 2);
     assert(msg->data[2] == 3);
     msg->cb(msg, PARAC_OK);
   };
+  n1->receive_message_from = n2->receive_message_from;
 
   REQUIRE(!message_cb_called[0]);
   REQUIRE(!message_cb_called[1]);
@@ -77,4 +79,23 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   REQUIRE(message_cb_called[0]);
   REQUIRE(message_cb_called[1]);
   REQUIRE(message_cb_called[2]);
+
+  int counter = 0;
+  msg.kind = PARAC_MESSAGE_ONLINE_ANNOUNCEMENT;
+  msg.userdata = &counter;
+  msg.cb = [](parac_message* msg, parac_status status) {
+    (void)status;
+    int* counter = static_cast<int*>(msg->userdata);
+    (*counter) += 1;
+  };
+
+  const size_t send_count = 20;
+
+  for(size_t i = 0; i < send_count; ++i) {
+    n1->send_message_to(n1, &msg);
+  }
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(3));
+
+  REQUIRE(counter == 2 * send_count);
 }

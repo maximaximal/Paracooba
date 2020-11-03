@@ -57,6 +57,9 @@ class TCPConnection {
   void send(parac_message&& message);
   void send(parac_file&& file);
   void send(EndTag&& end);
+  void send(parac_message& message);
+  void send(parac_file& file);
+  void send(EndTag& end);
   void sendACK(uint32_t id, parac_status status);
 
   struct SendQueueEntry;

@@ -261,6 +261,11 @@ TCPConnectionInitiator::try_connecting_to_host(
         m_state->socket =
           std::move(std::make_unique<boost::asio::ip::tcp::socket>(
             m_state->service.ioContext()));
+
+        {
+          boost::asio::ip::tcp::no_delay option(true);
+          m_state->socket->set_option(option);
+        }
       } else {
         parac_log(PARAC_COMMUNICATOR,
                   PARAC_TRACE,
