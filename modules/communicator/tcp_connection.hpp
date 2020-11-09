@@ -46,6 +46,11 @@ class TCPConnection {
   struct ACKTag;
 
   /** @brief Initialize a paracooba connection on an opened socket.
+   * @param service The Service to use.
+   * @param service socket Initialized socket to capture for this connection
+   * (from either TCPConnectionInitiator or TCPAcceptor).
+   * @param connectionTry Number of retries to establish connection (>0) when
+   * used from TCPConnectionInitiator, -1 when initialized from TCPAcceptor.
    */
   explicit TCPConnection(
     Service& service,

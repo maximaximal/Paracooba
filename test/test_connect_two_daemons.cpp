@@ -1,7 +1,11 @@
+#define PARAC_LOG_INCLUDE_FMT
+
 #include "mocks.hpp"
 #include "paracooba/common/log.h"
 #include "paracooba/common/message_kind.h"
 #include "paracooba/common/status.h"
+
+#include "paracooba/common/log.h"
 
 #include <catch2/catch.hpp>
 #include <chrono>
@@ -74,7 +78,7 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
 
   n1->send_message_to(n1, &msg);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
   REQUIRE(message_cb_called[0]);
   REQUIRE(message_cb_called[1]);
@@ -92,10 +96,19 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   const size_t send_count = 20;
 
   for(size_t i = 0; i < send_count; ++i) {
-    n1->send_message_to(n1, &msg);
+    // n1->send_message_to(n1, &msg);
   }
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(3));
+  std::this_thread::sleep_for(std::chrono::milliseconds(15));
+
+  // REQUIRE(counter == 2 * send_count);
+
+  counter = 0;
+  for(size_t i = 0; i < send_count; ++i) {
+    n2->send_message_to(n2, &msg);
+  }
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(15));
 
   REQUIRE(counter == 2 * send_count);
 }

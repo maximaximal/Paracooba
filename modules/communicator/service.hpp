@@ -1,6 +1,7 @@
 #pragma once
 
 #include "paracooba/common/status.h"
+#include "paracooba/common/types.h"
 #include <boost/version.hpp>
 #include <memory>
 
@@ -17,6 +18,10 @@ struct parac_handle;
 struct parac_config_entry;
 
 namespace parac::communicator {
+struct TCPConnectionPayload;
+using TCPConnectionPayloadPtr =
+  std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>;
+
 enum Config {
   TEMPORARY_DIRECTORY,
   LISTEN_ADDRESS,
@@ -58,7 +63,11 @@ class Service {
 
   parac_handle& handle() { return m_handle; }
 
-  void connectToRemote(const std::string &remote);
+  void connectToRemote(const std::string& remote);
+
+  void registerTCPConnectionPayload(parac_id id,
+                                    TCPConnectionPayloadPtr payload);
+  TCPConnectionPayloadPtr retrieveTCPConnectionPayload(parac_id id);
 
   private:
   parac_status run();

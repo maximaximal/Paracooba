@@ -150,8 +150,9 @@ TCPAcceptor::loop(const boost::system::error_code& ec) {
                     m_internal->newSocket->remote_endpoint());
 
           m_internal->newSocket->non_blocking(true);
+          m_internal->newSocket->set_option(boost::asio::ip::tcp::no_delay(true));
 
-          TCPConnection(m_internal->service, std::move(m_internal->newSocket));
+          TCPConnection(m_internal->service, std::move(m_internal->newSocket), -1);
         }
       }
     }

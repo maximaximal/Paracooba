@@ -38,6 +38,11 @@ class parac_file_wrapper : public parac_file {
     cb = f.cb;
   };
   ~parac_file_wrapper() { parac_file_free(this); }
+
+  void doCB(parac_status status) {
+    if(cb)
+      cb(this, status);
+  }
 };
 #endif
 

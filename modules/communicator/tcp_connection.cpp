@@ -130,6 +130,9 @@ struct TCPConnection::SendQueueEntry {
       case TransmitMessage:
         message().doCB(status);
         break;
+      case TransmitFile:
+        file().doCB(status);
+        break;
       default:
         break;
     }
@@ -146,7 +149,11 @@ struct TCPConnection::State {
     , socket(std::move(socket))
     , steadyTimer(service.ioContext())
     , connectionTry(connectionTry)
-    , writeInitiatorMessage({ service.handle().id }) {}
+    , writeInitiatorMessage({ service.handle().id }) {
+    if(connectionTry < 0) {
+      resumeMode = EndAfterShutdown;
+    }
+  }
   explicit State(Service& service,
                  std::unique_ptr<boost::asio::ip::tcp::socket> socket,
                  int connectionTry,
@@ -172,7 +179,11 @@ struct TCPConnection::State {
 
       switch(resumeMode) {
         case RestartAfterShutdown: {
-          if(connectionTry < service.connectionRetries()) {
+          if(connectionTry >= 0 &&
+             connectionTry < service.connectionRetries()) {
+            // Reconnects only happen if this side of the connection is the
+            // original initiating side. The other side will end the connection.
+
             parac_log(PARAC_COMMUNICATOR,
                       PARAC_TRACE,
                       "Reconnect to endpoint {} (remote id {}), try {}.",
@@ -183,12 +194,14 @@ struct TCPConnection::State {
               service, socket->remote_endpoint(), nullptr, ++connectionTry);
 
             initiator.setTCPConnectionPayload(generatePayload());
+          } else if(connectionTry == -1 && remoteId() != 0) {
+            service.registerTCPConnectionPayload(remoteId(), generatePayload());
           }
           break;
         }
         case EndAfterShutdown:
-          // Notify all items still in queue that the connection has been closed
-          // and transmission was unsuccessful.
+          // Notify all items still in queue that the connection has been
+          // closed and transmission was unsuccessful.
           while(!sendQueue.empty()) {
             sendQueue.front()(PARAC_CONNECTION_CLOSED);
             sendQueue.pop();
@@ -217,7 +230,7 @@ struct TCPConnection::State {
 
   std::vector<char> recvBuf;
   boost::asio::steady_timer steadyTimer;
-  std::atomic_uint16_t connectionTry = 0;
+  std::atomic_int connectionTry = 0;
 
   TransmitMode transmitMode = TransmitInit;
   ResumeMode resumeMode = EndAfterShutdown;
@@ -253,7 +266,7 @@ struct TCPConnection::State {
   }
 
   Lifecycle lifecycle = Initializing;
-  std::atomic_bool currentlySending = true;
+  std::atomic_flag currentlySending = true;
 
   std::queue<SendQueueEntry> sendQueue;
   std::map<decltype(PacketHeader::number), SendQueueEntry> sentBuffer;
@@ -271,6 +284,10 @@ TCPConnection::TCPConnection(
     m_state =
       std::make_shared<State>(service, std::move(socket), connectionTry);
   }
+
+  // Set at beginning, only unset if write_handler yields. Set again at
+  // send(SendQueueItem&).
+  m_state->currentlySending.test_and_set();
 
   writeHandler(boost::system::error_code(), 0);
   readHandler(boost::system::error_code(), 0);
@@ -339,7 +356,7 @@ TCPConnection::send(SendQueueEntry&& e) {
     }
     m_state->sendQueue.emplace(std::move(e));
   }
-  if(!m_state->currentlySending) {
+  if(!m_state->currentlySending.test_and_set()) {
     writeHandler(boost::system::error_code(), 0);
   }
 }
@@ -400,12 +417,14 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
 
 bool
 TCPConnection::handleReceivedACK(const PacketHeader& ack) {
+
   std::unique_lock lock(m_state->sendQueueMutex);
   auto it = m_state->sentBuffer.find(ack.number);
   if(it == m_state->sentBuffer.end()) {
     return false;
   }
   auto& sentItem = it->second;
+  assert(sentItem.message().cb);
   sentItem(ack.ack_status);
   sentItem(PARAC_TO_BE_DELETED);
   m_state->sentBuffer.erase(it);
@@ -426,6 +445,7 @@ TCPConnection::handleReceivedMessage() {
   msg.data = static_cast<char*>(m_state->recvBuf.data());
   msg.data_to_be_freed = false;
   msg.userdata = &d;
+  msg.origin = m_state->remoteId();
   msg.cb = [](parac_message* msg, parac_status status) {
     data* d = static_cast<data*>(msg->userdata);
     d->status = status;
@@ -537,6 +557,13 @@ TCPConnection::readHandler(boost::system::error_code ec,
                       std::placeholders::_2);
 
   if(shouldHandlerBeEnded()) {
+    return;
+  }
+
+  if(ec == boost::asio::error::eof) {
+    // End of file detected. This means the connection should shut down
+    // cleanly, without bloating the exception handling in the internal loop.
+    // Eventual reconnects are handled by destructors.
     return;
   }
 
@@ -748,10 +775,9 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
     while(true) {
       while(m_state->sendQueue.empty()) {
-        m_state->currentlySending = false;
+        m_state->currentlySending.clear();
         yield;
       }
-      m_state->currentlySending = true;
       e = &m_state->sendQueue.front();
 
       assert(e);
@@ -801,10 +827,13 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
       {
         std::unique_lock lock(m_state->sendQueueMutex);
-        auto n = e->header.number;
-        e->sent = std::chrono::steady_clock::now();
-        m_state->sentBuffer.try_emplace(n,
-                                        std::move(m_state->sendQueue.front()));
+        if(e->header.kind != PARAC_MESSAGE_ACK &&
+           e->header.kind != PARAC_MESSAGE_END) {
+          auto n = e->header.number;
+          e->sent = std::chrono::steady_clock::now();
+          m_state->sentBuffer.try_emplace(
+            n, std::move(m_state->sendQueue.front()));
+        }
         m_state->sendQueue.pop();
       }
     }

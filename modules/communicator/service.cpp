@@ -1,9 +1,13 @@
+#include <atomic>
+#include <map>
+
 #include "service.hpp"
 #include "tcp_acceptor.hpp"
 #include "tcp_connection_initiator.hpp"
 #include "udp_acceptor.hpp"
 
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/steady_timer.hpp>
 
 #include <paracooba/common/config.h>
 #include <paracooba/common/log.h>
@@ -19,6 +23,10 @@ struct Service::Internal {
 
   std::unique_ptr<TCPAcceptor> tcpAcceptor;
   std::unique_ptr<UDPAcceptor> udpAcceptor;
+
+  std::map<parac_id,
+           std::pair<boost::asio::steady_timer, TCPConnectionPayloadPtr>>
+    connectionPayloads;
 };
 
 Service::Service(parac_handle& handle)
@@ -91,6 +99,42 @@ Service::connectToKnownRemotes() {
 void
 Service::connectToRemote(const std::string& remote) {
   TCPConnectionInitiator initiator(*this, remote);
+}
+
+void
+Service::registerTCPConnectionPayload(parac_id id,
+                                      TCPConnectionPayloadPtr payload) {
+  assert(id != 0);
+
+  decltype(Internal::connectionPayloads)::mapped_type entry{
+    boost::asio::steady_timer(ioContext()), std::move(payload)
+  };
+
+  entry.first.expires_from_now(std::chrono::milliseconds(retryTimeoutMS() * 4));
+  entry.first.async_wait([this, id](const boost::system::error_code& error) {
+    if(!error) {
+      auto ptr = retrieveTCPConnectionPayload(id);
+      if(ptr) {
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_TRACE,
+                  "TCPConnectionPayload for connection to {} expired and was "
+                  "invalidated.",
+                  id);
+      }
+    }
+  });
+  m_internal->connectionPayloads.insert({ id, std::move(entry) });
+}
+
+TCPConnectionPayloadPtr
+Service::retrieveTCPConnectionPayload(parac_id id) {
+  auto it = m_internal->connectionPayloads.find(id);
+  TCPConnectionPayloadPtr ptr(nullptr, nullptr);
+  if(it->second.second) {
+    ptr = std::move(it->second.second);
+    m_internal->connectionPayloads.erase(id);
+  }
+  return ptr;
 }
 
 io_context&

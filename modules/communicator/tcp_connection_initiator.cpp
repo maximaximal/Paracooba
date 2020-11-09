@@ -67,14 +67,14 @@ struct TCPConnectionInitiator::State {
         std::make_unique<boost::asio::ip::tcp::socket>(service.ioContext()))
     , timer(service.ioContext())
     , connectionTry(connectionTry)
-    , conn(
-        HostConnection{ host,
-                        port,
-                        boost::asio::ip::tcp::resolver(service.ioContext()),
-                        boost::asio::ip::tcp::resolver::query(
-                          host,
-                          std::to_string(port),
-                          boost::asio::ip::tcp::resolver::numeric_service) }) {}
+    , conn(HostConnection{ host,
+                           port,
+                           boost::asio::ip::tcp::resolver(service.ioContext()),
+                           boost::asio::ip::tcp::resolver::query(
+                             host,
+                             std::to_string(port),
+                             boost::asio::ip::tcp::resolver::numeric_service),
+                           boost::asio::ip::tcp::endpoint() }) {}
   State(Service& service,
         boost::asio::ip::tcp::endpoint endpoint,
         Callback cb,
@@ -258,9 +258,8 @@ TCPConnectionInitiator::try_connecting_to_host(
                   m_state->host(),
                   m_state->currentEndpoint(),
                   ec.message());
-        m_state->socket =
-          std::move(std::make_unique<boost::asio::ip::tcp::socket>(
-            m_state->service.ioContext()));
+        m_state->socket = std::make_unique<boost::asio::ip::tcp::socket>(
+          m_state->service.ioContext());
 
         {
           boost::asio::ip::tcp::no_delay option(true);

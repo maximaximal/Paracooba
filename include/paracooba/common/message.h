@@ -38,6 +38,7 @@ class parac_message_wrapper : public parac_message {
     data_to_be_freed = false;
     userdata = 0;
     cb = nullptr;
+    origin = 0;
   };
   parac_message_wrapper(const parac_message& msg) {
     kind = msg.kind;
@@ -46,6 +47,7 @@ class parac_message_wrapper : public parac_message {
     data_to_be_freed = msg.data_to_be_freed;
     userdata = msg.userdata;
     cb = msg.cb;
+    origin = msg.origin;
   }
   parac_message_wrapper(parac_message&& msg) noexcept {
     kind = msg.kind;
@@ -54,6 +56,7 @@ class parac_message_wrapper : public parac_message {
     data_to_be_freed = msg.data_to_be_freed;
     userdata = msg.userdata;
     cb = msg.cb;
+    origin = msg.origin;
   }
   ~parac_message_wrapper() = default;
 
