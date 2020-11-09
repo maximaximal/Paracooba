@@ -1,5 +1,5 @@
-#ifndef PARACOOBA_COMMON_PATH_H
-#define PARACOOBA_COMMON_PATH_H
+#ifndef PARACOOBA_COMMON_LOG_H
+#define PARACOOBA_COMMON_LOG_H
 
 #include "paracooba/common/status.h"
 #include "paracooba/common/types.h"

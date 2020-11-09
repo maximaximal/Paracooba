@@ -7,7 +7,7 @@
 #include <distrac/distrac.h>
 
 #include "CLI.hpp"
-#include "ModuleLoader.hpp"
+#include <paracooba/loader/ModuleLoader.hpp>
 
 #define DISTRAC_DEFINITION
 #include <distrac_paracooba.h>

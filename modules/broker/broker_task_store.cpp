@@ -57,6 +57,8 @@ TaskStore::size() const {
 }
 parac_task*
 TaskStore::newTask(parac_path path, parac_id originator) {
+  (void)originator;// Can at a later stage also be used to differentiate
+                   // insertion position.
   auto it = m_internal->tasks.emplace(std::lower_bound(
     m_internal->tasks.begin(),
     m_internal->tasks.end(),
@@ -66,9 +68,7 @@ TaskStore::newTask(parac_path path, parac_id originator) {
 }
 
 parac_task*
-TaskStore::pop_top() {
-
-}
+TaskStore::pop_top() {}
 parac_task*
 TaskStore::pop_bottom() {}
 

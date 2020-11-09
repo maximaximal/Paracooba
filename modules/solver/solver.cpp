@@ -1,4 +1,7 @@
 #include "paracooba/common/log.h"
+#include "paracooba/common/task_store.h"
+#include <paracooba/broker/broker.h>
+#include <paracooba/common/path.h>
 #include <paracooba/module.h>
 
 #include <cassert>
@@ -10,6 +13,23 @@
 #define SOLVER_VERSION_MINOR 0
 #define SOLVER_VERSION_PATCH 0
 #define SOLVER_VERSION_TWEAK 0
+
+static parac_status
+create_parser_task(parac_module& mod) {
+  assert(mod.handle);
+  assert(mod.handle->input_file);
+
+  assert(mod.handle->modules[PARAC_MOD_BROKER]);
+  auto& broker = *mod.handle->modules[PARAC_MOD_BROKER]->broker;
+  assert(broker.task_store);
+  auto& task_store = *broker.task_store;
+
+  parac_task* task =
+    task_store.new_task(&task_store, paracooba::Path(), mod.handle->id);
+  assert(task);
+
+  return PARAC_OK;
+}
 
 static parac_status
 pre_init(parac_module* mod) {
@@ -30,7 +50,7 @@ init(parac_module* mod) {
   assert(mod->handle->thread_registry);
 
   /* The solver is responsible to create the initial task and to announce the
-   * result All actual solving happens in this module.
+   * result. All actual solving happens in this module.
    *
    * As everything is started now, the initial task can be created. This initial
    * task is the ParserTask. Atferwards, SolverTask instances are created, that
@@ -42,7 +62,9 @@ init(parac_module* mod) {
    * then ends processing.
    */
 
-  return PARAC_OK;
+  parac_status status = create_parser_task(*mod);
+
+  return status;
 }
 
 static parac_status

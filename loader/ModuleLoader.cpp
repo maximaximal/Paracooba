@@ -1,11 +1,12 @@
-#include "ModuleLoader.hpp"
+#include <paracooba/loader/ModuleLoader.hpp>
+
 #include "paracooba/module.h"
 #include <paracooba/common/log.h>
 
-#include "paracooba/broker/broker.h"
-#include "paracooba/communicator/communicator.h"
-#include "paracooba/runner/runner.h"
-#include "paracooba/solver/solver.h"
+#include <paracooba/broker/broker.h>
+#include <paracooba/communicator/communicator.h>
+#include <paracooba/runner/runner.h>
+#include <paracooba/solver/solver.h>
 
 #include <boost/asio/coroutine.hpp>
 
@@ -14,6 +15,10 @@
 #include <boost/dll/shared_library_load_mode.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/system/system_error.hpp>
+
+#include "parac_loader_export.h"
+
+#include <variant>
 
 typedef parac_status (*parac_module_discover_func)(parac_handle*);
 extern parac_module_discover_func
@@ -61,6 +66,11 @@ struct PathSource : public boost::asio::coroutine {
 
 namespace paracooba {
 struct ModuleLoader::Internal {
+  Internal()
+    : storedHandle(parac_handle()) {}
+  Internal(parac_handle& externalHandle)
+    : storedHandle(&externalHandle) {}
+
   std::vector<
     boost::dll::detail::import_type<decltype(parac_module_discover)>::type>
     imports;
@@ -69,8 +79,26 @@ struct ModuleLoader::Internal {
   parac_module_runner runner;
   parac_module_solver solver;
   parac_module_communicator communicator;
+
+  std::variant<parac_handle, parac_handle*> storedHandle;
+
+  parac_handle& handle() {
+    if(storedHandle.index() == 0)
+      return std::get<parac_handle>(storedHandle);
+    else {
+      return *std::get<parac_handle*>(storedHandle);
+    }
+  }
+  const parac_handle& handle() const {
+    if(storedHandle.index() == 0)
+      return std::get<parac_handle>(storedHandle);
+    else {
+      return *std::get<parac_handle*>(storedHandle);
+    }
+  }
 };
 
+PARAC_LOADER_EXPORT
 ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
                            struct parac_config& config,
                            parac_id id,
@@ -78,18 +106,24 @@ ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
                            const char* hostName,
                            const char* inputFile)
   : m_internal(std::make_unique<Internal>()) {
-  m_handle.userdata = this;
-  m_handle.prepare = &ModuleLoader::prepare;
-  m_handle.thread_registry = &thread_registry;
-  m_handle.config = &config;
-  m_handle.offsetNS = 0;
-  m_handle.distrac = nullptr;
-  m_handle.id = id;
-  m_handle.local_name = localName;
-  m_handle.host_name = hostName;
-  m_handle.input_file = inputFile;
+  handle().userdata = this;
+  handle().prepare = &ModuleLoader::prepare;
+  handle().thread_registry = &thread_registry;
+  handle().config = &config;
+  handle().offsetNS = 0;
+  handle().distrac = nullptr;
+  handle().id = id;
+  handle().local_name = localName;
+  handle().host_name = hostName;
+  handle().input_file = inputFile;
 }
-ModuleLoader::~ModuleLoader() {
+PARAC_LOADER_EXPORT
+ModuleLoader::ModuleLoader(parac_handle& externalHandle)
+  : m_internal(std::make_unique<Internal>(externalHandle)) {
+  handle().userdata = this;
+  handle().prepare = &ModuleLoader::prepare;
+}
+PARAC_LOADER_EXPORT ModuleLoader::~ModuleLoader() {
   exit();
 }
 
@@ -108,7 +142,7 @@ ModuleLoader::load(parac_module_type type) {
 
       auto static_discover_func = parac_static_module_discover(type);
       if(static_discover_func) {
-        status = static_discover_func(&m_handle);
+        status = static_discover_func(&handle());
         auto& mod = *m_modules[type];
 
         parac_log(PARAC_LOADER,
@@ -124,7 +158,7 @@ ModuleLoader::load(parac_module_type type) {
                   status);
       } else {
         auto imported = ImportModuleDiscoverFunc(path, name);
-        status = imported(&m_handle);
+        status = imported(&handle());
         m_internal->imports.push_back(std::move(imported));
 
         auto& mod = *m_modules[type];
@@ -163,24 +197,30 @@ ModuleLoader::load(parac_module_type type) {
   return false;
 }
 
-struct parac_module_solver*
+PARAC_LOADER_EXPORT struct parac_module_solver*
 ModuleLoader::solver() {
   return &m_internal->solver;
 }
-struct parac_module_runner*
+PARAC_LOADER_EXPORT struct parac_module_runner*
 ModuleLoader::runner() {
   return &m_internal->runner;
 }
-struct parac_module_communicator*
+PARAC_LOADER_EXPORT struct parac_module_communicator*
 ModuleLoader::communicator() {
   return &m_internal->communicator;
 }
-struct parac_module_broker*
+PARAC_LOADER_EXPORT struct parac_module_broker*
 ModuleLoader::broker() {
   return &m_internal->broker;
 }
+PARAC_LOADER_EXPORT struct parac_module*
+ModuleLoader::mod(size_t mod) {
+  assert(mod < PARAC_MOD__COUNT);
+  assert(m_modules[mod]);
+  return m_modules[mod].get();
+}
 
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::load() {
   for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
     parac_module_type type = static_cast<parac_module_type>(i);
@@ -192,24 +232,24 @@ ModuleLoader::load() {
       switch(mod->type) {
         case PARAC_MOD_BROKER:
           mod->broker = broker();
-          m_handle.modules[PARAC_MOD_BROKER] = mod.get();
+          handle().modules[PARAC_MOD_BROKER] = mod.get();
           break;
         case PARAC_MOD_RUNNER:
           mod->runner = runner();
-          m_handle.modules[PARAC_MOD_RUNNER] = mod.get();
+          handle().modules[PARAC_MOD_RUNNER] = mod.get();
           break;
         case PARAC_MOD_SOLVER:
           mod->solver = solver();
-          m_handle.modules[PARAC_MOD_SOLVER] = mod.get();
+          handle().modules[PARAC_MOD_SOLVER] = mod.get();
           break;
         case PARAC_MOD_COMMUNICATOR:
           mod->communicator = communicator();
-          m_handle.modules[PARAC_MOD_COMMUNICATOR] = mod.get();
+          handle().modules[PARAC_MOD_COMMUNICATOR] = mod.get();
           break;
         case PARAC_MOD__COUNT:
           assert(false);
       }
-      mod->handle = &m_handle;
+      mod->handle = &handle();
     }
   }
   if(!isComplete()) {
@@ -272,53 +312,53 @@ RunFuncInAllModules(ModuleLoader::ModuleArray& modules,
   return success;
 }
 
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::pre_init() {
   return RunFuncInAllModules(
     m_modules, "pre_init", [](auto& p) { return p->pre_init; });
 }
 
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::init() {
   return RunFuncInAllModules(
     m_modules, "init", [](auto& p) { return p->init; });
 }
 
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::request_exit() {
   return RunFuncInAllModules(
     m_modules, "request_exit", [](auto& p) { return p->request_exit; });
 }
 
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::exit() {
   return RunFuncInAllModules(
     m_modules, "exit", [](auto& p) { return p->exit; });
 }
 
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::isComplete() {
   return hasSolver() && hasRunner() && hasCommunicator() && hasBroker();
 }
 
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::hasSolver() {
   return (bool)m_modules[PARAC_MOD_SOLVER];
 }
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::hasBroker() {
   return (bool)m_modules[PARAC_MOD_BROKER];
 }
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::hasRunner() {
   return (bool)m_modules[PARAC_MOD_RUNNER];
 }
-bool
+PARAC_LOADER_EXPORT bool
 ModuleLoader::hasCommunicator() {
   return (bool)m_modules[PARAC_MOD_COMMUNICATOR];
 }
 
-parac_module*
+PARAC_LOADER_EXPORT parac_module*
 ModuleLoader::prepare(parac_handle* handle, parac_module_type type) {
   assert(handle);
   assert(handle->userdata);
@@ -341,5 +381,14 @@ ModuleLoader::prepare(parac_handle* handle, parac_module_type type) {
   ptr->exit = nullptr;
 
   return ptr.get();
+}
+
+PARAC_LOADER_EXPORT parac_handle&
+ModuleLoader::handle() {
+  return m_internal->handle();
+}
+PARAC_LOADER_EXPORT const parac_handle&
+ModuleLoader::handle() const {
+  return m_internal->handle();
 }
 }

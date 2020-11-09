@@ -3,7 +3,7 @@ set(TEST_SRCS
 )
 
 set(INTEGRATION_TEST_SRCS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../executable/StaticModuleLoader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../loader/StaticModuleLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/test_connect_two_daemons.cpp
 )
 
@@ -25,13 +25,10 @@ if(STATIC_BUILDS)
     # Integration tests need to be linked to all
     # other paracooba modules, so testing code is
     # linked to all other modules.
-    target_link_libraries(parac_test
+    target_link_libraries(
+        parac_test
         parac_modules
-        parac_broker_static
-        parac_runner_static
-        parac_solver_static
-        parac_common_static
-        parac_communicator_static
+        parac_loader
         Boost::filesystem Boost::log
         fmt)
 endif()

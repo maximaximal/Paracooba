@@ -1,6 +1,8 @@
 #ifndef PARACOOBA_COMMON_TASK_STORE_H
 #define PARACOOBA_COMMON_TASK_STORE_H
 
+#include "types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -76,6 +76,14 @@ parac_log_init(parac_thread_registry* thread_registry) {
               << std::endl;
     return PARAC_GENERIC_ERROR;
   }
+
+  if(std::getenv("PARAC_LOG_DEBUG")) {
+    parac_log_set_severity(PARAC_DEBUG);
+  }
+  if(std::getenv("PARAC_LOG_TRACE")) {
+    parac_log_set_severity(PARAC_TRACE);
+  }
+
   return PARAC_OK;
 }
 

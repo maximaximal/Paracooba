@@ -70,10 +70,14 @@ class parac_task_wrapper : public parac_task {
     userdata = nullptr;
     work = nullptr;
     assess = nullptr;
+    free_userdata = nullptr;
     received_from = 0;
     offloaded_to = 0;
   }
-  ~parac_task_wrapper() { free_userdata(this); }
+  ~parac_task_wrapper() {
+    if(free_userdata)
+      free_userdata(this);
+  }
 
   bool stateActive(parac_task_state s) const { return state & s; }
 
