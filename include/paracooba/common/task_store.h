@@ -28,18 +28,23 @@ typedef struct parac_task* (*parac_task_store_pop_offload)(
   struct parac_compute_node*);
 typedef struct parac_task* (*parac_task_store_pop_work)(
   struct parac_task_store*);
+typedef void (*parac_task_store_ping_on_work)(struct parac_task_store*);
 
 typedef struct parac_task_store {
   parac_task_store_empty empty;
   parac_task_store_get_size get_size;
   parac_task_store_get_size get_waiting_for_children_size;
   parac_task_store_get_size get_waiting_for_worker_size;
+  parac_task_store_get_size get_tasks_being_worked_on_size;
   parac_task_store_new_task new_task;
   parac_task_store_pop_offload pop_offload;
   parac_task_store_pop_work pop_work;
   parac_task_store_assess_task assess_task;
 
   void* userdata;
+
+  void* ping_on_work_userdata;
+  parac_task_store_ping_on_work ping_on_work;
 } parac_task_store;
 
 #ifdef __cplusplus

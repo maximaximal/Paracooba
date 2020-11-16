@@ -31,6 +31,11 @@ typedef enum parac_task_state {
                         PARAC_TASK_DONE | PARAC_TASK_SPLITTED,
 } parac_task_state;
 
+/** @brief Utility function to check if a task is done, irregarding splitted or
+ * not. */
+bool
+parac_task_state_is_done(parac_task_state state);
+
 struct parac_task;
 struct parac_message;
 
@@ -64,11 +69,21 @@ typedef struct parac_task {
 void
 parac_task_init(parac_task* t);
 
-/** @brief Upholds the left and right split invariant. */
+/** @brief Upholds the left and right split invariant and propagates SAT & UNSAT
+ */
 parac_task_state
 parac_task_default_assess(struct parac_task* task);
 
 #ifdef __cplusplus
+}
+inline parac_task_state
+operator|(parac_task_state a, parac_task_state b) {
+  return static_cast<parac_task_state>(static_cast<int>(a) |
+                                       static_cast<int>(b));
+}
+inline parac_task_state operator&(parac_task_state a, parac_task_state b) {
+  return static_cast<parac_task_state>(static_cast<int>(a) &
+                                       static_cast<int>(b));
 }
 
 inline std::ostream&

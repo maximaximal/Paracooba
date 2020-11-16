@@ -12,6 +12,5 @@ TEST_CASE("Config Initialisation, Reserving, Registration and Free",
 
   entries = parac_config_reserve(&config, entryCount);
   REQUIRE(entries);
-  REQUIRE(config.size == 2);
-  REQUIRE(config.reserved_size == 2);
+  REQUIRE(config.first_node->size == 2);
 }

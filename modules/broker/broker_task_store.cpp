@@ -18,7 +18,11 @@
 
 namespace parac::broker {
 struct TaskStore::Internal {
+  explicit Internal(parac_task_store& store)
+    : store(store) {}
+
   std::mutex containerMutex;
+  parac_task_store& store;
 
   struct Task {
     parac_task t;
@@ -60,7 +64,7 @@ struct TaskStore::Internal {
 };
 
 TaskStore::TaskStore(parac_task_store& s)
-  : m_internal(std::make_unique<Internal>()) {
+  : m_internal(std::make_unique<Internal>(s)) {
 
   s.userdata = this;
   s.empty = [](parac_task_store* store) {
@@ -85,6 +89,12 @@ TaskStore::TaskStore(parac_task_store& s)
     return static_cast<TaskStore*>(store->userdata)
       ->m_internal->tasksWaitingForChildren.size();
   };
+  s.get_tasks_being_worked_on_size = [](parac_task_store* store) {
+    assert(store);
+    assert(store->userdata);
+    return static_cast<TaskStore*>(store->userdata)
+      ->m_internal->tasksBeingWorkedOn.size();
+  };
   s.new_task = [](parac_task_store* store, parac_task* creator_task) {
     assert(store);
     assert(store->userdata);
@@ -107,6 +117,8 @@ TaskStore::TaskStore(parac_task_store& s)
     assert(task);
     return static_cast<TaskStore*>(store->userdata)->assess_task(task);
   };
+  s.ping_on_work_userdata = nullptr;
+  s.ping_on_work = nullptr;
 }
 TaskStore::~TaskStore() {}
 
@@ -136,6 +148,8 @@ TaskStore::pop_offload(parac_compute_node* target) {
   parac_task& t = m_internal->tasksWaitingForWorkerQueue.front();
   m_internal->tasksWaitingForWorkerQueue.pop_front();
   m_internal->offloadedTasks[target].insert(t);
+  t.state = static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
+  t.state = t.state | PARAC_TASK_OFFLOADED;
   return &t;
 }
 parac_task*
@@ -147,21 +161,31 @@ TaskStore::pop_work() {
   parac_task& t = m_internal->tasksWaitingForWorkerQueue.front();
   m_internal->tasksWaitingForWorkerQueue.pop_front();
   m_internal->tasksBeingWorkedOn.insert(t);
+  t.state = static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
   return &t;
 }
 
 void
 TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
   assert(task);
-  std::unique_lock lock(m_internal->containerMutex);
-  m_internal->tasksWaitingForWorkerQueue.insert(
-    std::lower_bound(m_internal->tasksWaitingForWorkerQueue.begin(),
-                     m_internal->tasksWaitingForWorkerQueue.end(),
-                     task->path,
-                     [](const Internal::TaskRef& t, parac_path p) {
-                       return t.get().path.length < p.length;
-                     }),
-    *task);
+
+  task->state = task->state | PARAC_TASK_WORK_AVAILABLE;
+
+  {
+    std::unique_lock lock(m_internal->containerMutex);
+    m_internal->tasksWaitingForWorkerQueue.insert(
+      std::lower_bound(m_internal->tasksWaitingForWorkerQueue.begin(),
+                       m_internal->tasksWaitingForWorkerQueue.end(),
+                       task->path,
+                       [](const Internal::TaskRef& t, parac_path p) {
+                         return t.get().path.length < p.length;
+                       }),
+      *task);
+  }
+
+  if(m_internal->store.ping_on_work) {
+    m_internal->store.ping_on_work(&m_internal->store);
+  }
 }
 
 void
@@ -175,6 +199,19 @@ TaskStore::remove_from_tasksWaitingForChildren(parac_task* task) {
   assert(task);
   std::unique_lock lock(m_internal->containerMutex);
   m_internal->tasksWaitingForChildren.erase(*task);
+}
+
+void
+TaskStore::insert_into_tasksBeingWorkedOn(parac_task* task) {
+  assert(task);
+  std::unique_lock lock(m_internal->containerMutex);
+  m_internal->tasksBeingWorkedOn.insert(*task);
+}
+void
+TaskStore::remove_from_tasksBeingWorkedOn(parac_task* task) {
+  assert(task);
+  std::unique_lock lock(m_internal->containerMutex);
+  m_internal->tasksBeingWorkedOn.erase(*task);
 }
 
 void
@@ -199,10 +236,14 @@ TaskStore::assess_task(parac_task* task) {
   if((s & PARAC_TASK_SPLITS_DONE) == PARAC_TASK_SPLITS_DONE) {
     remove_from_tasksWaitingForChildren(task);
   }
-  if((!(s & PARAC_TASK_SPLITTED) && s & PARAC_TASK_DONE) ||
-     ((s & PARAC_TASK_SPLITTED) &&
-      (s & PARAC_TASK_ALL_DONE) == PARAC_TASK_ALL_DONE)) {
-    assert(task->result != PARAC_PENDING);
+  if(parac_task_state_is_done(s)) {
+    remove_from_tasksBeingWorkedOn(task);
+
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Task on path {} done with result {}",
+              task->path,
+              task->result);
 
     if(task->parent_task &&
        m_internal->tasksWaitingForChildren.count(*task->parent_task)) {

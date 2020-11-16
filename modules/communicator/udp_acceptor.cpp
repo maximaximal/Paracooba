@@ -1,14 +1,19 @@
 #include "udp_acceptor.hpp"
+#include "service.hpp"
 
+#include <memory>
 #include <paracooba/common/log.h>
 
 namespace parac::communicator {
-struct UDPAcceptor::Internal {};
+struct UDPAcceptor::Internal {
+  Internal(Service& service)
+    : service(service) {}
+  Service& service;
+};
 
 UDPAcceptor::UDPAcceptor(const std::string& listenAddressStr,
                          uint16_t listenPort)
-  : m_internal(std::make_unique<Internal>())
-  , m_listenAddressStr(listenAddressStr)
+  : m_listenAddressStr(listenAddressStr)
   , m_listenPort(listenPort) {}
 
 UDPAcceptor::~UDPAcceptor() {
@@ -17,6 +22,7 @@ UDPAcceptor::~UDPAcceptor() {
 
 parac_status
 UDPAcceptor::start(Service& service) {
+  m_internal = std::make_unique<Internal>(service);
   parac_log(PARAC_COMMUNICATOR,
             PARAC_DEBUG,
             "Starting UDPAcceptor with listen address {} and port {}.",

@@ -15,6 +15,10 @@ parac_status_to_str(parac_status status) {
       return "Undefined";
     case PARAC_TO_BE_DELETED:
       return "To be deleted";
+    case PARAC_SAT:
+      return "SAT";
+    case PARAC_UNSAT:
+      return "UNSAT";
     case PARAC_CONNECTION_CLOSED:
       return "Connection Closed";
     case PARAC_OUT_OF_MEMORY:
@@ -25,6 +29,8 @@ parac_status_to_str(parac_status status) {
       return "Provided IP address could not be parsed";
     case PARAC_PARSE_ERROR:
       return "Parse Error";
+    case PARAC_PREMATURE_EXIT:
+      return "Premature Exit";
     case PARAC_GENERIC_ERROR:
       return "Generic Error";
   }

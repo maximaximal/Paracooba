@@ -27,8 +27,10 @@ class TaskStore {
 
   void insert_into_tasksWaitingForWorkerQueue(parac_task* task);
   void insert_into_tasksWaitingForChildren(parac_task* task);
+  void insert_into_tasksBeingWorkedOn(parac_task* task);
 
   void remove_from_tasksWaitingForChildren(parac_task* task);
+  void remove_from_tasksBeingWorkedOn(parac_task* task);
 
   struct Internal;
   std::unique_ptr<Internal> m_internal;

@@ -5,6 +5,7 @@
 #include <parac_common_export.h>
 
 #include <assert.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 
 #ifdef __STDC_NO_THREADS__
@@ -14,6 +15,8 @@
 #else
 #include <threads.h>
 #endif
+
+static atomic_bool global_exit = false;
 
 typedef struct thread_handle {
   parac_thread_registry_handle* registry_handle;
@@ -39,11 +42,17 @@ parac_thread_registry_init(parac_thread_registry* registry) {
   parac_thread_handle_list_init(registry->threads);
   parac_thread_registry_new_thread_starting_cb_list_init(
     registry->new_thread_starting_cbs);
+
+  atomic_store(&global_exit, false);
 }
 
 PARAC_COMMON_EXPORT
 void
 parac_thread_registry_free(parac_thread_registry* registry) {
+  // Once the thread registry is freed, no other thread should be started! This
+  // may happen in quick starts and stops.
+  atomic_store(&global_exit, true);
+
   assert(registry);
   assert(registry->threads);
   assert(registry->new_thread_starting_cbs);
@@ -60,10 +69,15 @@ static int
 run_wrapper(parac_thread_registry_handle* handle) {
   int returncode = 0;
 
+  if((atomic_bool*)atomic_load(&global_exit))
+    return PARAC_PREMATURE_EXIT;
+
   parac_thread_registry* registry = handle->registry;
   struct parac_thread_registry_new_thread_starting_cb_list_entry* cb =
     registry->new_thread_starting_cbs->first;
   while(cb) {
+    if(global_exit)
+      return PARAC_PREMATURE_EXIT;
     if(cb->entry) {
       cb->entry(handle);
     }

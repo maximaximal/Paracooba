@@ -54,7 +54,8 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
   REQUIRE(store->pop_offload(store, this_node) == nullptr);
   REQUIRE(store->pop_work(store) == nullptr);
 
-  task->result = PARAC_OK;
+  task->result = PARAC_PENDING;
+  task->state = task->state | PARAC_TASK_DONE | PARAC_TASK_WAITING_FOR_LEFT;
 
   parac_task* task2 = store->new_task(store, task);
   task2->path = parac_path_get_next_left(task->path);
@@ -75,7 +76,6 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
   REQUIRE(store->pop_offload(store, this_node) == task2);
 
   REQUIRE(store->get_waiting_for_children_size(store) == 0);
-  task->state = PARAC_TASK_WAITING_FOR_LEFT;
   store->assess_task(store, task);
   REQUIRE(store->pop_offload(store, this_node) == nullptr);
   REQUIRE(store->get_waiting_for_worker_size(store) == 0);
@@ -90,4 +90,5 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
 
   REQUIRE(store->get_waiting_for_children_size(store) == 0);
   REQUIRE(store->get_waiting_for_worker_size(store) == 0);
+  REQUIRE(store->get_tasks_being_worked_on_size(store) == 0);
 }

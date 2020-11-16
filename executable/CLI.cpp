@@ -49,27 +49,42 @@ CLI::CLI(struct parac_config& config)
   // clang-format on
 }
 CLI::~CLI() {
-  for(size_t i = 0; i < m_config.size; ++i) {
-    parac_config_entry& entry = m_config.entries[i];
-    if(entry.type == PARAC_TYPE_STR) {
-      // Was initiated in CLI and must be back-casted in order to be freed.
-      free(const_cast<char*>(entry.value.string));
-    }
-    if(entry.type == PARAC_TYPE_VECTOR_STR) {
-      // Was initiated in CLI and must be back-casted in order to be freed.
-      for(size_t i = 0; i < entry.value.string_vector.size; ++i) {
-        free(const_cast<char*>(entry.value.string_vector.strings[i]));
+  parac_config_entry_node** node = &m_config.first_node;
+
+  while(*node) {
+    parac_config_entry* entries = (*node)->entries;
+    size_t size = (*node)->size;
+    node = &(*node)->next;
+
+    for(size_t i = 0; i < size; ++i) {
+      parac_config_entry& entry = entries[i];
+      if(entry.type == PARAC_TYPE_STR) {
+        // Was initiated in CLI and must be back-casted in order to be freed.
+        free(const_cast<char*>(entry.value.string));
       }
-      delete[] entry.value.string_vector.strings;
+      if(entry.type == PARAC_TYPE_VECTOR_STR) {
+        // Was initiated in CLI and must be back-casted in order to be freed.
+        for(size_t i = 0; i < entry.value.string_vector.size; ++i) {
+          free(const_cast<char*>(entry.value.string_vector.strings[i]));
+        }
+        delete[] entry.value.string_vector.strings;
+      }
     }
   }
 }
 
 void
 CLI::parseConfig() {
-  for(size_t i = 0; i < m_config.size; ++i) {
-    parac_config_entry& entry = m_config.entries[i];
-    parseConfigEntry(entry);
+  parac_config_entry_node** node = &m_config.first_node;
+  while(*node) {
+    parac_config_entry* entries = (*node)->entries;
+    size_t size = (*node)->size;
+    node = &(*node)->next;
+
+    for(size_t i = 0; i < size; ++i) {
+      parac_config_entry& entry = entries[i];
+      parseConfigEntry(entry);
+    }
   }
 }
 
@@ -152,11 +167,10 @@ CLI::parseConfigEntry(parac_config_entry& e) {
                       e.description);
       break;
     case PARAC_TYPE_SWITCH:
-      o.add_options()(e.name,
-                      po::bool_switch()
-                        ->default_value(false)
-                        ->value_name("bool"),
-                      e.description);
+      o.add_options()(
+        e.name,
+        po::bool_switch()->default_value(false)->value_name("bool"),
+        e.description);
       break;
     case PARAC_TYPE_STR:
       if(e.default_value.string == nullptr)
@@ -322,9 +336,16 @@ CLI::parseModuleArgs(int argc, char* argv[]) {
     return false;
   }
 
-  for(size_t i = 0; i < m_config.size; ++i) {
-    parac_config_entry& entry = m_config.entries[i];
-    TryParsingCLIArgToConfigEntry(entry, m_vm);
+  parac_config_entry_node** node = &m_config.first_node;
+  while(*node) {
+    parac_config_entry* entries = (*node)->entries;
+    size_t size = (*node)->size;
+    node = &(*node)->next;
+
+    for(size_t i = 0; i < size; ++i) {
+      parac_config_entry& entry = entries[i];
+      TryParsingCLIArgToConfigEntry(entry, m_vm);
+    }
   }
 
   return true;

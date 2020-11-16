@@ -11,37 +11,26 @@ PARAC_COMMON_EXPORT
 void
 parac_config_init(parac_config* config) {
   assert(config);
-  config->size = 0;
-  config->reserved_size = 0;
+  config->first_node = NULL;
   config->userdata = NULL;
-  config->entries = NULL;
 }
 
 PARAC_COMMON_EXPORT
 parac_config_entry*
 parac_config_reserve(parac_config* config, size_t entry_count) {
   assert(config);
-  assert(config->reserved_size > 0 ||
-         (config->reserved_size == 0 && config->entries == NULL));
 
-  config->entries =
-    realloc(config->entries,
-            sizeof(parac_config_entry) * (config->reserved_size + entry_count));
+  parac_config_entry_node** node = &config->first_node;
 
-  if(config->entries == NULL) {
-    return NULL;
-  } else {
-    memset(config->entries + config->reserved_size,
-           0,
-           sizeof(parac_config_entry) * entry_count);
-
-    parac_config_entry* e = config->entries + config->reserved_size;
-
-    config->reserved_size += entry_count;
-    config->size += entry_count;
-
-    return e;
+  while(*node) {
+    node = &(*node)->next;
   }
+
+  (*node) = calloc(sizeof(parac_config_entry_node), 1);
+  (*node)->entries = calloc(sizeof(parac_config_entry), entry_count);
+  (*node)->size = entry_count;
+  (*node)->next = NULL;
+  return (*node)->entries;
 }
 
 PARAC_COMMON_EXPORT
@@ -69,30 +58,42 @@ PARAC_COMMON_EXPORT
 void
 parac_config_free(parac_config* config) {
   assert(config);
-  if(config->entries) {
-    for(size_t i = 0; i < config->reserved_size; ++i) {
-      parac_config_entry* e = &config->entries[i];
+
+  parac_config_entry_node* node = config->first_node;
+
+  while(node != NULL) {
+    parac_config_entry* entries = node->entries;
+    size_t size = node->size;
+    parac_config_entry_node* last_node = node;
+    node = node->next;
+
+    for(size_t i = 0; i < size; ++i) {
+      parac_config_entry* e = &entries[i];
       if(e->name)
         free(e->name);
       if(e->description)
         free(e->description);
     }
 
-    free(config->entries);
-    config->entries = 0;
-    config->size = 0;
-    config->reserved_size = 0;
+    free(entries);
+    free(last_node);
   }
+  config->first_node = NULL;
 }
 
 PARAC_COMMON_EXPORT void
 parac_config_apply_default_values(parac_config* config) {
   assert(config);
-  assert(config);
 
-  if(config->entries) {
-    for(size_t i = 0; i < config->reserved_size; ++i) {
-      parac_config_entry* e = &config->entries[i];
+  parac_config_entry_node** node = &config->first_node;
+
+  while(*node) {
+    parac_config_entry* entries = (*node)->entries;
+    size_t size = (*node)->size;
+    node = &(*node)->next;
+
+    for(size_t i = 0; i < size; ++i) {
+      parac_config_entry* e = &entries[i];
       e->value = e->default_value;
     }
   }

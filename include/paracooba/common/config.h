@@ -20,10 +20,14 @@ typedef struct parac_config_entry {
   parac_type_union default_value;
 } parac_config_entry;
 
-typedef struct parac_config {
-  size_t size;
-  size_t reserved_size;
+typedef struct parac_config_entry_node {
   parac_config_entry* entries;
+  size_t size;
+  struct parac_config_entry_node* next;
+} parac_config_entry_node;
+
+typedef struct parac_config {
+  parac_config_entry_node* first_node;
 
   void* userdata;/// Owned by Executor.
 } parac_config;
