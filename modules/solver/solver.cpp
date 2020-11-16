@@ -24,8 +24,7 @@ create_parser_task(parac_module& mod) {
   assert(broker.task_store);
   auto& task_store = *broker.task_store;
 
-  parac_task* task =
-    task_store.new_task(&task_store, paracooba::Path(), mod.handle->id);
+  parac_task* task = task_store.new_task(&task_store, nullptr);
   assert(task);
 
   return PARAC_OK;
@@ -62,7 +61,11 @@ init(parac_module* mod) {
    * then ends processing.
    */
 
-  parac_status status = create_parser_task(*mod);
+  parac_status status = PARAC_OK;
+
+  if(mod->handle->input_file) {
+    status = create_parser_task(*mod);
+  }
 
   return status;
 }

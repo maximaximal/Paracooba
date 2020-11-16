@@ -57,6 +57,9 @@ parac_log(parac_log_channel channel,
           parac_log_severity severity,
           const char* msg);
 
+bool
+parac_log_enabled(parac_log_channel channel, parac_log_severity severity);
+
 #ifdef __cplusplus
 }
 #include <ostream>
@@ -89,6 +92,8 @@ parac_log(parac_log_channel channel,
           parac_log_severity severity,
           const FormatString& fmt,
           const Args&... args) {
+  if(!parac_log_enabled(channel, severity))
+    return;
   parac_log(channel, severity, fmt, args...);
 }
 
@@ -98,6 +103,8 @@ parac_log(parac_log_channel channel,
           parac_log_severity severity,
           fmt::string_view fmt,
           const Args&... args) {
+  if(!parac_log_enabled(channel, severity))
+    return;
   parac_log(channel, severity, fmt, args...);
 }
 template<typename FormatString, typename... Args>
@@ -106,6 +113,8 @@ parac_log(parac_log_channel channel,
           parac_log_severity severity,
           const FormatString& fmt,
           const Args&... args) {
+  if(!parac_log_enabled(channel, severity))
+    return;
   try {
     fmt::memory_buffer buf;
     fmt::format_to(buf, fmt, args...);

@@ -17,7 +17,7 @@
 
 TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   ParacoobaMock master(1);
-  ParacoobaMock daemon(2, &master);
+  ParacoobaMock daemon(2, nullptr, &master);
 
   auto master_cns = master.getBroker().compute_node_store;
   auto daemon_cns = daemon.getBroker().compute_node_store;

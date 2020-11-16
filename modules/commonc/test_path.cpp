@@ -5,7 +5,7 @@
 #include <bitset>
 #include <string>
 
-using namespace paracooba;
+using namespace parac;
 
 TEST_CASE("Path Manipulation", "[commonc][path]") {
   using PathBitset = std::bitset<64>;

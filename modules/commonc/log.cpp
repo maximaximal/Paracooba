@@ -121,7 +121,7 @@ PARAC_COMMON_EXPORT void
 parac_log(parac_log_channel channel,
           parac_log_severity severity,
           std::string_view msg) {
-  if(severity >= global_severity && global_channels[channel]) {
+  if(parac_log_enabled(channel, severity)) {
     try {
       BOOST_LOG_CHANNEL_SEV(global_logger, channel, severity) << msg;
     } catch(std::exception& e) {
@@ -130,6 +130,11 @@ parac_log(parac_log_channel channel,
         << e.what() << std::endl;
     }
   }
+}
+
+PARAC_COMMON_EXPORT bool
+parac_log_enabled(parac_log_channel channel, parac_log_severity severity) {
+  return severity >= global_severity && global_channels[channel];
 }
 
 PARAC_COMMON_EXPORT const char*

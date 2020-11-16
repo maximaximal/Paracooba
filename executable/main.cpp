@@ -107,12 +107,17 @@ main(int argc, char* argv[]) {
     return EXIT_SUCCESS;
   }
 
+  const char* inputFile = nullptr;
+  if(cli.getInputFile() != "") {
+    inputFile = cli.getInputFile().c_str();
+  }
+
   ModuleLoader loader(thread_registry,
                       config,
                       cli.getId(),
                       cli.getLocalName().c_str(),
                       cli.getHostName().c_str(),
-                      cli.getInputFile().c_str());
+                      inputFile);
   GlobalModuleLoader = &loader;
   signal(SIGINT, InterruptHandler);
 

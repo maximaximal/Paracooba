@@ -27,7 +27,7 @@ class FileSender {
     std::string source_file;
     int fd = 0;
     boost::asio::ip::tcp::socket& target_socket;
-    size_t file_size;
+    off_t file_size;
     off_t offset;
     FinishedCB cb;
   };

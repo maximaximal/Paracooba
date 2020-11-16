@@ -70,7 +70,7 @@ parac_path_to_str(parac_path p, char* out_str);
 #include <iostream>
 #include <string>
 
-namespace paracooba {
+namespace parac {
 class Path : public parac_path {
 
   public:
@@ -123,6 +123,7 @@ class Path : public parac_path {
   }
 
   void operator=(parac_path p) { rep = p.rep; }
+  bool operator==(const parac_path &p) const { return rep == p.rep; }
   operator uint64_t() const { return rep; }
   bool operator<(const Path& o) const { return length < o.length; }
 };
@@ -137,6 +138,12 @@ to_string(Path const& p) {
 
 inline std::ostream&
 operator<<(std::ostream& o, parac_path p) {
+  char str[PARAC_PATH_MAX_LENGTH];
+  parac_path_to_str(p, str);
+  return o << str;
+}
+inline std::ostream&
+operator<<(std::ostream& o, parac::Path p) {
   char str[PARAC_PATH_MAX_LENGTH];
   parac_path_to_str(p, str);
   return o << str;

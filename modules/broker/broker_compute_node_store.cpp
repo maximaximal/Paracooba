@@ -42,7 +42,7 @@ ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
                                   workers,
                                   communicator->udp_listen_port,
                                   communicator->udp_listen_port,
-                                  std::strcmp(handle.input_file, "") == 0,
+                                  handle.input_file == nullptr,
                                   true);
 }
 ComputeNodeStore::~ComputeNodeStore() {

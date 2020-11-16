@@ -24,7 +24,9 @@ parac_static_module_discover(parac_module_type mod);
 
 class ParacoobaMock : public parac_handle {
   public:
-  ParacoobaMock(parac_id id, ParacoobaMock* knownRemote = nullptr) {
+  ParacoobaMock(parac_id id,
+                const char* input_file = nullptr,
+                ParacoobaMock* knownRemote = nullptr) {
     version.major = 0;
     version.minor = 0;
     version.patch = 0;
@@ -34,7 +36,7 @@ class ParacoobaMock : public parac_handle {
     userdata = this;
     local_name = "Mock";
     host_name = "Mock";
-    input_file = "";
+    this->input_file = input_file;
     config = &m_config;
     thread_registry = &m_threadRegistry;
     distrac = nullptr;

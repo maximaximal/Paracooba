@@ -17,8 +17,9 @@ typedef enum parac_task_state {
   PARAC_TASK_LEFT_DONE = 1 << 3,
   PARAC_TASK_RIGHT_DONE = 1 << 4,
   PARAC_TASK_DONE = 1 << 5,
+  PARAC_TASK_OFFLOADED = 1 << 6,
 
-  PARAC_TASK_ERROR = 1 << 6,
+  PARAC_TASK_ERROR = 1 << 7,
 
   PARAC_TASK_WAITING_FOR_RIGHT =
     PARAC_TASK_LEFT_DONE | PARAC_TASK_WAITING_FOR_SPLITS | PARAC_TASK_SPLITTED,
@@ -40,6 +41,7 @@ typedef parac_status (*parac_task_serialize_func)(struct parac_task*,
 typedef parac_status (*parac_task_free_userdata_func)(struct parac_task*);
 
 typedef struct parac_task {
+  parac_task_state last_state;
   parac_task_state state;
   parac_status result;
   parac_status left_result;
@@ -48,55 +50,51 @@ typedef struct parac_task {
   parac_path path;
   parac_id received_from;
   parac_id offloaded_to;
+  parac_id originator;
 
   void* userdata;
   parac_task_assess_func assess;
   parac_task_work_func work;
   parac_task_serialize_func serialize;
   parac_task_free_userdata_func free_userdata;
+
+  struct parac_task* parent_task;
 } parac_task;
+
+void
+parac_task_init(parac_task* t);
+
+/** @brief Upholds the left and right split invariant. */
+parac_task_state
+parac_task_default_assess(struct parac_task* task);
 
 #ifdef __cplusplus
 }
 
-class parac_task_wrapper : public parac_task {
-  public:
-  parac_task_wrapper() {
-    state = PARAC_TASK_NEW;
-    result = PARAC_PENDING;
-    left_result = PARAC_PENDING;
-    right_result = PARAC_PENDING;
-    path.rep = PARAC_PATH_EXPLICITLY_UNKNOWN;
-    userdata = nullptr;
-    work = nullptr;
-    assess = nullptr;
-    free_userdata = nullptr;
-    received_from = 0;
-    offloaded_to = 0;
-  }
-  ~parac_task_wrapper() {
-    if(free_userdata)
-      free_userdata(this);
-  }
-
-  bool stateActive(parac_task_state s) const { return state & s; }
-
-  parac_status doWork() {
-    if(!work)
-      return PARAC_UNDEFINED;
-    return work(this);
-  }
-  parac_task_state doAssess() {
-    if(!assess)
-      return PARAC_TASK_ERROR;
-    return assess(this);
-  }
-  parac_status doSerialize(parac_message& msg) {
-    if(!serialize)
-      return PARAC_UNDEFINED;
-    return serialize(this, &msg);
-  }
-};
+inline std::ostream&
+operator<<(std::ostream& o, parac_task_state s) {
+  o << "( ";
+  if(s == PARAC_TASK_NEW)
+    o << "new ";
+  if(s & PARAC_TASK_SPLITTED)
+    o << "splitted ";
+  if(s & PARAC_TASK_WORK_AVAILABLE)
+    o << "work-available ";
+  if(s & PARAC_TASK_WAITING_FOR_SPLITS)
+    o << "waiting-for-splits ";
+  if(s & PARAC_TASK_LEFT_DONE)
+    o << "left-done ";
+  if(s & PARAC_TASK_RIGHT_DONE)
+    o << "right-done ";
+  if(s & PARAC_TASK_DONE)
+    o << "done ";
+  if(s & PARAC_TASK_OFFLOADED)
+    o << "offloaded ";
+  if(s & PARAC_TASK_ERROR)
+    o << "error ";
+  o << ")";
+  return o;
+}
 #endif
 
 #endif
