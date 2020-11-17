@@ -1,5 +1,6 @@
 #include "paracooba/common/status.h"
 #include <boost/log/expressions/message.hpp>
+#include <boost/log/expressions/predicates/has_attr.hpp>
 #include <paracooba/common/log.h>
 #include <paracooba/common/thread_registry.h>
 
@@ -61,15 +62,17 @@ parac_log_init(parac_thread_registry* thread_registry) {
 
     global_console_sink = add_console_log(std::clog);
     global_console_sink->set_formatter(
-      expressions::stream << "c ["
-                          << expressions::attr<std::string>("LocalName") << "|"
-                          << expressions::attr<parac_id>("LocalID") << "] ["
-                          << parac_logger_timestamp << "] ["
-                          << expressions::attr<parac_log_severity>("Severity")
-                          << "] ["
-                          << expressions::attr<parac_log_channel>("Channel")
-                          << " @ T" << expressions::attr<uint16_t>("ThreadID")
-                          << "] " << expressions::smessage);
+      expressions::stream
+      << "c ["
+      << expressions::if_(expressions::has_attr<std::string>(
+           "LocalName"))[expressions::stream
+                         << expressions::attr<std::string>("LocalName") << "|"]
+      << expressions::attr<parac_id>("LocalID") << "] ["
+      << parac_logger_timestamp << "] ["
+      << expressions::attr<parac_log_severity>("Severity") << "] ["
+      << expressions::attr<parac_log_channel>("Channel") << " @ T"
+      << expressions::attr<uint16_t>("ThreadID") << "] "
+      << expressions::smessage);
     boost::log::core::get()->add_sink(global_console_sink);
   } catch(std::exception& e) {
     std::cerr << "> Exception during log setup! Message: " << e.what()
@@ -106,8 +109,10 @@ parac_log_set_local_id(parac_id id) {
 PARAC_COMMON_EXPORT void
 parac_log_set_local_name(const char* name) {
   local_name = name;
-  global_logger.add_attribute("LocalName",
-                              attributes::make_constant(local_name));
+  if(local_name.size() > 0) {
+    global_logger.add_attribute("LocalName",
+                                attributes::make_constant(local_name));
+  }
 }
 
 PARAC_COMMON_EXPORT void

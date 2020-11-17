@@ -46,7 +46,7 @@ class CLI {
 
   void parseConfigEntry(struct parac_config_entry& e);
 
-  parac_id generateId(int64_t uniqueNumber);
+  parac_id generateId();
   parac_id m_id = 0;
 
   std::string m_inputFile;

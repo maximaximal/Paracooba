@@ -2,6 +2,7 @@
 #include "paracooba/common/log.h"
 #include "paracooba/common/types.h"
 #include <boost/program_options/variables_map.hpp>
+#include <cstdlib>
 #include <paracooba/common/config.h>
 #include <paracooba/module.h>
 
@@ -19,11 +20,6 @@ CLI::CLI(struct parac_config& config)
   using namespace boost::posix_time;
   using namespace boost::gregorian;
 
-  std::random_device dev;
-  std::mt19937_64 rng(dev());
-  std::uniform_int_distribution<std::mt19937_64::result_type> dist_mac(
-    -((int64_t)1 << 47), ((int64_t)1 << 47) - 1);
-
   m_hostName = boost::asio::ip::host_name();
 
   std::string generatedLocalName =
@@ -33,15 +29,20 @@ CLI::CLI(struct parac_config& config)
     generatedLocalName + "_" +
     to_iso_extended_string(second_clock::universal_time()) + ".distrac-trace";
 
+  if(std::getenv("PARAC_LOCAL_NAME")) {
+    generatedLocalName = std::getenv("PARAC_LOCAL_NAME");
+  }
+
   // clang-format off
   m_globalOptions.add_options()
     ("help", "produce help message for all available options")
-    ("id", po::value<parac_id>()->default_value(generateId(dist_mac(rng)))->value_name("int"), "Unique number for local ID")
     ("input-file", po::value<std::string>()->default_value("")->value_name("string"), "Input CNF file in DIMACS format")
-    ("local-name,n", po::value<std::string>()->default_value(generatedLocalName)->value_name("string"), "Local name of this node")
+    ("local-name,n", po::value<std::string>()->default_value(generatedLocalName)->value_name("string"), "Local name of this node. Can be overridden by environment variable PARAC_LOCAL_NAME")
     ("trace,t", po::bool_switch(&m_traceMode)->default_value(false)->value_name("bool"), "debug mode (set severity >= TRACE)")
     ("debug,d", po::bool_switch(&m_debugMode)->default_value(false)->value_name("bool"), "debug mode (set severity >= DEBG)")
     ("info,i", po::bool_switch(&m_infoMode)->default_value(false)->value_name("bool"), "debug mode (set severity >= INFO)")
+
+    ("id", po::value<parac_id>()->default_value(generateId())->value_name("int"), "Unique number for local ID. Can be overridden by environment variable PARAC_ID")
 
     ("distrac-enable", po::bool_switch(&m_enableDistrac)->default_value(false)->value_name("bool"), "enable distrac tracing")
     ("distrac-output", po::value<std::string>()->default_value(generatedTracefileName)->value_name("string"), "distrac tracefile output")
@@ -352,7 +353,18 @@ CLI::parseModuleArgs(int argc, char* argv[]) {
 }
 
 parac_id
-CLI::generateId(int64_t uniqueNumber) {
+CLI::generateId() {
+  if(std::getenv("PARAC_ID")) {
+    return std::atoi(std::getenv("PARAC_ID"));
+  }
+
+  std::random_device dev;
+  std::mt19937_64 rng(dev());
+  std::uniform_int_distribution<std::mt19937_64::result_type> dist_mac(
+    -((int64_t)1 << 47), ((int64_t)1 << 47) - 1);
+
+  int64_t uniqueNumber = dist_mac(rng);
+
   int16_t pid = std::abs(static_cast<int16_t>(::getpid()));
   return ((int64_t)pid << 48) | uniqueNumber;
 }
