@@ -33,6 +33,11 @@ parac_path_set_assignment(parac_path p, parac_path_length_type d, bool v) {
   return p;
 }
 
+PARAC_COMMON_EXPORT bool
+parac_path_is_root(parac_path p) {
+  return p.length == 0;
+}
+
 PARAC_COMMON_EXPORT parac_path_type
 parac_path_get_shifted(parac_path p) {
   return p.rep >> 6u;
@@ -88,7 +93,7 @@ parac_path_cleanup(parac_path p) {
 
 PARAC_COMMON_EXPORT void
 parac_path_to_str(parac_path p, char* out_str) {
-  if(p.length == 0) {
+  if(parac_path_is_root(p)) {
     size_t i = 0;
     out_str[i++] = '(';
     out_str[i++] = 'r';

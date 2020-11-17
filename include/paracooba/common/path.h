@@ -36,6 +36,9 @@ parac_path_left_aligned(parac_path p);
 bool
 parac_path_get_assignment(parac_path p, parac_path_length_type d);
 
+bool
+parac_path_is_root(parac_path p);
+
 parac_path
 parac_path_set_assignment(parac_path p, parac_path_length_type d, bool v);
 
@@ -124,7 +127,7 @@ class Path : public parac_path {
   }
 
   void operator=(parac_path p) { rep = p.rep; }
-  bool operator==(const parac_path &p) const { return rep == p.rep; }
+  bool operator==(const parac_path& p) const { return rep == p.rep; }
   operator uint64_t() const { return rep; }
   bool operator<(const Path& o) const { return length < o.length; }
 };

@@ -12,7 +12,8 @@ class Solver;
 namespace parac::solver {
 class CaDiCaLHandle {
   public:
-  CaDiCaLHandle(bool &stop, parac_id originatorId);
+  CaDiCaLHandle(bool& stop, parac_id originatorId);
+  CaDiCaLHandle(CaDiCaLHandle& o);
   ~CaDiCaLHandle();
 
   CaDiCaL::Solver& solver();

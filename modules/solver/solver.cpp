@@ -3,6 +3,7 @@
 #include "paracooba/common/log.h"
 #include "paracooba/common/task_store.h"
 #include "parser_task.hpp"
+#include "solver_task.hpp"
 #include <paracooba/broker/broker.h>
 #include <paracooba/common/path.h>
 #include <paracooba/module.h>
@@ -19,6 +20,7 @@
 
 using parac::solver::CaDiCaLManager;
 using parac::solver::ParserTask;
+using parac::solver::SolverTask;
 
 struct SolverUserdata {
   std::unique_ptr<CaDiCaLManager> cadicalManager;
@@ -45,7 +47,8 @@ create_parser_task(parac_module& mod) {
     *task,
     mod.handle->input_file,
     mod.handle->id,
-    [&mod](parac_status status, ParserTask::CaDiCaLHandlePtr parsedFormula) {
+    [&mod, &task_store](parac_status status,
+                        ParserTask::CaDiCaLHandlePtr parsedFormula) {
       if(status != PARAC_OK) {
         parac_log(PARAC_SOLVER,
                   PARAC_FATAL,
@@ -58,6 +61,11 @@ create_parser_task(parac_module& mod) {
       SolverUserdata* userdata = static_cast<SolverUserdata*>(mod.userdata);
       userdata->cadicalManager =
         std::make_unique<CaDiCaLManager>(mod, std::move(parsedFormula));
+
+      parac_task* task = task_store.new_task(&task_store, nullptr);
+      assert(task);
+      SolverTask::createRoot(*task, *userdata->cadicalManager);
+      task_store.assess_task(&task_store, task);
     });
   task_store.assess_task(&task_store, task);
 

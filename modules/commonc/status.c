@@ -19,6 +19,10 @@ parac_status_to_str(parac_status status) {
       return "SAT";
     case PARAC_UNSAT:
       return "UNSAT";
+    case PARAC_UNKNOWN:
+      return "UNKNOWN";
+    case PARAC_ABORTED:
+      return "ABORTED";
     case PARAC_CONNECTION_CLOSED:
       return "Connection Closed";
     case PARAC_OUT_OF_MEMORY:

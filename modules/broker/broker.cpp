@@ -23,7 +23,7 @@
 struct BrokerUserdata {
   BrokerUserdata(parac_handle& handle)
     : computeNodeStore(handle, compute_node_store_interface)
-    , taskStore(task_store_interface) {
+    , taskStore(handle, task_store_interface) {
     handle.modules[PARAC_MOD_BROKER]->broker->compute_node_store =
       &compute_node_store_interface;
     handle.modules[PARAC_MOD_BROKER]->broker->task_store =

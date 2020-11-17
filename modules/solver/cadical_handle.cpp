@@ -24,6 +24,12 @@ struct CaDiCaLHandle::Internal {
 
 CaDiCaLHandle::CaDiCaLHandle(bool& stop, parac_id originatorId)
   : m_internal(std::make_unique<Internal>(stop, originatorId)) {}
+CaDiCaLHandle::CaDiCaLHandle(CaDiCaLHandle& o)
+  : m_internal(std::make_unique<Internal>(o.m_internal->terminator.stopRef(),
+                                          o.m_internal->originatorId)) {
+  // Copy from other solver to this one.
+  o.solver().copy(solver());
+}
 CaDiCaLHandle::~CaDiCaLHandle() {}
 
 CaDiCaL::Solver&

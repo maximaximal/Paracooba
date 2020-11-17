@@ -2,9 +2,10 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <mutex>
 #include <memory>
+#include <mutex>
 
+#include <paracooba/common/types.h>
 #include <paracooba/common/status.h>
 
 struct parac_path;
@@ -19,7 +20,8 @@ class Worker {
          std::mutex& notifierMutex,
          std::condition_variable& notifier,
          std::atomic_bool& notifierCheck,
-         std::atomic_bool& stop);
+         std::atomic_bool& stop,
+         parac_worker workerId);
   Worker(const Worker& o) = delete;
   Worker(Worker&& o);
   ~Worker();
@@ -37,6 +39,7 @@ class Worker {
   std::condition_variable& m_notifier;
   std::atomic_bool& m_notifierCheck;
   std::atomic_bool& m_stop;
+  parac_worker m_workerId;
 
   std::atomic_bool m_working;
   std::unique_ptr<parac_thread_registry_handle> m_threadRegistryHandle;

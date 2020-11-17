@@ -123,6 +123,7 @@ ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
   handle().local_name = localName;
   handle().host_name = hostName;
   handle().request_exit = &static_request_exit;
+  handle().exit_status = PARAC_UNKNOWN;
 }
 PARAC_LOADER_EXPORT
 ModuleLoader::ModuleLoader(parac_handle& externalHandle)
@@ -130,6 +131,7 @@ ModuleLoader::ModuleLoader(parac_handle& externalHandle)
   handle().userdata = this;
   handle().prepare = &ModuleLoader::prepare;
   handle().request_exit = &static_request_exit;
+  handle().exit_status = PARAC_UNKNOWN;
 }
 PARAC_LOADER_EXPORT ModuleLoader::~ModuleLoader() {
   exit();

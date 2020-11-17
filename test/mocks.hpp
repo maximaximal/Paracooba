@@ -47,6 +47,11 @@ class ParacoobaMock : public parac_handle {
     distrac = nullptr;
     offsetNS = 0;
 
+    modules[PARAC_MOD_BROKER] = nullptr;
+    modules[PARAC_MOD_COMMUNICATOR] = nullptr;
+    modules[PARAC_MOD_SOLVER] = nullptr;
+    modules[PARAC_MOD_RUNNER] = nullptr;
+
     static bool log_initialized = false;
     if(!log_initialized) {
       parac_log_init(thread_registry);

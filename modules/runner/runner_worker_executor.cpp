@@ -1,4 +1,5 @@
 #include "runner_worker_executor.hpp"
+#include "paracooba/common/types.h"
 #include "runner_worker.hpp"
 
 #include <atomic>
@@ -45,13 +46,14 @@ WorkerExecutor::init() {
   parac_task_store& task_store =
     *handle.modules[PARAC_MOD_BROKER]->broker->task_store;
 
+  parac_worker id = 0;
   while(m_internal->workers.size() < workerCount()) {
     m_internal->workers.emplace_back(
       std::make_unique<Worker>(task_store,
                                m_internal->notifierMutex,
                                m_internal->notifier,
                                m_internal->notifierCheck,
-                               m_internal->stop));
+                               m_internal->stop, id++));
 
     auto& worker = m_internal->workers[m_internal->workers.size() - 1];
 

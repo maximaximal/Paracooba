@@ -40,7 +40,7 @@ struct parac_task;
 struct parac_message;
 
 typedef parac_task_state (*parac_task_assess_func)(struct parac_task*);
-typedef parac_status (*parac_task_work_func)(struct parac_task*);
+typedef parac_status (*parac_task_work_func)(struct parac_task*, parac_worker);
 typedef parac_status (*parac_task_serialize_func)(struct parac_task*,
                                                   struct parac_message*);
 typedef parac_status (*parac_task_free_userdata_func)(struct parac_task*);

@@ -11,6 +11,8 @@ class CaDiCaLTerminator : public CaDiCaL::Terminator {
 
   virtual bool terminate() { return m_terminated; }
 
+  bool& stopRef() const { return m_terminated; }
+
   private:
   bool& m_terminated;
 };

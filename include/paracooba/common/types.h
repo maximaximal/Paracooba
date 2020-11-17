@@ -10,6 +10,7 @@ extern "C" {
 #include <stdbool.h>
 
 typedef uint64_t parac_id;
+typedef uint32_t parac_worker;
 
 typedef struct parac_string_vector {
   const char** strings;

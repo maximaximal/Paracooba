@@ -13,12 +13,14 @@ Worker::Worker(parac_task_store& taskStore,
                std::mutex& notifierMutex,
                std::condition_variable& notifier,
                std::atomic_bool& notifierCheck,
-               std::atomic_bool& stop)
+               std::atomic_bool& stop,
+               parac_worker workerId)
   : m_taskStore(taskStore)
   , m_notifierMutex(notifierMutex)
   , m_notifier(notifier)
   , m_notifierCheck(notifierCheck)
   , m_stop(stop)
+  , m_workerId(workerId)
   , m_threadRegistryHandle(std::make_unique<parac_thread_registry_handle>()) {
   threadRegistryHandle().userdata = this;
 }
@@ -35,7 +37,10 @@ Worker::~Worker() {}
 
 parac_status
 Worker::run() {
-  parac_log(PARAC_RUNNER, PARAC_DEBUG, "Worker started.");
+  parac_log(PARAC_RUNNER,
+            PARAC_DEBUG,
+            "Worker started (Runner-module-internal worker id: {})",
+            m_workerId);
   while(!m_stop) {
     if(!(m_currentTask = getNextTask())) {
       continue;
@@ -48,7 +53,7 @@ Worker::run() {
               m_currentTask->path);
 
     if(m_currentTask->work) {
-      m_currentTask->result = m_currentTask->work(m_currentTask);
+      m_currentTask->result = m_currentTask->work(m_currentTask, m_workerId);
     }
 
     m_currentTask->state = m_currentTask->state | PARAC_TASK_DONE;

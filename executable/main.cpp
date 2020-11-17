@@ -7,6 +7,7 @@
 #include <distrac/distrac.h>
 
 #include "CLI.hpp"
+#include "paracooba/common/status.h"
 #include <paracooba/loader/ModuleLoader.hpp>
 
 #define DISTRAC_DEFINITION
@@ -176,7 +177,7 @@ main(int argc, char* argv[]) {
 
   thread_registry.wait();
 
-  parac_log(PARAC_GENERAL, PARAC_INFO, "All threads exited, ending Paracooba.");
+  parac_log(PARAC_GENERAL, PARAC_DEBUG, "All threads exited, ending Paracooba.");
 
   if(cli.distracEnabled()) {
     distracWrapper.finalize(loader.handle().offsetNS);
@@ -190,6 +191,27 @@ main(int argc, char* argv[]) {
                 "of distrac, as it is not empty!",
                 distracWrapper.working_directory);
     }
+  }
+
+  switch(loader.handle().exit_status) {
+    case PARAC_SAT:
+      std::cout << "s SATISFIABLE" << std::endl;
+      // TODO: Print SAT assignment.
+      break;
+    case PARAC_UNSAT:
+      std::cout << "s UNSATISFIABLE" << std::endl;
+      break;
+    case PARAC_UNKNOWN:
+    case PARAC_ABORTED:
+      std::cout << "s UNKNOWN" << std::endl;
+      break;
+    default:
+      parac_log(PARAC_GENERAL,
+                PARAC_LOCALERROR,
+                "Unknown exit return code with parac status {}!",
+                loader.handle().exit_status);
+      std::cout << "s UNKNOWN" << std::endl;
+      break;
   }
 
   return EXIT_SUCCESS;

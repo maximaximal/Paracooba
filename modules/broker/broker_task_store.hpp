@@ -3,6 +3,7 @@
 #include "paracooba/common/types.h"
 #include <memory>
 
+struct parac_handle;
 struct parac_path;
 struct parac_task;
 struct parac_task_store;
@@ -11,7 +12,7 @@ struct parac_compute_node;
 namespace parac::broker {
 class TaskStore {
   public:
-  explicit TaskStore(parac_task_store& store);
+  explicit TaskStore(parac_handle& handle, parac_task_store& store);
   ~TaskStore();
 
   bool empty() const;
@@ -31,7 +32,7 @@ class TaskStore {
 
   void remove_from_tasksWaitingForChildren(parac_task* task);
   void remove_from_tasksBeingWorkedOn(parac_task* task);
-  void remove(parac_task *task);
+  void remove(parac_task* task);
 
   struct Internal;
   std::unique_ptr<Internal> m_internal;

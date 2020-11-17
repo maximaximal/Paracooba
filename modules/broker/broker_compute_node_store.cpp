@@ -36,6 +36,7 @@ ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
   uint32_t workers = 0;
 
   if(handle.modules[PARAC_MOD_RUNNER]) {
+    assert(handle.modules[PARAC_MOD_RUNNER]->runner);
     auto runner = handle.modules[PARAC_MOD_RUNNER]->runner;
     workers = runner->available_worker_count;
   }

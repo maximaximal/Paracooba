@@ -13,15 +13,18 @@
 #include "paracooba/common/task.h"
 #include "paracooba/common/task_store.h"
 #include "paracooba/common/types.h"
+#include "paracooba/module.h"
 
 #include <boost/pool/pool_alloc.hpp>
 
 namespace parac::broker {
 struct TaskStore::Internal {
-  explicit Internal(parac_task_store& store)
-    : store(store) {}
+  explicit Internal(parac_handle& handle, parac_task_store& store)
+    : handle(handle)
+    , store(store) {}
 
   std::mutex containerMutex;
+  parac_handle& handle;
   parac_task_store& store;
 
   struct Task;
@@ -67,8 +70,8 @@ struct TaskStore::Internal {
     offloadedTasks;
 };
 
-TaskStore::TaskStore(parac_task_store& s)
-  : m_internal(std::make_unique<Internal>(s)) {
+TaskStore::TaskStore(parac_handle& handle, parac_task_store& s)
+  : m_internal(std::make_unique<Internal>(handle, s)) {
 
   s.userdata = this;
   s.empty = [](parac_task_store* store) {
@@ -286,6 +289,12 @@ TaskStore::assess_task(parac_task* task) {
 
       assess_task(parent);
     }
+
+    if(m_internal->handle.input_file && parac_path_is_root(task->path)) {
+      m_internal->handle.request_exit(&m_internal->handle);
+      m_internal->handle.exit_status = task->result;
+    }
+
     // As this task is done and the parent has been assessed, it can be
     // deleted.
     remove(task);

@@ -3,6 +3,7 @@
 #include "cadical_handle.hpp"
 #include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
+#include "paracooba/common/types.h"
 #include "parser_task.hpp"
 
 #include <paracooba/common/task.h>
@@ -39,7 +40,7 @@ ParserTask::ParserTask(parac_task& task,
 ParserTask::~ParserTask() {}
 
 parac_status
-ParserTask::work(parac_task* self) {
+ParserTask::work(parac_task* self, parac_worker worker) {
   assert(self);
   assert(self->userdata);
   ParserTask* t = static_cast<ParserTask*>(self->userdata);

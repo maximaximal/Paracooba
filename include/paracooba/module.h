@@ -113,6 +113,7 @@ typedef struct parac_handle {
   parac_module* modules[PARAC_MOD__COUNT];
 
   parac_handle_request_exit request_exit;// Request to exit program.
+  parac_status exit_status;// Exit status of program.
 } parac_handle;
 
 enum parac_status
