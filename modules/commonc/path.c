@@ -122,6 +122,18 @@ parac_path_to_str(parac_path p, char* out_str) {
     out_str[i++] = ')';
     out_str[i++] = '\0';
     return;
+  } else if(p.length == PARAC_PATH_PARSER) {
+    size_t i = 0;
+    out_str[i++] = '(';
+    out_str[i++] = 'p';
+    out_str[i++] = 'a';
+    out_str[i++] = 'r';
+    out_str[i++] = 's';
+    out_str[i++] = 'e';
+    out_str[i++] = 'r';
+    out_str[i++] = ')';
+    out_str[i++] = '\0';
+    return;
   } else if(p.length >= PARAC_PATH_MAX_LENGTH) {
     size_t i = 0;
     out_str[i++] = 'I';

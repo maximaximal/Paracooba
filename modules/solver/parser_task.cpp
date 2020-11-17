@@ -21,34 +21,29 @@ ParserTask::ParserTask(parac_task& task,
   , m_task(task)
   , m_file(file)
   , m_finishedCB(finishedCB) {
-  task.state = PARAC_TASK_NEW;
-  task.result = PARAC_UNDEFINED;
-  task.left_result = PARAC_UNDEFINED;
-  task.right_result = PARAC_UNDEFINED;
-  task.path.rep = PARAC_PATH_EXPLICITLY_UNKNOWN;
+  task.path.rep = PARAC_PATH_PARSER;
+  task.state = task.state | PARAC_TASK_WORK_AVAILABLE;
   task.received_from = 0;
   task.offloaded_to = 0;
   task.userdata = this;
   task.work = &ParserTask::work;
+  task.free_userdata = [](parac_task* task) {
+    assert(task);
+    assert(task->userdata);
+    ParserTask* parserTask = static_cast<ParserTask*>(task->userdata);
+    delete parserTask;
+    return PARAC_OK;
+  };
 }
 ParserTask::~ParserTask() {}
-
-parac_task_state
-ParserTask::assess(parac_task* self) {
-  assert(self);
-  assert(self->userdata);
-  ParserTask* t = static_cast<ParserTask*>(self->userdata);
-  if(!t->m_internal->handlePtr->hasFormula()) {
-    return PARAC_TASK_WORK_AVAILABLE;
-  }
-  return PARAC_TASK_DONE;
-}
 
 parac_status
 ParserTask::work(parac_task* self) {
   assert(self);
   assert(self->userdata);
   ParserTask* t = static_cast<ParserTask*>(self->userdata);
+  assert(t->m_internal);
+  assert(t->m_internal->handlePtr);
   assert(!t->m_internal->handlePtr->hasFormula());
   parac_status s = t->m_internal->handlePtr->parseFile(t->m_file);
   if(t->m_finishedCB) {

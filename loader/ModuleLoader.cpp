@@ -98,13 +98,20 @@ struct ModuleLoader::Internal {
   }
 };
 
+void
+ModuleLoader::static_request_exit(parac_handle* handle) {
+  assert(handle);
+  assert(handle->userdata);
+  ModuleLoader* loader = static_cast<ModuleLoader*>(handle->userdata);
+  loader->request_exit();
+}
+
 PARAC_LOADER_EXPORT
 ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
                            struct parac_config& config,
                            parac_id id,
                            const char* localName,
-                           const char* hostName,
-                           const char* inputFile)
+                           const char* hostName)
   : m_internal(std::make_unique<Internal>()) {
   handle().userdata = this;
   handle().prepare = &ModuleLoader::prepare;
@@ -115,13 +122,14 @@ ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
   handle().id = id;
   handle().local_name = localName;
   handle().host_name = hostName;
-  handle().input_file = inputFile;
+  handle().request_exit = &static_request_exit;
 }
 PARAC_LOADER_EXPORT
 ModuleLoader::ModuleLoader(parac_handle& externalHandle)
   : m_internal(std::make_unique<Internal>(externalHandle)) {
   handle().userdata = this;
   handle().prepare = &ModuleLoader::prepare;
+  handle().request_exit = &static_request_exit;
 }
 PARAC_LOADER_EXPORT ModuleLoader::~ModuleLoader() {
   exit();
@@ -221,10 +229,12 @@ ModuleLoader::mod(size_t mod) {
 }
 
 PARAC_LOADER_EXPORT bool
-ModuleLoader::load() {
+ModuleLoader::load(std::set<parac_module_type> modulesToLoad) {
   for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
     parac_module_type type = static_cast<parac_module_type>(i);
-    load(type);
+    if(modulesToLoad.count(type)) {
+      load(type);
+    }
   }
 
   for(auto& mod : m_modules) {
@@ -252,7 +262,7 @@ ModuleLoader::load() {
       mod->handle = &handle();
     }
   }
-  if(!isComplete()) {
+  if(!isComplete(modulesToLoad)) {
     parac_log(
       PARAC_LOADER, PARAC_FATAL, "Cannot load all required paracooba modules!");
   }
@@ -274,6 +284,10 @@ RunFuncInAllModules(ModuleLoader::ModuleArray& modules,
   for(size_t i = 0; i < PARAC_MOD__COUNT; ++i) {
     parac_module_type type = static_cast<parac_module_type>(i);
     auto& ptr = modules[type];
+
+    // If the module is not loaded at this stage, it is explicitly deactivated.
+    if(!ptr)
+      return true;
 
     if(!ptr || !getFunc(ptr)) {
       parac_log(PARAC_LOADER,
@@ -337,8 +351,12 @@ ModuleLoader::exit() {
 }
 
 PARAC_LOADER_EXPORT bool
-ModuleLoader::isComplete() {
-  return hasSolver() && hasRunner() && hasCommunicator() && hasBroker();
+ModuleLoader::isComplete(std::set<parac_module_type> modulesToLoad) {
+  for(parac_module_type t : modulesToLoad) {
+    if(!m_modules[t])
+      return false;
+  }
+  return true;
 }
 
 PARAC_LOADER_EXPORT bool

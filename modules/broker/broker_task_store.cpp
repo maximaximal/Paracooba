@@ -24,17 +24,7 @@ struct TaskStore::Internal {
   std::mutex containerMutex;
   parac_task_store& store;
 
-  struct Task {
-    parac_task t;
-
-    ~Task() {
-      if(t.free_userdata) {
-        t.free_userdata(&t);
-      }
-    }
-  };
-  using TaskRef = std::reference_wrapper<parac_task>;
-
+  struct Task;
   template<typename T>
   using Allocator = boost::fast_pool_allocator<
     T,
@@ -43,6 +33,20 @@ struct TaskStore::Internal {
                                      // synchronized by containerMutex
     64,
     128>;
+  using TaskList = std::list<Task, Allocator<Task>>;
+
+  struct Task {
+    TaskList::iterator it;
+    parac_task t;
+
+    ~Task() {
+      parac_log(PARAC_BROKER, PARAC_TRACE, "Delete task on path {}.", t.path);
+      if(t.free_userdata) {
+        t.free_userdata(&t);
+      }
+    }
+  };
+  using TaskRef = std::reference_wrapper<parac_task>;
 
   struct TaskRefCompare {
     bool operator()(const TaskRef& lhs, const TaskRef& rhs) const {
@@ -51,7 +55,7 @@ struct TaskStore::Internal {
     }
   };
 
-  std::list<Task, Allocator<Task>> tasks;
+  TaskList tasks;
 
   std::list<TaskRef, Allocator<TaskRef>> tasksWaitingForWorkerQueue;
 
@@ -133,7 +137,9 @@ TaskStore::size() const {
 parac_task*
 TaskStore::newTask(parac_task* parent_task) {
   std::unique_lock lock(m_internal->containerMutex);
-  parac_task* task = &m_internal->tasks.emplace_front().t;
+  auto& taskWrapper = m_internal->tasks.emplace_front();
+  parac_task* task = &taskWrapper.t;
+  taskWrapper.it = m_internal->tasks.begin();
   parac_task_init(task);
   task->parent_task = parent_task;
   return task;
@@ -213,6 +219,16 @@ TaskStore::remove_from_tasksBeingWorkedOn(parac_task* task) {
   std::unique_lock lock(m_internal->containerMutex);
   m_internal->tasksBeingWorkedOn.erase(*task);
 }
+void
+TaskStore::remove(parac_task* task) {
+  Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+    reinterpret_cast<std::byte*>(task) - offsetof(Internal::Task, t));
+  assert(taskWrapper);
+
+  assert(task);
+  std::unique_lock lock(m_internal->containerMutex);
+  m_internal->tasks.erase(taskWrapper->it);
+}
 
 void
 TaskStore::assess_task(parac_task* task) {
@@ -236,6 +252,9 @@ TaskStore::assess_task(parac_task* task) {
   if((s & PARAC_TASK_SPLITS_DONE) == PARAC_TASK_SPLITS_DONE) {
     remove_from_tasksWaitingForChildren(task);
   }
+
+  task->last_state = s;
+
   if(parac_task_state_is_done(s)) {
     remove_from_tasksBeingWorkedOn(task);
 
@@ -266,10 +285,12 @@ TaskStore::assess_task(parac_task* task) {
       }
 
       assess_task(parent);
+
+      // As this task is done and the parent has been assessed, it can be
+      // deleted.
+      remove(task);
     }
   }
-
-  task->last_state = s;
 }
 
 }

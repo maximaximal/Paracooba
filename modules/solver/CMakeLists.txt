@@ -8,3 +8,5 @@ set(PARACOOBA_SOLVER_SRCS
 
 parac_module(parac_solver "${PARACOOBA_SOLVER_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
 target_link_libraries(parac_solver_obj PRIVATE libcadical)
+target_link_libraries(parac_solver_static PRIVATE libcadical)
+target_link_libraries(parac_solver PRIVATE libcadical)

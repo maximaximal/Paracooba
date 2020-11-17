@@ -24,6 +24,6 @@ class CaDiCaLHandle {
   struct Internal;
   std::unique_ptr<Internal> m_internal;
 
-  bool m_hasFormula;
+  bool m_hasFormula = false;
 };
 }

@@ -1,5 +1,8 @@
+#include "cadical_handle.hpp"
+#include "cadical_manager.hpp"
 #include "paracooba/common/log.h"
 #include "paracooba/common/task_store.h"
+#include "parser_task.hpp"
 #include <paracooba/broker/broker.h>
 #include <paracooba/common/path.h>
 #include <paracooba/module.h>
@@ -16,6 +19,7 @@
 
 static parac_status
 create_parser_task(parac_module& mod) {
+  using parac::solver::ParserTask;
   assert(mod.handle);
   assert(mod.handle->input_file);
 
@@ -25,7 +29,26 @@ create_parser_task(parac_module& mod) {
   auto& task_store = *broker.task_store;
 
   parac_task* task = task_store.new_task(&task_store, nullptr);
+  parac_log(PARAC_SOLVER,
+            PARAC_DEBUG,
+            "Create ParserTask for formula in file \"{}\".",
+            mod.handle->input_file);
+
   assert(task);
+  new ParserTask(
+    *task,
+    mod.handle->input_file,
+    [&mod](parac_status status, ParserTask::CaDiCaLHandlePtr parsedFormula) {
+      if(status != PARAC_OK) {
+        parac_log(PARAC_SOLVER,
+                  PARAC_FATAL,
+                  "Parsing of formula \"{}\" failed with status {}! Exiting.",
+                  mod.handle->input_file,
+                  status);
+        mod.handle->request_exit(mod.handle);
+      }
+    });
+  task_store.assess_task(&task_store, task);
 
   return PARAC_OK;
 }
@@ -65,6 +88,11 @@ init(parac_module* mod) {
 
   if(mod->handle->input_file) {
     status = create_parser_task(*mod);
+  } else {
+    parac_log(PARAC_SOLVER,
+              PARAC_DEBUG,
+              "Solver did not receive input file, so paracooba is going into "
+              "daemon mode.");
   }
 
   return status;

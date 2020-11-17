@@ -107,17 +107,11 @@ main(int argc, char* argv[]) {
     return EXIT_SUCCESS;
   }
 
-  const char* inputFile = nullptr;
-  if(cli.getInputFile() != "") {
-    inputFile = cli.getInputFile().c_str();
-  }
-
   ModuleLoader loader(thread_registry,
                       config,
                       cli.getId(),
                       cli.getLocalName().c_str(),
-                      cli.getHostName().c_str(),
-                      inputFile);
+                      cli.getHostName().c_str());
   GlobalModuleLoader = &loader;
   signal(SIGINT, InterruptHandler);
 
@@ -138,6 +132,12 @@ main(int argc, char* argv[]) {
   if(!cli.parseModuleArgs(argc, argv)) {
     return EXIT_SUCCESS;
   }
+
+  const char* inputFile = nullptr;
+  if(cli.getInputFile() != "") {
+    inputFile = cli.getInputFile().c_str();
+  }
+  loader.handle().input_file = inputFile;
 
   if(cli.getInputFile() != "" &&
      !boost::filesystem::exists(cli.getInputFile())) {

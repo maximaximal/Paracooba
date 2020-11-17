@@ -26,7 +26,12 @@ class ParacoobaMock : public parac_handle {
   public:
   ParacoobaMock(parac_id id,
                 const char* input_file = nullptr,
-                ParacoobaMock* knownRemote = nullptr) {
+                ParacoobaMock* knownRemote = nullptr,
+                std::set<parac_module_type> modulesToLoad = {
+                  PARAC_MOD_BROKER,
+                  PARAC_MOD_RUNNER,
+                  PARAC_MOD_SOLVER,
+                  PARAC_MOD_COMMUNICATOR }) {
     version.major = 0;
     version.minor = 0;
     version.patch = 0;
@@ -52,7 +57,7 @@ class ParacoobaMock : public parac_handle {
     m_moduleLoader = std::make_unique<paracooba::ModuleLoader>(
       *static_cast<parac_handle*>(this));
 
-    m_moduleLoader->load();
+    m_moduleLoader->load(modulesToLoad);
 
     parac_config_apply_default_values(config);
 

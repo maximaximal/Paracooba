@@ -31,6 +31,7 @@ class TaskStore {
 
   void remove_from_tasksWaitingForChildren(parac_task* task);
   void remove_from_tasksBeingWorkedOn(parac_task* task);
+  void remove(parac_task *task);
 
   struct Internal;
   std::unique_ptr<Internal> m_internal;

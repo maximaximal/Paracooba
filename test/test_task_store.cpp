@@ -8,10 +8,11 @@
 
 #include "mocks.hpp"
 #include "paracooba/common/status.h"
+#include "paracooba/module.h"
 
 TEST_CASE("Test Task Store: Manipulating Tasks",
           "[integration,broker,taskstore]") {
-  ParacoobaMock master(1);
+  ParacoobaMock master(1, nullptr, nullptr, { PARAC_MOD_BROKER });
 
   parac_compute_node* this_node =
     master.getBroker().compute_node_store->this_node;

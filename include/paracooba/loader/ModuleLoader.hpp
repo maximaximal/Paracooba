@@ -3,6 +3,7 @@
 
 #include <array>
 #include <memory>
+#include <set>
 
 #include <paracooba/common/config.h>
 #include <paracooba/module.h>
@@ -17,8 +18,7 @@ class ModuleLoader {
                struct parac_config& config,
                parac_id id,
                const char* localName,
-               const char* hostName,
-               const char* inputFile);
+               const char* hostName);
 
   /** @brief Initialize the module loader with an externally provided handle.
    */
@@ -26,13 +26,21 @@ class ModuleLoader {
 
   ~ModuleLoader();
 
-  bool load();
+  bool load(std::set<parac_module_type> modulesToLoad = {
+              PARAC_MOD_BROKER,
+              PARAC_MOD_RUNNER,
+              PARAC_MOD_SOLVER,
+              PARAC_MOD_COMMUNICATOR });
   bool pre_init();
   bool init();
   bool request_exit();
   bool exit();
 
-  bool isComplete();
+  bool isComplete(std::set<parac_module_type> modulesToLoad = {
+                    PARAC_MOD_BROKER,
+                    PARAC_MOD_RUNNER,
+                    PARAC_MOD_SOLVER,
+                    PARAC_MOD_COMMUNICATOR });
 
   bool hasSolver();
   bool hasRunner();
@@ -58,6 +66,8 @@ class ModuleLoader {
   ModuleArray m_modules;
 
   bool load(parac_module_type type);
+
+  static void static_request_exit(parac_handle* handle);
 };
 }
 

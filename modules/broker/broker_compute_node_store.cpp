@@ -31,17 +31,27 @@ ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
   assert(thisNode->broker_userdata);
   store.this_node = thisNode;
 
-  auto runner = handle.modules[PARAC_MOD_RUNNER]->runner;
-  auto communicator = handle.modules[PARAC_MOD_COMMUNICATOR]->communicator;
-  auto workers = runner->available_worker_count;
+  uint16_t udpListenPort = 0;
+  uint16_t tcpListenPort = 0;
+  uint32_t workers = 0;
+
+  if(handle.modules[PARAC_MOD_RUNNER]) {
+    auto runner = handle.modules[PARAC_MOD_RUNNER]->runner;
+    workers = runner->available_worker_count;
+  }
+  if(handle.modules[PARAC_MOD_COMMUNICATOR]) {
+    auto communicator = handle.modules[PARAC_MOD_COMMUNICATOR]->communicator;
+    udpListenPort = communicator->udp_listen_port;
+    tcpListenPort = communicator->tcp_listen_port;
+  }
 
   ComputeNode* thisBrokerNode =
     static_cast<ComputeNode*>(thisNode->broker_userdata);
   thisBrokerNode->initDescription(handle.local_name,
                                   handle.host_name,
                                   workers,
-                                  communicator->udp_listen_port,
-                                  communicator->udp_listen_port,
+                                  tcpListenPort,
+                                  udpListenPort,
                                   handle.input_file == nullptr,
                                   true);
 }

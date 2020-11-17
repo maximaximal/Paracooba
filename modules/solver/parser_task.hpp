@@ -25,7 +25,6 @@ class ParserTask {
   struct Internal;
   std::unique_ptr<Internal> m_internal;
 
-  static parac_task_state assess(parac_task* self);
   static parac_status work(parac_task* self);
 
   parac_task& m_task;

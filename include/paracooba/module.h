@@ -84,6 +84,8 @@ typedef struct parac_module {
   };
 } parac_module;
 
+typedef void (*parac_handle_request_exit)(struct parac_handle* handle);
+
 /** @brief Called from the module into Paracooba. Controlled by Paracooba,
  * owned by Paracooba.
  *
@@ -109,6 +111,8 @@ typedef struct parac_handle {
   parac_module_prepare prepare;// Returns a parac_module object to insert module
                                // commands into. Can only be called once.
   parac_module* modules[PARAC_MOD__COUNT];
+
+  parac_handle_request_exit request_exit;// Request to exit program.
 } parac_handle;
 
 enum parac_status

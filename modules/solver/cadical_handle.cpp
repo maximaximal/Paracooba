@@ -1,5 +1,6 @@
 #include "cadical_handle.hpp"
 #include "cadical_terminator.hpp"
+#include "fmt/core.h"
 #include "paracooba/common/log.h"
 #include "paracooba/common/status.h"
 
@@ -58,6 +59,8 @@ CaDiCaLHandle::parseFile(const std::string& path) {
             path,
             m_internal->vars,
             m_internal->pregeneratedCubes.size());
+
+  m_hasFormula = true;
 
   return PARAC_OK;
 }
