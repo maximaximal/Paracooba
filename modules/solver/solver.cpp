@@ -17,9 +17,15 @@
 #define SOLVER_VERSION_PATCH 0
 #define SOLVER_VERSION_TWEAK 0
 
+using parac::solver::CaDiCaLManager;
+using parac::solver::ParserTask;
+
+struct SolverUserdata {
+  std::unique_ptr<CaDiCaLManager> cadicalManager;
+};
+
 static parac_status
 create_parser_task(parac_module& mod) {
-  using parac::solver::ParserTask;
   assert(mod.handle);
   assert(mod.handle->input_file);
 
@@ -38,6 +44,7 @@ create_parser_task(parac_module& mod) {
   new ParserTask(
     *task,
     mod.handle->input_file,
+    mod.handle->id,
     [&mod](parac_status status, ParserTask::CaDiCaLHandlePtr parsedFormula) {
       if(status != PARAC_OK) {
         parac_log(PARAC_SOLVER,
@@ -47,6 +54,10 @@ create_parser_task(parac_module& mod) {
                   status);
         mod.handle->request_exit(mod.handle);
       }
+
+      SolverUserdata* userdata = static_cast<SolverUserdata*>(mod.userdata);
+      userdata->cadicalManager =
+        std::make_unique<CaDiCaLManager>(mod, std::move(parsedFormula));
     });
   task_store.assess_task(&task_store, task);
 
@@ -113,6 +124,11 @@ mod_exit(parac_module* mod) {
   assert(mod->solver);
   assert(mod->handle);
 
+  if(mod->userdata) {
+    SolverUserdata* userdata = static_cast<SolverUserdata*>(mod->userdata);
+    delete userdata;
+  }
+
   return PARAC_OK;
 }
 
@@ -133,6 +149,9 @@ parac_module_discover_solver(parac_handle* handle) {
   mod->init = init;
   mod->request_exit = mod_request_exit;
   mod->exit = mod_exit;
+
+  SolverUserdata* userdata = new SolverUserdata();
+  mod->userdata = userdata;
 
   return PARAC_OK;
 }

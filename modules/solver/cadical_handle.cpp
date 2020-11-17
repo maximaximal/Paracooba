@@ -10,18 +10,20 @@
 
 namespace parac::solver {
 struct CaDiCaLHandle::Internal {
-  Internal(bool& stop)
-    : terminator(stop) {}
+  Internal(bool& stop, parac_id originatorId)
+    : terminator(stop)
+    , originatorId(originatorId) {}
   CaDiCaL::Solver solver;
   std::vector<int> pregeneratedCubes;
   int vars;
   bool incremental;
   CaDiCaLTerminator terminator;
   std::string path;
+  parac_id originatorId;
 };
 
-CaDiCaLHandle::CaDiCaLHandle(bool& stop)
-  : m_internal(std::make_unique<Internal>(stop)) {}
+CaDiCaLHandle::CaDiCaLHandle(bool& stop, parac_id originatorId)
+  : m_internal(std::make_unique<Internal>(stop, originatorId)) {}
 CaDiCaLHandle::~CaDiCaLHandle() {}
 
 CaDiCaL::Solver&
@@ -63,5 +65,13 @@ CaDiCaLHandle::parseFile(const std::string& path) {
   m_hasFormula = true;
 
   return PARAC_OK;
+}
+const std::string&
+CaDiCaLHandle::path() const {
+  return m_internal->path;
+}
+parac_id
+CaDiCaLHandle::originatorId() const {
+  return m_internal->originatorId;
 }
 }

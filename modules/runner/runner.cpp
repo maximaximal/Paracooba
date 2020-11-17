@@ -45,6 +45,12 @@ pre_init(parac_module* mod) {
   assert(mod->runner);
   assert(mod->handle);
   assert(mod->handle->config);
+  assert(mod->userdata);
+
+  RunnerUserdata* runnerUserdata = static_cast<RunnerUserdata*>(mod->userdata);
+
+  mod->runner->busy_worker_count = 0;
+  mod->runner->available_worker_count = runnerUserdata->executor.workerCount();
 
   return PARAC_OK;
 }

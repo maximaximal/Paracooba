@@ -9,15 +9,16 @@
 
 namespace parac::solver {
 struct ParserTask::Internal {
-  Internal(bool& stop)
-    : handlePtr(std::make_unique<CaDiCaLHandle>(stop)) {}
+  Internal(bool& stop, parac_id originatorId)
+    : handlePtr(std::make_unique<CaDiCaLHandle>(stop, originatorId)) {}
   CaDiCaLHandlePtr handlePtr;
 };
 
 ParserTask::ParserTask(parac_task& task,
                        const std::string& file,
+                       parac_id originatorId,
                        FinishedCB finishedCB)
-  : m_internal(std::make_unique<Internal>(task.stop))
+  : m_internal(std::make_unique<Internal>(task.stop, originatorId))
   , m_task(task)
   , m_file(file)
   , m_finishedCB(finishedCB) {

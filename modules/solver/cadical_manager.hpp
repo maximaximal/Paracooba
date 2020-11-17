@@ -16,6 +16,7 @@ class CaDiCaLManager {
   ~CaDiCaLManager();
 
   private:
+  parac_module& m_mod;
   CaDiCaLHandlePtr m_parsedFormula;
   std::vector<CaDiCaLHandlePtr> m_solvers;
 };

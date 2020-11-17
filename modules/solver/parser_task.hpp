@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "paracooba/common/types.h"
 #include <paracooba/common/status.h>
 #include <paracooba/common/task.h>
 
@@ -18,7 +19,10 @@ class ParserTask {
   using CaDiCaLHandlePtr = std::unique_ptr<CaDiCaLHandle>;
   using FinishedCB = std::function<void(parac_status, CaDiCaLHandlePtr)>;
 
-  ParserTask(parac_task& task, const std::string& file, FinishedCB finishedCB);
+  ParserTask(parac_task& task,
+             const std::string& file,
+             parac_id originatorId,
+             FinishedCB finishedCB);
   ~ParserTask();
 
   private:
