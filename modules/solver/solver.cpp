@@ -56,6 +56,7 @@ create_parser_task(parac_module& mod) {
                   mod.handle->input_file,
                   status);
         mod.handle->request_exit(mod.handle);
+        return;
       }
 
       SolverUserdata* userdata = static_cast<SolverUserdata*>(mod.userdata);
