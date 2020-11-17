@@ -53,12 +53,6 @@ Worker::run() {
 
     m_currentTask->state = m_currentTask->state | PARAC_TASK_DONE;
 
-    parac_log(PARAC_RUNNER,
-              PARAC_TRACE,
-              "Ended work on path {} with result {} and task state {}.",
-              m_currentTask->path,
-              m_currentTask->result,
-              m_currentTask->state);
     m_taskStore.assess_task(&m_taskStore, m_currentTask);
   }
   parac_log(PARAC_RUNNER, PARAC_DEBUG, "Worker exited.");
