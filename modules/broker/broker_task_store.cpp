@@ -285,12 +285,10 @@ TaskStore::assess_task(parac_task* task) {
       }
 
       assess_task(parent);
-
-      // As this task is done and the parent has been assessed, it can be
-      // deleted.
-      remove(task);
     }
+    // As this task is done and the parent has been assessed, it can be
+    // deleted.
+    remove(task);
   }
 }
-
 }
