@@ -14,12 +14,15 @@ class CaDiCaLHandle;
 class SolverTask;
 class CubeIteratorRange;
 class SolverAssignment;
+class SolverConfig;
 
 class CaDiCaLManager {
   public:
   using CaDiCaLHandlePtr = std::unique_ptr<CaDiCaLHandle>;
 
-  CaDiCaLManager(parac_module& mod, CaDiCaLHandlePtr parsedFormula);
+  CaDiCaLManager(parac_module& mod,
+                 CaDiCaLHandlePtr parsedFormula,
+                 SolverConfig& solverConfig);
   ~CaDiCaLManager();
 
   SolverTask* createSolverTask(parac_task& task);
@@ -49,6 +52,8 @@ class CaDiCaLManager {
 
   parac_id originatorId() const;
 
+  const SolverConfig& config() const { return m_solverConfig; }
+
   private:
   struct Internal;
   std::unique_ptr<Internal> m_internal;
@@ -56,6 +61,7 @@ class CaDiCaLManager {
 
   parac_module& m_mod;
   CaDiCaLHandlePtr m_parsedFormula;
+  SolverConfig& m_solverConfig;
 
   CaDiCaLHandlePtr takeHandleForWorker(parac_worker worker);
   void returnHandleFromWorker(CaDiCaLHandlePtr handle, parac_worker worker);

@@ -38,6 +38,7 @@ struct SolverInstance {
   parac_module_solver_instance instance;
   std::unique_ptr<CaDiCaLManager> cadicalManager;
   SolverInstanceList::iterator it;
+  SolverConfig config;
   const parac_id originatorId;
 };
 
@@ -49,6 +50,7 @@ struct SolverUserdata {
 
 static parac_status
 initiate_solving_on_file(parac_module& mod,
+                         parac_module_solver_instance* instance,
                          const char* file,
                          parac_id originatorId) {
   assert(mod.handle);
@@ -71,8 +73,8 @@ initiate_solving_on_file(parac_module& mod,
     *task,
     file,
     originatorId,
-    [&mod, &task_store](parac_status status,
-                        ParserTask::CaDiCaLHandlePtr parsedFormula) {
+    [&mod, &task_store, instance](parac_status status,
+                                  ParserTask::CaDiCaLHandlePtr parsedFormula) {
       if(status != PARAC_OK) {
         parac_log(PARAC_SOLVER,
                   PARAC_FATAL,
@@ -83,12 +85,9 @@ initiate_solving_on_file(parac_module& mod,
         return;
       }
 
-      parac_module_solver_instance* instance =
-        mod.solver->add_instance(&mod, mod.handle->id);
-
       SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
-      i->cadicalManager =
-        std::make_unique<CaDiCaLManager>(mod, std::move(parsedFormula));
+      i->cadicalManager = std::make_unique<CaDiCaLManager>(
+        mod, std::move(parsedFormula), i->config);
 
       parac_task* task = task_store.new_task(&task_store, nullptr);
       assert(task);
@@ -146,6 +145,9 @@ pre_init(parac_module* mod) {
   mod->solver->add_instance = &add_instance;
   mod->solver->remove_instance = &remove_instance;
 
+  SolverUserdata* userdata = static_cast<SolverUserdata*>(mod->userdata);
+  userdata->config.extractFromConfigEntries();
+
   return PARAC_OK;
 }
 
@@ -156,6 +158,8 @@ init(parac_module* mod) {
   assert(mod->handle);
   assert(mod->handle->config);
   assert(mod->handle->thread_registry);
+
+  SolverUserdata* userdata = static_cast<SolverUserdata*>(mod->userdata);
 
   /* The solver is responsible to create the initial task and to announce the
    * result. All actual solving happens in this module.
@@ -173,9 +177,14 @@ init(parac_module* mod) {
   parac_status status = PARAC_OK;
 
   if(mod->handle->input_file) {
-    // Start local solver.
-    status =
-      initiate_solving_on_file(*mod, mod->handle->input_file, mod->handle->id);
+    parac_module_solver_instance* instance =
+      mod->solver->add_instance(mod, mod->handle->id);
+
+    SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
+    i->config = userdata->config;
+
+    status = initiate_solving_on_file(
+      *mod, instance, mod->handle->input_file, mod->handle->id);
 
   } else {
     parac_log(PARAC_SOLVER,

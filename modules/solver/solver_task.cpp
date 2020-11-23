@@ -5,10 +5,12 @@
 #include "paracooba/common/types.h"
 #include "paracooba/solver/cube_iterator.hpp"
 #include "solver_assignment.hpp"
+#include "solver_config.hpp"
 #include "solver_task.hpp"
 
 #include <chrono>
 #include <paracooba/common/task.h>
+#include <paracooba/common/log.h>
 #include <thread>
 
 namespace parac::solver {

@@ -44,10 +44,12 @@ CaDiCaLManager::Internal::SolverTaskWrapperList
 std::mutex CaDiCaLManager::Internal::solverTasksMutex;
 
 CaDiCaLManager::CaDiCaLManager(parac_module& mod,
-                               CaDiCaLHandlePtr parsedFormula)
+                               CaDiCaLHandlePtr parsedFormula,
+                               SolverConfig& solverConfig)
   : m_internal(std::make_unique<Internal>())
   , m_mod(mod)
-  , m_parsedFormula(std::move(parsedFormula)) {
+  , m_parsedFormula(std::move(parsedFormula))
+  , m_solverConfig(solverConfig) {
   uint32_t workers = 0;
 
   if(mod.handle->modules[PARAC_MOD_RUNNER]) {
