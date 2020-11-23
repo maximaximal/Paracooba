@@ -1,14 +1,19 @@
+#include "paracooba/solver/solver.h"
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
 #include "paracooba/common/log.h"
 #include "paracooba/common/task_store.h"
 #include "parser_task.hpp"
+#include "solver_config.hpp"
 #include "solver_task.hpp"
 #include <paracooba/broker/broker.h>
 #include <paracooba/common/path.h>
 #include <paracooba/module.h>
+#include <paracooba/solver/solver.h>
 
 #include <cassert>
+#include <list>
+#include <mutex>
 
 #include <parac_solver_export.h>
 
@@ -20,14 +25,32 @@
 
 using parac::solver::CaDiCaLManager;
 using parac::solver::ParserTask;
+using parac::solver::SolverConfig;
 using parac::solver::SolverTask;
 
-struct SolverUserdata {
+struct SolverInstance;
+using SolverInstanceList = std::list<SolverInstance>;
+
+struct SolverInstance {
+  explicit SolverInstance(parac_id originatorId)
+    : originatorId(originatorId) {}
+
+  parac_module_solver_instance instance;
   std::unique_ptr<CaDiCaLManager> cadicalManager;
+  SolverInstanceList::iterator it;
+  const parac_id originatorId;
+};
+
+struct SolverUserdata {
+  SolverInstanceList instances;
+  std::mutex instancesMutex;
+  SolverConfig config;
 };
 
 static parac_status
-create_parser_task(parac_module& mod) {
+initiate_solving_on_file(parac_module& mod,
+                         const char* file,
+                         parac_id originatorId) {
   assert(mod.handle);
   assert(mod.handle->input_file);
 
@@ -39,14 +62,15 @@ create_parser_task(parac_module& mod) {
   parac_task* task = task_store.new_task(&task_store, nullptr);
   parac_log(PARAC_SOLVER,
             PARAC_DEBUG,
-            "Create ParserTask for formula in file \"{}\".",
-            mod.handle->input_file);
+            "Create ParserTask for formula in file \"{}\" from node {}.",
+            file,
+            originatorId);
 
   assert(task);
   new ParserTask(
     *task,
-    mod.handle->input_file,
-    mod.handle->id,
+    file,
+    originatorId,
     [&mod, &task_store](parac_status status,
                         ParserTask::CaDiCaLHandlePtr parsedFormula) {
       if(status != PARAC_OK) {
@@ -59,13 +83,16 @@ create_parser_task(parac_module& mod) {
         return;
       }
 
-      SolverUserdata* userdata = static_cast<SolverUserdata*>(mod.userdata);
-      userdata->cadicalManager =
+      parac_module_solver_instance* instance =
+        mod.solver->add_instance(&mod, mod.handle->id);
+
+      SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
+      i->cadicalManager =
         std::make_unique<CaDiCaLManager>(mod, std::move(parsedFormula));
 
       parac_task* task = task_store.new_task(&task_store, nullptr);
       assert(task);
-      SolverTask::createRoot(*task, *userdata->cadicalManager);
+      SolverTask::createRoot(*task, *i->cadicalManager);
       task_store.assess_task(&task_store, task);
     });
   task_store.assess_task(&task_store, task);
@@ -74,11 +101,50 @@ create_parser_task(parac_module& mod) {
 }
 
 static parac_status
+instance_handle_message(parac_module_solver_instance* instance,
+                        parac_message* msg) {
+  return PARAC_OK;
+}
+
+static parac_module_solver_instance*
+add_instance(parac_module* mod, parac_id originatorId) {
+  assert(mod);
+  assert(mod->userdata);
+  SolverUserdata* userdata = static_cast<SolverUserdata*>(mod->userdata);
+  std::unique_lock lock(userdata->instancesMutex);
+  auto& instance = userdata->instances.emplace_front(originatorId);
+  instance.it = userdata->instances.begin();
+  instance.instance.userdata = &instance;
+  instance.instance.handle_message = &instance_handle_message;
+  return &instance.instance;
+}
+
+static parac_status
+remove_instance(parac_module* mod, parac_module_solver_instance* instance) {
+  assert(mod);
+  assert(mod->userdata);
+  assert(instance);
+
+  SolverUserdata* userdata = static_cast<SolverUserdata*>(mod->userdata);
+  SolverInstance* i =
+    reinterpret_cast<SolverInstance*>(reinterpret_cast<std::byte*>(instance) -
+                                      offsetof(SolverInstance, instance));
+  std::unique_lock lock(userdata->instancesMutex);
+
+  userdata->instances.erase(i->it);
+
+  return PARAC_OK;
+}
+
+static parac_status
 pre_init(parac_module* mod) {
   assert(mod);
-  assert(mod->runner);
+  assert(mod->solver);
   assert(mod->handle);
   assert(mod->handle->config);
+
+  mod->solver->add_instance = &add_instance;
+  mod->solver->remove_instance = &remove_instance;
 
   return PARAC_OK;
 }
@@ -107,7 +173,10 @@ init(parac_module* mod) {
   parac_status status = PARAC_OK;
 
   if(mod->handle->input_file) {
-    status = create_parser_task(*mod);
+    // Start local solver.
+    status =
+      initiate_solving_on_file(*mod, mod->handle->input_file, mod->handle->id);
+
   } else {
     parac_log(PARAC_SOLVER,
               PARAC_DEBUG,
@@ -161,6 +230,8 @@ parac_module_discover_solver(parac_handle* handle) {
 
   SolverUserdata* userdata = new SolverUserdata();
   mod->userdata = userdata;
+
+  userdata->config = SolverConfig(handle->config);
 
   return PARAC_OK;
 }

@@ -5,6 +5,7 @@ set(PARACOOBA_SOLVER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/cadical_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cadical_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cube_source.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/solver_config.cpp
     )
 
 parac_module(parac_solver "${PARACOOBA_SOLVER_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
