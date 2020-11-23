@@ -161,6 +161,8 @@ CaDiCaLManager::handleSatisfyingAssignmentFound(
     mod().handle->assignment_is_set = &SolverAssignment::static_isSet;
     mod().handle->assignment_highest_literal =
       &SolverAssignment::static_highestLiteral;
+
+    mod().handle->request_exit(mod().handle);
   }
 }
 

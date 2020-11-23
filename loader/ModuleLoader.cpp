@@ -79,6 +79,7 @@ struct ModuleLoader::Internal {
   parac_module_runner runner;
   parac_module_solver solver;
   parac_module_communicator communicator;
+  bool exitRequested = false;
 
   std::variant<parac_handle, parac_handle*> storedHandle;
 
@@ -349,8 +350,12 @@ ModuleLoader::init() {
 
 PARAC_LOADER_EXPORT bool
 ModuleLoader::request_exit() {
-  return RunFuncInAllModules(
-    m_modules, "request_exit", [](auto& p) { return p->request_exit; });
+  if(!m_internal->exitRequested) {
+    m_internal->exitRequested = true;
+    return RunFuncInAllModules(
+      m_modules, "request_exit", [](auto& p) { return p->request_exit; });
+  }
+  return false;
 }
 
 PARAC_LOADER_EXPORT bool
