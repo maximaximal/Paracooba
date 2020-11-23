@@ -86,6 +86,9 @@ typedef struct parac_module {
 
 typedef void (*parac_handle_request_exit)(struct parac_handle* handle);
 
+typedef bool (*parac_handle_assignment_is_set)(void* assignment_data, int l);
+typedef int (*parac_handle_assignment_highest_literal)(void* assignment_data);
+
 /** @brief Called from the module into Paracooba. Controlled by Paracooba,
  * owned by Paracooba.
  *
@@ -113,7 +116,12 @@ typedef struct parac_handle {
   parac_module* modules[PARAC_MOD__COUNT];
 
   parac_handle_request_exit request_exit;// Request to exit program.
-  parac_status exit_status;// Exit status of program.
+  parac_status exit_status;              // Exit status of program.
+
+  // Set by solver once an assignment was found.
+  parac_handle_assignment_is_set assignment_is_set;
+  parac_handle_assignment_highest_literal assignment_highest_literal;
+  void* assignment_data;
 } parac_handle;
 
 enum parac_status

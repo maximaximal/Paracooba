@@ -177,7 +177,8 @@ main(int argc, char* argv[]) {
 
   thread_registry.wait();
 
-  parac_log(PARAC_GENERAL, PARAC_DEBUG, "All threads exited, ending Paracooba.");
+  parac_log(
+    PARAC_GENERAL, PARAC_DEBUG, "All threads exited, ending Paracooba.");
 
   if(cli.distracEnabled()) {
     distracWrapper.finalize(loader.handle().offsetNS);
@@ -195,8 +196,21 @@ main(int argc, char* argv[]) {
 
   switch(loader.handle().exit_status) {
     case PARAC_SAT:
-      std::cout << "s SATISFIABLE" << std::endl;
-      // TODO: Print SAT assignment.
+      std::cout << "s SATISFIABLE";
+      for(auto i = 1; i <= loader.handle().assignment_highest_literal(
+                             loader.handle().assignment_data);
+          ++i) {
+        if(i % 10 == 1) {
+          std::cout << "\nv";
+        }
+        std::cout << " "
+                  << (loader.handle().assignment_is_set(
+                        loader.handle().assignment_data, i)
+                        ? "-"
+                        : "")
+                  << i;
+      }
+      std ::cout << " 0" << std::endl;
       break;
     case PARAC_UNSAT:
       std::cout << "s UNSATISFIABLE" << std::endl;

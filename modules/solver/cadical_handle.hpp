@@ -14,6 +14,7 @@ class Solver;
 
 namespace parac::solver {
 class CubeIteratorRange;
+class SolverAssignment;
 
 class CaDiCaLHandle {
   public:
@@ -41,9 +42,12 @@ class CaDiCaLHandle {
    */
   parac_status solve();
 
+  std::unique_ptr<SolverAssignment> takeSolverAssignment();
+
   private:
   struct Internal;
   std::unique_ptr<Internal> m_internal;
+  std::unique_ptr<SolverAssignment> m_solverAssignment;
 
   void generateJumplist();
 

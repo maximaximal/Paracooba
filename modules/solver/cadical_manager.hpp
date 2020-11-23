@@ -13,6 +13,7 @@ namespace parac::solver {
 class CaDiCaLHandle;
 class SolverTask;
 class CubeIteratorRange;
+class SolverAssignment;
 
 class CaDiCaLManager {
   public:
@@ -38,14 +39,20 @@ class CaDiCaLManager {
 
   CaDiCaLHandlePtrWrapper getHandleForWorker(parac_worker worker);
 
+  void handleSatisfyingAssignmentFound(
+    std::unique_ptr<SolverAssignment> assignment);
+
   CubeIteratorRange getCubeFromPath(parac_path path) const;
 
   /** @brief Get reference to solver module. */
   parac_module& mod() { return m_mod; }
 
+  parac_id originatorId() const;
+
   private:
   struct Internal;
   std::unique_ptr<Internal> m_internal;
+  std::unique_ptr<SolverAssignment> m_solverAssignment;
 
   parac_module& m_mod;
   CaDiCaLHandlePtr m_parsedFormula;

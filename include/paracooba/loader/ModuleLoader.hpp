@@ -61,6 +61,8 @@ class ModuleLoader {
 
   std::unique_ptr<Internal> m_internal;
 
+  void initHandle();
+
   static parac_module* prepare(parac_handle* handle, parac_module_type type);
 
   ModuleArray m_modules;

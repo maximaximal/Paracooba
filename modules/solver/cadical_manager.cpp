@@ -4,6 +4,7 @@
 
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
+#include "solver_assignment.hpp"
 #include "solver_task.hpp"
 
 #include <paracooba/common/log.h>
@@ -147,8 +148,29 @@ CaDiCaLManager::getHandleForWorker(parac_worker worker) {
   return CaDiCaLHandlePtrWrapper(takeHandleForWorker(worker), *this, worker);
 }
 
+void
+CaDiCaLManager::handleSatisfyingAssignmentFound(
+  std::unique_ptr<SolverAssignment> assignment) {
+  m_solverAssignment = std::move(assignment);
+
+  if(originatorId() == m_mod.handle->id) {
+    // Local solution found! Give solution to handle and exit paracooba, so that
+    // it can be printed in main().
+
+    mod().handle->assignment_data = m_solverAssignment.get();
+    mod().handle->assignment_is_set = &SolverAssignment::static_isSet;
+    mod().handle->assignment_highest_literal =
+      &SolverAssignment::static_highestLiteral;
+  }
+}
+
 CubeIteratorRange
 CaDiCaLManager::getCubeFromPath(parac_path path) const {
   return m_parsedFormula->getCubeFromPath(path);
+}
+
+parac_id
+CaDiCaLManager::originatorId() const {
+  return m_parsedFormula->originatorId();
 }
 }

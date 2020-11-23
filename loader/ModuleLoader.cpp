@@ -122,19 +122,26 @@ ModuleLoader::ModuleLoader(struct parac_thread_registry& thread_registry,
   handle().id = id;
   handle().local_name = localName;
   handle().host_name = hostName;
-  handle().request_exit = &static_request_exit;
-  handle().exit_status = PARAC_UNKNOWN;
+  initHandle();
 }
 PARAC_LOADER_EXPORT
 ModuleLoader::ModuleLoader(parac_handle& externalHandle)
   : m_internal(std::make_unique<Internal>(externalHandle)) {
+  initHandle();
+}
+PARAC_LOADER_EXPORT ModuleLoader::~ModuleLoader() {
+  exit();
+}
+
+void
+ModuleLoader::initHandle() {
   handle().userdata = this;
   handle().prepare = &ModuleLoader::prepare;
   handle().request_exit = &static_request_exit;
   handle().exit_status = PARAC_UNKNOWN;
-}
-PARAC_LOADER_EXPORT ModuleLoader::~ModuleLoader() {
-  exit();
+  handle().assignment_highest_literal = nullptr;
+  handle().assignment_is_set = nullptr;
+  handle().assignment_data = nullptr;
 }
 
 bool

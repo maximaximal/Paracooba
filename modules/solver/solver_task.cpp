@@ -1,9 +1,10 @@
 #include <cassert>
 
-#include "cadical_manager.hpp"
 #include "cadical_handle.hpp"
+#include "cadical_manager.hpp"
 #include "paracooba/common/types.h"
 #include "paracooba/solver/cube_iterator.hpp"
+#include "solver_assignment.hpp"
 #include "solver_task.hpp"
 
 #include <chrono>
@@ -63,9 +64,14 @@ SolverTask::init(CaDiCaLManager& manager, parac_task& task) {
 parac_status
 SolverTask::work(parac_worker worker) {
   auto handlePtr = m_manager->getHandleForWorker(worker);
-  auto &handle = handlePtr.ptr;
+  auto& handle = handlePtr.ptr;
 
-  return handle->solve();
+  parac_status s = handle->solve();
+
+  if(s == PARAC_SAT) {
+    m_manager->handleSatisfyingAssignmentFound(handle->takeSolverAssignment());
+  }
+  return s;
 }
 parac_status
 SolverTask::serialize_to_msg(parac_message* tgt_msg) {

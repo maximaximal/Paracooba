@@ -1,9 +1,9 @@
 #include "cadical_handle.hpp"
 #include "cadical_terminator.hpp"
-#include "fmt/core.h"
 #include "paracooba/common/log.h"
 #include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
+#include "solver_assignment.hpp"
 
 #include "paracooba/solver/cube_iterator.hpp"
 
@@ -14,12 +14,16 @@
 
 namespace parac::solver {
 struct CaDiCaLHandle::Internal {
-  Internal(bool& stop, parac_id originatorId)
+  Internal(bool& stop,
+           parac_id originatorId,
+           std::shared_ptr<Cube> pregeneratedCubes = std::make_shared<Cube>(),
+           std::shared_ptr<std::vector<size_t>> pregeneratedCubesJumplist =
+             std::make_shared<std::vector<size_t>>())
     : terminator(stop)
-    , originatorId(originatorId) {}
+    , originatorId(originatorId)
+    , pregeneratedCubes(pregeneratedCubes)
+    , pregeneratedCubesJumplist(pregeneratedCubesJumplist) {}
   CaDiCaL::Solver solver;
-  std::vector<Literal> pregeneratedCubes;
-  std::vector<size_t> pregeneratedCubesJumplist;
   size_t pregeneratedCubesCount = 0;
   size_t normalizedPathLength = 0;
   int vars;
@@ -27,15 +31,27 @@ struct CaDiCaLHandle::Internal {
   CaDiCaLTerminator terminator;
   std::string path;
   parac_id originatorId;
+  std::shared_ptr<std::vector<Literal>> pregeneratedCubes;
+  std::shared_ptr<std::vector<size_t>> pregeneratedCubesJumplist;
 };
 
 CaDiCaLHandle::CaDiCaLHandle(bool& stop, parac_id originatorId)
   : m_internal(std::make_unique<Internal>(stop, originatorId)) {}
 CaDiCaLHandle::CaDiCaLHandle(CaDiCaLHandle& o)
-  : m_internal(std::make_unique<Internal>(o.m_internal->terminator.stopRef(),
-                                          o.m_internal->originatorId)) {
+  : m_internal(
+      std::make_unique<Internal>(o.m_internal->terminator.stopRef(),
+                                 o.m_internal->originatorId,
+                                 o.m_internal->pregeneratedCubes,
+                                 o.m_internal->pregeneratedCubesJumplist)) {
   // Copy from other solver to this one.
   o.solver().copy(solver());
+
+  m_internal->pregeneratedCubesCount = o.m_internal->pregeneratedCubesCount;
+  m_internal->normalizedPathLength = o.m_internal->normalizedPathLength;
+  m_internal->vars = o.m_internal->vars;
+  m_internal->incremental = o.m_internal->incremental;
+  m_internal->path = o.m_internal->path;
+  m_internal->originatorId = o.m_internal->originatorId;
 }
 CaDiCaLHandle::~CaDiCaLHandle() {}
 
@@ -56,7 +72,7 @@ CaDiCaLHandle::parseFile(const std::string& path) {
                                    m_internal->vars,
                                    1,
                                    m_internal->incremental,
-                                   m_internal->pregeneratedCubes);
+                                   *m_internal->pregeneratedCubes);
 
   if(parseStatus != 0) {
     parac_log(PARAC_SOLVER,
@@ -67,7 +83,7 @@ CaDiCaLHandle::parseFile(const std::string& path) {
     return PARAC_PARSE_ERROR;
   }
 
-  if(m_internal->pregeneratedCubes.size()) {
+  if(m_internal->pregeneratedCubes->size()) {
     generateJumplist();
   }
 
@@ -99,11 +115,11 @@ CaDiCaLHandle::getCubeFromId(CubeId id) const {
     return CubeIteratorRange();
   }
 
-  size_t beginPos = m_internal->pregeneratedCubesJumplist[id];
-  size_t endPos = m_internal->pregeneratedCubesJumplist[id + 1];
+  size_t beginPos = (*m_internal->pregeneratedCubesJumplist)[id];
+  size_t endPos = (*m_internal->pregeneratedCubesJumplist)[id + 1];
 
-  auto begin = &m_internal->pregeneratedCubes[beginPos];
-  auto end = &m_internal->pregeneratedCubes[endPos];
+  auto begin = &(*m_internal->pregeneratedCubes)[beginPos];
+  auto end = &(*m_internal->pregeneratedCubes)[endPos];
 
   assert(begin);
   assert(end);
@@ -127,21 +143,21 @@ CaDiCaLHandle::generateJumplist() {
   parac_log(
     PARAC_SOLVER, PARAC_TRACE, "Begin parsing supplied cubes into jumplist.");
 
-  m_internal->pregeneratedCubesJumplist.clear();
+  m_internal->pregeneratedCubesJumplist->clear();
 
   size_t i = 0, lastStart = 0;
-  for(int lit : m_internal->pregeneratedCubes) {
+  for(int lit : *m_internal->pregeneratedCubes) {
     if(lit == 0) {
-      m_internal->pregeneratedCubesJumplist.push_back(lastStart);
+      m_internal->pregeneratedCubesJumplist->push_back(lastStart);
       lastStart = i + 1;
     }
     ++i;
   }
 
   m_internal->pregeneratedCubesCount =
-    m_internal->pregeneratedCubesJumplist.size();
+    m_internal->pregeneratedCubesJumplist->size();
 
-  m_internal->pregeneratedCubesJumplist.push_back(lastStart);
+  m_internal->pregeneratedCubesJumplist->push_back(lastStart);
 
   float log = std::log2f(m_internal->pregeneratedCubesCount);
   m_internal->normalizedPathLength = std::ceil(log);
@@ -164,11 +180,27 @@ CaDiCaLHandle::solve() {
     case 0:
       return PARAC_ABORTED;
     case 10:
+      parac_log(
+        PARAC_SOLVER,
+        PARAC_TRACE,
+        "Satisfying assignment found! Encoding before returning result.");
+      m_solverAssignment = std::make_unique<SolverAssignment>();
+      m_solverAssignment->SerializeAssignmentFromSolver(m_internal->vars,
+                                                        m_internal->solver);
+      parac_log(PARAC_SOLVER,
+                PARAC_TRACE,
+                "Finished encoding satisfying result! Encoded {} variables.",
+                m_solverAssignment->varCount());
       return PARAC_SAT;
     case 20:
       return PARAC_UNSAT;
     default:
       return PARAC_UNKNOWN;
   }
+}
+
+std::unique_ptr<SolverAssignment>
+CaDiCaLHandle::takeSolverAssignment() {
+  return std::move(m_solverAssignment);
 }
 }
