@@ -1,9 +1,11 @@
 #include <atomic>
 #include <map>
 
+#include "paracooba/common/timeout.h"
 #include "service.hpp"
 #include "tcp_acceptor.hpp"
 #include "tcp_connection_initiator.hpp"
+#include "timeout_controller.hpp"
 #include "udp_acceptor.hpp"
 
 #include <boost/asio/io_context.hpp>
@@ -12,6 +14,7 @@
 #include <paracooba/common/config.h>
 #include <paracooba/common/log.h>
 #include <paracooba/common/thread_registry.h>
+#include <paracooba/communicator/communicator.h>
 #include <paracooba/module.h>
 
 using boost::asio::io_context;
@@ -23,6 +26,7 @@ struct Service::Internal {
 
   std::unique_ptr<TCPAcceptor> tcpAcceptor;
   std::unique_ptr<UDPAcceptor> udpAcceptor;
+  std::unique_ptr<TimeoutController> timeoutController;
 
   std::map<parac_id,
            std::pair<boost::asio::steady_timer, TCPConnectionPayloadPtr>>
@@ -33,6 +37,8 @@ Service::Service(parac_handle& handle)
   : m_internal(std::make_unique<Internal>())
   , m_handle(handle) {
   m_internal->threadHandle.userdata = this;
+
+  m_internal->timeoutController = std::make_unique<TimeoutController>(*this);
 }
 
 Service::~Service() {}
@@ -99,6 +105,13 @@ Service::connectToKnownRemotes() {
 void
 Service::connectToRemote(const std::string& remote) {
   TCPConnectionInitiator initiator(*this, remote);
+}
+
+parac_timeout*
+Service::setTimeout(uint64_t ms,
+                    void* userdata,
+                    parac_timeout_expired expiery_cb) {
+  return m_internal->timeoutController->setTimeout(ms, userdata, expiery_cb);
 }
 
 void

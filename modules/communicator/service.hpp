@@ -1,6 +1,7 @@
 #pragma once
 
 #include "paracooba/common/status.h"
+#include "paracooba/common/timeout.h"
 #include "paracooba/common/types.h"
 #include <boost/version.hpp>
 #include <memory>
@@ -16,6 +17,7 @@ typedef io_service io_context;
 
 struct parac_handle;
 struct parac_config_entry;
+struct parac_timeout;
 
 namespace parac::communicator {
 struct TCPConnectionPayload;
@@ -64,6 +66,9 @@ class Service {
   parac_handle& handle() { return m_handle; }
 
   void connectToRemote(const std::string& remote);
+  parac_timeout* setTimeout(uint64_t ms,
+                            void* userdata,
+                            parac_timeout_expired expiery_cb);
 
   void registerTCPConnectionPayload(parac_id id,
                                     TCPConnectionPayloadPtr payload);

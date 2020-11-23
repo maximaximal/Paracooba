@@ -9,6 +9,7 @@
 #include <paracooba/common/log.h>
 #include <paracooba/module.h>
 #include <paracooba/runner/runner.h>
+#include <paracooba/solver/cube_iterator.hpp>
 
 #include <boost/pool/pool_alloc.hpp>
 
@@ -127,5 +128,27 @@ CaDiCaLManager::deleteSolverTask(SolverTask* task) {
   assert(taskWrapper);
   std::unique_lock lock(Internal::solverTasksMutex);
   Internal::solverTasks.erase(taskWrapper->it);
+}
+
+CaDiCaLManager::CaDiCaLHandlePtrWrapper::CaDiCaLHandlePtrWrapper(
+  CaDiCaLHandlePtr ptr,
+  CaDiCaLManager& mgr,
+  parac_worker worker)
+  : ptr(std::move(ptr))
+  , mgr(mgr)
+  , worker(worker) {}
+
+CaDiCaLManager::CaDiCaLHandlePtrWrapper::~CaDiCaLHandlePtrWrapper() {
+  mgr.returnHandleFromWorker(std::move(ptr), worker);
+}
+
+CaDiCaLManager::CaDiCaLHandlePtrWrapper
+CaDiCaLManager::getHandleForWorker(parac_worker worker) {
+  return CaDiCaLHandlePtrWrapper(takeHandleForWorker(worker), *this, worker);
+}
+
+CubeIteratorRange
+CaDiCaLManager::getCubeFromPath(parac_path path) const {
+  return m_parsedFormula->getCubeFromPath(path);
 }
 }

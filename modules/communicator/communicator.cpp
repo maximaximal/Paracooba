@@ -32,11 +32,25 @@ struct CommunicatorUserdata {
   parac_config_entry* config_entries;
 };
 
-static void connect_to_remote (parac_module *mod, const char *remote) {
+static void
+connect_to_remote(parac_module* mod, const char* remote) {
   assert(mod);
   assert(mod->userdata);
-  CommunicatorUserdata *userdata = static_cast<CommunicatorUserdata*>(mod->userdata);
+  CommunicatorUserdata* userdata =
+    static_cast<CommunicatorUserdata*>(mod->userdata);
   userdata->service.connectToRemote(remote);
+}
+
+static parac_timeout*
+set_timeout(parac_module* mod,
+            uint64_t ms,
+            void* userdata,
+            parac_timeout_expired expiery_cb) {
+  assert(mod);
+  assert(mod->userdata);
+  CommunicatorUserdata* comm =
+    static_cast<CommunicatorUserdata*>(mod->userdata);
+  return comm->service.setTimeout(ms, userdata, expiery_cb);
 }
 
 static void
@@ -152,6 +166,7 @@ pre_init(parac_module* mod) {
 
   mod->communicator->tcp_acceptor_active = false;
   mod->communicator->connect_to_remote = &connect_to_remote;
+  mod->communicator->set_timeout = &set_timeout;
 
   CommunicatorUserdata* userdata =
     static_cast<CommunicatorUserdata*>(mod->userdata);

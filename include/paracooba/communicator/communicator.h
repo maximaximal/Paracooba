@@ -2,6 +2,7 @@
 #define PARACOOBA_MODULE_COMMUNICATOR_H
 
 #include <paracooba/common/status.h>
+#include <paracooba/common/timeout.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,6 +14,12 @@ typedef void (*parac_module_communicator_connect_to_remote)(
   struct parac_module*,
   const char*);
 
+typedef struct parac_timeout* (*parac_module_communicator_set_timeout)(
+  struct parac_module*,
+  uint64_t ms,
+  void* userdata,
+  parac_timeout_expired expiery_cb);
+
 typedef struct parac_module_communicator {
   uint16_t udp_listen_port;
   uint16_t tcp_listen_port;
@@ -20,6 +27,7 @@ typedef struct parac_module_communicator {
   bool tcp_acceptor_active;
 
   parac_module_communicator_connect_to_remote connect_to_remote;
+  parac_module_communicator_set_timeout set_timeout;
 } parac_module_communicator;
 
 #ifdef __cplusplus

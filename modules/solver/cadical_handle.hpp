@@ -2,14 +2,19 @@
 
 #include "paracooba/common/status.h"
 #include "paracooba/common/types.h"
+#include "paracooba/solver/types.hpp"
 #include <memory>
 #include <string>
+
+struct parac_path;
 
 namespace CaDiCaL {
 class Solver;
 }
 
 namespace parac::solver {
+class CubeIteratorRange;
+
 class CaDiCaLHandle {
   public:
   CaDiCaLHandle(bool& stop, parac_id originatorId);
@@ -25,9 +30,22 @@ class CaDiCaLHandle {
   const std::string& path() const;
   parac_id originatorId() const;
 
+  CubeIteratorRange getCubeFromId(CubeId id) const;
+  CubeIteratorRange getCubeFromPath(parac_path path) const;
+
+  void applyCubeAsAssumption(CubeIteratorRange cube);
+
+  /** @brief Calls solve on the internal CaDiCaL Solver instance.
+   *
+   * @returns PARAC_ABORTED, PARAC_SAT, PARAC_UNSAT, or PARAC_UNKNOWN
+   */
+  parac_status solve();
+
   private:
   struct Internal;
   std::unique_ptr<Internal> m_internal;
+
+  void generateJumplist();
 
   bool m_hasFormula = false;
 };

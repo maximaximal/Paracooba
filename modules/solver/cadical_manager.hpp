@@ -3,13 +3,16 @@
 #include <memory>
 
 #include <paracooba/common/types.h>
+#include <paracooba/solver/types.hpp>
 
-class parac_module;
-class parac_task;
+struct parac_module;
+struct parac_task;
+struct parac_path;
 
 namespace parac::solver {
 class CaDiCaLHandle;
 class SolverTask;
+class CubeIteratorRange;
 
 class CaDiCaLManager {
   public:
@@ -21,8 +24,24 @@ class CaDiCaLManager {
   SolverTask* createSolverTask(parac_task& task);
   void deleteSolverTask(SolverTask* task);
 
-  CaDiCaLHandlePtr takeHandleForWorker(parac_worker worker);
-  void returnHandleFromWorker(CaDiCaLHandlePtr handle, parac_worker worker);
+  struct CaDiCaLHandlePtrWrapper {
+    CaDiCaLHandlePtr ptr;
+    CaDiCaLManager& mgr;
+    parac_worker worker;
+
+    explicit CaDiCaLHandlePtrWrapper(CaDiCaLHandlePtr ptr,
+                                     CaDiCaLManager& mgr,
+                                     parac_worker worker);
+
+    ~CaDiCaLHandlePtrWrapper();
+  };
+
+  CaDiCaLHandlePtrWrapper getHandleForWorker(parac_worker worker);
+
+  CubeIteratorRange getCubeFromPath(parac_path path) const;
+
+  /** @brief Get reference to solver module. */
+  parac_module& mod() { return m_mod; }
 
   private:
   struct Internal;
@@ -30,5 +49,8 @@ class CaDiCaLManager {
 
   parac_module& m_mod;
   CaDiCaLHandlePtr m_parsedFormula;
+
+  CaDiCaLHandlePtr takeHandleForWorker(parac_worker worker);
+  void returnHandleFromWorker(CaDiCaLHandlePtr handle, parac_worker worker);
 };
 }
