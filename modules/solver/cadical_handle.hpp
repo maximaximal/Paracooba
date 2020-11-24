@@ -33,6 +33,7 @@ class CaDiCaLHandle {
 
   CubeIteratorRange getCubeFromId(CubeId id) const;
   CubeIteratorRange getCubeFromPath(parac_path path) const;
+  bool pathIsInNormalizedRange(parac_path path) const;
 
   void applyCubeAsAssumption(CubeIteratorRange cube);
 

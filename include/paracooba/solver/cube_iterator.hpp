@@ -15,9 +15,11 @@ class CubeIterator {
 
   CubeIterator() = default;
 
-  CubeIterator(pointer pos)
+  CubeIterator(const pointer& pos)
     : m_pos(pos) {}
   CubeIterator(Cube::iterator it)
+    : m_pos(&*it) {}
+  CubeIterator(const Cube::const_iterator& it)
     : m_pos(&*it) {}
 
   // PREFIX
@@ -55,7 +57,7 @@ class CubeIterator {
 };
 struct CubeIteratorRange {
   CubeIteratorRange() = default;
-  CubeIteratorRange(CubeIterator begin, CubeIterator end)
+  CubeIteratorRange(const CubeIterator& begin, const CubeIterator& end)
     : m_begin(begin)
     , m_end(end) {}
   ~CubeIteratorRange() = default;
@@ -68,6 +70,16 @@ struct CubeIteratorRange {
   const CubeIterator m_end = nullptr;
 
   operator bool() { return m_begin != m_end && m_begin != nullptr; }
+
+  bool contains0() {
+    if(!*this)
+      return false;
+    for(auto l : *this) {
+      if(l == 0)
+        return true;
+    }
+    return false;
+  }
 };
 }
 

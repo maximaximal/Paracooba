@@ -47,6 +47,8 @@ Worker::run() {
     }
     assert(m_currentTask);
 
+    assert(!(m_currentTask->state & PARAC_TASK_WORK_AVAILABLE));
+
     parac_log(PARAC_RUNNER,
               PARAC_TRACE,
               "Starting work on path {}",
@@ -67,10 +69,12 @@ Worker::run() {
 
 parac_task*
 Worker::getNextTask() {
-  if(m_notifierCheck.exchange(false)) {
-    // New task is available and no other task has cleared the flag yet!
-    // Immediately get next task and don't even lock the mutex.
-    return m_taskStore.pop_work(&m_taskStore);
+  // New task is available and no other task has cleared the flag yet!
+  // Immediately get next task and don't even lock the mutex.
+  auto work = m_taskStore.pop_work(&m_taskStore);
+  if(work) {
+    m_notifierCheck.store(false);
+    return work;
   }
 
   parac_log(
@@ -79,7 +83,7 @@ Worker::getNextTask() {
   std::unique_lock lock(m_notifierMutex);
   while(!m_stop) {
     m_notifier.wait(lock);
-    if(m_notifierCheck.exchange(false)) {
+    if(m_notifierCheck.exchange(false) && !m_stop) {
       // Only this thread has been woken up and catched the notifier! Return
       // next task.
       return m_taskStore.pop_work(&m_taskStore);

@@ -56,7 +56,9 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
   REQUIRE(store->pop_work(store) == nullptr);
 
   task->result = PARAC_PENDING;
-  task->state = task->state | PARAC_TASK_DONE | PARAC_TASK_WAITING_FOR_LEFT;
+  task->right_result = PARAC_UNSAT;
+  task->state = task->state | PARAC_TASK_DONE | PARAC_TASK_WAITING_FOR_SPLITS |
+                PARAC_TASK_SPLITTED;
 
   parac_task* task2 = store->new_task(store, task);
   task2->path = parac_path_get_next_left(task->path);
@@ -83,7 +85,7 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
   REQUIRE(store->get_waiting_for_children_size(store) == 1);
 
   task2->result = PARAC_OK;
-  task2->state = PARAC_TASK_ALL_DONE;
+  task2->state = PARAC_TASK_DONE | PARAC_TASK_SPLITS_DONE;
   store->assess_task(store, task2);
 
   CAPTURE(task->state);

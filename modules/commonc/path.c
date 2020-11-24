@@ -68,6 +68,7 @@ parac_path_get_sibling(parac_path p) {
 PARAC_COMMON_EXPORT parac_path
 parac_path_get_next_left(parac_path p) {
   parac_path_length_type depth = p.length + 1;
+  assert(p.rep != PARAC_PATH_EXPLICITLY_UNKNOWN);
   assert(depth <= PARAC_PATH_MAX_LENGTH);
   p = parac_path_set_assignment(p, depth, false);
   p.length = depth;
@@ -77,6 +78,7 @@ parac_path_get_next_left(parac_path p) {
 PARAC_COMMON_EXPORT parac_path
 parac_path_get_next_right(parac_path p) {
   parac_path_length_type depth = p.length + 1;
+  assert(p.rep != PARAC_PATH_EXPLICITLY_UNKNOWN);
   assert(depth <= PARAC_PATH_MAX_LENGTH);
   p = parac_path_set_assignment(p, depth, true);
   p.length = depth;

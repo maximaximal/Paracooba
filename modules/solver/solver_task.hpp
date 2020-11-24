@@ -25,7 +25,9 @@ class SolverTask {
   SolverTask();
   ~SolverTask();
 
-  void init(CaDiCaLManager& manager, parac_task& task);
+  void init(CaDiCaLManager& manager,
+            parac_task& task,
+            std::shared_ptr<cubesource::Source> cubesource);
 
   parac_status work(parac_worker worker);
   parac_status serialize_to_msg(parac_message* tgt_msg);
@@ -33,7 +35,8 @@ class SolverTask {
   static SolverTask& createRoot(parac_task& task, CaDiCaLManager& manager);
   static SolverTask& create(parac_task& task,
                             CaDiCaLManager& manager,
-                            cubesource::Source& source);
+                            parac_path path,
+                            std::shared_ptr<cubesource::Source> source);
   static parac_status static_work(parac_task* task, parac_worker worker);
   static parac_status static_serialize(parac_task* task,
                                        parac_message* tgt_msg);
@@ -44,7 +47,7 @@ class SolverTask {
   CaDiCaLManager* m_manager = nullptr;
   parac_task* m_task = nullptr;
 
-  cubesource::Source* m_cubeSource = nullptr;
+  std::shared_ptr<cubesource::Source> m_cubeSource;
 
   friend class cereal::access;
   template<class Archive>

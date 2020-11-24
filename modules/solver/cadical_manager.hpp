@@ -16,6 +16,10 @@ class CubeIteratorRange;
 class SolverAssignment;
 class SolverConfig;
 
+namespace cubesource {
+class Source;
+}
+
 class CaDiCaLManager {
   public:
   using CaDiCaLHandlePtr = std::unique_ptr<CaDiCaLHandle>;
@@ -25,7 +29,8 @@ class CaDiCaLManager {
                  SolverConfig& solverConfig);
   ~CaDiCaLManager();
 
-  SolverTask* createSolverTask(parac_task& task);
+  SolverTask* createSolverTask(parac_task& task,
+                               std::shared_ptr<cubesource::Source> cubesource);
   void deleteSolverTask(SolverTask* task);
 
   struct CaDiCaLHandlePtrWrapper {
@@ -53,6 +58,8 @@ class CaDiCaLManager {
   parac_id originatorId() const;
 
   const SolverConfig& config() const { return m_solverConfig; }
+
+  std::unique_ptr<cubesource::Source> createRootCubeSource();
 
   private:
   struct Internal;

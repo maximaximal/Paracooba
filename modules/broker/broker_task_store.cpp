@@ -43,7 +43,11 @@ struct TaskStore::Internal {
     parac_task t;
 
     ~Task() {
-      parac_log(PARAC_BROKER, PARAC_TRACE, "Delete task on path {}.", t.path);
+      parac_log(PARAC_BROKER,
+                PARAC_TRACE,
+                "Delete task on path {} with address {}",
+                t.path,
+                static_cast<void*>(&t));
       if(t.free_userdata) {
         t.free_userdata(&t);
       }
@@ -53,7 +57,7 @@ struct TaskStore::Internal {
 
   struct TaskRefCompare {
     bool operator()(const TaskRef& lhs, const TaskRef& rhs) const {
-      return static_cast<parac::Path&>(lhs.get().path) <
+      return static_cast<parac::Path&>(lhs.get().path) >
              static_cast<parac::Path&>(rhs.get().path);
     }
   };
@@ -145,6 +149,7 @@ TaskStore::newTask(parac_task* parent_task) {
   taskWrapper.it = m_internal->tasks.begin();
   parac_task_init(task);
   task->parent_task = parent_task;
+  task->task_store = &m_internal->store;
   return task;
 }
 
@@ -154,8 +159,8 @@ TaskStore::pop_offload(parac_compute_node* target) {
   if(m_internal->tasksWaitingForWorkerQueue.empty()) {
     return nullptr;
   }
-  parac_task& t = m_internal->tasksWaitingForWorkerQueue.front();
-  m_internal->tasksWaitingForWorkerQueue.pop_front();
+  parac_task& t = m_internal->tasksWaitingForWorkerQueue.back();
+  m_internal->tasksWaitingForWorkerQueue.pop_back();
   m_internal->offloadedTasks[target].insert(t);
   t.state = static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
   t.state = t.state | PARAC_TASK_OFFLOADED;
@@ -187,7 +192,7 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
                        m_internal->tasksWaitingForWorkerQueue.end(),
                        task->path,
                        [](const Internal::TaskRef& t, parac_path p) {
-                         return t.get().path.length < p.length;
+                         return t.get().path.length > p.length;
                        }),
       *task);
   }
@@ -229,6 +234,9 @@ TaskStore::remove(parac_task* task) {
   assert(taskWrapper);
 
   assert(task);
+  assert(!(task->state & PARAC_TASK_WAITING_FOR_SPLITS));
+  assert(!(task->state & PARAC_TASK_WORK_AVAILABLE));
+  assert(task->state & PARAC_TASK_DONE);
   std::unique_lock lock(m_internal->containerMutex);
   m_internal->tasks.erase(taskWrapper->it);
 }
@@ -237,26 +245,17 @@ void
 TaskStore::assess_task(parac_task* task) {
   assert(task);
   assert(task->assess);
+  assert(task->path.rep != PARAC_PATH_EXPLICITLY_UNKNOWN);
   parac_task_state s = task->assess(task);
 
   parac_log(PARAC_BROKER,
             PARAC_TRACE,
-            "Assessing task on path {} to state {}",
+            "Assessing task on path {} to state {}. Work available in store: "
+            "{}, tasks in store: {}",
             task->path,
-            task->state);
-
-  if(s & PARAC_TASK_WORK_AVAILABLE) {
-    insert_into_tasksWaitingForWorkerQueue(task);
-  }
-  if(!(task->last_state & PARAC_TASK_WAITING_FOR_SPLITS) &&
-     s & PARAC_TASK_WAITING_FOR_SPLITS) {
-    insert_into_tasksWaitingForChildren(task);
-  }
-  if((s & PARAC_TASK_SPLITS_DONE) == PARAC_TASK_SPLITS_DONE) {
-    remove_from_tasksWaitingForChildren(task);
-  }
-
-  task->last_state = s;
+            task->state,
+            m_internal->tasksWaitingForWorkerQueue.size(),
+            m_internal->tasks.size());
 
   if(parac_task_state_is_done(s)) {
     remove_from_tasksBeingWorkedOn(task);
@@ -267,15 +266,14 @@ TaskStore::assess_task(parac_task* task) {
               task->path,
               task->result);
 
-    if(task->parent_task &&
-       m_internal->tasksWaitingForChildren.count(*task->parent_task)) {
+    if(task->parent_task) {
       parac_task* parent = task->parent_task;
-      Path path(task->path);
-      Path parentPath(parent->path);
+      parac_path path = task->path;
+      parac_path parentPath = parent->path;
 
-      if(path == parentPath.left()) {
+      if(path.rep == parac_path_get_next_left(parentPath).rep) {
         parent->left_result = task->result;
-      } else if(path == parentPath.right()) {
+      } else if(path.rep == parac_path_get_next_right(parentPath).rep) {
         parent->right_result = task->result;
       } else {
         parac_log(PARAC_BROKER,
@@ -295,9 +293,26 @@ TaskStore::assess_task(parac_task* task) {
       m_internal->handle.exit_status = task->result;
     }
 
+    if((s & PARAC_TASK_SPLITS_DONE) == PARAC_TASK_SPLITS_DONE) {
+      remove_from_tasksWaitingForChildren(task);
+    }
+
     // As this task is done and the parent has been assessed, it can be
     // deleted.
     remove(task);
+    return;
   }
+
+  // Must be at the end, because priority inversion could finish the task and
+  // immediately remove it, leading to double invocations and chaos!
+  if(s & PARAC_TASK_WORK_AVAILABLE) {
+    insert_into_tasksWaitingForWorkerQueue(task);
+  }
+  if(!(task->last_state & PARAC_TASK_WAITING_FOR_SPLITS) &&
+     s & PARAC_TASK_WAITING_FOR_SPLITS) {
+    insert_into_tasksWaitingForChildren(task);
+  }
+
+  task->last_state = s;
 }
 }

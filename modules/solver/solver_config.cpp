@@ -11,6 +11,18 @@ SolverConfig::SolverConfig(parac_config* config) {
   m_config = parac_config_reserve(config, static_cast<size_t>(Entry::_COUNT));
 
   parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(Entry::DeactivatePredefinedCubes)],
+    "deactivate-predefined-cubes",
+    "Deactivate trying all predefined cubes from the given "
+    "iCNF file before going into resplitting options. ");
+  m_config[static_cast<size_t>(Entry::DeactivatePredefinedCubes)].registrar =
+    PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::DeactivatePredefinedCubes)].type =
+    PARAC_TYPE_SWITCH;
+  m_config[static_cast<size_t>(Entry::DeactivatePredefinedCubes)]
+    .default_value.boolean_switch = false;
+
+  parac_config_entry_set_str(
     &m_config[static_cast<size_t>(Entry::CaDiCaLCubes)],
     "cadical-cubes",
     "Use CaDiCaL to cube the formula");
@@ -67,6 +79,9 @@ SolverConfig::~SolverConfig() {}
 
 void
 SolverConfig::extractFromConfigEntries() {
+  m_predefinedCubes =
+    !m_config[static_cast<size_t>(Entry::DeactivatePredefinedCubes)]
+       .value.boolean_switch;
   m_CaDiCaLCubes =
     m_config[static_cast<size_t>(Entry::CaDiCaLCubes)].value.boolean_switch;
   m_resplit =

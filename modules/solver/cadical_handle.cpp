@@ -119,7 +119,7 @@ CaDiCaLHandle::getCubeFromId(CubeId id) const {
   size_t endPos = (*m_internal->pregeneratedCubesJumplist)[id + 1];
 
   auto begin = &(*m_internal->pregeneratedCubes)[beginPos];
-  auto end = &(*m_internal->pregeneratedCubes)[endPos];
+  auto end = &(*m_internal->pregeneratedCubes)[endPos] - 1;
 
   assert(begin);
   assert(end);
@@ -128,7 +128,7 @@ CaDiCaLHandle::getCubeFromId(CubeId id) const {
 }
 CubeIteratorRange
 CaDiCaLHandle::getCubeFromPath(parac_path path) const {
-  if(path.length != m_internal->normalizedPathLength) {
+  if(path.length != m_internal->normalizedPathLength - 1) {
     // The path needs to be at the end of the cube tree, or no predefined
     // cubes can be received, as the cube would be ambiguous!
     return CubeIteratorRange();
@@ -136,6 +136,13 @@ CaDiCaLHandle::getCubeFromPath(parac_path path) const {
 
   parac_path_type depth_shifted = parac_path_get_depth_shifted(path);
   return getCubeFromId(depth_shifted);
+}
+
+bool
+CaDiCaLHandle::pathIsInNormalizedRange(parac_path path) const {
+  size_t l = path.length;
+  size_t possibleSolvers = 1u << l;
+  return possibleSolvers < (m_internal->pregeneratedCubesCount - 1);
 }
 
 void
@@ -162,14 +169,17 @@ CaDiCaLHandle::generateJumplist() {
   float log = std::log2f(m_internal->pregeneratedCubesCount);
   m_internal->normalizedPathLength = std::ceil(log);
 
-  parac_log(PARAC_SOLVER,
-            PARAC_TRACE,
-            "Finished parsing supplied cubes into jumplist.");
+  parac_log(
+    PARAC_SOLVER,
+    PARAC_TRACE,
+    "Finished parsing supplied cubes into jumplist. Normalized path length: {}",
+    m_internal->normalizedPathLength);
 }
 
 void
 CaDiCaLHandle::applyCubeAsAssumption(CubeIteratorRange cube) {
   for(auto lit : cube) {
+    assert(lit != 0);
     m_internal->solver.assume(lit);
   }
 }

@@ -18,6 +18,7 @@ class SolverConfig {
   void extractFromConfigEntries();
 
   enum class Entry {
+    DeactivatePredefinedCubes,
     CaDiCaLCubes,
     Resplit,
     InitialCubeDepth,
@@ -26,6 +27,7 @@ class SolverConfig {
     _COUNT
   };
 
+  bool PredefinedCubes() const { return m_predefinedCubes; }
   bool CaDiCaLCubes() const { return m_CaDiCaLCubes; };
   bool Resplit() const { return m_resplit; }
   uint16_t InitialCubeDepth() const { return m_initialCubeDepth; }
@@ -35,6 +37,7 @@ class SolverConfig {
   private:
   parac_config_entry* m_config = nullptr;
 
+  bool m_predefinedCubes = false;
   bool m_CaDiCaLCubes = false;
   bool m_resplit = false;
   uint16_t m_initialCubeDepth = 0;
@@ -44,7 +47,8 @@ class SolverConfig {
   friend class cereal::access;
   template<class Archive>
   void serialize(Archive& ar) {
-    ar(cereal::make_nvp("CaDiCaLCubes", m_CaDiCaLCubes),
+    ar(cereal::make_nvp("predefinedCubes", m_predefinedCubes),
+       cereal::make_nvp("CaDiCaLCubes", m_CaDiCaLCubes),
        cereal::make_nvp("resplit", m_resplit),
        cereal::make_nvp("initialCubeDepth", m_initialCubeDepth),
        cereal::make_nvp("initialMinimalCubeDepth", m_initialMinimalCubeDepth),

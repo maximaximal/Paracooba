@@ -1,10 +1,14 @@
 #include <algorithm>
+#include <atomic>
 #include <list>
+#include <memory>
 #include <vector>
 
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
+#include "cube_source.hpp"
 #include "solver_assignment.hpp"
+#include "solver_config.hpp"
 #include "solver_task.hpp"
 
 #include <paracooba/common/log.h>
@@ -12,6 +16,7 @@
 #include <paracooba/runner/runner.h>
 #include <paracooba/solver/cube_iterator.hpp>
 
+#include <boost/container/vector.hpp>
 #include <boost/pool/pool_alloc.hpp>
 
 namespace parac::solver {
@@ -36,7 +41,9 @@ struct CaDiCaLManager::Internal {
   static std::mutex solverTasksMutex;
 
   std::vector<CaDiCaLHandlePtr> solvers;
-  std::vector<bool> borrowed;// Default constructor of bool is false.
+  boost::container::vector<bool>
+    borrowed;// Default constructor of bool is false. Must be a boost vector, as
+             // std vector is a bitset, which breaks multithreading.
 };
 
 CaDiCaLManager::Internal::SolverTaskWrapperList
@@ -114,10 +121,12 @@ CaDiCaLManager::returnHandleFromWorker(CaDiCaLHandlePtr handle,
 }
 
 SolverTask*
-CaDiCaLManager::createSolverTask(parac_task& task) {
+CaDiCaLManager::createSolverTask(
+  parac_task& task,
+  std::shared_ptr<cubesource::Source> cubesource) {
   std::unique_lock lock(Internal::solverTasksMutex);
   auto& wrapper = Internal::solverTasks.emplace_front();
-  wrapper.t.init(*this, task);
+  wrapper.t.init(*this, task, cubesource);
   wrapper.it = Internal::solverTasks.begin();
   return &wrapper.t;
 }
@@ -176,5 +185,14 @@ CaDiCaLManager::getCubeFromPath(parac_path path) const {
 parac_id
 CaDiCaLManager::originatorId() const {
   return m_parsedFormula->originatorId();
+}
+
+std::unique_ptr<cubesource::Source>
+CaDiCaLManager::createRootCubeSource() {
+  if(m_solverConfig.PredefinedCubes()) {
+    return std::make_unique<cubesource::PathDefined>();
+  } else {
+    return std::make_unique<cubesource::Unspecified>();
+  }
 }
 }
