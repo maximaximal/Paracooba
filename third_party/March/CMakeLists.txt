@@ -4,7 +4,7 @@ include(ExternalProject)
 ExternalProject_Add(March
     PREFIX March
     URL ${CMAKE_CURRENT_SOURCE_DIR}/March_cu.tar.gz
-    URL_HASH SHA256=0711199168585c89d3940d4a1ac3d31a93619d24b34b39d4272377ef7b080491
+    URL_HASH SHA256=244085144b66c8f54f868cfb2f8f8078cda56bdf00c0b4b97faf34af5b2143a6
     BUILD_IN_SOURCE 1
     BUILD_COMMAND bash -c "make"
     UPDATE_COMMAND ""
