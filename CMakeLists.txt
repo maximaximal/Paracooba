@@ -114,6 +114,12 @@ macro(parac_static_shared_combined NAME SRCS SHARED_EXTRA_SRCS)
     )
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
+    if(ENABLE_TESTS)
+        # sbs stands for "side by side" linkable. This means there are no
+        # colliding symbols between libraries. Is used for building tests.
+        add_library(${NAME}_sbs SHARED $<TARGET_OBJECTS:${NAME}_obj>)
+    endif()
+
     add_library(${NAME} SHARED $<TARGET_OBJECTS:${NAME}_obj> ${SHARED_EXTRA_SRCS})
     if(STATIC_BUILDS)
         add_library(${NAME}_static STATIC $<TARGET_OBJECTS:${NAME}_obj>)
@@ -135,9 +141,14 @@ macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
     set_target_properties(${NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(${NAME} PROPERTIES C_VISIBILITY_PRESET hidden)
 
-    target_compile_definitions(${NAME}_obj PRIVATE "-DPARAC_LOG_INCLUDE_FMT")
+    # Add fmt support to parac_log statements and set FMT to be header only, as
+    # the runtime will be defined by the executable and not in the module.
+    target_compile_definitions(${NAME}_obj PRIVATE "-DPARAC_LOG_INCLUDE_FMT -DFMT_HEADER_ONLY")
 
-    target_link_libraries(${NAME}_obj PUBLIC parac_common parac_modules fmt::fmt)
+    get_target_property(FMT_INCLUDE_DIRECTORIES fmt::fmt INCLUDE_DIRECTORIES)
+    target_include_directories(${NAME}_obj PRIVATE ${FMT_INCLUDE_DIRECTORIES})
+
+    target_link_libraries(${NAME}_obj PUBLIC parac_common parac_modules)
     target_link_libraries(${NAME} PUBLIC parac_common parac_modules fmt::fmt)
 
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

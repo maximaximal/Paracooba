@@ -74,6 +74,17 @@ parac_path_to_str(parac_path p, char* out_str);
 #include <iostream>
 #include <string>
 
+template<typename T>
+parac_path
+parac_path_build(T p, parac_path_length_type l) {
+  parac_path path;
+  path.rep = p;
+  path.rep <<= (((sizeof(parac_path)) - (sizeof(T))) * 8);
+  path.length = l;
+  path = parac_path_cleanup(path);
+  return path;
+}
+
 namespace parac {
 class Path : public parac_path {
 
@@ -88,12 +99,7 @@ class Path : public parac_path {
 
   template<typename T>
   static Path build(T p, length_type l) {
-    Path path;
-    path.rep = p;
-    path.rep <<= (((sizeof(Path)) - (sizeof(T))) * 8);
-    path.length = l;
-    path = parac_path_cleanup(path);
-    return path;
+    return parac_path_build(p, l);
   }
 
   Path left() const { return parac_path_get_next_left(*this); }

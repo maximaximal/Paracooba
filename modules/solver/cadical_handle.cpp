@@ -9,6 +9,9 @@
 
 #include <cadical/cadical.hpp>
 #include <cassert>
+#include <cstdio>
+#include <fstream>
+#include <string_view>
 #include <unistd.h>
 #include <vector>
 
@@ -58,6 +61,29 @@ CaDiCaLHandle::~CaDiCaLHandle() {}
 CaDiCaL::Solver&
 CaDiCaLHandle::solver() {
   return m_internal->solver;
+}
+
+parac_status
+CaDiCaLHandle::parseString(std::string_view iCNF) {
+  auto h = std::hash<std::string_view>{}(iCNF);
+  std::string path = "/dev/shm/paracooba-tmp-dimacs-file-" + std::to_string(h);
+  parac_log(PARAC_SOLVER,
+            PARAC_TRACE,
+            "Writing temp file \"{}\" in order to parse DIMACS from string.",
+            path);
+  {
+    std::ofstream out(path);
+    out << iCNF;
+    out.flush();
+  }
+  parac_status s = parseFile(path);
+  std::remove(path.c_str());
+  parac_log(
+    PARAC_SOLVER,
+    PARAC_TRACE,
+    "Removed temp file \"{}\" created in order to parse DIMACS from string.",
+    path);
+  return s;
 }
 
 parac_status
@@ -128,7 +154,7 @@ CaDiCaLHandle::getCubeFromId(CubeId id) const {
 }
 CubeIteratorRange
 CaDiCaLHandle::getCubeFromPath(parac_path path) const {
-  if(path.length != m_internal->normalizedPathLength - 1) {
+  if(path.length != m_internal->normalizedPathLength) {
     // The path needs to be at the end of the cube tree, or no predefined
     // cubes can be received, as the cube would be ambiguous!
     return CubeIteratorRange();
@@ -138,11 +164,13 @@ CaDiCaLHandle::getCubeFromPath(parac_path path) const {
   return getCubeFromId(depth_shifted);
 }
 
-bool
-CaDiCaLHandle::pathIsInNormalizedRange(parac_path path) const {
-  size_t l = path.length;
-  size_t possibleSolvers = 1u << l;
-  return possibleSolvers < (m_internal->pregeneratedCubesCount - 1);
+size_t
+CaDiCaLHandle::getPregeneratedCubesCount() const {
+  return m_internal->pregeneratedCubesCount;
+}
+size_t
+CaDiCaLHandle::getNormalizedPathLength() const {
+  return m_internal->normalizedPathLength;
 }
 
 void

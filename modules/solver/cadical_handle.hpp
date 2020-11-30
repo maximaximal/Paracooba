@@ -25,6 +25,7 @@ class CaDiCaLHandle {
   CaDiCaL::Solver& solver();
 
   parac_status parseFile(const std::string& path);
+  parac_status parseString(std::string_view iCNF);
 
   bool hasFormula() const { return m_hasFormula; }
 
@@ -33,7 +34,8 @@ class CaDiCaLHandle {
 
   CubeIteratorRange getCubeFromId(CubeId id) const;
   CubeIteratorRange getCubeFromPath(parac_path path) const;
-  bool pathIsInNormalizedRange(parac_path path) const;
+  size_t getPregeneratedCubesCount() const;
+  size_t getNormalizedPathLength() const;
 
   void applyCubeAsAssumption(CubeIteratorRange cube);
 

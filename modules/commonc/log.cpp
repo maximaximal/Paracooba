@@ -50,6 +50,12 @@ log_new_thread_callback(parac_thread_registry_handle* handle) {
 
 PARAC_COMMON_EXPORT parac_status
 parac_log_init(parac_thread_registry* thread_registry) {
+  static bool initialized = false;
+
+  if(initialized)
+    return PARAC_OK;
+  initialized = true;
+
   try {
     global_channels.fill(true);
 
@@ -57,8 +63,10 @@ parac_log_init(parac_thread_registry* thread_registry) {
     boost::log::core::get()->add_thread_attribute(
       "ThreadID", boost::log::attributes::constant<uint16_t>(0));
 
-    parac_thread_registry_add_starting_callback(thread_registry,
-                                                &log_new_thread_callback);
+    if(thread_registry) {
+      parac_thread_registry_add_starting_callback(thread_registry,
+                                                  &log_new_thread_callback);
+    }
 
     global_console_sink = add_console_log(std::clog);
     global_console_sink->set_formatter(

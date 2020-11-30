@@ -57,9 +57,11 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
   , m_mod(mod)
   , m_parsedFormula(std::move(parsedFormula))
   , m_solverConfig(solverConfig) {
+  assert(m_parsedFormula);
+
   uint32_t workers = 0;
 
-  if(mod.handle->modules[PARAC_MOD_RUNNER]) {
+  if(mod.handle && mod.handle->modules[PARAC_MOD_RUNNER]) {
     workers =
       mod.handle->modules[PARAC_MOD_RUNNER]->runner->available_worker_count;
   }
@@ -194,5 +196,9 @@ CaDiCaLManager::createRootCubeSource() {
   } else {
     return std::make_unique<cubesource::Unspecified>();
   }
+}
+const CaDiCaLHandle&
+CaDiCaLManager::parsedFormulaHandle() const {
+  return *m_parsedFormula;
 }
 }

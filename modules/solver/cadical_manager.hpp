@@ -61,6 +61,8 @@ class CaDiCaLManager {
 
   std::unique_ptr<cubesource::Source> createRootCubeSource();
 
+  const CaDiCaLHandle& parsedFormulaHandle() const;
+
   private:
   struct Internal;
   std::unique_ptr<Internal> m_internal;

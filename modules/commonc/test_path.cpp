@@ -4,6 +4,7 @@
 
 #include <bitset>
 #include <string>
+#include <sys/types.h>
 
 using namespace parac;
 
@@ -101,4 +102,7 @@ TEST_CASE("Path Manipulation", "[commonc][path]") {
 
   REQUIRE(p.left_aligned() == ((uint64_t)0b11111000u) << (64 - 8));
   REQUIRE(p.depth_shifted() == 31u);
+
+  p = Path::build((uint8_t)0b10000000u, 1);
+  REQUIRE(PathBitset(p)[63]);
 }

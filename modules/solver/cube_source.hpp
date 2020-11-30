@@ -21,7 +21,7 @@ class Source {
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr) = 0;
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
-                     CaDiCaLHandle& handle,
+                     const CaDiCaLHandle& handle,
                      bool& left,
                      bool& right) const = 0;
   virtual const char* name() const = 0;
@@ -40,7 +40,7 @@ class PathDefined : public Source {
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
-                     CaDiCaLHandle& handle,
+                     const CaDiCaLHandle& handle,
                      bool& left,
                      bool& right) const;
   virtual const char* name() const { return "PathDefined"; }
@@ -52,12 +52,12 @@ class Supplied : public Source {
   public:
   explicit Supplied(const Cube& cube)
     : m_cube(cube.begin(), cube.end()) {}
-  ~Supplied();
+  ~Supplied() = default;
 
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
-                     CaDiCaLHandle& handle,
+                     const CaDiCaLHandle& handle,
                      bool& left,
                      bool& right) const;
   virtual const char* name() const { return "Supplied"; }
@@ -76,7 +76,7 @@ class Unspecified : public Source {
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
-                     CaDiCaLHandle& handle,
+                     const CaDiCaLHandle& handle,
                      bool& left,
                      bool& right) const;
   virtual const char* name() const { return "Unspecified"; }
