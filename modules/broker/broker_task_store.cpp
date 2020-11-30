@@ -39,7 +39,6 @@ struct TaskStore::Internal {
     64,
     128>;
   using TaskList = std::list<Task, Allocator<Task>>;
-  //using TaskList = std::list<Task>;
 
   struct Task {
     TaskList::iterator it;
