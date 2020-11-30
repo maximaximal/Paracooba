@@ -61,7 +61,8 @@ initiate_solving_on_file(parac_module& mod,
   assert(broker.task_store);
   auto& task_store = *broker.task_store;
 
-  parac_task* task = task_store.new_task(&task_store, nullptr);
+  parac_task* task =
+    task_store.new_task(&task_store, nullptr, parac_path_unknown());
   parac_log(PARAC_SOLVER,
             PARAC_DEBUG,
             "Create ParserTask for formula in file \"{}\" from node {}.",
@@ -89,7 +90,8 @@ initiate_solving_on_file(parac_module& mod,
       i->cadicalManager = std::make_unique<CaDiCaLManager>(
         mod, std::move(parsedFormula), i->config);
 
-      parac_task* task = task_store.new_task(&task_store, nullptr);
+      parac_task* task =
+        task_store.new_task(&task_store, nullptr, parac_path_unknown());
       assert(task);
       SolverTask::createRoot(*task, *i->cadicalManager);
       task_store.assess_task(&task_store, task);

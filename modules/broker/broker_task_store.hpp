@@ -17,7 +17,7 @@ class TaskStore {
 
   bool empty() const;
   size_t size() const;
-  parac_task* newTask(parac_task* parent_task);
+  parac_task* newTask(parac_task* parent_task, parac_path new_path);
 
   /** @brief Pop task for offloading. */
   parac_task* pop_offload(parac_compute_node* target);
@@ -26,6 +26,7 @@ class TaskStore {
 
   void assess_task(parac_task* task);
 
+  private:
   void insert_into_tasksWaitingForWorkerQueue(parac_task* task);
   void insert_into_tasksWaitingForChildren(parac_task* task);
   void insert_into_tasksBeingWorkedOn(parac_task* task);

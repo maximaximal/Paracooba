@@ -7,6 +7,7 @@
 #include "paracooba/common/path.h"
 
 #include "mocks.hpp"
+#include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
 #include "paracooba/module.h"
 
@@ -32,7 +33,7 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
 
   auto p = parac::Path::build(0b1000000, 1);
 
-  parac_task* task = store->new_task(store, nullptr);
+  parac_task* task = store->new_task(store, nullptr, parac_path_unknown());
   REQUIRE(task);
   REQUIRE(task->left_result == PARAC_PENDING);
   REQUIRE(task->right_result == PARAC_PENDING);
@@ -51,6 +52,8 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
   store->assess_task(store, task);
 
   REQUIRE(store->pop_work(store) == task);
+  task->state =
+    static_cast<parac_task_state>(task->state & ~PARAC_TASK_WORKING);
 
   REQUIRE(store->pop_offload(store, this_node) == nullptr);
   REQUIRE(store->pop_work(store) == nullptr);
@@ -60,11 +63,12 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
   task->state = task->state | PARAC_TASK_DONE | PARAC_TASK_WAITING_FOR_SPLITS |
                 PARAC_TASK_SPLITTED;
 
-  parac_task* task2 = store->new_task(store, task);
-  task2->path = parac_path_get_next_left(task->path);
+  auto leftp = parac_path_get_next_left(task->path);
+  parac_task* task2 = store->new_task(store, task, leftp);
 
   REQUIRE(task2);
-  REQUIRE(task2->parent_task == task);
+  REQUIRE(task2->parent_task_ == task);
+  REQUIRE(task2->parent_task_->left_child_ == task2);
 
   REQUIRE(store->get_size(store) == 2);
 
@@ -79,6 +83,7 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
   REQUIRE(store->pop_offload(store, this_node) == task2);
 
   REQUIRE(store->get_waiting_for_children_size(store) == 0);
+  CAPTURE(task->state);
   store->assess_task(store, task);
   REQUIRE(store->pop_offload(store, this_node) == nullptr);
   REQUIRE(store->get_waiting_for_worker_size(store) == 0);
@@ -86,10 +91,8 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
 
   task2->result = PARAC_OK;
   task2->state = PARAC_TASK_DONE | PARAC_TASK_SPLITS_DONE;
-  store->assess_task(store, task2);
-
-  CAPTURE(task->state);
   CAPTURE(task2->state);
+  store->assess_task(store, task2);
 
   REQUIRE(store->get_waiting_for_children_size(store) == 0);
   REQUIRE(store->get_waiting_for_worker_size(store) == 0);

@@ -2,6 +2,7 @@
 #include <cassert>
 #include <deque>
 #include <list>
+#include <mutex>
 #include <set>
 #include <unordered_map>
 
@@ -23,6 +24,7 @@ struct TaskStore::Internal {
     : handle(handle)
     , store(store) {}
 
+  std::recursive_mutex assessMutex;
   std::mutex containerMutex;
   parac_handle& handle;
   parac_task_store& store;
@@ -37,10 +39,12 @@ struct TaskStore::Internal {
     64,
     128>;
   using TaskList = std::list<Task, Allocator<Task>>;
+  //using TaskList = std::list<Task>;
 
   struct Task {
     TaskList::iterator it;
     parac_task t;
+    short refcount = 0;
 
     ~Task() {
       parac_log(PARAC_BROKER,
@@ -106,11 +110,13 @@ TaskStore::TaskStore(parac_handle& handle, parac_task_store& s)
     return static_cast<TaskStore*>(store->userdata)
       ->m_internal->tasksBeingWorkedOn.size();
   };
-  s.new_task = [](parac_task_store* store, parac_task* creator_task) {
-    assert(store);
-    assert(store->userdata);
-    return static_cast<TaskStore*>(store->userdata)->newTask(creator_task);
-  };
+  s.new_task =
+    [](parac_task_store* store, parac_task* creator_task, parac_path new_path) {
+      assert(store);
+      assert(store->userdata);
+      return static_cast<TaskStore*>(store->userdata)
+        ->newTask(creator_task, new_path);
+    };
   s.pop_offload = [](parac_task_store* store, parac_compute_node* target) {
     assert(store);
     assert(store->userdata);
@@ -142,14 +148,29 @@ TaskStore::size() const {
   return m_internal->tasks.size();
 }
 parac_task*
-TaskStore::newTask(parac_task* parent_task) {
+TaskStore::newTask(parac_task* parent_task, parac_path new_path) {
   std::unique_lock lock(m_internal->containerMutex);
   auto& taskWrapper = m_internal->tasks.emplace_front();
   parac_task* task = &taskWrapper.t;
   taskWrapper.it = m_internal->tasks.begin();
   parac_task_init(task);
-  task->parent_task = parent_task;
+  task->parent_task_ = parent_task;
   task->task_store = &m_internal->store;
+  task->path = new_path;
+
+  if(parent_task) {
+    Internal::Task* parentWrapper = reinterpret_cast<Internal::Task*>(
+      reinterpret_cast<std::byte*>(parent_task) - offsetof(Internal::Task, t));
+    ++(parentWrapper->refcount);
+
+    if(parac_path_get_next_left(parent_task->path).rep == new_path.rep) {
+      parent_task->left_child_ = task;
+    } else if(parac_path_get_next_right(parent_task->path).rep ==
+              new_path.rep) {
+      parent_task->right_child_ = task;
+    }
+  }
+
   return task;
 }
 
@@ -164,6 +185,11 @@ TaskStore::pop_offload(parac_compute_node* target) {
   m_internal->offloadedTasks[target].insert(t);
   t.state = static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
   t.state = t.state | PARAC_TASK_OFFLOADED;
+
+  Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+    reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
+  ++taskWrapper->refcount;
+
   return &t;
 }
 parac_task*
@@ -176,6 +202,12 @@ TaskStore::pop_work() {
   m_internal->tasksWaitingForWorkerQueue.pop_front();
   m_internal->tasksBeingWorkedOn.insert(t);
   t.state = static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
+  t.state = t.state | PARAC_TASK_WORKING;
+
+  Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+    reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
+  ++taskWrapper->refcount;
+
   return &t;
 }
 
@@ -227,17 +259,43 @@ TaskStore::remove_from_tasksBeingWorkedOn(parac_task* task) {
   std::unique_lock lock(m_internal->containerMutex);
   m_internal->tasksBeingWorkedOn.erase(*task);
 }
+
 void
 TaskStore::remove(parac_task* task) {
   Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
     reinterpret_cast<std::byte*>(task) - offsetof(Internal::Task, t));
   assert(taskWrapper);
 
+  std::unique_lock lock(m_internal->containerMutex);
+
+  --taskWrapper->refcount;
+
+  if(taskWrapper->refcount > 0)
+    return;
+
   assert(task);
   assert(!(task->state & PARAC_TASK_WAITING_FOR_SPLITS));
   assert(!(task->state & PARAC_TASK_WORK_AVAILABLE));
   assert(task->state & PARAC_TASK_DONE);
-  std::unique_lock lock(m_internal->containerMutex);
+
+  // Remove references to now removed path.
+  if(task->left_child_)
+    task->left_child_->parent_task_ = nullptr;
+  if(task->right_child_)
+    task->right_child_->parent_task_ = nullptr;
+
+  if(task->parent_task_) {
+    Internal::Task* parentWrapper = reinterpret_cast<Internal::Task*>(
+      reinterpret_cast<std::byte*>(task->parent_task_) -
+      offsetof(Internal::Task, t));
+    --parentWrapper->refcount;
+
+    if(task->parent_task_->left_child_ == task)
+      task->parent_task_->left_child_ = nullptr;
+    if(task->parent_task_->right_child_ == task)
+      task->parent_task_->right_child_ = nullptr;
+  }
+
   m_internal->tasks.erase(taskWrapper->it);
 }
 
@@ -246,7 +304,12 @@ TaskStore::assess_task(parac_task* task) {
   assert(task);
   assert(task->assess);
   assert(task->path.rep != PARAC_PATH_EXPLICITLY_UNKNOWN);
+
+  // Required so that no concurrent assessments of the same tasks are happening.
+  std::unique_lock lock(m_internal->assessMutex);
+
   parac_task_state s = task->assess(task);
+  task->state = s;
 
   parac_log(PARAC_BROKER,
             PARAC_TRACE,
@@ -258,23 +321,38 @@ TaskStore::assess_task(parac_task* task) {
             m_internal->tasks.size());
 
   if(parac_task_state_is_done(s)) {
+    assert(!(s & PARAC_TASK_WORK_AVAILABLE));
+
     remove_from_tasksBeingWorkedOn(task);
+
+    if(m_internal->handle.input_file && parac_path_is_root(task->path)) {
+      m_internal->handle.request_exit(&m_internal->handle);
+      m_internal->handle.exit_status = task->result;
+    }
+
+    if((s & PARAC_TASK_SPLITS_DONE) == PARAC_TASK_SPLITS_DONE) {
+      remove_from_tasksWaitingForChildren(task);
+    }
+
+    auto path = task->path;
+    auto result = task->result;
+    parac_task* parent = task->parent_task_;
+
+    remove(task);
 
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Task on path {} done with result {}",
-              task->path,
-              task->result);
+              path,
+              result);
 
-    if(task->parent_task) {
-      parac_task* parent = task->parent_task;
-      parac_path path = task->path;
+    if(parent) {
       parac_path parentPath = parent->path;
 
       if(path.rep == parac_path_get_next_left(parentPath).rep) {
-        parent->left_result = task->result;
+        parent->left_result = result;
       } else if(path.rep == parac_path_get_next_right(parentPath).rep) {
-        parent->right_result = task->result;
+        parent->right_result = result;
       } else {
         parac_log(PARAC_BROKER,
                   PARAC_GLOBALERROR,
@@ -288,24 +366,12 @@ TaskStore::assess_task(parac_task* task) {
       assess_task(parent);
     }
 
-    if(m_internal->handle.input_file && parac_path_is_root(task->path)) {
-      m_internal->handle.request_exit(&m_internal->handle);
-      m_internal->handle.exit_status = task->result;
-    }
-
-    if((s & PARAC_TASK_SPLITS_DONE) == PARAC_TASK_SPLITS_DONE) {
-      remove_from_tasksWaitingForChildren(task);
-    }
-
-    // As this task is done and the parent has been assessed, it can be
-    // deleted.
-    remove(task);
     return;
   }
 
   // Must be at the end, because priority inversion could finish the task and
   // immediately remove it, leading to double invocations and chaos!
-  if(s & PARAC_TASK_WORK_AVAILABLE) {
+  if(s & PARAC_TASK_WORK_AVAILABLE && !(s & PARAC_TASK_DONE)) {
     insert_into_tasksWaitingForWorkerQueue(task);
   }
   if(!(task->last_state & PARAC_TASK_WAITING_FOR_SPLITS) &&

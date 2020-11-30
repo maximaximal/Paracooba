@@ -35,7 +35,6 @@ class SolverTask {
   static SolverTask& createRoot(parac_task& task, CaDiCaLManager& manager);
   static SolverTask& create(parac_task& task,
                             CaDiCaLManager& manager,
-                            parac_path path,
                             std::shared_ptr<cubesource::Source> source);
   static parac_status static_work(parac_task* task, parac_worker worker);
   static parac_status static_serialize(parac_task* task,

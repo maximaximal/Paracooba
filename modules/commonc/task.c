@@ -45,13 +45,17 @@ parac_task_init(parac_task* t) {
   t->received_from = 0;
   t->offloaded_to = 0;
   t->originator = 0;
-  t->parent_task = NULL;
+  t->parent_task_ = NULL;
+  t->left_child_ = NULL;
+  t->right_child_ = NULL;
   t->task_store = NULL;
+  t->stop = false;
 }
 
 PARAC_COMMON_EXPORT
 bool
 parac_task_state_is_done(parac_task_state s) {
-  return (!(s & PARAC_TASK_SPLITTED) && s & PARAC_TASK_DONE) ||
-         ((s & PARAC_TASK_SPLITTED) && (s & PARAC_TASK_SPLITS_DONE));
+  return !(s & PARAC_TASK_WORK_AVAILABLE) && !(s & PARAC_TASK_WORKING) &&
+         ((!(s & PARAC_TASK_SPLITTED) && s & PARAC_TASK_DONE) ||
+          ((s & PARAC_TASK_SPLITTED) && (s & PARAC_TASK_SPLITS_DONE)));
 }

@@ -13,12 +13,13 @@ typedef enum parac_task_state {
   PARAC_TASK_NEW = 0,
   PARAC_TASK_SPLITTED = 1 << 0,
   PARAC_TASK_WORK_AVAILABLE = 1 << 1,
-  PARAC_TASK_WAITING_FOR_SPLITS = 1 << 2,
-  PARAC_TASK_DONE = 1 << 3,
-  PARAC_TASK_SPLITS_DONE = 1 << 4,
-  PARAC_TASK_OFFLOADED = 1 << 5,
+  PARAC_TASK_WORKING = 1 << 2,
+  PARAC_TASK_WAITING_FOR_SPLITS = 1 << 3,
+  PARAC_TASK_DONE = 1 << 4,
+  PARAC_TASK_SPLITS_DONE = 1 << 5,
+  PARAC_TASK_OFFLOADED = 1 << 6,
 
-  PARAC_TASK_ERROR = 1 << 6,
+  PARAC_TASK_ERROR = 1 << 7,
 } parac_task_state;
 
 /** @brief Utility function to check if a task is done, irregarding splitted or
@@ -53,7 +54,9 @@ typedef struct parac_task {
   parac_task_serialize_func serialize;
   parac_task_free_userdata_func free_userdata;
 
-  struct parac_task* parent_task;
+  struct parac_task* parent_task_;
+  struct parac_task* left_child_;
+  struct parac_task* right_child_;
   struct parac_task_store* task_store;
 } parac_task;
 
@@ -86,6 +89,8 @@ operator<<(std::ostream& o, parac_task_state s) {
     o << "splitted ";
   if(s & PARAC_TASK_WORK_AVAILABLE)
     o << "work-available ";
+  if(s & PARAC_TASK_WORKING)
+    o << "working ";
   if(s & PARAC_TASK_WAITING_FOR_SPLITS)
     o << "waiting-for-splits ";
   if(s & PARAC_TASK_DONE)

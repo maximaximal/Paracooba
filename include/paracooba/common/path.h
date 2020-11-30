@@ -69,6 +69,9 @@ parac_path_from_str(const char* str, size_t len, parac_path* tgt);
 void
 parac_path_to_str(parac_path p, char* out_str);
 
+parac_path
+parac_path_unknown();
+
 #ifdef __cplusplus
 }
 #include <iostream>

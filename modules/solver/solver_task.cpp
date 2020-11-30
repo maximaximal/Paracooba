@@ -17,6 +17,9 @@
 #include <paracooba/common/task.h>
 #include <thread>
 
+#include <mutex>
+#include <set>
+
 namespace parac::solver {
 class FastSplit {
   public:
@@ -64,7 +67,7 @@ SolverTask::init(CaDiCaLManager& manager,
   m_task = &task;
   m_cubeSource = cubesource;
 
-  task.state = task.state | PARAC_TASK_WORK_AVAILABLE;
+  task.state = PARAC_TASK_WORK_AVAILABLE;
   task.work = &static_work;
   task.serialize = &static_serialize;
   task.userdata = this;
@@ -74,6 +77,14 @@ parac_status
 SolverTask::work(parac_worker worker) {
   auto handlePtr = m_manager->getHandleForWorker(worker);
   auto& handle = *handlePtr.ptr;
+
+  {
+    static std::mutex mtx;
+    static std::set<parac_path_type> paths;
+    std::unique_lock lock(mtx);
+    assert(!paths.count(m_task->path.rep));
+    paths.insert(m_task->path.rep);
+  }
 
   assert(m_manager);
   assert(m_task);
@@ -91,23 +102,33 @@ SolverTask::work(parac_worker worker) {
       PARAC_TASK_SPLITTED | PARAC_TASK_WAITING_FOR_SPLITS | PARAC_TASK_DONE;
 
     if(split_left) {
+      parac_log(PARAC_SOLVER,
+                PARAC_TRACE,
+                "Task on path {} lsplit to path {}",
+                m_task->path,
+                parac_path_get_next_left(m_task->path));
       assert(m_task->task_store);
-      parac_task* l = m_task->task_store->new_task(m_task->task_store, m_task);
-      create(
-        *l, *m_manager, parac_path_get_next_left(m_task->path), m_cubeSource);
+      parac_task* l = m_task->task_store->new_task(
+        m_task->task_store, m_task, parac_path_get_next_left(m_task->path));
+      create(*l, *m_manager, m_cubeSource);
       assert(m_task->task_store);
-      m_task->task_store->assess_task(m_task->task_store, l);
       m_task->left_result = PARAC_PENDING;
+      m_task->task_store->assess_task(m_task->task_store, l);
     } else {
       m_task->left_result = PARAC_UNSAT;
     }
 
     if(split_right) {
-      parac_task* r = m_task->task_store->new_task(m_task->task_store, m_task);
-      create(
-        *r, *m_manager, parac_path_get_next_right(m_task->path), m_cubeSource);
-      m_task->task_store->assess_task(m_task->task_store, r);
+      parac_log(PARAC_SOLVER,
+                PARAC_TRACE,
+                "Task on path {} rsplit to path {}",
+                m_task->path,
+                parac_path_get_next_right(m_task->path));
+      parac_task* r = m_task->task_store->new_task(
+        m_task->task_store, m_task, parac_path_get_next_right(m_task->path));
+      create(*r, *m_manager, m_cubeSource);
       m_task->right_result = PARAC_PENDING;
+      m_task->task_store->assess_task(m_task->task_store, r);
     } else {
       m_task->right_result = PARAC_UNSAT;
     }
@@ -142,14 +163,12 @@ SolverTask::createRoot(parac_task& task, CaDiCaLManager& manager) {
 SolverTask&
 SolverTask::create(parac_task& task,
                    CaDiCaLManager& manager,
-                   parac_path path,
                    std::shared_ptr<cubesource::Source> source) {
   assert(source);
 
   auto self = manager.createSolverTask(task, source);
   assert(self);
   self->m_cubeSource = source;
-  self->m_task->path = path;
   return *self;
 }
 

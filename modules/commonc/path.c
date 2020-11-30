@@ -184,3 +184,10 @@ parac_path_from_str(const char* str, size_t len, parac_path* tgt) {
 
   return PARAC_OK;
 }
+
+PARAC_COMMON_EXPORT parac_path
+parac_path_unknown() {
+  parac_path p;
+  p.rep = PARAC_PATH_EXPLICITLY_UNKNOWN;
+  return p;
+}

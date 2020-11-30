@@ -58,9 +58,13 @@ Worker::run() {
       m_currentTask->result = m_currentTask->work(m_currentTask, m_workerId);
     }
 
-    m_currentTask->state = m_currentTask->state | PARAC_TASK_DONE;
+    m_currentTask->state = static_cast<parac_task_state>(m_currentTask->state &
+                                                         ~PARAC_TASK_WORKING) |
+                           PARAC_TASK_DONE;
 
-    m_taskStore.assess_task(&m_taskStore, m_currentTask);
+    if(!(m_currentTask->state & PARAC_TASK_SPLITTED)) {
+      m_taskStore.assess_task(&m_taskStore, m_currentTask);
+    }
   }
   parac_log(PARAC_RUNNER, PARAC_DEBUG, "Worker exited.");
 
