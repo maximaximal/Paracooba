@@ -5,9 +5,10 @@
 #include <memory>
 #include <mutex>
 
-#include <paracooba/common/types.h>
 #include <paracooba/common/status.h>
+#include <paracooba/common/types.h>
 
+struct parac_module;
 struct parac_path;
 struct parac_task;
 struct parac_task_store;
@@ -16,7 +17,8 @@ struct parac_thread_registry_handle;
 namespace parac::runner {
 class Worker {
   public:
-  Worker(parac_task_store& taskStore,
+  Worker(parac_module& mod,
+         parac_task_store& taskStore,
          std::mutex& notifierMutex,
          std::condition_variable& notifier,
          std::atomic_bool& notifierCheck,
@@ -34,6 +36,7 @@ class Worker {
   parac_thread_registry_handle& threadRegistryHandle();
 
   private:
+  parac_module &m_mod;
   parac_task_store& m_taskStore;
   std::mutex& m_notifierMutex;
   std::condition_variable& m_notifier;

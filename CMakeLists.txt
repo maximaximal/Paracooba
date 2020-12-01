@@ -138,8 +138,8 @@ macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
     get_target_property(FMT_INCLUDE_DIRECTORIES fmt::fmt INCLUDE_DIRECTORIES)
     target_include_directories(${NAME}_obj PRIVATE ${FMT_INCLUDE_DIRECTORIES})
 
-    target_link_libraries(${NAME}_obj PUBLIC parac_common parac_modules)
-    target_link_libraries(${NAME} PUBLIC parac_common parac_modules fmt::fmt)
+    target_link_libraries(${NAME}_obj PUBLIC distrac parac_common parac_modules)
+    target_link_libraries(${NAME} PUBLIC distrac parac_common parac_modules fmt::fmt)
 
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -175,7 +175,7 @@ target_link_libraries(parac PUBLIC distrac parac_common parac_modules parac_load
 if(STATIC_BUILDS)
     add_executable(paracs $<TARGET_OBJECTS:parac_executable>
         ${CMAKE_CURRENT_SOURCE_DIR}/loader/StaticModuleLoader.cpp)
-    target_link_libraries(paracs parac_modules parac_loader fmt::fmt Boost::filesystem Boost::coroutine Boost::log Boost::context Boost::program_options Boost::date_time ${CMAKE_DL_LIBS})
+    target_link_libraries(paracs distrac parac_modules parac_loader fmt::fmt Boost::filesystem Boost::coroutine Boost::log Boost::context Boost::program_options Boost::date_time ${CMAKE_DL_LIBS})
     target_link_libraries(paracs parac_communicator_static parac_broker_static parac_runner_static parac_solver_static distrac parac_common_static)
 endif()
 

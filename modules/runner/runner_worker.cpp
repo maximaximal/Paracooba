@@ -7,15 +7,21 @@
 #include <paracooba/common/path.h>
 #include <paracooba/common/task.h>
 #include <paracooba/common/task_store.h>
+#include <paracooba/module.h>
+
+#include <distrac/distrac.h>
+#include <distrac_paracooba.h>
 
 namespace parac::runner {
-Worker::Worker(parac_task_store& taskStore,
+Worker::Worker(parac_module& mod,
+               parac_task_store& taskStore,
                std::mutex& notifierMutex,
                std::condition_variable& notifier,
                std::atomic_bool& notifierCheck,
                std::atomic_bool& stop,
                parac_worker workerId)
-  : m_taskStore(taskStore)
+  : m_mod(mod)
+  , m_taskStore(taskStore)
   , m_notifierMutex(notifierMutex)
   , m_notifier(notifier)
   , m_notifierCheck(notifierCheck)
@@ -25,7 +31,8 @@ Worker::Worker(parac_task_store& taskStore,
   threadRegistryHandle().userdata = this;
 }
 Worker::Worker(Worker&& o)
-  : m_taskStore(o.m_taskStore)
+  : m_mod(o.m_mod)
+  , m_taskStore(o.m_taskStore)
   , m_notifierMutex(o.m_notifierMutex)
   , m_notifier(o.m_notifier)
   , m_notifierCheck(o.m_notifierCheck)
@@ -54,6 +61,15 @@ Worker::run() {
               "Starting work on path {}",
               m_currentTask->path);
 
+    if(m_mod.handle->distrac) {
+      parac_ev_start_processing_task start_processing_task{
+        { .rep = m_currentTask->path.rep }, m_workerId
+      };
+      distrac_push(m_mod.handle->distrac,
+                   &start_processing_task,
+                   PARAC_EV_START_PROCESSING_TASK);
+    }
+
     if(m_currentTask->work) {
       m_currentTask->result = m_currentTask->work(m_currentTask, m_workerId);
     }
@@ -61,6 +77,17 @@ Worker::run() {
     m_currentTask->state = static_cast<parac_task_state>(m_currentTask->state &
                                                          ~PARAC_TASK_WORKING) |
                            PARAC_TASK_DONE;
+
+    if(m_mod.handle->distrac) {
+      parac_ev_finish_processing_task finish_processing_task{
+        distrac_parac_path{ .rep = m_currentTask->path.rep },
+        m_workerId,
+        static_cast<uint32_t>(m_currentTask->result)
+      };
+      distrac_push(m_mod.handle->distrac,
+                   &finish_processing_task,
+                   PARAC_EV_FINISH_PROCESSING_TASK);
+    }
 
     if(!(m_currentTask->state & PARAC_TASK_SPLITTED)) {
       m_taskStore.assess_task(&m_taskStore, m_currentTask);
@@ -81,6 +108,11 @@ Worker::getNextTask() {
     return work;
   }
 
+  if(m_mod.handle->distrac) {
+    parac_ev_worker_idle worker_idle{ m_workerId };
+    distrac_push(m_mod.handle->distrac, &worker_idle, PARAC_EV_WORKER_IDLE);
+  }
+
   parac_log(
     PARAC_RUNNER, PARAC_TRACE, "Worker going into idle and waiting for tasks.");
 
@@ -90,6 +122,11 @@ Worker::getNextTask() {
     if(m_notifierCheck.exchange(false) && !m_stop) {
       // Only this thread has been woken up and catched the notifier! Return
       // next task.
+      if(m_mod.handle->distrac) {
+        parac_ev_worker_working worker_working{ m_workerId };
+        distrac_push(
+          m_mod.handle->distrac, &worker_working, PARAC_EV_WORKER_WORKING);
+      }
       return m_taskStore.pop_work(&m_taskStore);
     }
   }

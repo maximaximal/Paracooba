@@ -49,11 +49,13 @@ WorkerExecutor::init() {
   parac_worker id = 0;
   while(m_internal->workers.size() < workerCount()) {
     m_internal->workers.emplace_back(
-      std::make_unique<Worker>(task_store,
+      std::make_unique<Worker>(m_internal->mod,
+                               task_store,
                                m_internal->notifierMutex,
                                m_internal->notifier,
                                m_internal->notifierCheck,
-                               m_internal->stop, id++));
+                               m_internal->stop,
+                               id++));
 
     auto& worker = m_internal->workers[m_internal->workers.size() - 1];
 

@@ -7,6 +7,7 @@
 #include <distrac/distrac.h>
 
 #include "CLI.hpp"
+#include "distrac/headers.h"
 #include "paracooba/common/status.h"
 #include <paracooba/loader/ModuleLoader.hpp>
 
@@ -137,6 +138,13 @@ main(int argc, char* argv[]) {
   const char* inputFile = nullptr;
   if(cli.getInputFile() != "") {
     inputFile = cli.getInputFile().c_str();
+
+    if(loader.handle().distrac) {
+      strncpy(loader.handle().distrac->definition.file_header.problem_name,
+              inputFile,
+              DISTRAC_LONGNAME_LENGTH);
+      loader.handle().distrac->is_main_node = true;
+    }
   }
   loader.handle().input_file = inputFile;
 
