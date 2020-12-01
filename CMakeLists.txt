@@ -163,9 +163,20 @@ endmacro()
 
 set(test_libs  "" CACHE INTERNAL "Libraries for Tests")
 
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/distrac_paracooba.h
+    COMMAND $<TARGET_FILE:distrac-codegen-bin> ${CMAKE_CURRENT_SOURCE_DIR}/Paracooba.distracdef -o ${CMAKE_CURRENT_BINARY_DIR}/distrac_paracooba.h
+    DEPENDS distrac-codegen-bin
+    MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/Paracooba.distracdef)
+add_custom_target(distrac_paracooba DEPENDS distrac_paracooba.h)
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 add_subdirectory(loader)
 add_subdirectory(modules)
 add_subdirectory(executable)
+
+set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
 
 add_executable(parac $<TARGET_OBJECTS:parac_executable>
     ${CMAKE_CURRENT_SOURCE_DIR}/loader/StaticModuleLoader.cpp)
