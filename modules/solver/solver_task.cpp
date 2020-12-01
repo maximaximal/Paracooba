@@ -78,14 +78,6 @@ SolverTask::work(parac_worker worker) {
   auto handlePtr = m_manager->getHandleForWorker(worker);
   auto& handle = *handlePtr.ptr;
 
-  {
-    static std::mutex mtx;
-    static std::set<parac_path_type> paths;
-    std::unique_lock lock(mtx);
-    assert(!paths.count(m_task->path.rep));
-    paths.insert(m_task->path.rep);
-  }
-
   assert(m_manager);
   assert(m_task);
   assert(m_task->task_store);
