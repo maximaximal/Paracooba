@@ -104,6 +104,8 @@ initiate_solving_on_file(parac_module& mod,
 static parac_status
 instance_handle_message(parac_module_solver_instance* instance,
                         parac_message* msg) {
+  (void)instance;
+  (void)msg;
   return PARAC_OK;
 }
 

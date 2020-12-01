@@ -24,7 +24,7 @@ PathDefined::split(parac_path p,
                    bool& right) const {
   (void)mgr;
 
-  if(handle.getNormalizedPathLength() < p.length + 1) {
+  if(handle.getNormalizedPathLength() < static_cast<size_t>(p.length) + 1) {
     left = false;
     right = false;
     return false;

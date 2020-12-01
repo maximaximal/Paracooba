@@ -41,6 +41,7 @@ ParserTask::~ParserTask() {}
 
 parac_status
 ParserTask::work(parac_task* self, parac_worker worker) {
+  (void)worker;
   assert(self);
   assert(self->userdata);
   ParserTask* t = static_cast<ParserTask*>(self->userdata);
