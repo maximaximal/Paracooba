@@ -48,16 +48,6 @@ add_definitions(-DBOOST_ALL_DYN_LINK)
 set(Boost_USE_MULTITHREADED ON)
 find_package(Boost COMPONENTS log program_options thread filesystem system iostreams coroutine context REQUIRED)
 
-# Try to include beast headers. They are required for the internal webserver.
-find_file(BOOST_BEAST_HEADER "boost/beast/core.hpp" PATHS ${Boost_INCLUDE_DIRS})
-if(NOT BOOST_BEAST_HEADER)
-    message(WARNING "Could not find Boost Beast HTTP Library. Internal webserver will not be available.")
-    set(BOOST_BEAST_AVAILABLE FALSE)
-else()
-    message(STATUS "Found Boost Beast HTTP library. Enabling internal webserver.")
-    set(BOOST_BEAST_AVAILABLE TRUE)
-endif()
-
 find_program(
     CLANG_TIDY_EXE
     NAMES "clang-tidy"
