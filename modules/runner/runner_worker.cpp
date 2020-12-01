@@ -61,13 +61,14 @@ Worker::run() {
               "Starting work on path {}",
               m_currentTask->path);
 
+    int64_t startOfProcessing;
     if(m_mod.handle->distrac) {
       parac_ev_start_processing_task start_processing_task{
         { .rep = m_currentTask->path.rep }, m_workerId
       };
-      distrac_push(m_mod.handle->distrac,
-                   &start_processing_task,
-                   PARAC_EV_START_PROCESSING_TASK);
+      startOfProcessing = distrac_push(m_mod.handle->distrac,
+                                       &start_processing_task,
+                                       PARAC_EV_START_PROCESSING_TASK);
     }
 
     if(m_currentTask->work) {
@@ -79,10 +80,14 @@ Worker::run() {
                            PARAC_TASK_DONE;
 
     if(m_mod.handle->distrac) {
+      uint32_t diff =
+        (distrac_current_time(m_mod.handle->distrac) - startOfProcessing) /
+        (1000);
       parac_ev_finish_processing_task finish_processing_task{
         distrac_parac_path{ .rep = m_currentTask->path.rep },
-        m_workerId,
-        static_cast<uint32_t>(m_currentTask->result)
+        static_cast<uint16_t>(m_workerId),
+        static_cast<uint16_t>(m_currentTask->result),
+        diff
       };
       distrac_push(m_mod.handle->distrac,
                    &finish_processing_task,

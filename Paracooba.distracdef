@@ -55,8 +55,9 @@ start_processing_task : Issued by Runner when it starts processing a task. {
 }
 finish_processing_task : Issued by Runner when it finishes processing a task. {
   path : parac_path [match = "path"]
-  worker_id : uint32
-  result : uint32
+  worker_id : uint16
+  result : uint16
+  processed_for_microseconds : uint32
 }
     [after = "start_processing_task"]
 
