@@ -26,7 +26,7 @@ typedef struct __attribute__((__packed__)) parac_path {
       parac_path_length_type length : 6;
       parac_path_type path : 58;
     };
-    parac_path_type rep : 64;
+    parac_path_type rep;
   };
 } parac_path;
 

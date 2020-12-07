@@ -1,7 +1,13 @@
 #pragma once
 
-#include "paracooba/solver/cube_iterator.hpp"
+#include <boost/utility/base_from_member.hpp>
+
+#include <cereal/archives/binary.hpp>
+#include <cereal/types/polymorphic.hpp>
+#include <cereal/types/vector.hpp>
+
 #include <paracooba/solver/types.hpp>
+#include <paracooba/solver/cube_iterator.hpp>
 
 #include <memory>
 #include <variant>
@@ -26,6 +32,8 @@ class Source {
                      bool& right) const = 0;
   virtual const char* name() const = 0;
   virtual std::unique_ptr<Source> copy() const = 0;
+
+  // Also include serialize functions!
 };
 
 /** @brief Cube is defined by path and received from solver.
@@ -34,8 +42,8 @@ class Source {
  * cube tree! */
 class PathDefined : public Source {
   public:
-  PathDefined() = default;
-  ~PathDefined() = default;
+  PathDefined();
+  ~PathDefined();
 
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
@@ -45,14 +53,20 @@ class PathDefined : public Source {
                      bool& right) const;
   virtual const char* name() const { return "PathDefined"; }
   virtual std::unique_ptr<Source> copy() const;
+
+  template<class Archive>
+  void serialize(Archive &ar) {
+    ar(0);
+  }
 };
 
 /** @brief Cube is supplied by parent. */
 class Supplied : public Source {
   public:
+  Supplied();
   explicit Supplied(const Cube& cube)
-    : m_cube(cube.begin(), cube.end()) {}
-  ~Supplied() = default;
+    : m_cube(cube) {}
+  ~Supplied();
 
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
@@ -63,8 +77,13 @@ class Supplied : public Source {
   virtual const char* name() const { return "Supplied"; }
   virtual std::unique_ptr<Source> copy() const;
 
+  template<class Archive>
+  void serialize(Archive &ar) {
+    ar(m_cube);
+  }
+
   private:
-  const CubeIteratorRange m_cube;
+  Cube m_cube;
 };
 
 /** @brief Cube is supplied by parent. */
@@ -81,6 +100,11 @@ class Unspecified : public Source {
                      bool& right) const;
   virtual const char* name() const { return "Unspecified"; }
   virtual std::unique_ptr<Source> copy() const;
+
+  template<class Archive>
+  void serialize(Archive &ar) {
+    ar(0);
+  }
 };
 
 using Variant = std::variant<cubesource::PathDefined,

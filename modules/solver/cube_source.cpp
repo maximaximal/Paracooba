@@ -16,6 +16,9 @@ PathDefined::cube(parac_path p, CaDiCaLManager& mgr) {
   return r;
 }
 
+PathDefined::PathDefined() {}
+PathDefined::~PathDefined() {}
+
 bool
 PathDefined::split(parac_path p,
                    CaDiCaLManager& mgr,
@@ -48,11 +51,14 @@ PathDefined::split(parac_path p,
   return left || right;
 }
 
+Supplied::Supplied() {}
+Supplied::~Supplied() {}
+
 CubeIteratorRange
 Supplied::cube(parac_path p, CaDiCaLManager& mgr) {
   (void)p;
   (void)mgr;
-  return m_cube;
+  return CubeIteratorRange(m_cube.begin(), m_cube.end());
 }
 std::unique_ptr<Source>
 PathDefined::copy() const {
@@ -102,3 +108,13 @@ Unspecified::copy() const {
   return std::make_unique<Unspecified>(*this);
 }
 }
+
+CEREAL_REGISTER_TYPE(parac::solver::cubesource::PathDefined)
+CEREAL_REGISTER_TYPE(parac::solver::cubesource::Supplied)
+CEREAL_REGISTER_TYPE(parac::solver::cubesource::Unspecified)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(parac::solver::cubesource::Source,
+                                     parac::solver::cubesource::PathDefined)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(parac::solver::cubesource::Source,
+                                     parac::solver::cubesource::Supplied)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(parac::solver::cubesource::Source,
+                                     parac::solver::cubesource::Unspecified)

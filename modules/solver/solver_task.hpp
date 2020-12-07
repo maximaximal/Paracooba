@@ -1,6 +1,5 @@
 #pragma once
 
-#include "paracooba/common/path.h"
 #include <optional>
 #include <vector>
 
@@ -8,6 +7,7 @@
 #include <cereal/types/optional.hpp>
 #include <cereal/types/vector.hpp>
 
+#include <paracooba/common/path.h>
 #include <paracooba/common/status.h>
 #include <paracooba/common/types.h>
 #include <paracooba/solver/types.hpp>
@@ -19,6 +19,7 @@ struct parac_message;
 
 namespace parac::solver {
 class CaDiCaLManager;
+class NoncopyOStringstream;
 
 class SolverTask {
   public:
@@ -40,7 +41,9 @@ class SolverTask {
   static parac_status static_serialize(parac_task* task,
                                        parac_message* tgt_msg);
 
-  parac_path path() const;
+  parac_path& path();
+  const parac_path& path() const;
+  CaDiCaLManager* manager() { return m_manager; }
 
   private:
   CaDiCaLManager* m_manager = nullptr;
@@ -48,11 +51,12 @@ class SolverTask {
 
   std::shared_ptr<cubesource::Source> m_cubeSource;
 
-  friend class cereal::access;
+  friend class ::cereal::access;
   template<class Archive>
   void serialize(Archive& ar) {
-    ar(cereal::make_nvp("path", path()),
-       cereal::make_nvp("source", *m_cubeSource));
+    ar(cereal::make_nvp("source", m_cubeSource));
   }
+
+  std::unique_ptr<NoncopyOStringstream> m_serializationOutStream;
 };
 }

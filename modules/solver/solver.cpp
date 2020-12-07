@@ -1,12 +1,15 @@
 #include "paracooba/solver/solver.h"
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
+#include "cereal/archives/binary.hpp"
 #include "paracooba/common/log.h"
 #include "paracooba/common/task_store.h"
 #include "parser_task.hpp"
 #include "solver_config.hpp"
 #include "solver_task.hpp"
 #include <paracooba/broker/broker.h>
+#include <paracooba/common/message.h>
+#include <paracooba/common/message_kind.h>
 #include <paracooba/common/path.h>
 #include <paracooba/module.h>
 #include <paracooba/solver/solver.h>
@@ -16,6 +19,9 @@
 #include <mutex>
 
 #include <parac_solver_export.h>
+
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 
 #define SOLVER_NAME "cpp_cubetree_splitter"
 #define SOLVER_VERSION_MAJOR 1
@@ -40,6 +46,9 @@ struct SolverInstance {
   SolverInstanceList::iterator it;
   SolverConfig config;
   const parac_id originatorId;
+  parac_task_store* task_store = nullptr;
+
+  bool configured = false;
 };
 
 struct SolverUserdata {
@@ -87,6 +96,7 @@ initiate_solving_on_file(parac_module& mod,
       }
 
       SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
+      i->task_store = &task_store;
       i->cadicalManager = std::make_unique<CaDiCaLManager>(
         mod, std::move(parsedFormula), i->config);
 
@@ -104,8 +114,53 @@ initiate_solving_on_file(parac_module& mod,
 static parac_status
 instance_handle_message(parac_module_solver_instance* instance,
                         parac_message* msg) {
-  (void)instance;
-  (void)msg;
+  assert(instance);
+  assert(msg);
+  assert(instance->userdata);
+
+  SolverInstance* solverInstance =
+    static_cast<SolverInstance*>(instance->userdata);
+
+  parac_task_store* task_store = solverInstance->task_store;
+  assert(task_store);
+
+  boost::iostreams::stream<boost::iostreams::basic_array_source<char>> data(
+    msg->data, msg->length);
+
+  switch(msg->kind) {
+    case PARAC_MESSAGE_SOLVER_TASK: {
+      assert(solverInstance->cadicalManager);
+      assert(solverInstance->configured);
+
+      parac_path_type pathType;
+      cereal::BinaryInputArchive ia(data);
+      ia(pathType);
+
+      parac_task* task = task_store->new_task(
+        task_store, nullptr, parac_path{ .rep = pathType });
+      assert(task);
+      task->received_from = msg->origin;
+
+      SolverTask* solverTask =
+        solverInstance->cadicalManager->createSolverTask(*task, nullptr);
+      ia(*solverTask);
+
+      task_store->assess_task(task_store, task);
+
+      break;
+    }
+    case PARAC_MESSAGE_SOLVER_DESCRIPTION: {
+      assert(!solverInstance->configured);
+      {
+        cereal::BinaryInputArchive ia(data);
+        ia(solverInstance->config);
+      }
+      solverInstance->configured = true;
+      break;
+    }
+    default:
+      assert(false);
+  }
   return PARAC_OK;
 }
 

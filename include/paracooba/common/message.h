@@ -13,6 +13,7 @@ extern "C" {
 #include <stddef.h>
 
 struct parac_message;
+struct parac_compute_node;
 
 typedef void (*parac_message_cb)(struct parac_message*, parac_status);
 
@@ -21,9 +22,9 @@ typedef struct parac_message {
   char* data;
   bool data_to_be_freed;
   size_t length;
-  parac_id origin;
   void* userdata;
   parac_message_cb cb;
+  struct parac_compute_node* origin;
 } parac_message;
 
 #ifdef __cplusplus

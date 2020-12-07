@@ -2,6 +2,7 @@
 
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
+#include "noncopy_ostream.hpp"
 #include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
 #include "paracooba/common/task_store.h"
@@ -14,8 +15,11 @@
 
 #include <chrono>
 #include <paracooba/common/log.h>
+#include <paracooba/common/message.h>
 #include <paracooba/common/task.h>
 #include <thread>
+
+#include <cereal/archives/binary.hpp>
 
 #include <mutex>
 #include <set>
@@ -71,6 +75,16 @@ SolverTask::init(CaDiCaLManager& manager,
   task.work = &static_work;
   task.serialize = &static_serialize;
   task.userdata = this;
+
+  task.free_userdata = [](parac_task* t) {
+    assert(t);
+    assert(t->userdata);
+    SolverTask* solverTask = static_cast<SolverTask*>(t->userdata);
+    CaDiCaLManager* manager = solverTask->manager();
+    assert(manager);
+    manager->deleteSolverTask(solverTask);
+    return PARAC_OK;
+  };
 }
 
 parac_status
@@ -141,6 +155,19 @@ SolverTask::work(parac_worker worker) {
 parac_status
 SolverTask::serialize_to_msg(parac_message* tgt_msg) {
   assert(tgt_msg);
+
+  if(!m_serializationOutStream) {
+    m_serializationOutStream = std::make_unique<NoncopyOStringstream>();
+
+    {
+      cereal::BinaryOutputArchive oa(*m_serializationOutStream);
+      oa(*this);
+    }
+  }
+
+  tgt_msg->data = m_serializationOutStream->ptr();
+  tgt_msg->length = m_serializationOutStream->tellp();
+
   return PARAC_OK;
 }
 
@@ -178,5 +205,16 @@ SolverTask::static_serialize(parac_task* task, parac_message* tgt_msg) {
   assert(task->userdata);
   SolverTask* t = static_cast<SolverTask*>(task->userdata);
   return t->serialize_to_msg(tgt_msg);
+}
+
+const parac_path&
+SolverTask::path() const {
+  assert(m_task);
+  return m_task->path;
+}
+parac_path&
+SolverTask::path() {
+  assert(m_task);
+  return m_task->path;
 }
 }

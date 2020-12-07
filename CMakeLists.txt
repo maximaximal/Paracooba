@@ -104,12 +104,6 @@ macro(parac_static_shared_combined NAME SRCS SHARED_EXTRA_SRCS)
     )
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
-    if(ENABLE_TESTS)
-        # sbs stands for "side by side" linkable. This means there are no
-        # colliding symbols between libraries. Is used for building tests.
-        add_library(${NAME}_sbs SHARED $<TARGET_OBJECTS:${NAME}_obj>)
-    endif()
-
     add_library(${NAME} SHARED $<TARGET_OBJECTS:${NAME}_obj> ${SHARED_EXTRA_SRCS})
     if(STATIC_BUILDS)
         add_library(${NAME}_static STATIC $<TARGET_OBJECTS:${NAME}_obj>)

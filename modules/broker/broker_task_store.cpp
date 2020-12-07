@@ -136,7 +136,9 @@ TaskStore::TaskStore(parac_handle& handle, parac_task_store& s)
   s.ping_on_work_userdata = nullptr;
   s.ping_on_work = nullptr;
 }
-TaskStore::~TaskStore() {}
+TaskStore::~TaskStore() {
+  parac_log(PARAC_BROKER, PARAC_DEBUG, "Destroy TaskStore.");
+}
 
 bool
 TaskStore::empty() const {

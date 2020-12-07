@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
+
 typedef enum parac_message_kind {
   PARAC_MESSAGE_UNKNOWN,
   PARAC_MESSAGE_ONLINE_ANNOUNCEMENT,
@@ -15,10 +17,11 @@ typedef enum parac_message_kind {
   PARAC_MESSAGE_CNF_TREE_NODE_STATUS_REPLY,
   PARAC_MESSAGE_NEW_REMOTE_CONNECTED,
   PARAC_MESSAGE_NEW_SOLVER_INSTANCE,
+  PARAC_MESSAGE_TASK_REPARENT,
+  PARAC_MESSAGE_TASK_RESULT,
 
-  PARAC_MESSAGE_SOLVER_TASK_PATH,
-  PARAC_MESSAGE_SOLVER_TASK_RESULT,
-  PARAC_MESSAGE_SOLVER_INITIATOR,
+  PARAC_MESSAGE_SOLVER_DESCRIPTION,
+  PARAC_MESSAGE_SOLVER_TASK,
 
   PARAC_MESSAGE_FILE,
   PARAC_MESSAGE_ACK,
@@ -29,6 +32,9 @@ typedef enum parac_message_kind {
 
 const char*
 parac_message_kind_to_str(parac_message_kind kind);
+
+bool
+parac_message_kind_is_for_solver(parac_message_kind kind);
 
 #ifdef __cplusplus
 }

@@ -47,7 +47,7 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   msg.data = data;
   msg.kind = PARAC_MESSAGE_NODE_STATUS;
   msg.length = 3;
-  msg.origin = 1;
+  msg.origin = n1;
   msg.userdata = message_cb_called;
   msg.cb = [](parac_message* msg, parac_status status) {
     bool* cb_called = static_cast<bool*>(msg->userdata);

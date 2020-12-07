@@ -445,7 +445,7 @@ TCPConnection::handleReceivedMessage() {
   msg.data = static_cast<char*>(m_state->recvBuf.data());
   msg.data_to_be_freed = false;
   msg.userdata = &d;
-  msg.origin = m_state->remoteId();
+  msg.origin = m_state->compute_node;
   msg.cb = [](parac_message* msg, parac_status status) {
     data* d = static_cast<data*>(msg->userdata);
     d->status = status;

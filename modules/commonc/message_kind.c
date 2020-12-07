@@ -16,6 +16,8 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "AnnouncementRequest";
     case PARAC_MESSAGE_NODE_STATUS:
       return "NodeStatus";
+    case PARAC_MESSAGE_TASK_REPARENT:
+      return "ReparentTask";
     case PARAC_MESSAGE_CNF_TREE_NODE_STATUS_REQUEST:
       return "CNFTreeNodeStatusRequest";
     case PARAC_MESSAGE_CNF_TREE_NODE_STATUS_REPLY:
@@ -24,12 +26,10 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "NewRemoteConnected";
     case PARAC_MESSAGE_NEW_SOLVER_INSTANCE:
       return "NewSolverInstance";
-    case PARAC_MESSAGE_SOLVER_INITIATOR:
-      return "Solver-Initiator";
-    case PARAC_MESSAGE_SOLVER_TASK_PATH:
-      return "Solver-TaskPath";
-    case PARAC_MESSAGE_SOLVER_TASK_RESULT:
-      return "Solver-TaskResult";
+    case PARAC_MESSAGE_SOLVER_DESCRIPTION:
+      return "Solver-Description";
+    case PARAC_MESSAGE_SOLVER_TASK:
+      return "Solver-Task";
     case PARAC_MESSAGE_FILE:
       return "File";
     case PARAC_MESSAGE_ACK:
@@ -38,4 +38,15 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "End";
   }
   return "";
+}
+
+PARAC_COMMON_EXPORT bool
+parac_message_kind_is_for_solver(parac_message_kind kind) {
+  switch(kind) {
+    case PARAC_MESSAGE_SOLVER_TASK:
+    case PARAC_MESSAGE_SOLVER_DESCRIPTION:
+      return true;
+    default:
+      return false;
+  }
 }

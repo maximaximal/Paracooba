@@ -1,6 +1,7 @@
 #ifndef PARACOOBA_COMMON_TASK_H
 #define PARACOOBA_COMMON_TASK_H
 
+#include "paracooba/common/compute_node.h"
 #include "path.h"
 #include "status.h"
 #include "types.h"
@@ -29,6 +30,7 @@ parac_task_state_is_done(parac_task_state state);
 
 struct parac_task;
 struct parac_message;
+struct parac_compute_node;
 
 typedef parac_task_state (*parac_task_assess_func)(struct parac_task*);
 typedef parac_status (*parac_task_work_func)(struct parac_task*, parac_worker);
@@ -44,8 +46,8 @@ typedef struct parac_task {
   parac_status right_result;
   bool stop;
   parac_path path;
-  parac_id received_from;
-  parac_id offloaded_to;
+  struct parac_compute_node* received_from;
+  struct parac_compute_node* offloaded_to;
   parac_id originator;
 
   void* userdata;

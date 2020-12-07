@@ -1,25 +1,12 @@
 prefix="parac_";
 name="Paracooba";
-description="Distrac definition for"
+description="Distrac definition for Paracooba"
 
 send_msg_ipv4 : Issued by Communicator when a message was sent over IPv4. {
   size : uint64
   target_id : int64
   target_ipv4 : ipv4
-  message_type : uint8 [
-    v0  = "Unknown",
-    v1  = "CNF",
-    v2  = "OnlineAnnouncement",
-    v3  = "OfflineAnnouncement",
-    v4  = "AnnouncementRequest",
-    v5  = "NodeStatus",
-    v6  = "CNFTreeNodeStatusRequest",
-    v7  = "CNFTreeNodeStatusReply",
-    v8  = "NewRemoteConnected",
-    v9  = "JobPath",
-    v10 = "JobResult",
-    v11 = "JobInitiator"
-  ]
+  message_type : uint8
 
   padd1 : uint8
   padd2 : uint16
@@ -35,14 +22,30 @@ recv_msg_ipv4 : Issued by Communicator when a message was received over IPv4. {
 }
     [after = "send_msg_ipv4"]
 
-offload_task : Issued by Broker when a task is offloaded to another node. {
+send_msg_ipv6 : Issued by Communicator when a message was sent over IPv6. {
+  size : uint64
   target_id : int64
+  target_ipv6 : ipv6
+  message_type : uint64
+}
+recv_msg_ipv6 : Issued by Communicator when a message was received over IPv6. {
+  size : uint64        [match = "size"]
+  source_id : int64    [match = "target_id"]
+  source_ipv6 : ipv6   [match = "target_ipv6"]
+  message_type : uint64 [match = "message_type"]
+}
+    [after = "send_msg_ipv6"]
+
+offload_task : Issued by Broker when a task is offloaded to another node. {
+  target_id : uint64
+  originator_id: uint64
   path      : parac_path
   localWorkQueueSize : uint32
   perceivedRemoteWorkQueueSize : uint32
 }
 receive_task : Issued by Broker when a task is received from another node. {
-  source_id : int64 [match = "target_id"]
+  source_id : uint64 [match = "target_id"]
+  originator_id: uint64 [match = "originator_id"]
   path      : parac_path [match = "path"]
   localWorkQueueSize : uint32
   perceivedSrcRemoteWorkQueueSize : uint32
@@ -50,10 +53,12 @@ receive_task : Issued by Broker when a task is received from another node. {
     [after = "offload_task"]
 
 start_processing_task : Issued by Runner when it starts processing a task. {
+  originator : uint64
   path : parac_path
   worker_id : uint64
 }
 finish_processing_task : Issued by Runner when it finishes processing a task. {
+  originator : uint64 [match = "originator"]
   path : parac_path [match = "path"]
   worker_id : uint16
   result : uint16

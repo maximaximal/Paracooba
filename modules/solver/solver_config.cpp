@@ -6,7 +6,6 @@
 #include <thread>
 
 namespace parac::solver {
-SolverConfig::SolverConfig() {}
 SolverConfig::SolverConfig(parac_config* config) {
   m_config = parac_config_reserve(config, static_cast<size_t>(Entry::_COUNT));
 
@@ -75,7 +74,6 @@ SolverConfig::SolverConfig(parac_config* config) {
   m_config[static_cast<size_t>(Entry::MarchCubes)]
     .default_value.boolean_switch = false;
 }
-SolverConfig::~SolverConfig() {}
 
 void
 SolverConfig::extractFromConfigEntries() {

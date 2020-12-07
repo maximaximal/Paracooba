@@ -42,8 +42,8 @@ parac_task_init(parac_task* t) {
   t->work = NULL;
   t->assess = &parac_task_default_assess;
   t->free_userdata = NULL;
-  t->received_from = 0;
-  t->offloaded_to = 0;
+  t->received_from = NULL;
+  t->offloaded_to = NULL;
   t->originator = 0;
   t->parent_task_ = NULL;
   t->left_child_ = NULL;

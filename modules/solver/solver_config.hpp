@@ -11,9 +11,9 @@ struct parac_config;
 namespace parac::solver {
 class SolverConfig {
   public:
-  SolverConfig();
+  SolverConfig() = default;
   explicit SolverConfig(parac_config* config);
-  ~SolverConfig();
+  ~SolverConfig() = default;
 
   void extractFromConfigEntries();
 
