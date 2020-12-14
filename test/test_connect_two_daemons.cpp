@@ -1,3 +1,4 @@
+#include "paracooba/module.h"
 #define PARAC_LOG_INCLUDE_FMT
 
 #include "mocks.hpp"
@@ -27,7 +28,7 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   REQUIRE(!daemon_cns->has(daemon_cns, 1));
   REQUIRE(daemon_cns->has(daemon_cns, 2));
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
   REQUIRE(master_cns->has(master_cns, 1));
   REQUIRE(master_cns->has(master_cns, 2));

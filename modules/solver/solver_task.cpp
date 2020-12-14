@@ -2,7 +2,7 @@
 
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
-#include "noncopy_ostream.hpp"
+#include "paracooba/common/noncopy_ostream.hpp"
 #include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
 #include "paracooba/common/task_store.h"
@@ -114,8 +114,11 @@ SolverTask::work(parac_worker worker) {
                 m_task->path,
                 parac_path_get_next_left(m_task->path));
       assert(m_task->task_store);
-      parac_task* l = m_task->task_store->new_task(
-        m_task->task_store, m_task, parac_path_get_next_left(m_task->path));
+      parac_task* l =
+        m_task->task_store->new_task(m_task->task_store,
+                                     m_task,
+                                     parac_path_get_next_left(m_task->path),
+                                     m_task->originator);
       create(*l, *m_manager, m_cubeSource);
       assert(m_task->task_store);
       m_task->left_result = PARAC_PENDING;
@@ -130,8 +133,11 @@ SolverTask::work(parac_worker worker) {
                 "Task on path {} rsplit to path {}",
                 m_task->path,
                 parac_path_get_next_right(m_task->path));
-      parac_task* r = m_task->task_store->new_task(
-        m_task->task_store, m_task, parac_path_get_next_right(m_task->path));
+      parac_task* r =
+        m_task->task_store->new_task(m_task->task_store,
+                                     m_task,
+                                     parac_path_get_next_right(m_task->path),
+                                     m_task->originator);
       create(*r, *m_manager, m_cubeSource);
       m_task->right_result = PARAC_PENDING;
       m_task->task_store->assess_task(m_task->task_store, r);

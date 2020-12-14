@@ -394,23 +394,25 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
   auto compute_node_store = m_state->service.handle()
                               .modules[PARAC_MOD_BROKER]
                               ->broker->compute_node_store;
-  m_state->compute_node =
-    compute_node_store->get(compute_node_store, init.sender_id);
+
+  TCPConnection* conn = new TCPConnection(*this);
+
+  m_state->compute_node = compute_node_store->get_with_connection(
+    compute_node_store,
+    init.sender_id,
+    &TCPConnection::compute_node_free_func,
+    conn,
+    &TCPConnection::compute_node_send_message_to_func,
+    &TCPConnection::compute_node_send_file_to_func);
 
   if(!m_state->compute_node) {
     parac_log(PARAC_COMMUNICATOR,
               PARAC_LOCALERROR,
               "Error when creating compute node {}!",
               init.sender_id);
+    delete conn;
     return false;
   }
-
-  auto n = m_state->compute_node;
-  n->communicator_free = &TCPConnection::compute_node_free_func;
-  n->communicator_userdata = new TCPConnection(*this);
-
-  n->send_message_to = &TCPConnection::compute_node_send_message_to_func;
-  n->send_file_to = &TCPConnection::compute_node_send_file_to_func;
 
   return true;
 }
@@ -424,7 +426,6 @@ TCPConnection::handleReceivedACK(const PacketHeader& ack) {
     return false;
   }
   auto& sentItem = it->second;
-  assert(sentItem.message().cb);
   sentItem(ack.ack_status);
   sentItem(PARAC_TO_BE_DELETED);
   m_state->sentBuffer.erase(it);
@@ -452,6 +453,7 @@ TCPConnection::handleReceivedMessage() {
     d->returned = true;
   };
   assert(msg.data);
+
   m_state->compute_node->receive_message_from(m_state->compute_node, &msg);
 
   // Callback must be called immediately! This gives the status that is

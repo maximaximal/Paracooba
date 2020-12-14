@@ -13,11 +13,13 @@ namespace parac::broker {
 class TaskStore {
   public:
   explicit TaskStore(parac_handle& handle, parac_task_store& store);
-  ~TaskStore();
+  virtual ~TaskStore();
 
   bool empty() const;
   size_t size() const;
-  parac_task* newTask(parac_task* parent_task, parac_path new_path);
+  parac_task* newTask(parac_task* parent_task,
+                      parac_path new_path,
+                      parac_id originator);
 
   /** @brief Pop task for offloading. */
   parac_task* pop_offload(parac_compute_node* target);

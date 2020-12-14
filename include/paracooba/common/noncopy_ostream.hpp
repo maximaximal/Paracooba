@@ -3,7 +3,7 @@
 #include <cassert>
 #include <sstream>
 
-namespace parac::solver {
+namespace parac {
 class NoncopyStringbuf : public std::stringbuf {
   public:
   char* eback() { return std::streambuf::eback(); }

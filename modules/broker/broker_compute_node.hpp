@@ -7,21 +7,37 @@
 #include <cereal/types/string.hpp>
 
 struct parac_compute_node;
+struct parac_message;
+struct parac_module_solver_instance;
+struct parac_handle;
+
+namespace parac {
+class NoncopyOStringstream;
+}
 
 namespace parac::broker {
 class ComputeNode {
   public:
-  ComputeNode(const parac_compute_node& node);
-  ~ComputeNode();
+  ComputeNode(parac_compute_node& node, parac_handle& handle);
+  virtual ~ComputeNode();
 
   struct Description {
-    const std::string name;
-    const std::string host;
-    const uint32_t workers;
-    const uint16_t udpListenPort;
-    const uint16_t tcpListenPort;
-    const bool demon;
-    const bool local = false;
+    std::string name;
+    std::string host;
+    uint32_t workers;
+    uint16_t udpListenPort;
+    uint16_t tcpListenPort;
+    bool daemon = true;
+    bool local = false;
+
+    Description();
+    Description(std::string name,
+                std::string host,
+                uint32_t workers,
+                uint16_t udpListenPort,
+                uint16_t tcpListenPort,
+                bool daemon,
+                bool local = false);
 
     template<class Archive>
     void serialize(Archive& ar) {
@@ -30,8 +46,13 @@ class ComputeNode {
          CEREAL_NVP(workers),
          CEREAL_NVP(udpListenPort),
          CEREAL_NVP(tcpListenPort),
-         CEREAL_NVP(demon));
+         CEREAL_NVP(daemon));
     }
+
+    void serializeToMessage(parac_message& msg) const;
+
+    private:
+    mutable std::unique_ptr<NoncopyOStringstream> m_descriptionStream;
   };
 
   struct SolverInstance {
@@ -40,8 +61,7 @@ class ComputeNode {
 
     template<class Archive>
     void serialize(Archive& ar) {
-      ar(CEREAL_NVP(formula_parsed),
-         CEREAL_NVP(workQueueSize));
+      ar(CEREAL_NVP(formula_parsed), CEREAL_NVP(workQueueSize));
     }
   };
 
@@ -53,10 +73,20 @@ class ComputeNode {
     void serialize(Archive& ar) {
       ar(CEREAL_NVP(solverInstances));
     }
+
+    void serializeToMessage(parac_message& msg) const;
+
+    private:
+    mutable std::unique_ptr<NoncopyOStringstream> m_statusStream;
   };
 
-  const Description* description() const { return m_description.get(); }
+  const Description* description() const {
+    return m_description ? &m_description.value() : nullptr;
+  }
   const Status& status() const { return m_status; }
+
+  void incrementWorkQueueSize(parac_id originator);
+  void decrementWorkQueueSize(parac_id originator);
 
   void initDescription(const std::string& name,
                        const std::string& host,
@@ -68,10 +98,23 @@ class ComputeNode {
 
   void applyStatus(const Status& s);
 
+  void receiveMessageFrom(parac_message& msg);
+  void receiveMessageDescriptionFrom(parac_message& msg);
+  void receiveMessageStatusFrom(parac_message& msg);
+
   private:
   const parac_compute_node& m_node;
+  parac_handle& m_handle;
 
-  std::unique_ptr<Description> m_description;
+  std::optional<Description> m_description;
   Status m_status;
+  parac_module_solver_instance* m_solverInstance = nullptr;
 };
 }
+std::ostream&
+operator<<(std::ostream& o, const parac::broker::ComputeNode::Description& d);
+std::ostream&
+operator<<(std::ostream& o,
+           const parac::broker::ComputeNode::SolverInstance& si);
+std::ostream&
+operator<<(std::ostream& o, const parac::broker::ComputeNode::Status& s);

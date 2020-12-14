@@ -88,13 +88,19 @@ CaDiCaLHandle::parseString(std::string_view iCNF) {
 
 parac_status
 CaDiCaLHandle::parseFile(const std::string& path) {
-  m_internal->path = path;
+  if(path == "-") {
+    m_internal->path = "/dev/stdin";
+  } else {
+    m_internal->path = path;
+  }
 
-  parac_log(
-    PARAC_SOLVER, PARAC_DEBUG, "Start to parse DIMACS file \"{}\".", path);
+  parac_log(PARAC_SOLVER,
+            PARAC_DEBUG,
+            "Start to parse DIMACS file \"{}\".",
+            m_internal->path);
 
   const char* parseStatus =
-    m_internal->solver.read_dimacs(path.c_str(),
+    m_internal->solver.read_dimacs(m_internal->path.c_str(),
                                    m_internal->vars,
                                    1,
                                    m_internal->incremental,
@@ -104,7 +110,7 @@ CaDiCaLHandle::parseFile(const std::string& path) {
     parac_log(PARAC_SOLVER,
               PARAC_FATAL,
               "Could not parse DIMACS file \"{}\"! Error: {}",
-              path,
+              m_internal->path,
               parseStatus);
     return PARAC_PARSE_ERROR;
   }
@@ -117,7 +123,7 @@ CaDiCaLHandle::parseFile(const std::string& path) {
             PARAC_DEBUG,
             "Finished parsing DIMACS file \"{}\" with {} variables and {} "
             "pregenerated cubes. Normalized path length is {}.",
-            path,
+            m_internal->path,
             m_internal->vars,
             m_internal->pregeneratedCubesCount,
             m_internal->normalizedPathLength);

@@ -130,6 +130,7 @@ build/
 build-gcc/
 build-fresh/
 build-*/
+build*/
 clangd
 .clangd
 .ccls-cache

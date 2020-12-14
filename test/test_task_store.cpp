@@ -33,7 +33,7 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
 
   auto p = parac::Path::build(0b1000000, 1);
 
-  parac_task* task = store->new_task(store, nullptr, parac_path_unknown());
+  parac_task* task = store->new_task(store, nullptr, parac_path_unknown(), 0);
   REQUIRE(task);
   REQUIRE(task->left_result == PARAC_PENDING);
   REQUIRE(task->right_result == PARAC_PENDING);
@@ -64,7 +64,7 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
                 PARAC_TASK_SPLITTED;
 
   auto leftp = parac_path_get_next_left(task->path);
-  parac_task* task2 = store->new_task(store, task, leftp);
+  parac_task* task2 = store->new_task(store, task, leftp, 0);
 
   REQUIRE(task2);
   REQUIRE(task2->parent_task_ == task);

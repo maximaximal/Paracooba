@@ -36,7 +36,7 @@ CLI::CLI(struct parac_config& config)
   // clang-format off
   m_globalOptions.add_options()
     ("help", "produce help message for all available options")
-    ("input-file", po::value<std::string>()->default_value("")->value_name("string"), "Input CNF file in DIMACS format")
+    ("input", po::value<std::string>()->default_value("")->value_name("string"), "Input CNF file (or inline string beginning with ':' to read from CLI or '-' to read from stdin) in DIMACS format")
     ("local-name,n", po::value<std::string>()->default_value(generatedLocalName)->value_name("string"), "Local name of this node. Can be overridden by environment variable PARAC_LOCAL_NAME")
     ("trace,t", po::bool_switch(&m_traceMode)->default_value(false)->value_name("bool"), "debug mode (set severity >= TRACE)")
     ("debug,d", po::bool_switch(&m_debugMode)->default_value(false)->value_name("bool"), "debug mode (set severity >= DEBG)")
@@ -303,7 +303,7 @@ TryParsingCLIArgToConfigEntry(parac_config_entry& e,
 bool
 CLI::parseModuleArgs(int argc, char* argv[]) {
   po::positional_options_description positionalOptions;
-  positionalOptions.add("input-file", 1);
+  positionalOptions.add("input", 1);
 
   po::options_description options;
   options.add(m_globalOptions)
@@ -325,8 +325,8 @@ CLI::parseModuleArgs(int argc, char* argv[]) {
     return false;
   }
 
-  if(m_vm.count("input-file")) {
-    m_inputFile = m_vm["input-file"].as<std::string>();
+  if(m_vm.count("input")) {
+    m_inputFile = m_vm["input"].as<std::string>();
   }
 
   if(m_vm.count("help")) {

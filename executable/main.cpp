@@ -148,7 +148,8 @@ main(int argc, char* argv[]) {
   }
   loader.handle().input_file = inputFile;
 
-  if(cli.getInputFile() != "" &&
+  if(cli.getInputFile() != "" && cli.getInputFile()[0] != ':' &&
+     cli.getInputFile() != "-" &&
      !boost::filesystem::exists(cli.getInputFile())) {
     parac_log(PARAC_GENERAL,
               PARAC_FATAL,

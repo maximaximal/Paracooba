@@ -20,7 +20,7 @@ class ParserTask {
   using FinishedCB = std::function<void(parac_status, CaDiCaLHandlePtr)>;
 
   ParserTask(parac_task& task,
-             const std::string& file,
+             const std::string& input,
              parac_id originatorId,
              FinishedCB finishedCB);
   ~ParserTask();
@@ -32,7 +32,7 @@ class ParserTask {
   static parac_status work(parac_task* self, parac_worker worker);
 
   parac_task& m_task;
-  const std::string m_file;
+  const std::string m_input;
   FinishedCB m_finishedCB;
 };
 }

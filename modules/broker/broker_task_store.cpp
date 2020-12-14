@@ -2,12 +2,17 @@
 #include <cassert>
 #include <deque>
 #include <list>
+#include <map>
 #include <mutex>
 #include <set>
 #include <unordered_map>
 
+#include "broker_compute_node_store.hpp"
 #include "broker_task_store.hpp"
+
+#include "paracooba/broker/broker.h"
 #include "paracooba/common/compute_node.h"
+#include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/log.h"
 #include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
@@ -19,6 +24,27 @@
 #include <boost/pool/pool_alloc.hpp>
 
 namespace parac::broker {
+static ComputeNodeStore&
+extractComputeNodeStore(parac_handle& h) {
+  assert(h.modules[PARAC_MOD_BROKER]);
+  parac_module_broker& broker = *h.modules[PARAC_MOD_BROKER]->broker;
+  assert(broker.compute_node_store);
+  assert(broker.compute_node_store->userdata);
+  return *static_cast<ComputeNodeStore*>(broker.compute_node_store->userdata);
+}
+
+static void
+incrementWorkQueueInComputeNode(parac_handle& h, parac_id originator) {
+  ComputeNodeStore& brokerComputeNodeStore = extractComputeNodeStore(h);
+  brokerComputeNodeStore.incrementThisNodeWorkQueueSize(originator);
+}
+
+static void
+decrementWorkQueueInComputeNode(parac_handle& h, parac_id originator) {
+  ComputeNodeStore& brokerComputeNodeStore = extractComputeNodeStore(h);
+  brokerComputeNodeStore.decrementThisNodeWorkQueueSize(originator);
+}
+
 struct TaskStore::Internal {
   explicit Internal(parac_handle& handle, parac_task_store& store)
     : handle(handle)
@@ -109,13 +135,15 @@ TaskStore::TaskStore(parac_handle& handle, parac_task_store& s)
     return static_cast<TaskStore*>(store->userdata)
       ->m_internal->tasksBeingWorkedOn.size();
   };
-  s.new_task =
-    [](parac_task_store* store, parac_task* creator_task, parac_path new_path) {
-      assert(store);
-      assert(store->userdata);
-      return static_cast<TaskStore*>(store->userdata)
-        ->newTask(creator_task, new_path);
-    };
+  s.new_task = [](parac_task_store* store,
+                  parac_task* creator_task,
+                  parac_path new_path,
+                  parac_id originator) {
+    assert(store);
+    assert(store->userdata);
+    return static_cast<TaskStore*>(store->userdata)
+      ->newTask(creator_task, new_path, originator);
+  };
   s.pop_offload = [](parac_task_store* store, parac_compute_node* target) {
     assert(store);
     assert(store->userdata);
@@ -149,7 +177,9 @@ TaskStore::size() const {
   return m_internal->tasks.size();
 }
 parac_task*
-TaskStore::newTask(parac_task* parent_task, parac_path new_path) {
+TaskStore::newTask(parac_task* parent_task,
+                   parac_path new_path,
+                   parac_id originator) {
   std::unique_lock lock(m_internal->containerMutex);
   auto& taskWrapper = m_internal->tasks.emplace_front();
   parac_task* task = &taskWrapper.t;
@@ -158,6 +188,7 @@ TaskStore::newTask(parac_task* parent_task, parac_path new_path) {
   task->parent_task_ = parent_task;
   task->task_store = &m_internal->store;
   task->path = new_path;
+  task->originator = originator;
 
   if(parent_task) {
     Internal::Task* parentWrapper = reinterpret_cast<Internal::Task*>(
@@ -191,6 +222,8 @@ TaskStore::pop_offload(parac_compute_node* target) {
     reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
   ++taskWrapper->refcount;
 
+  decrementWorkQueueInComputeNode(m_internal->handle, t.originator);
+
   return &t;
 }
 parac_task*
@@ -208,6 +241,8 @@ TaskStore::pop_work() {
   Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
     reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
   ++taskWrapper->refcount;
+
+  decrementWorkQueueInComputeNode(m_internal->handle, t.originator);
 
   return &t;
 }
@@ -228,6 +263,8 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
                          return t.get().path.length > p.length;
                        }),
       *task);
+
+    incrementWorkQueueInComputeNode(m_internal->handle, task->originator);
   }
 
   if(m_internal->store.ping_on_work) {

@@ -58,6 +58,9 @@ init(parac_module* mod) {
   assert(mod->handle->thread_registry);
   assert(mod->userdata);
 
+  BrokerUserdata* userdata = static_cast<BrokerUserdata*>(mod->userdata);
+  userdata->computeNodeStore.updateThisNodeDescription();
+
   return PARAC_OK;
 }
 

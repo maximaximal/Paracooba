@@ -16,16 +16,12 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "AnnouncementRequest";
     case PARAC_MESSAGE_NODE_STATUS:
       return "NodeStatus";
+    case PARAC_MESSAGE_NODE_DESCRIPTION:
+      return "NodeDescription";
     case PARAC_MESSAGE_TASK_REPARENT:
       return "ReparentTask";
-    case PARAC_MESSAGE_CNF_TREE_NODE_STATUS_REQUEST:
-      return "CNFTreeNodeStatusRequest";
-    case PARAC_MESSAGE_CNF_TREE_NODE_STATUS_REPLY:
-      return "CNFTreeNodeStatusReply";
     case PARAC_MESSAGE_NEW_REMOTE_CONNECTED:
       return "NewRemoteConnected";
-    case PARAC_MESSAGE_NEW_SOLVER_INSTANCE:
-      return "NewSolverInstance";
     case PARAC_MESSAGE_SOLVER_DESCRIPTION:
       return "Solver-Description";
     case PARAC_MESSAGE_SOLVER_TASK:

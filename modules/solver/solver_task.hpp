@@ -17,9 +17,12 @@
 struct parac_task;
 struct parac_message;
 
+namespace parac {
+class NoncopyOStringstream;
+}
+
 namespace parac::solver {
 class CaDiCaLManager;
-class NoncopyOStringstream;
 
 class SolverTask {
   public:

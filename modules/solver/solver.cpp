@@ -70,12 +70,12 @@ initiate_solving_on_file(parac_module& mod,
   assert(broker.task_store);
   auto& task_store = *broker.task_store;
 
-  parac_task* task =
-    task_store.new_task(&task_store, nullptr, parac_path_unknown());
+  parac_task* task = task_store.new_task(
+    &task_store, nullptr, parac_path_unknown(), originatorId);
   parac_log(PARAC_SOLVER,
             PARAC_DEBUG,
             "Create ParserTask for formula in file \"{}\" from node {}.",
-            file,
+            file[0] == ':' ? "(inline - given on CLI)" : file,
             originatorId);
 
   assert(task);
@@ -83,8 +83,8 @@ initiate_solving_on_file(parac_module& mod,
     *task,
     file,
     originatorId,
-    [&mod, &task_store, instance](parac_status status,
-                                  ParserTask::CaDiCaLHandlePtr parsedFormula) {
+    [&mod, &task_store, originatorId, instance](
+      parac_status status, ParserTask::CaDiCaLHandlePtr parsedFormula) {
       if(status != PARAC_OK) {
         parac_log(PARAC_SOLVER,
                   PARAC_FATAL,
@@ -100,8 +100,8 @@ initiate_solving_on_file(parac_module& mod,
       i->cadicalManager = std::make_unique<CaDiCaLManager>(
         mod, std::move(parsedFormula), i->config);
 
-      parac_task* task =
-        task_store.new_task(&task_store, nullptr, parac_path_unknown());
+      parac_task* task = task_store.new_task(
+        &task_store, nullptr, parac_path_unknown(), originatorId);
       assert(task);
       SolverTask::createRoot(*task, *i->cadicalManager);
       task_store.assess_task(&task_store, task);
@@ -133,11 +133,14 @@ instance_handle_message(parac_module_solver_instance* instance,
       assert(solverInstance->configured);
 
       parac_path_type pathType;
+
       cereal::BinaryInputArchive ia(data);
       ia(pathType);
 
-      parac_task* task = task_store->new_task(
-        task_store, nullptr, parac_path{ .rep = pathType });
+      parac_task* task = task_store->new_task(task_store,
+                                              nullptr,
+                                              parac_path{ .rep = pathType },
+                                              instance->originator_id);
       assert(task);
       task->received_from = msg->origin;
 

@@ -21,7 +21,8 @@ typedef size_t (*parac_task_store_get_size)(struct parac_task_store*);
 typedef struct parac_task* (*parac_task_store_new_task)(
   struct parac_task_store*,
   struct parac_task* creator_task,
-  struct parac_path new_path);
+  struct parac_path new_path,
+  parac_id originator);
 typedef void (*parac_task_store_assess_task)(struct parac_task_store*,
                                              struct parac_task*);
 typedef struct parac_task* (*parac_task_store_pop_offload)(

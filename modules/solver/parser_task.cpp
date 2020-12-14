@@ -16,12 +16,12 @@ struct ParserTask::Internal {
 };
 
 ParserTask::ParserTask(parac_task& task,
-                       const std::string& file,
+                       const std::string& input,
                        parac_id originatorId,
                        FinishedCB finishedCB)
   : m_internal(std::make_unique<Internal>(task.stop, originatorId))
   , m_task(task)
-  , m_file(file)
+  , m_input(input)
   , m_finishedCB(finishedCB) {
   task.path.rep = PARAC_PATH_PARSER;
   task.state = task.state | PARAC_TASK_WORK_AVAILABLE;
@@ -48,7 +48,14 @@ ParserTask::work(parac_task* self, parac_worker worker) {
   assert(t->m_internal);
   assert(t->m_internal->handlePtr);
   assert(!t->m_internal->handlePtr->hasFormula());
-  parac_status s = t->m_internal->handlePtr->parseFile(t->m_file);
+  parac_status s;
+  if(t->m_input[0] == ':') {
+    std::string_view view(t->m_input);
+    auto contentView = view.substr(1, std::string_view::npos);
+    s = t->m_internal->handlePtr->parseString(contentView);
+  } else {
+    s = t->m_internal->handlePtr->parseFile(t->m_input);
+  }
   if(t->m_finishedCB) {
     t->m_finishedCB(s, std::move(t->m_internal->handlePtr));
   }
