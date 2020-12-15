@@ -94,6 +94,10 @@ class ParacoobaMock : public parac_handle {
   parac_module_solver& getSolver() { return *m_moduleLoader->solver(); }
   parac_module_broker& getBroker() { return *m_moduleLoader->broker(); }
 
+  paracooba::ThreadRegistryWrapper& getThreadRegistry() {
+    return m_threadRegistry;
+  }
+
   private:
   paracooba::ConfigWrapper m_config;
   paracooba::ThreadRegistryWrapper m_threadRegistry;

@@ -33,6 +33,9 @@ struct CaDiCaLHandle::Internal {
   bool incremental;
   CaDiCaLTerminator terminator;
   std::string path;
+  /// Only in parsed handle. The file should be deleted at the end (for string
+  /// input).
+  std::string pathToDelete;
   parac_id originatorId;
   std::shared_ptr<std::vector<Literal>> pregeneratedCubes;
   std::shared_ptr<std::vector<size_t>> pregeneratedCubesJumplist;
@@ -56,7 +59,16 @@ CaDiCaLHandle::CaDiCaLHandle(CaDiCaLHandle& o)
   m_internal->path = o.m_internal->path;
   m_internal->originatorId = o.m_internal->originatorId;
 }
-CaDiCaLHandle::~CaDiCaLHandle() {}
+CaDiCaLHandle::~CaDiCaLHandle() {
+  if(m_internal->pathToDelete != "") {
+    std::remove(m_internal->pathToDelete.c_str());
+    parac_log(
+      PARAC_SOLVER,
+      PARAC_TRACE,
+      "Removed temp file \"{}\" created in order to parse DIMACS from string.",
+      m_internal->pathToDelete);
+  }
+}
 
 CaDiCaL::Solver&
 CaDiCaLHandle::solver() {
@@ -77,12 +89,7 @@ CaDiCaLHandle::parseString(std::string_view iCNF) {
     out.flush();
   }
   parac_status s = parseFile(path);
-  std::remove(path.c_str());
-  parac_log(
-    PARAC_SOLVER,
-    PARAC_TRACE,
-    "Removed temp file \"{}\" created in order to parse DIMACS from string.",
-    path);
+  m_internal->pathToDelete = path;
   return s;
 }
 

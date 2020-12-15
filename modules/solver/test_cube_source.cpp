@@ -12,13 +12,15 @@
 using namespace parac::solver;
 using namespace parac::solver::cubesource;
 
-static const char* test_dimacs_str = R"(p inccnf
+static const char* test_dimacs_str = R"(
+p inccnf
 -1 2 0
 2 1 0
 -1 1 0
 a 1 2 0
 a 1 -2 0
-a -1 0)";
+a -1 0
+)";
 
 TEST_CASE("Test PathDefined Cube-Source", "[solver][cubesource]") {
   parac_log_init(nullptr);

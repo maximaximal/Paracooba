@@ -57,7 +57,6 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
   , m_mod(mod)
   , m_parsedFormula(std::move(parsedFormula))
   , m_solverConfig(solverConfig) {
-  assert(m_parsedFormula);
 
   uint32_t workers = 0;
 
@@ -66,18 +65,26 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
       mod.handle->modules[PARAC_MOD_RUNNER]->runner->available_worker_count;
   }
 
-  parac_log(
-    PARAC_SOLVER,
-    PARAC_TRACE,
-    "Generate CaDiCaLManager for formula in file \"{}\" from compute node {} "
-    "for {} "
-    "workers. Copy operation is deferred to when a solver is requested.",
-    m_parsedFormula->path(),
-    m_parsedFormula->originatorId(),
-    workers);
+  if(workers > 0) {
+    assert(m_parsedFormula);
+    parac_log(
+      PARAC_SOLVER,
+      PARAC_TRACE,
+      "Generate CaDiCaLManager for formula in file \"{}\" from compute node {} "
+      "for {} "
+      "workers. Copy operation is deferred to when a solver is requested.",
+      m_parsedFormula->path(),
+      m_parsedFormula->originatorId(),
+      workers);
 
-  m_internal->solvers.resize(workers);
-  m_internal->borrowed.resize(workers);
+    m_internal->solvers.resize(workers);
+    m_internal->borrowed.resize(workers);
+  } else {
+    parac_log(PARAC_SOLVER,
+              PARAC_TRACE,
+              "Generate dummy CaDiCaLManager for formula that was not parsed "
+              "locally, as there are 0 workers.");
+  }
 }
 CaDiCaLManager::~CaDiCaLManager() {
   parac_log(PARAC_SOLVER,

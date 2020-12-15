@@ -12,6 +12,7 @@
 #include <paracooba/common/message_kind.h>
 #include <paracooba/common/path.h>
 #include <paracooba/module.h>
+#include <paracooba/runner/runner.h>
 #include <paracooba/solver/solver.h>
 
 #include <cassert>
@@ -70,43 +71,60 @@ initiate_solving_on_file(parac_module& mod,
   assert(broker.task_store);
   auto& task_store = *broker.task_store;
 
-  parac_task* task = task_store.new_task(
-    &task_store, nullptr, parac_path_unknown(), originatorId);
-  parac_log(PARAC_SOLVER,
-            PARAC_DEBUG,
-            "Create ParserTask for formula in file \"{}\" from node {}.",
-            file[0] == ':' ? "(inline - given on CLI)" : file,
-            originatorId);
+  bool useLocalWorkers = true;
+  if(mod.handle->modules[PARAC_MOD_RUNNER]) {
+    useLocalWorkers =
+      mod.handle->modules[PARAC_MOD_RUNNER]->runner->available_worker_count > 0;
+  }
 
-  assert(task);
-  new ParserTask(
-    *task,
-    file,
-    originatorId,
-    [&mod, &task_store, originatorId, instance](
-      parac_status status, ParserTask::CaDiCaLHandlePtr parsedFormula) {
-      if(status != PARAC_OK) {
-        parac_log(PARAC_SOLVER,
-                  PARAC_FATAL,
-                  "Parsing of formula \"{}\" failed with status {}! Exiting.",
-                  mod.handle->input_file,
-                  status);
-        mod.handle->request_exit(mod.handle);
-        return;
-      }
+  auto parserDone = [&mod, &task_store, originatorId, instance](
+                      parac_status status,
+                      ParserTask::CaDiCaLHandlePtr parsedFormula) {
+    if(status != PARAC_OK) {
+      parac_log(PARAC_SOLVER,
+                PARAC_FATAL,
+                "Parsing of formula \"{}\" failed with status {}! Exiting.",
+                mod.handle->input_file,
+                status);
+      mod.handle->request_exit(mod.handle);
+      return;
+    }
 
-      SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
-      i->task_store = &task_store;
-      i->cadicalManager = std::make_unique<CaDiCaLManager>(
-        mod, std::move(parsedFormula), i->config);
+    SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
+    i->task_store = &task_store;
+    i->cadicalManager = std::make_unique<CaDiCaLManager>(
+      mod, std::move(parsedFormula), i->config);
 
-      parac_task* task = task_store.new_task(
-        &task_store, nullptr, parac_path_unknown(), originatorId);
-      assert(task);
-      SolverTask::createRoot(*task, *i->cadicalManager);
-      task_store.assess_task(&task_store, task);
-    });
-  task_store.assess_task(&task_store, task);
+    parac_task* task = task_store.new_task(
+      &task_store, nullptr, parac_path_unknown(), originatorId);
+    assert(task);
+    SolverTask::createRoot(*task, *i->cadicalManager);
+    task_store.assess_task(&task_store, task);
+  };
+
+  if(useLocalWorkers) {
+    parac_task* task = task_store.new_task(
+      &task_store, nullptr, parac_path_unknown(), originatorId);
+    parac_log(PARAC_SOLVER,
+              PARAC_DEBUG,
+              "Create ParserTask for formula in file \"{}\" from node {}.",
+              file[0] == ':' ? "(inline - given on CLI)" : file,
+              originatorId);
+
+    assert(task);
+    new ParserTask(*task, file, originatorId, parserDone);
+    task_store.assess_task(&task_store, task);
+  } else {
+    parac_task task;
+    task.path.rep = PARAC_PATH_PARSER;
+    parac_log(PARAC_SOLVER,
+              PARAC_DEBUG,
+              "Create ParserTask for formula in file \"{}\" from node {}.",
+              file[0] == ':' ? "(inline - given on CLI)" : file,
+              originatorId);
+    new ParserTask(task, file, originatorId, parserDone);
+    task.work(&task, 0);
+  }
 
   return PARAC_OK;
 }

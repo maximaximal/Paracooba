@@ -162,4 +162,5 @@ parac_thread_registry_wait_for_exit(parac_thread_registry* registry) {
               &handle->entry.registry_handle->exit_status);
     handle = handle->next;
   }
+  registry->threads->first = NULL;
 }

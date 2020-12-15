@@ -1,5 +1,6 @@
 #include "paracooba/common/types.h"
 #include "runner_worker_executor.hpp"
+#include <cstdlib>
 #include <paracooba/common/config.h>
 #include <paracooba/module.h>
 #include <paracooba/runner/runner.h>
@@ -29,14 +30,19 @@ init_config(RunnerUserdata* u) {
   using parac::runner::WorkerExecutor;
   parac_config_entry* e = u->config_entries;
 
+  uint32_t worker_count = std::thread::hardware_concurrency();
+  const char* workerCount = "PARAC_WORKER_COUNT";
+  if(std::getenv(workerCount)) {
+    worker_count = std::atoi(std::getenv(workerCount));
+  }
+
   parac_config_entry_set_str(
     &e[WorkerExecutor::WORKER_COUNT],
     "worker-count",
     "Number of workers working on tasks that run in parallel as OS threads.");
   e[WorkerExecutor::WORKER_COUNT].registrar = PARAC_MOD_RUNNER;
   e[WorkerExecutor::WORKER_COUNT].type = PARAC_TYPE_UINT32;
-  e[WorkerExecutor::WORKER_COUNT].default_value.uint32 =
-    std::thread::hardware_concurrency();
+  e[WorkerExecutor::WORKER_COUNT].default_value.uint32 = worker_count;
 }
 
 static parac_status
