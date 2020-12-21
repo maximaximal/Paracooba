@@ -190,7 +190,15 @@ ComputeNode::receiveMessageFrom(parac_message& msg) {
       break;
     }
     default:
-      assert(false);
+      parac_log(PARAC_BROKER,
+                PARAC_GLOBALERROR,
+                "Invalid message kind received in compute node! Kind: {}, "
+                "size: {}, origin: {}, originator: {}",
+                msg.kind,
+                msg.length,
+                m_node.id,
+                msg.originator_id);
+      msg.cb(&msg, PARAC_UNKNOWN);
       break;
   }
 }
