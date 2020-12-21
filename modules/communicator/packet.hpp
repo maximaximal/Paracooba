@@ -7,6 +7,7 @@
 
 namespace parac::communicator {
 struct PacketHeader {
+  parac_id originator;
   uint32_t number;
   parac_message_kind kind;
 
@@ -17,7 +18,6 @@ struct PacketHeader {
 };
 
 struct PacketFileHeader {
-  parac_id originator;
   char name[255];
 };
 }

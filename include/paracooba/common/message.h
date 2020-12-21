@@ -25,6 +25,7 @@ typedef struct parac_message {
   void* userdata;
   parac_message_cb cb;
   struct parac_compute_node* origin;
+  parac_id originator_id;
 } parac_message;
 
 #ifdef __cplusplus
@@ -40,6 +41,7 @@ class parac_message_wrapper : public parac_message {
     userdata = 0;
     cb = nullptr;
     origin = 0;
+    originator_id = 0;
   };
   parac_message_wrapper(const parac_message& msg) {
     kind = msg.kind;
@@ -49,6 +51,7 @@ class parac_message_wrapper : public parac_message {
     userdata = msg.userdata;
     cb = msg.cb;
     origin = msg.origin;
+    originator_id = msg.originator_id;
   }
   parac_message_wrapper(parac_message&& msg) noexcept {
     kind = msg.kind;
@@ -58,6 +61,7 @@ class parac_message_wrapper : public parac_message {
     userdata = msg.userdata;
     cb = msg.cb;
     origin = msg.origin;
+    originator_id = msg.originator_id;
   }
   ~parac_message_wrapper() = default;
 

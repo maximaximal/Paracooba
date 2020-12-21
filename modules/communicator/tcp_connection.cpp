@@ -71,12 +71,14 @@ struct TCPConnection::SendQueueEntry {
     , transmitMode(TransmitMessage) {
     header.kind = msg.kind;
     header.size = msg.length;
+    header.originator = msg.originator_id;
   }
   SendQueueEntry(parac_file& file) noexcept
     : value(file)
     , transmitMode(TransmitFile) {
     header.kind = PARAC_MESSAGE_FILE;
     header.size = FileSender::file_size(file.path);
+    header.originator = file.originator;
   }
   SendQueueEntry(EndTag& end) noexcept
     : value(end)
@@ -89,12 +91,14 @@ struct TCPConnection::SendQueueEntry {
     , transmitMode(TransmitMessage) {
     header.kind = msg.kind;
     header.size = msg.length;
+    header.originator = msg.originator_id;
   }
   SendQueueEntry(parac_file&& file) noexcept
     : value(std::move(file))
     , transmitMode(TransmitFile) {
     header.kind = PARAC_MESSAGE_FILE;
     header.size = FileSender::file_size(file.path);
+    header.originator = file.originator;
   }
   SendQueueEntry(EndTag&& end) noexcept
     : value(std::move(end))
@@ -271,7 +275,8 @@ struct TCPConnection::State {
   std::atomic_flag currentlySending = true;
 
   std::queue<SendQueueEntry> sendQueue;
-  std::map<decltype(PacketHeader::number), SendQueueEntry> sentBuffer;
+  using SentBuffer = std::map<decltype(PacketHeader::number), SendQueueEntry>;
+  SentBuffer sentBuffer;
 };
 
 TCPConnection::TCPConnection(
@@ -421,16 +426,21 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
 
 bool
 TCPConnection::handleReceivedACK(const PacketHeader& ack) {
-
-  std::unique_lock lock(m_state->sendQueueMutex);
-  auto it = m_state->sentBuffer.find(ack.number);
-  if(it == m_state->sentBuffer.end()) {
-    return false;
+  State::SentBuffer::iterator it;
+  {
+    std::unique_lock lock(m_state->sendQueueMutex);
+    it = m_state->sentBuffer.find(ack.number);
+    if(it == m_state->sentBuffer.end()) {
+      return false;
+    }
   }
   auto& sentItem = it->second;
   sentItem(ack.ack_status);
   sentItem(PARAC_TO_BE_DELETED);
-  m_state->sentBuffer.erase(it);
+  {
+    std::unique_lock lock(m_state->sendQueueMutex);
+    m_state->sentBuffer.erase(it);
+  }
   return true;
 }
 
@@ -471,8 +481,8 @@ TCPConnection::handleReceivedFileStart() {
 
   boost::filesystem::path p(m_state->service.temporaryDirectory());
 
-  if(m_state->readFileHeader.originator != m_state->service.handle().id) {
-    p /= std::to_string(m_state->readFileHeader.originator);
+  if(m_state->readHeader.originator != m_state->service.handle().id) {
+    p /= std::to_string(m_state->readHeader.originator);
     boost::filesystem::create_directory(p);
   }
   p /= name;
@@ -517,7 +527,7 @@ TCPConnection::handleReceivedFile() {
             "Wrote {} bytes.",
             m_state->readFileOstream->path,
             m_state->remoteId(),
-            m_state->readFileHeader.originator,
+            m_state->readHeader.originator,
             m_state->readFileOstream->o.tellp());
 
   file.cb = [](parac_file* file, parac_status status) {
@@ -527,7 +537,7 @@ TCPConnection::handleReceivedFile() {
   };
   file.userdata = &d;
   file.path = m_state->readFileOstream->path.c_str();
-  file.originator = m_state->readFileHeader.originator;
+  file.originator = m_state->readHeader.originator;
 
   assert(m_state->compute_node);
   assert(m_state->compute_node->receive_file_from);

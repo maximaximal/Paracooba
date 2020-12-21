@@ -56,3 +56,6 @@ class SolverConfig {
   }
 };
 }
+
+std::ostream&
+operator<<(std::ostream& o, const parac::solver::SolverConfig& config);

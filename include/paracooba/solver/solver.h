@@ -27,9 +27,14 @@ typedef parac_status (*parac_module_solver_instance_handle_formula)(
   void* cb_userdata,
   parac_module_solver_instance_formula_parsed_cb);
 
+typedef void (*parac_module_solver_instance_serialize_config_to_msg)(
+  struct parac_module_solver_instance*,
+  struct parac_message*);
+
 typedef struct parac_module_solver_instance* (
   *parac_module_solver_add_instance)(struct parac_module*,
-                                     parac_id originator_id);
+                                     parac_id originator_id,
+                                     struct parac_task_store*);
 typedef parac_status (*parac_module_solver_remove_instance)(
   struct parac_module*,
   struct parac_module_solver_instance* instance);
@@ -43,6 +48,10 @@ typedef struct parac_module_solver_instance {
 
   parac_module_solver_instance_handle_formula
     handle_formula;/// Called by Broker to parse the received formula.
+
+  parac_module_solver_instance_serialize_config_to_msg
+    serialize_config_to_msg;/// Called by Broker to get config of a solver
+                            /// instance.
 
   void* userdata;
 } parac_module_solver_instance;

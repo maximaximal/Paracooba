@@ -12,7 +12,7 @@ extern "C" {
 struct parac_compute_node;
 struct parac_message;
 struct parac_file;
-struct parac_solver_instance;
+struct parac_module_solver_instance;
 
 typedef void (*parac_compute_node_message_func)(
   struct parac_compute_node* compute_node,
@@ -61,10 +61,7 @@ typedef struct parac_compute_node {
   void* broker_userdata;      /// Set by Broker.
   void* communicator_userdata;/// Set by Communicator.
 
-  struct parac_solver_instance*
-    solver_instance;/// Set by Broker once all required data arrived to create a
-                    /// solver. Is only valid when this compute node is a master
-                    /// node.
+  struct parac_module_solver_instance* solver_instance;
 
   uint32_t bytes_sent;
   uint32_t bytes_received;
@@ -87,6 +84,7 @@ class parac_compute_node_wrapper : public parac_compute_node {
     broker_userdata = nullptr;
     communicator_userdata = nullptr;
     state = PARAC_COMPUTE_NODE_NEW;
+    solver_instance = nullptr;
   }
   ~parac_compute_node_wrapper() {
     if(broker_free)

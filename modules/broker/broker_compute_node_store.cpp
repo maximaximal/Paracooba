@@ -27,10 +27,12 @@ struct ComputeNodeStore::Internal {
 };
 
 ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
-                                   parac_compute_node_store& store)
+                                   parac_compute_node_store& store,
+                                   TaskStore& taskStore)
   : m_internal(std::make_unique<Internal>())
   , m_handle(handle)
-  , m_computeNodeStore(store) {
+  , m_computeNodeStore(store)
+  , m_taskStore(taskStore) {
   parac_log(PARAC_BROKER, PARAC_DEBUG, "Initialize ComputeNodeStore.");
 
   store.userdata = this;
@@ -154,7 +156,7 @@ ComputeNodeStore::create(parac_id id) {
   m_internal->nodesRefMap.try_emplace(id, inserted_node);
 
   ComputeNode* broker_compute_node =
-    new ComputeNode(inserted_node, m_handle, *this);
+    new ComputeNode(inserted_node, m_handle, *this, m_taskStore);
   inserted_node.broker_userdata = broker_compute_node;
 
   return &inserted_node;

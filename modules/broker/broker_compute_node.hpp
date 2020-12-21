@@ -18,12 +18,14 @@ class NoncopyOStringstream;
 
 namespace parac::broker {
 class ComputeNodeStore;
+class TaskStore;
 
 class ComputeNode {
   public:
   ComputeNode(parac_compute_node& node,
               parac_handle& handle,
-              ComputeNodeStore& store);
+              ComputeNodeStore& store,
+              TaskStore& taskStore);
 
   virtual ~ComputeNode();
 
@@ -85,6 +87,7 @@ class ComputeNode {
 
     bool dirty() const { return m_dirty; }
     void resetDirty() const { m_dirty = false; }
+    bool isParsed(parac_id id) const;
 
     private:
     mutable std::unique_ptr<NoncopyOStringstream> m_statusStream;
@@ -118,14 +121,16 @@ class ComputeNode {
 
   void receiveFileFrom(parac_file& file);
 
+  float computeUtilization() const;
+
   private:
   parac_compute_node& m_node;
   parac_handle& m_handle;
   ComputeNodeStore& m_store;
+  TaskStore& m_taskStore;
 
   std::optional<Description> m_description;
   Status m_status;
-  parac_module_solver_instance* m_solverInstance = nullptr;
 };
 }
 std::ostream&

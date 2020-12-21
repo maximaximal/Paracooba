@@ -1,6 +1,7 @@
 #pragma once
 
 #include "paracooba/common/types.h"
+#include <functional>
 #include <memory>
 
 struct parac_handle;
@@ -15,6 +16,8 @@ class TaskStore {
   explicit TaskStore(parac_handle& handle, parac_task_store& store);
   virtual ~TaskStore();
 
+  using CheckOriginator = std::function<bool(parac_id)>;
+
   bool empty() const;
   size_t size() const;
   parac_task* newTask(parac_task* parent_task,
@@ -22,11 +25,14 @@ class TaskStore {
                       parac_id originator);
 
   /** @brief Pop task for offloading. */
-  parac_task* pop_offload(parac_compute_node* target);
+  parac_task* pop_offload(parac_compute_node* target,
+                          CheckOriginator check = nullptr);
   /** @brief Pop task for working. */
   parac_task* pop_work();
 
   void assess_task(parac_task* task);
+
+  parac_task_store& store();
 
   private:
   void insert_into_tasksWaitingForWorkerQueue(parac_task* task);

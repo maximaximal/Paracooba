@@ -2,7 +2,10 @@
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
 #include "cereal/archives/binary.hpp"
+#include "paracooba/common/compute_node.h"
+#include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/log.h"
+#include "paracooba/common/noncopy_ostream.hpp"
 #include "paracooba/common/task_store.h"
 #include "parser_task.hpp"
 #include "solver_config.hpp"
@@ -53,6 +56,8 @@ struct SolverInstance {
 
   bool configured = false;
   parac_module* mod;
+
+  std::unique_ptr<parac::NoncopyOStringstream> configStream;
 };
 
 static_assert(std::is_standard_layout<SolverInstance>());
@@ -62,6 +67,30 @@ struct SolverUserdata {
   std::mutex instancesMutex;
   SolverConfig config;
 };
+
+static void
+serialize_solver_config_into_msg(parac_module_solver_instance* instance,
+                                 parac_message* msg) {
+  assert(instance);
+  assert(instance->userdata);
+  assert(msg);
+
+  SolverInstance* solverInstance =
+    static_cast<SolverInstance*>(instance->userdata);
+
+  msg->kind = PARAC_MESSAGE_SOLVER_DESCRIPTION;
+
+  if(!solverInstance->configStream) {
+    solverInstance->configStream =
+      std::make_unique<parac::NoncopyOStringstream>();
+    cereal::BinaryOutputArchive oa(*solverInstance->configStream);
+    oa(solverInstance->config);
+  }
+
+  msg->data = solverInstance->configStream->ptr();
+  msg->length = solverInstance->configStream->tellp();
+  msg->originator_id = instance->originator_id;
+}
 
 static parac_status
 parse_formula_file(parac_module& mod,
@@ -136,10 +165,14 @@ initiate_root_solver_on_file(parac_module& mod,
       return;
     }
 
+    SolverUserdata* solverUserdata = static_cast<SolverUserdata*>(mod.userdata);
+    assert(solverUserdata);
+
     SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
     i->task_store = &task_store;
     i->cadicalManager = std::make_unique<CaDiCaLManager>(
       mod, std::move(parsedFormula), i->config);
+    i->config = solverUserdata->config;
 
     parac_task* task = task_store.new_task(
       &task_store, nullptr, parac_path_unknown(), originatorId);
@@ -220,23 +253,27 @@ instance_handle_message(parac_module_solver_instance* instance,
       assert(solverInstance->configured);
 
       parac_path_type pathType;
+      parac_task* task = nullptr;
+      SolverTask* solverTask = nullptr;
 
-      cereal::BinaryInputArchive ia(data);
-      ia(pathType);
+      {
+        cereal::BinaryInputArchive ia(data);
+        ia(pathType);
 
-      parac_task* task = task_store->new_task(task_store,
-                                              nullptr,
-                                              parac_path{ .rep = pathType },
-                                              instance->originator_id);
-      assert(task);
-      task->received_from = msg->origin;
+        task = task_store->new_task(task_store,
+                                    nullptr,
+                                    parac_path{ .rep = pathType },
+                                    instance->originator_id);
+        assert(task);
+        task->received_from = msg->origin;
 
-      SolverTask* solverTask =
-        solverInstance->cadicalManager->createSolverTask(*task, nullptr);
-      ia(*solverTask);
+        solverTask =
+          solverInstance->cadicalManager->createSolverTask(*task, nullptr);
+        ia(*solverTask);
+      }
 
       task_store->assess_task(task_store, task);
-
+      msg->cb(msg, PARAC_OK);
       break;
     }
     case PARAC_MESSAGE_SOLVER_DESCRIPTION: {
@@ -246,6 +283,12 @@ instance_handle_message(parac_module_solver_instance* instance,
         ia(solverInstance->config);
       }
       solverInstance->configured = true;
+      parac_log(PARAC_SOLVER,
+                PARAC_TRACE,
+                "Received solver config from {}: {}",
+                msg->origin->id,
+                solverInstance->config);
+      msg->cb(msg, PARAC_OK);
       break;
     }
     default:
@@ -282,7 +325,9 @@ instance_handle_formula(parac_module_solver_instance* instance,
 }
 
 static parac_module_solver_instance*
-add_instance(parac_module* mod, parac_id originatorId) {
+add_instance(parac_module* mod,
+             parac_id originatorId,
+             parac_task_store* task_store) {
   assert(mod);
   assert(mod->userdata);
   SolverUserdata* userdata = static_cast<SolverUserdata*>(mod->userdata);
@@ -292,6 +337,8 @@ add_instance(parac_module* mod, parac_id originatorId) {
   instance.instance.userdata = &instance;
   instance.instance.handle_message = &instance_handle_message;
   instance.instance.handle_formula = &instance_handle_formula;
+  instance.instance.serialize_config_to_msg = &serialize_solver_config_into_msg;
+  instance.task_store = task_store;
 
   parac_log(PARAC_SOLVER,
             PARAC_TRACE,
@@ -360,11 +407,31 @@ init(parac_module* mod) {
   parac_status status = PARAC_OK;
 
   if(mod->handle->input_file) {
+    parac_task_store* task_store = nullptr;
+    if(mod->handle->modules[PARAC_MOD_BROKER]) {
+      auto modBroker = mod->handle->modules[PARAC_MOD_BROKER];
+      if(modBroker->broker) {
+        auto broker = modBroker->broker;
+        task_store = broker->task_store;
+      }
+    }
+
     parac_module_solver_instance* instance =
-      mod->solver->add_instance(mod, mod->handle->id);
+      mod->solver->add_instance(mod, mod->handle->id, task_store);
 
     SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
     i->config = userdata->config;
+
+    if(mod->handle->modules[PARAC_MOD_BROKER] &&
+       mod->handle->modules[PARAC_MOD_BROKER]->broker) {
+      auto broker = mod->handle->modules[PARAC_MOD_BROKER]->broker;
+      assert(broker);
+      assert(broker->compute_node_store);
+      auto thisNode = broker->compute_node_store->this_node;
+      assert(thisNode);
+      thisNode->solver_instance = instance;
+      parac_log(PARAC_SOLVER, PARAC_TRACE, "Set in {}!", thisNode->id);
+    }
 
     status = initiate_root_solver_on_file(
       *mod, instance, mod->handle->input_file, mod->handle->id);

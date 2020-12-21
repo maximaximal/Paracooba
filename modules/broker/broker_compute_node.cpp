@@ -1,12 +1,15 @@
 #include "broker_compute_node.hpp"
 #include "broker_compute_node_store.hpp"
+#include "broker_task_store.hpp"
 #include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/file.h"
 #include "paracooba/common/message_kind.h"
 #include "paracooba/common/status.h"
+#include "paracooba/common/task.h"
 #include "paracooba/module.h"
 #include "paracooba/solver/solver.h"
 
+#include <cmath>
 #include <paracooba/common/compute_node.h>
 #include <paracooba/common/log.h>
 #include <paracooba/common/message.h>
@@ -34,10 +37,12 @@ using std::mem_fn;
 namespace parac::broker {
 ComputeNode::ComputeNode(parac_compute_node& node,
                          parac_handle& handle,
-                         ComputeNodeStore& store)
+                         ComputeNodeStore& store,
+                         TaskStore& taskStore)
   : m_node(node)
   , m_handle(handle)
-  , m_store(store) {
+  , m_store(store)
+  , m_taskStore(taskStore) {
   node.receive_message_from = [](parac_compute_node* n, parac_message* msg) {
     assert(n);
     assert(n->broker_userdata);
@@ -123,6 +128,13 @@ ComputeNode::Status::serializeToMessage(parac_message& msg) const {
   msg.data = m_statusStream->ptr();
   msg.length = m_statusStream->tellp();
 }
+bool
+ComputeNode::Status::isParsed(parac_id id) const {
+  auto it = solverInstances.find(id);
+  if(it == solverInstances.end())
+    return false;
+  return it->second.formula_parsed;
+}
 
 void
 ComputeNode::incrementWorkQueueSize(parac_id originator) {
@@ -159,6 +171,12 @@ ComputeNode::applyStatus(const Status& s) {
 
 void
 ComputeNode::receiveMessageFrom(parac_message& msg) {
+  if(parac_message_kind_is_for_solver(msg.kind)) {
+    assert(m_node.solver_instance);
+    m_node.solver_instance->handle_message(m_node.solver_instance, &msg);
+    return;
+  }
+
   switch(msg.kind) {
     case PARAC_MESSAGE_NODE_DESCRIPTION:
       receiveMessageDescriptionFrom(msg);
@@ -193,31 +211,59 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
             msg.origin->id,
             *m_description);
 
-  if(!m_description->daemon && !m_solverInstance) {
+  if(!m_description->daemon && !m_node.solver_instance) {
     auto solverMod = m_handle.modules[PARAC_MOD_SOLVER];
     assert(solverMod);
     auto solver = solverMod->solver;
     assert(solver);
-    m_solverInstance = solver->add_instance(solverMod, m_node.id);
+    m_node.solver_instance =
+      solver->add_instance(solverMod, m_node.id, &m_taskStore.store());
   }
   if(m_handle.input_file &&
      !m_status.solverInstances[m_handle.id].formula_received) {
-    // Client node received from other node.
+    // Client node received a message from other node.
     // =================================================================
+
+    // First, solver configuration - then send file to parse.
+    parac_module_solver_instance* instance =
+      m_store.thisNode().m_node.solver_instance;
+    assert(instance);
 
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
-              "Send formula in file {} with originator {} to node ID {}!",
-              m_handle.input_file,
-              m_handle.id,
-              msg.origin->id);
+              "Send solver config to node ID {}!",
+              m_handle.id);
 
-    // This is a client node with an input file! Send the input file to the
-    // peer. Once the formula was parsed, a status is sent.
-    parac_file_wrapper formula;
-    formula.path = m_handle.input_file;
-    formula.originator = m_handle.id;
-    m_node.send_file_to(&m_node, &formula);
+    parac_message_wrapper msg;
+    instance->serialize_config_to_msg(instance, &msg);
+
+    msg.userdata = this;
+    msg.cb = [](parac_message* msg, parac_status s) {
+      if(s == PARAC_OK) {
+        assert(msg->userdata);
+        auto self = static_cast<ComputeNode*>(msg->userdata);
+
+        parac_module_solver_instance* instance =
+          self->m_store.thisNode().m_node.solver_instance;
+        assert(instance);
+
+        parac_log(PARAC_BROKER,
+                  PARAC_TRACE,
+                  "Send formula in file {} with originator {} to node ID {}!",
+                  self->m_handle.input_file,
+                  instance->originator_id,
+                  self->m_handle.id);
+
+        // This is a client node with an input file! Send the input file to the
+        // peer. Once the formula was parsed, a status is sent.
+        parac_file_wrapper formula;
+        formula.path = self->m_handle.input_file;
+        formula.originator = self->m_handle.id;
+        self->m_node.send_file_to(&self->m_node, &formula);
+      }
+    };
+
+    m_node.send_message_to(&m_node, &msg);
   }
 }
 
@@ -232,10 +278,26 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
 
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
-              "Got status from {}: {}, message length: {}",
+              "Got status from {}: {}, message length: {}B",
               msg.origin->id,
               m_status,
               msg.length);
+  }
+
+  // Check if the target needs some tasks according to offloading heuristic.
+  float utilization = computeUtilization();
+  if(utilization < 3) {
+    // Tasks need to be offloaded!
+    parac_task* task =
+      m_taskStore.pop_offload(&m_node, [this](parac_id originator) {
+        return status().isParsed(originator);
+      });
+
+    if(task) {
+      parac_message_wrapper msg;
+      task->serialize(task, &msg);
+      m_node.send_message_to(&m_node, &msg);
+    }
   }
 
   msg.cb(&msg, PARAC_OK);
@@ -255,10 +317,10 @@ ComputeNode::receiveFileFrom(parac_file& file) {
     } else {
       // The received file must be the formula! It should be parsed and then
       // waited on for tasks.
-      assert(m_solverInstance);
-      assert(m_solverInstance->handle_formula);
-      m_solverInstance->handle_formula(
-        m_solverInstance,
+      assert(m_node.solver_instance);
+      assert(m_node.solver_instance->handle_formula);
+      m_node.solver_instance->handle_formula(
+        m_node.solver_instance,
         &file,
         this,
         [](parac_module_solver_instance* instance,
@@ -274,6 +336,18 @@ ComputeNode::receiveFileFrom(parac_file& file) {
         });
     }
   }
+}
+
+float
+ComputeNode::computeUtilization() const {
+  // Utilization cannot be computed, so it is assumed to be infinite.
+  if(!description())
+    return FP_INFINITE;
+
+  float workers = description()->workers;
+  float workQueueSize = status().workQueueSize();
+
+  return workQueueSize / workers;
 }
 }
 

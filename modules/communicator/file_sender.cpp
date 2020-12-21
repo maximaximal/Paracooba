@@ -21,7 +21,6 @@ FileSender::FileSender(const std::string& source_file,
   : m_state(std::make_shared<State>(socket)) {
   m_state->source_file = source_file;
   m_state->cb = cb;
-  m_state->fileHeader.originator = originator;
 
   {
     boost::filesystem::path p(m_state->source_file);
@@ -60,11 +59,10 @@ FileSender::FileSender(const std::string& source_file,
 
   parac_log(PARAC_COMMUNICATOR,
             PARAC_TRACE,
-            "Sending file {} with {} bytes and originator id {} from endpoint "
+            "Sending file {} with {} bytes from endpoint "
             "{} to endpoint {}.",
             source_file,
             m_state->file_size,
-            m_state->fileHeader.originator,
             socket.local_endpoint(),
             socket.remote_endpoint());
 

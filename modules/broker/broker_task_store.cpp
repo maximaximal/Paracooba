@@ -207,12 +207,19 @@ TaskStore::newTask(parac_task* parent_task,
 }
 
 parac_task*
-TaskStore::pop_offload(parac_compute_node* target) {
+TaskStore::pop_offload(parac_compute_node* target, CheckOriginator check) {
   std::unique_lock lock(m_internal->containerMutex);
   if(m_internal->tasksWaitingForWorkerQueue.empty()) {
     return nullptr;
   }
   parac_task& t = m_internal->tasksWaitingForWorkerQueue.back();
+
+  if(check) {
+    if(!check(t.originator)) {
+      return nullptr;
+    }
+  }
+
   m_internal->tasksWaitingForWorkerQueue.pop_back();
   m_internal->offloadedTasks[target].insert(t);
   t.state = static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
@@ -420,5 +427,10 @@ TaskStore::assess_task(parac_task* task) {
   }
 
   task->last_state = s;
+}
+
+parac_task_store&
+TaskStore::store() {
+  return m_internal->store;
 }
 }

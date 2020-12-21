@@ -11,10 +11,13 @@ struct parac_handle;
 
 namespace parac::broker {
 struct ComputeNode;
+struct TaskStore;
 
 class ComputeNodeStore {
   public:
-  ComputeNodeStore(parac_handle& handle, parac_compute_node_store& store);
+  ComputeNodeStore(parac_handle& handle,
+                   parac_compute_node_store& store,
+                   TaskStore& taskStore);
   virtual ~ComputeNodeStore();
 
   void updateThisNodeDescription();
@@ -39,6 +42,8 @@ class ComputeNodeStore {
   void decrementThisNodeWorkQueueSize(parac_id originator);
   void formulaParsed(parac_id originator);
 
+  ComputeNode& thisNode();
+
   private:
   static parac_compute_node* static_get(parac_compute_node_store* store,
                                         parac_id id);
@@ -55,7 +60,6 @@ class ComputeNodeStore {
   static void static_node_free(parac_compute_node* node);
 
   parac_compute_node* create(parac_id id);
-  ComputeNode& thisNode();
   void sendStatusToPeers();
 
   struct Internal;
@@ -63,5 +67,6 @@ class ComputeNodeStore {
 
   parac_handle& m_handle;
   parac_compute_node_store& m_computeNodeStore;
+  TaskStore& m_taskStore;
 };
 }

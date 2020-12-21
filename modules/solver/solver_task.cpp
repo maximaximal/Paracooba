@@ -2,6 +2,7 @@
 
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
+#include "paracooba/common/message_kind.h"
 #include "paracooba/common/noncopy_ostream.hpp"
 #include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
@@ -167,12 +168,16 @@ SolverTask::serialize_to_msg(parac_message* tgt_msg) {
 
     {
       cereal::BinaryOutputArchive oa(*m_serializationOutStream);
+      parac_path_type p = m_task->path.rep;
+      oa(p);
       oa(*this);
     }
   }
 
+  tgt_msg->kind = PARAC_MESSAGE_SOLVER_TASK;
   tgt_msg->data = m_serializationOutStream->ptr();
   tgt_msg->length = m_serializationOutStream->tellp();
+  tgt_msg->originator_id = m_task->originator;
 
   return PARAC_OK;
 }
