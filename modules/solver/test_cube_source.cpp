@@ -26,7 +26,11 @@ TEST_CASE("Test PathDefined Cube-Source", "[solver][cubesource]") {
   parac_log_init(nullptr);
 
   parac_handle handle;
+  memset(&handle, 0, sizeof(parac_handle));
+  handle.input_file = nullptr;
+  handle.modules[PARAC_MOD_RUNNER] = nullptr;
   parac_module mod;
+  mod.handle = &handle;
   bool stop = false;
   SolverConfig dummyConfig;
   std::unique_ptr<CaDiCaLHandle> dummyHandle =
