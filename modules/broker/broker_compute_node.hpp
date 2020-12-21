@@ -83,8 +83,14 @@ class ComputeNode {
 
     void serializeToMessage(parac_message& msg) const;
 
+    bool dirty() const { return m_dirty; }
+    void resetDirty() const { m_dirty = false; }
+
     private:
     mutable std::unique_ptr<NoncopyOStringstream> m_statusStream;
+
+    friend class ComputeNode;
+    mutable bool m_dirty;
   };
 
   const Description* description() const {

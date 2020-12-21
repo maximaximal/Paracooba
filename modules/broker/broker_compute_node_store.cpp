@@ -162,6 +162,9 @@ ComputeNodeStore::create(parac_id id) {
 
 void
 ComputeNodeStore::sendStatusToPeers() {
+  if(!thisNode().status().dirty()) {
+    return;
+  }
   parac_message_wrapper msg;
   thisNode().status().serializeToMessage(msg);
 

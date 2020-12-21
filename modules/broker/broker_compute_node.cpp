@@ -106,14 +106,18 @@ ComputeNode::Status::serializeToMessage(parac_message& msg) const {
   if(!m_statusStream) {
     m_statusStream = std::make_unique<NoncopyOStringstream>();
   } else {
-    *m_statusStream = NoncopyOStringstream();
+    if(dirty()) {
+      *m_statusStream = NoncopyOStringstream();
+    }
   }
 
-  assert(m_statusStream->tellp() == 0);
+  if(dirty()) {
+    assert(m_statusStream->tellp() == 0);
 
-  {
-    cereal::BinaryOutputArchive oa(*m_statusStream);
-    oa(*this);
+    {
+      cereal::BinaryOutputArchive oa(*m_statusStream);
+      oa(*this);
+    }
   }
 
   msg.data = m_statusStream->ptr();
@@ -123,14 +127,17 @@ ComputeNode::Status::serializeToMessage(parac_message& msg) const {
 void
 ComputeNode::incrementWorkQueueSize(parac_id originator) {
   ++m_status.solverInstances[originator].workQueueSize;
+  m_status.m_dirty = true;
 }
 void
 ComputeNode::decrementWorkQueueSize(parac_id originator) {
   --m_status.solverInstances[originator].workQueueSize;
+  m_status.m_dirty = true;
 }
 void
 ComputeNode::formulaParsed(parac_id originator) {
   m_status.solverInstances[originator].formula_parsed = true;
+  m_status.m_dirty = true;
 }
 
 void
