@@ -213,51 +213,59 @@ TaskStore::newTask(parac_task* parent_task,
 
 parac_task*
 TaskStore::pop_offload(parac_compute_node* target, CheckOriginator check) {
-  std::unique_lock lock(m_internal->containerMutex);
-  if(m_internal->tasksWaitingForWorkerQueue.empty()) {
-    return nullptr;
-  }
-  parac_task& t = m_internal->tasksWaitingForWorkerQueue.back();
-
-  if(check) {
-    if(!check(t.originator)) {
+  parac_task* t = nullptr;
+  {
+    std::unique_lock lock(m_internal->containerMutex);
+    if(m_internal->tasksWaitingForWorkerQueue.empty()) {
       return nullptr;
     }
+    t = &m_internal->tasksWaitingForWorkerQueue.back().get();
+
+    if(check) {
+      if(!check(t->originator)) {
+        return nullptr;
+      }
+    }
+
+    m_internal->tasksWaitingForWorkerQueue.pop_back();
+    auto rep = t->path.rep;
+    m_internal->offloadedTasks[target].insert({ rep, *t });
+    t->state =
+      static_cast<parac_task_state>(t->state & ~PARAC_TASK_WORK_AVAILABLE);
+    t->state = t->state | PARAC_TASK_OFFLOADED;
+
+    Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+      reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
+    ++taskWrapper->refcount;
   }
 
-  m_internal->tasksWaitingForWorkerQueue.pop_back();
-  auto rep = t.path.rep;
-  m_internal->offloadedTasks[target].insert({ rep, t });
-  t.state = static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
-  t.state = t.state | PARAC_TASK_OFFLOADED;
+  decrementWorkQueueInComputeNode(m_internal->handle, t->originator);
 
-  Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
-    reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
-  ++taskWrapper->refcount;
-
-  decrementWorkQueueInComputeNode(m_internal->handle, t.originator);
-
-  return &t;
+  return t;
 }
 parac_task*
 TaskStore::pop_work() {
-  std::unique_lock lock(m_internal->containerMutex);
-  if(m_internal->tasksWaitingForWorkerQueue.empty()) {
-    return nullptr;
+  parac_task* t = nullptr;
+  {
+    std::unique_lock lock(m_internal->containerMutex);
+    if(m_internal->tasksWaitingForWorkerQueue.empty()) {
+      return nullptr;
+    }
+    t = &m_internal->tasksWaitingForWorkerQueue.front().get();
+    m_internal->tasksWaitingForWorkerQueue.pop_front();
+    m_internal->tasksBeingWorkedOn.insert(*t);
+    t->state =
+      static_cast<parac_task_state>(t->state & ~PARAC_TASK_WORK_AVAILABLE);
+    t->state = t->state | PARAC_TASK_WORKING;
+
+    Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+      reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
+    ++taskWrapper->refcount;
   }
-  parac_task& t = m_internal->tasksWaitingForWorkerQueue.front();
-  m_internal->tasksWaitingForWorkerQueue.pop_front();
-  m_internal->tasksBeingWorkedOn.insert(t);
-  t.state = static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
-  t.state = t.state | PARAC_TASK_WORKING;
 
-  Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
-    reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
-  ++taskWrapper->refcount;
+  decrementWorkQueueInComputeNode(m_internal->handle, t->originator);
 
-  decrementWorkQueueInComputeNode(m_internal->handle, t.originator);
-
-  return &t;
+  return t;
 }
 
 void
