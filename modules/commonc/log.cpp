@@ -65,12 +65,12 @@ parac_log_init(parac_thread_registry* thread_registry) {
     boost::log::core::get()->add_thread_attribute(
       "ThreadID", boost::log::attributes::constant<uint16_t>(0));
 
-    boost::log::core::get()->add_thread_attribute(
-      "LocalID",
-      boost::log::attributes::constant<parac_id>(
-        thread_registry->belongs_to_id));
-
     if(thread_registry) {
+      boost::log::core::get()->add_thread_attribute(
+        "LocalID",
+        boost::log::attributes::constant<parac_id>(
+          thread_registry->belongs_to_id));
+
       parac_thread_registry_add_starting_callback(thread_registry,
                                                   &log_new_thread_callback);
     }

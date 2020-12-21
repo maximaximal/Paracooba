@@ -23,6 +23,11 @@ typedef enum parac_task_state {
   PARAC_TASK_ERROR = 1 << 7,
 } parac_task_state;
 
+parac_status
+parac_task_result_packet_get_result(void* result);
+struct parac_path
+parac_task_result_packet_get_path(void* result);
+
 /** @brief Utility function to check if a task is done, irregarding splitted or
  * not. */
 bool

@@ -7,6 +7,7 @@
 struct parac_handle;
 struct parac_path;
 struct parac_task;
+struct parac_message;
 struct parac_task_store;
 struct parac_compute_node;
 
@@ -33,6 +34,8 @@ class TaskStore {
   void assess_task(parac_task* task);
 
   parac_task_store& store();
+
+  void receiveTaskResultFromPeer(parac_message& msg);
 
   private:
   void insert_into_tasksWaitingForWorkerQueue(parac_task* task);

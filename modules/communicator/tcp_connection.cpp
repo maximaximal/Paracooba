@@ -458,6 +458,7 @@ TCPConnection::handleReceivedMessage() {
   msg.data = static_cast<char*>(m_state->recvBuf.data());
   msg.data_to_be_freed = false;
   msg.userdata = &d;
+  msg.originator_id = m_state->readHeader.originator;
   msg.origin = m_state->compute_node;
   msg.cb = [](parac_message* msg, parac_status status) {
     data* d = static_cast<data*>(msg->userdata);
@@ -856,9 +857,17 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         // dropped and re-established.
         yield sender->send();
       } else {
-        yield async_write(*m_state->socket,
-                          const_buffer(e->message().data, e->header.size),
-                          wh);
+        if(e->message().data_is_inline) {
+          assert(e->header.size <= PARAC_MESSAGE_INLINE_DATA_SIZE);
+          yield async_write(
+            *m_state->socket,
+            const_buffer(e->message().inline_data, e->header.size),
+            wh);
+        } else {
+          yield async_write(*m_state->socket,
+                            const_buffer(e->message().data, e->header.size),
+                            wh);
+        }
 
         if(ec) {
           parac_log(PARAC_COMMUNICATOR,

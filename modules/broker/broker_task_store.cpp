@@ -14,6 +14,7 @@
 #include "paracooba/common/compute_node.h"
 #include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/log.h"
+#include "paracooba/common/message.h"
 #include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
 #include "paracooba/common/task.h"
@@ -99,7 +100,11 @@ struct TaskStore::Internal {
   std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>> tasksWaitingForChildren;
 
   std::unordered_map<parac_compute_node*,
-                     std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>>>
+                     std::unordered_map<parac_path_type,
+                                        TaskRef,
+                                        std::hash<parac_path_type>,
+                                        std::equal_to<parac_path_type>,
+                                        Allocator<TaskRef>>>
     offloadedTasks;
 };
 
@@ -221,7 +226,8 @@ TaskStore::pop_offload(parac_compute_node* target, CheckOriginator check) {
   }
 
   m_internal->tasksWaitingForWorkerQueue.pop_back();
-  m_internal->offloadedTasks[target].insert(t);
+  auto rep = t.path.rep;
+  m_internal->offloadedTasks[target].insert({ rep, t });
   t.state = static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
   t.state = t.state | PARAC_TASK_OFFLOADED;
 
@@ -432,5 +438,53 @@ TaskStore::assess_task(parac_task* task) {
 parac_task_store&
 TaskStore::store() {
   return m_internal->store;
+}
+
+void
+TaskStore::receiveTaskResultFromPeer(parac_message& msg) {
+  auto originId = msg.origin->id;
+  auto path = parac_task_result_packet_get_path(msg.data);
+  parac_status result = parac_task_result_packet_get_result(msg.data);
+
+  auto pathTaskMapIt = m_internal->offloadedTasks.find(msg.origin);
+  if(pathTaskMapIt == m_internal->offloadedTasks.end()) {
+    parac_log(
+      PARAC_BROKER,
+      PARAC_GLOBALERROR,
+      "Task result {} on path {} with originator {} received from {}, but node "
+      "not found in broker task store! Ignoring.",
+      result,
+      path,
+      msg.originator_id,
+      originId);
+    msg.cb(&msg, PARAC_COMPUTE_NODE_NOT_FOUND_ERROR);
+    return;
+  }
+
+  auto& pathTaskMap = pathTaskMapIt->second;
+
+  auto taskIt = pathTaskMap.find(path.rep);
+  if(taskIt == pathTaskMap.end()) {
+    parac_log(
+      PARAC_BROKER,
+      PARAC_GLOBALERROR,
+      "Task result {} on path {} with originator {} received from {}, but "
+      "task path "
+      "not found in broker task store node map! Ignoring.",
+      result,
+      path,
+      msg.originator_id,
+      originId);
+    msg.cb(&msg, PARAC_PATH_NOT_FOUND_ERROR);
+    return;
+  }
+
+  auto& task = taskIt->second.get();
+  task.result = result;
+  task.state = task.state | PARAC_TASK_DONE;
+
+  assess_task(&task);
+
+  msg.cb(&msg, PARAC_OK);
 }
 }

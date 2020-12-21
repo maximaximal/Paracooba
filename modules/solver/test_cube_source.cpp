@@ -32,6 +32,7 @@ TEST_CASE("Test PathDefined Cube-Source", "[solver][cubesource]") {
   std::unique_ptr<CaDiCaLHandle> dummyHandle =
     std::make_unique<CaDiCaLHandle>(handle, stop, 1);
   auto [s, outFile] = dummyHandle->prepareString(test_dimacs_str);
+  dummyHandle->parseFile(outFile);
 
   REQUIRE(s == PARAC_OK);
 

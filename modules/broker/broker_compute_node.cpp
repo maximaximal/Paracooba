@@ -185,6 +185,10 @@ ComputeNode::receiveMessageFrom(parac_message& msg) {
       receiveMessageStatusFrom(msg);
       break;
     }
+    case PARAC_MESSAGE_TASK_RESULT: {
+      receiveMessageTaskResultFrom(msg);
+      break;
+    }
     default:
       assert(false);
       break;
@@ -301,6 +305,10 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
   }
 
   msg.cb(&msg, PARAC_OK);
+}
+void
+ComputeNode::receiveMessageTaskResultFrom(parac_message& msg) {
+  m_taskStore.receiveTaskResultFromPeer(msg);
 }
 
 void

@@ -118,6 +118,7 @@ class ComputeNode {
   void receiveMessageFrom(parac_message& msg);
   void receiveMessageDescriptionFrom(parac_message& msg);
   void receiveMessageStatusFrom(parac_message& msg);
+  void receiveMessageTaskResultFrom(parac_message& msg);
 
   void receiveFileFrom(parac_file& file);
 

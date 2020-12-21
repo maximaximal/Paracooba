@@ -31,6 +31,10 @@ parac_status_to_str(parac_status status) {
       return "Invalid Char Encountered";
     case PARAC_INVALID_IP:
       return "Provided IP address could not be parsed";
+    case PARAC_COMPUTE_NODE_NOT_FOUND_ERROR:
+      return "Compute Node not found Error";
+    case PARAC_PATH_NOT_FOUND_ERROR:
+      return "Path not found Error";
     case PARAC_PARSE_ERROR:
       return "Parse Error";
     case PARAC_PREMATURE_EXIT:
