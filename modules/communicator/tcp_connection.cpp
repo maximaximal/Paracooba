@@ -13,6 +13,7 @@
 #include <boost/asio/error.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/placeholders.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/system/error_code.hpp>
 #include <chrono>
@@ -246,8 +247,9 @@ struct TCPConnection::State {
   uint32_t sendMessageNumber = 0;
 
   struct FileOstream {
-    std::fstream o;
+    std::ofstream o;
     std::string path;
+    std::string originalFilename;
   };
   std::unique_ptr<FileOstream> readFileOstream;
 
@@ -467,17 +469,28 @@ void
 TCPConnection::handleReceivedFileStart() {
   std::string name = m_state->readFileHeader.name;
 
-  parac_log(PARAC_COMMUNICATOR,
-            PARAC_DEBUG,
-            "Start receiving file \"{}\"from {} ",
-            name,
-            m_state->remoteId());
-
   boost::filesystem::path p(m_state->service.temporaryDirectory());
+
+  if(m_state->readFileHeader.originator != m_state->service.handle().id) {
+    p /= std::to_string(m_state->readFileHeader.originator);
+    boost::filesystem::create_directory(p);
+  }
   p /= name;
 
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_TRACE,
+            "Start receiving file \"{}\" from {} to {}",
+            name,
+            m_state->remoteId(),
+            p);
+
   m_state->readFileOstream = std::make_unique<State::FileOstream>(
-    State::FileOstream{ { p, std::ios::binary }, p.string() });
+    State::FileOstream{ std::ofstream{ p.string().c_str(), std::ios::binary },
+                        p.string(),
+                        m_state->readFileHeader.name });
+
+  assert(m_state->readFileOstream->o);
+  assert(m_state->readFileOstream->o.is_open());
 }
 
 void
@@ -496,12 +509,29 @@ TCPConnection::handleReceivedFile() {
   };
   data d;
 
-  file.cb = [](void* userdata, parac_status status) {
-    data* d = static_cast<data*>(userdata);
+  m_state->readFileOstream->o.flush();
+
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_TRACE,
+            "Finished receiving file to \"{}\" from {} with originator {}. "
+            "Wrote {} bytes.",
+            m_state->readFileOstream->path,
+            m_state->remoteId(),
+            m_state->readFileHeader.originator,
+            m_state->readFileOstream->o.tellp());
+
+  file.cb = [](parac_file* file, parac_status status) {
+    data* d = static_cast<data*>(file->userdata);
     d->status = status;
     d->returned = true;
   };
   file.userdata = &d;
+  file.path = m_state->readFileOstream->path.c_str();
+  file.originator = m_state->readFileHeader.originator;
+
+  assert(m_state->compute_node);
+  assert(m_state->compute_node->receive_file_from);
+
   m_state->compute_node->receive_file_from(m_state->compute_node, &file);
 
   // Callback must be called immediately! This gives the status that is
@@ -542,7 +572,7 @@ TCPConnection::compute_node_send_file_to_func(parac_compute_node* n,
   assert(n);
   assert(n->communicator_userdata);
   TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
-  conn->send(std::move(*file));
+  conn->send(*file);
 }
 
 #define BUF(SOURCE) boost::asio::buffer(&SOURCE, sizeof(SOURCE))
@@ -645,6 +675,8 @@ TCPConnection::readHandler(boost::system::error_code ec,
                     ec.message());
           return;
         }
+
+        handleReceivedFileStart();
 
         while(m_state->readHeader.size > 0) {
           m_state->recvBuf.resize(
@@ -803,6 +835,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
         sender =
           std::make_unique<FileSender>(e->file().path,
+                                       e->file().originator,
                                        *m_state->socket,
                                        std::bind(&TCPConnection::writeHandler,
                                                  *this,

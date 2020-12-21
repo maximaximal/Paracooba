@@ -12,9 +12,20 @@ struct parac_module;
 struct parac_module_solver_instance;
 struct parac_message;
 
+typedef void (*parac_module_solver_instance_formula_parsed_cb)(
+  struct parac_module_solver_instance*,
+  void* userdata,
+  parac_status);
+
 typedef parac_status (*parac_module_solver_instance_handle_message)(
   struct parac_module_solver_instance*,
   struct parac_message*);
+
+typedef parac_status (*parac_module_solver_instance_handle_formula)(
+  struct parac_module_solver_instance*,
+  struct parac_file*,
+  void* cb_userdata,
+  parac_module_solver_instance_formula_parsed_cb);
 
 typedef struct parac_module_solver_instance* (
   *parac_module_solver_add_instance)(struct parac_module*,
@@ -29,6 +40,9 @@ typedef struct parac_module_solver_instance {
   parac_module_solver_instance_handle_message
     handle_message;/// Called by Broker to create tasks or handle results from
                    /// serialized messages.
+
+  parac_module_solver_instance_handle_formula
+    handle_formula;/// Called by Broker to parse the received formula.
 
   void* userdata;
 } parac_module_solver_instance;

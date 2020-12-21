@@ -8,6 +8,7 @@
 #include "solver_config.hpp"
 #include "solver_task.hpp"
 #include <paracooba/broker/broker.h>
+#include <paracooba/common/file.h>
 #include <paracooba/common/message.h>
 #include <paracooba/common/message_kind.h>
 #include <paracooba/common/path.h>
@@ -39,18 +40,22 @@ struct SolverInstance;
 using SolverInstanceList = std::list<SolverInstance>;
 
 struct SolverInstance {
-  explicit SolverInstance(parac_id originatorId)
-    : originatorId(originatorId) {}
+  explicit SolverInstance(parac_module* mod, parac_id originatorId)
+    : mod(mod) {
+    instance.originator_id = originatorId;
+  }
 
   parac_module_solver_instance instance;
   std::unique_ptr<CaDiCaLManager> cadicalManager;
-  SolverInstanceList::iterator it;
   SolverConfig config;
-  const parac_id originatorId;
   parac_task_store* task_store = nullptr;
+  SolverInstanceList::iterator it;
 
   bool configured = false;
+  parac_module* mod;
 };
+
+static_assert(std::is_standard_layout<SolverInstance>());
 
 struct SolverUserdata {
   SolverInstanceList instances;
@@ -59,12 +64,12 @@ struct SolverUserdata {
 };
 
 static parac_status
-initiate_solving_on_file(parac_module& mod,
-                         parac_module_solver_instance* instance,
-                         const char* file,
-                         parac_id originatorId) {
+parse_formula_file(parac_module& mod,
+                   const char* file,
+                   parac_id originatorId,
+                   ParserTask::FinishedCB parsingFinishedCB) {
   assert(mod.handle);
-  assert(mod.handle->input_file);
+  assert(file);
 
   assert(mod.handle->modules[PARAC_MOD_BROKER]);
   auto& broker = *mod.handle->modules[PARAC_MOD_BROKER]->broker;
@@ -76,6 +81,47 @@ initiate_solving_on_file(parac_module& mod,
     useLocalWorkers =
       mod.handle->modules[PARAC_MOD_RUNNER]->runner->available_worker_count > 0;
   }
+
+  if(useLocalWorkers) {
+    parac_task* task = task_store.new_task(
+      &task_store, nullptr, parac_path_unknown(), originatorId);
+    parac_log(PARAC_SOLVER,
+              PARAC_DEBUG,
+              "Create ParserTask for formula in file \"{}\" from node {}.",
+              file[0] == ':' ? "(inline - given on CLI)" : file,
+              originatorId);
+
+    assert(task);
+    new ParserTask(*mod.handle, *task, file, originatorId, parsingFinishedCB);
+    task_store.assess_task(&task_store, task);
+  } else {
+    parac_task task;
+    parac_task_init(&task);
+    task.path.rep = PARAC_PATH_PARSER;
+    parac_log(PARAC_SOLVER,
+              PARAC_DEBUG,
+              "Create ParserTask for formula in file \"{}\" from node {}.",
+              file[0] == ':' ? "(inline - given on CLI)" : file,
+              originatorId);
+    new ParserTask(*mod.handle, task, file, originatorId, parsingFinishedCB);
+    task.work(&task, 0);
+  }
+
+  return PARAC_OK;
+}
+
+static parac_status
+initiate_root_solver_on_file(parac_module& mod,
+                             parac_module_solver_instance* instance,
+                             const char* file,
+                             parac_id originatorId) {
+  assert(mod.handle);
+  assert(mod.handle->input_file);
+
+  assert(mod.handle->modules[PARAC_MOD_BROKER]);
+  auto& broker = *mod.handle->modules[PARAC_MOD_BROKER]->broker;
+  assert(broker.task_store);
+  auto& task_store = *broker.task_store;
 
   auto parserDone = [&mod, &task_store, originatorId, instance](
                       parac_status status,
@@ -102,31 +148,54 @@ initiate_solving_on_file(parac_module& mod,
     task_store.assess_task(&task_store, task);
   };
 
-  if(useLocalWorkers) {
-    parac_task* task = task_store.new_task(
-      &task_store, nullptr, parac_path_unknown(), originatorId);
-    parac_log(PARAC_SOLVER,
-              PARAC_DEBUG,
-              "Create ParserTask for formula in file \"{}\" from node {}.",
-              file[0] == ':' ? "(inline - given on CLI)" : file,
-              originatorId);
+  return parse_formula_file(mod, file, originatorId, parserDone);
+}
 
-    assert(task);
-    new ParserTask(*task, file, originatorId, parserDone);
-    task_store.assess_task(&task_store, task);
-  } else {
-    parac_task task;
-    task.path.rep = PARAC_PATH_PARSER;
-    parac_log(PARAC_SOLVER,
-              PARAC_DEBUG,
-              "Create ParserTask for formula in file \"{}\" from node {}.",
-              file[0] == ':' ? "(inline - given on CLI)" : file,
-              originatorId);
-    new ParserTask(task, file, originatorId, parserDone);
-    task.work(&task, 0);
-  }
+static parac_status
+initiate_peer_solver_on_file(
+  parac_module& mod,
+  parac_module_solver_instance* instance,
+  const char* file,
+  parac_id originatorId,
+  void* cb_userdata,
+  parac_module_solver_instance_formula_parsed_cb cb) {
+  assert(mod.handle);
+  assert(cb);
 
-  return PARAC_OK;
+  assert(mod.handle->modules[PARAC_MOD_BROKER]);
+  auto& broker = *mod.handle->modules[PARAC_MOD_BROKER]->broker;
+  assert(broker.task_store);
+  auto& task_store = *broker.task_store;
+
+  auto parserDone = [&mod, &task_store, instance, cb, cb_userdata](
+                      parac_status status,
+                      ParserTask::CaDiCaLHandlePtr parsedFormula) {
+    if(status != PARAC_OK) {
+      parac_log(PARAC_SOLVER,
+                PARAC_FATAL,
+                "Parsing of formula \"{}\" failed with status {}! Exiting.",
+                parsedFormula->path(),
+                status);
+      cb(instance, cb_userdata, status);
+      return;
+    }
+
+    parac_log(PARAC_SOLVER,
+              PARAC_TRACE,
+              "Parsing of formula \"{}\" finished! Now sending status to peers "
+              "and waiting for tasks.",
+              parsedFormula->path(),
+              status);
+
+    SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
+    i->task_store = &task_store;
+    i->cadicalManager = std::make_unique<CaDiCaLManager>(
+      mod, std::move(parsedFormula), i->config);
+
+    cb(instance, cb_userdata, status);
+  };
+
+  return parse_formula_file(mod, file, originatorId, parserDone);
 }
 
 static parac_status
@@ -185,16 +254,50 @@ instance_handle_message(parac_module_solver_instance* instance,
   return PARAC_OK;
 }
 
+static parac_status
+instance_handle_formula(parac_module_solver_instance* instance,
+                        parac_file* formula,
+                        void* cb_userdata,
+                        parac_module_solver_instance_formula_parsed_cb cb) {
+  assert(instance);
+  assert(formula);
+  assert(instance->userdata);
+
+  SolverInstance* solverInstance =
+    static_cast<SolverInstance*>(instance->userdata);
+
+  assert(solverInstance->mod);
+  assert(!solverInstance->cadicalManager);
+
+  parac_status status = initiate_peer_solver_on_file(*solverInstance->mod,
+                                                     instance,
+                                                     formula->path,
+                                                     instance->originator_id,
+                                                     cb_userdata,
+                                                     cb);
+
+  formula->cb(formula, status);
+
+  return status;
+}
+
 static parac_module_solver_instance*
 add_instance(parac_module* mod, parac_id originatorId) {
   assert(mod);
   assert(mod->userdata);
   SolverUserdata* userdata = static_cast<SolverUserdata*>(mod->userdata);
   std::unique_lock lock(userdata->instancesMutex);
-  auto& instance = userdata->instances.emplace_front(originatorId);
+  auto& instance = userdata->instances.emplace_front(mod, originatorId);
   instance.it = userdata->instances.begin();
   instance.instance.userdata = &instance;
   instance.instance.handle_message = &instance_handle_message;
+  instance.instance.handle_formula = &instance_handle_formula;
+
+  parac_log(PARAC_SOLVER,
+            PARAC_TRACE,
+            "Create new solver instance with originator ID {}",
+            originatorId);
+
   return &instance.instance;
 }
 
@@ -263,7 +366,7 @@ init(parac_module* mod) {
     SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
     i->config = userdata->config;
 
-    status = initiate_solving_on_file(
+    status = initiate_root_solver_on_file(
       *mod, instance, mod->handle->input_file, mod->handle->id);
 
   } else {

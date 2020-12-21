@@ -8,13 +8,22 @@
 #include <paracooba/common/message.h>
 #include <paracooba/module.h>
 
+#include <list>
+#include <mutex>
+
 #include "broker_compute_node.hpp"
 #include "paracooba/communicator/communicator.h"
 #include "paracooba/runner/runner.h"
 
 namespace parac::broker {
 struct ComputeNodeStore::Internal {
-  std::unordered_map<parac_id, parac_compute_node_wrapper> nodes;
+  std::mutex nodesMutex;
+
+  std::list<parac_compute_node_wrapper> nodesList;
+
+  std::unordered_map<parac_id,
+                     std::reference_wrapper<parac_compute_node_wrapper>>
+    nodesRefMap;
 };
 
 ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
@@ -68,8 +77,13 @@ ComputeNodeStore::updateThisNodeDescription() {
 
 parac_compute_node*
 ComputeNodeStore::get(parac_id id) {
-  if(has(id))
-    return &m_internal->nodes[id];
+  {
+    std::unique_lock lock(m_internal->nodesMutex);
+    auto it = m_internal->nodesRefMap.find(id);
+    if(it != m_internal->nodesRefMap.end()) {
+      return &it->second.get();
+    }
+  }
 
   // Create new node.
   return create(id);
@@ -107,7 +121,8 @@ ComputeNodeStore::get_broker_compute_node(parac_id id) {
 
 bool
 ComputeNodeStore::has(parac_id id) const {
-  return m_internal->nodes.count(id);
+  std::unique_lock lock(m_internal->nodesMutex);
+  return m_internal->nodesRefMap.count(id);
 }
 
 void
@@ -120,21 +135,26 @@ ComputeNodeStore::decrementThisNodeWorkQueueSize(parac_id originator) {
   thisNode().decrementWorkQueueSize(originator);
   sendStatusToPeers();
 }
+void
+ComputeNodeStore::formulaParsed(parac_id originator) {
+  thisNode().formulaParsed(originator);
+  sendStatusToPeers();
+}
 
 parac_compute_node*
 ComputeNodeStore::create(parac_id id) {
   parac_log(PARAC_BROKER, PARAC_DEBUG, "Create compute node {}.", id);
 
   assert(!has(id));
-  parac_compute_node_wrapper node;
-  node.id = id;
-  node.broker_free = &ComputeNodeStore::static_node_free;
-  auto it = m_internal->nodes.try_emplace(id, std::move(node));
 
-  auto& inserted_node = it.first->second;
+  std::unique_lock lock(m_internal->nodesMutex);
+  auto& inserted_node = m_internal->nodesList.emplace_front();
+  inserted_node.id = id;
+  inserted_node.broker_free = &ComputeNodeStore::static_node_free;
+  m_internal->nodesRefMap.try_emplace(id, inserted_node);
 
   ComputeNode* broker_compute_node =
-    new ComputeNode(it.first->second, m_handle);
+    new ComputeNode(inserted_node, m_handle, *this);
   inserted_node.broker_userdata = broker_compute_node;
 
   return &inserted_node;
@@ -142,8 +162,15 @@ ComputeNodeStore::create(parac_id id) {
 
 void
 ComputeNodeStore::sendStatusToPeers() {
-  parac_message msg;
+  parac_message_wrapper msg;
   thisNode().status().serializeToMessage(msg);
+
+  std::unique_lock lock(m_internal->nodesMutex);
+  for(auto& e : m_internal->nodesList) {
+    if(e.send_message_to) {
+      e.send_message_to(&e, &msg);
+    }
+  }
 }
 
 ComputeNode&

@@ -25,12 +25,13 @@ a -1 0
 TEST_CASE("Test PathDefined Cube-Source", "[solver][cubesource]") {
   parac_log_init(nullptr);
 
+  parac_handle handle;
   parac_module mod;
   bool stop = false;
   SolverConfig dummyConfig;
   std::unique_ptr<CaDiCaLHandle> dummyHandle =
-    std::make_unique<CaDiCaLHandle>(stop, 1);
-  parac_status s = dummyHandle->parseString(test_dimacs_str);
+    std::make_unique<CaDiCaLHandle>(handle, stop, 1);
+  auto [s, outFile] = dummyHandle->prepareString(test_dimacs_str);
 
   REQUIRE(s == PARAC_OK);
 

@@ -8,6 +8,7 @@
 
 struct parac_compute_node;
 struct parac_message;
+struct parac_file;
 struct parac_module_solver_instance;
 struct parac_handle;
 
@@ -16,9 +17,14 @@ class NoncopyOStringstream;
 }
 
 namespace parac::broker {
+class ComputeNodeStore;
+
 class ComputeNode {
   public:
-  ComputeNode(parac_compute_node& node, parac_handle& handle);
+  ComputeNode(parac_compute_node& node,
+              parac_handle& handle,
+              ComputeNodeStore& store);
+
   virtual ~ComputeNode();
 
   struct Description {
@@ -56,6 +62,7 @@ class ComputeNode {
   };
 
   struct SolverInstance {
+    bool formula_received = false;
     bool formula_parsed = false;
     uint64_t workQueueSize = 0;
 
@@ -87,6 +94,7 @@ class ComputeNode {
 
   void incrementWorkQueueSize(parac_id originator);
   void decrementWorkQueueSize(parac_id originator);
+  void formulaParsed(parac_id originator);
 
   void initDescription(const std::string& name,
                        const std::string& host,
@@ -102,9 +110,12 @@ class ComputeNode {
   void receiveMessageDescriptionFrom(parac_message& msg);
   void receiveMessageStatusFrom(parac_message& msg);
 
+  void receiveFileFrom(parac_file& file);
+
   private:
-  const parac_compute_node& m_node;
+  parac_compute_node& m_node;
   parac_handle& m_handle;
+  ComputeNodeStore& m_store;
 
   std::optional<Description> m_description;
   Status m_status;

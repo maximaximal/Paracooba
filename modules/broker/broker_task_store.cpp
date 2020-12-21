@@ -374,14 +374,16 @@ TaskStore::assess_task(parac_task* task) {
 
     auto path = task->path;
     auto result = task->result;
+    auto originator = task->originator;
     parac_task* parent = task->parent_task_;
 
     remove(task);
 
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
-              "Task on path {} done with result {}",
+              "Task on path {} with originator {} done with result {}",
               path,
+              originator,
               result);
 
     if(parent) {

@@ -35,6 +35,10 @@ parac_status_to_str(parac_status status) {
       return "Parse Error";
     case PARAC_PREMATURE_EXIT:
       return "Premature Exit";
+    case PARAC_FORMULA_RECEIVED_TWICE_ERROR:
+      return "Formula received twice Error";
+    case PARAC_FILE_NOT_FOUND_ERROR:
+      return "File not found Error";
     case PARAC_GENERIC_ERROR:
       return "Generic Error";
   }

@@ -3,6 +3,7 @@
 #include "paracooba/common/log.h"
 #include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
+#include "paracooba/module.h"
 #include "solver_assignment.hpp"
 
 #include "paracooba/solver/cube_iterator.hpp"
@@ -17,15 +18,18 @@
 
 namespace parac::solver {
 struct CaDiCaLHandle::Internal {
-  Internal(bool& stop,
+  Internal(parac_handle& handle,
+           bool& stop,
            parac_id originatorId,
            std::shared_ptr<Cube> pregeneratedCubes = std::make_shared<Cube>(),
            std::shared_ptr<std::vector<size_t>> pregeneratedCubesJumplist =
              std::make_shared<std::vector<size_t>>())
-    : terminator(stop)
+    : handle(handle)
+    , terminator(stop)
     , originatorId(originatorId)
     , pregeneratedCubes(pregeneratedCubes)
     , pregeneratedCubesJumplist(pregeneratedCubesJumplist) {}
+  parac_handle& handle;
   CaDiCaL::Solver solver;
   size_t pregeneratedCubesCount = 0;
   size_t normalizedPathLength = 0;
@@ -41,11 +45,14 @@ struct CaDiCaLHandle::Internal {
   std::shared_ptr<std::vector<size_t>> pregeneratedCubesJumplist;
 };
 
-CaDiCaLHandle::CaDiCaLHandle(bool& stop, parac_id originatorId)
-  : m_internal(std::make_unique<Internal>(stop, originatorId)) {}
+CaDiCaLHandle::CaDiCaLHandle(parac_handle& handle,
+                             bool& stop,
+                             parac_id originatorId)
+  : m_internal(std::make_unique<Internal>(handle, stop, originatorId)) {}
 CaDiCaLHandle::CaDiCaLHandle(CaDiCaLHandle& o)
   : m_internal(
-      std::make_unique<Internal>(o.m_internal->terminator.stopRef(),
+      std::make_unique<Internal>(o.m_internal->handle,
+                                 o.m_internal->terminator.stopRef(),
                                  o.m_internal->originatorId,
                                  o.m_internal->pregeneratedCubes,
                                  o.m_internal->pregeneratedCubesJumplist)) {
@@ -75,8 +82,8 @@ CaDiCaLHandle::solver() {
   return m_internal->solver;
 }
 
-parac_status
-CaDiCaLHandle::parseString(std::string_view iCNF) {
+std::pair<parac_status, std::string>
+CaDiCaLHandle::prepareString(std::string_view iCNF) {
   auto h = std::hash<std::string_view>{}(iCNF);
   std::string path = "/dev/shm/paracooba-tmp-dimacs-file-" + std::to_string(h);
   parac_log(PARAC_SOLVER,
@@ -88,9 +95,11 @@ CaDiCaLHandle::parseString(std::string_view iCNF) {
     out << iCNF;
     out.flush();
   }
-  parac_status s = parseFile(path);
   m_internal->pathToDelete = path;
-  return s;
+  if(m_internal->handle.input_file) {
+    m_internal->handle.input_file = m_internal->pathToDelete.c_str();
+  }
+  return { PARAC_OK, path };
 }
 
 parac_status

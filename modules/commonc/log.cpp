@@ -46,42 +46,52 @@ log_new_thread_callback(parac_thread_registry_handle* handle) {
   assert(handle);
   boost::log::core::get()->add_thread_attribute(
     "ThreadID", boost::log::attributes::constant<uint16_t>(handle->thread_id));
+
+  boost::log::core::get()->add_thread_attribute(
+    "LocalID",
+    boost::log::attributes::constant<parac_id>(
+      handle->registry->belongs_to_id));
 }
 
 PARAC_COMMON_EXPORT parac_status
 parac_log_init(parac_thread_registry* thread_registry) {
   static bool initialized = false;
 
-  if(initialized)
-    return PARAC_OK;
-  initialized = true;
-
   try {
-    global_channels.fill(true);
+    if(!initialized)
+      global_channels.fill(true);
 
     add_common_attributes();
     boost::log::core::get()->add_thread_attribute(
       "ThreadID", boost::log::attributes::constant<uint16_t>(0));
+
+    boost::log::core::get()->add_thread_attribute(
+      "LocalID",
+      boost::log::attributes::constant<parac_id>(
+        thread_registry->belongs_to_id));
 
     if(thread_registry) {
       parac_thread_registry_add_starting_callback(thread_registry,
                                                   &log_new_thread_callback);
     }
 
-    global_console_sink = add_console_log(std::clog);
-    global_console_sink->set_formatter(
-      expressions::stream
-      << "c ["
-      << expressions::if_(expressions::has_attr<std::string>(
-           "LocalName"))[expressions::stream
-                         << expressions::attr<std::string>("LocalName") << "|"]
-      << expressions::attr<parac_id>("LocalID") << "] ["
-      << parac_logger_timestamp << "] ["
-      << expressions::attr<parac_log_severity>("Severity") << "] ["
-      << expressions::attr<parac_log_channel>("Channel") << " @ T"
-      << expressions::attr<uint16_t>("ThreadID") << "] "
-      << expressions::smessage);
-    boost::log::core::get()->add_sink(global_console_sink);
+    if(!initialized) {
+      global_console_sink = add_console_log(std::clog);
+      global_console_sink->set_formatter(
+        expressions::stream
+        << "c ["
+        << expressions::if_(expressions::has_attr<std::string>(
+             "LocalName"))[expressions::stream
+                           << expressions::attr<std::string>("LocalName")
+                           << "|"]
+        << expressions::attr<parac_id>("LocalID") << "] ["
+        << parac_logger_timestamp << "] ["
+        << expressions::attr<parac_log_severity>("Severity") << "] ["
+        << expressions::attr<parac_log_channel>("Channel") << " @ T"
+        << expressions::attr<uint16_t>("ThreadID") << "] "
+        << expressions::smessage);
+      boost::log::core::get()->add_sink(global_console_sink);
+    }
   } catch(std::exception& e) {
     std::cerr << "> Exception during log setup! Message: " << e.what()
               << std::endl;
@@ -94,6 +104,8 @@ parac_log_init(parac_thread_registry* thread_registry) {
   if(std::getenv("PARAC_LOG_TRACE")) {
     parac_log_set_severity(PARAC_TRACE);
   }
+
+  initialized = true;
 
   return PARAC_OK;
 }
@@ -111,7 +123,8 @@ parac_log_set_channel_active(parac_log_channel channel, bool active) {
 PARAC_COMMON_EXPORT void
 parac_log_set_local_id(parac_id id) {
   local_id = id;
-  global_logger.add_attribute("LocalID", attributes::make_constant(local_id));
+  boost::log::core::get()->add_thread_attribute(
+    "LocalID", boost::log::attributes::constant<parac_id>(id));
 }
 
 PARAC_COMMON_EXPORT void

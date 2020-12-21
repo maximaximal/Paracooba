@@ -99,7 +99,7 @@ main(int argc, char* argv[]) {
     argv = argv_default;
   }
 
-  ThreadRegistryWrapper thread_registry;
+  ThreadRegistryWrapper thread_registry(0);
   ConfigWrapper config;
   CLI cli(config);
 
@@ -108,6 +108,8 @@ main(int argc, char* argv[]) {
   if(!cli.parseGlobalArgs(argc, argv)) {
     return EXIT_SUCCESS;
   }
+
+  thread_registry.belongs_to_id = cli.getId();
 
   ModuleLoader loader(thread_registry,
                       config,

@@ -37,6 +37,7 @@ class ComputeNodeStore {
 
   void incrementThisNodeWorkQueueSize(parac_id originator);
   void decrementThisNodeWorkQueueSize(parac_id originator);
+  void formulaParsed(parac_id originator);
 
   private:
   static parac_compute_node* static_get(parac_compute_node_store* store,
@@ -54,10 +55,8 @@ class ComputeNodeStore {
   static void static_node_free(parac_compute_node* node);
 
   parac_compute_node* create(parac_id id);
-
-  void sendStatusToPeers();
-
   ComputeNode& thisNode();
+  void sendStatusToPeers();
 
   struct Internal;
   std::unique_ptr<Internal> m_internal;

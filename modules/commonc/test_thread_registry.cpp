@@ -3,7 +3,7 @@
 #include <paracooba/common/thread_registry.h>
 
 TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
-  paracooba::ThreadRegistryWrapper registry;
+  paracooba::ThreadRegistryWrapper registry(0);
 
   parac_thread_registry_handle handle;
 

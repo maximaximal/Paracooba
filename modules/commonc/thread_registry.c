@@ -29,8 +29,11 @@ PARAC_LINKED_LIST(thread_registry_new_thread_starting_cb,
 
 PARAC_COMMON_EXPORT
 void
-parac_thread_registry_init(parac_thread_registry* registry) {
+parac_thread_registry_init(parac_thread_registry* registry,
+                           parac_id belongs_to_id) {
   assert(registry);
+
+  registry->belongs_to_id = belongs_to_id;
 
   registry->threads = malloc(sizeof(parac_thread_handle_list));
   registry->new_thread_starting_cbs =

@@ -19,8 +19,9 @@ class ParserTask {
   using CaDiCaLHandlePtr = std::unique_ptr<CaDiCaLHandle>;
   using FinishedCB = std::function<void(parac_status, CaDiCaLHandlePtr)>;
 
-  ParserTask(parac_task& task,
-             const std::string& input,
+  ParserTask(parac_handle& handle,
+             parac_task& task,
+             std::string input,
              parac_id originatorId,
              FinishedCB finishedCB);
   ~ParserTask();
@@ -33,6 +34,7 @@ class ParserTask {
 
   parac_task& m_task;
   const std::string m_input;
+  std::string m_path;
   FinishedCB m_finishedCB;
 };
 }

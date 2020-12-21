@@ -2,6 +2,7 @@
 #define PARAC_COMMON_THREAD_REGISTRY_H
 
 #include "status.h"
+#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,6 +27,7 @@ typedef struct parac_thread_registry {
   struct parac_thread_handle_list* threads;
   struct parac_thread_registry_new_thread_starting_cb_list*
     new_thread_starting_cbs;
+  parac_id belongs_to_id;
 } parac_thread_registry;
 
 typedef struct parac_thread_registry_handle {
@@ -41,7 +43,8 @@ typedef struct parac_thread_registry_handle {
 } parac_thread_registry_handle;
 
 void
-parac_thread_registry_init(parac_thread_registry* registry);
+parac_thread_registry_init(parac_thread_registry* registry,
+                           parac_id belongs_to_id);
 
 void
 parac_thread_registry_free(parac_thread_registry* registry);
@@ -68,7 +71,9 @@ parac_thread_registry_wait_for_exit(parac_thread_registry* registry);
 
 namespace paracooba {
 struct ThreadRegistryWrapper : public parac_thread_registry {
-  ThreadRegistryWrapper() { parac_thread_registry_init(this); }
+  ThreadRegistryWrapper(parac_id belongs_to_id) {
+    parac_thread_registry_init(this, belongs_to_id);
+  }
   ~ThreadRegistryWrapper() { parac_thread_registry_free(this); }
 
   void wait() { parac_thread_registry_wait_for_exit(this); }

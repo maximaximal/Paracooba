@@ -24,14 +24,15 @@ parac_static_module_discover(parac_module_type mod);
 
 class ParacoobaMock : public parac_handle {
   public:
-  ParacoobaMock(parac_id id,
-                const char* input_file = nullptr,
-                ParacoobaMock* knownRemote = nullptr,
-                std::set<parac_module_type> modulesToLoad = {
-                  PARAC_MOD_BROKER,
-                  PARAC_MOD_RUNNER,
-                  PARAC_MOD_SOLVER,
-                  PARAC_MOD_COMMUNICATOR }) {
+  ParacoobaMock(
+    parac_id id,
+    const char* input_file = nullptr,
+    ParacoobaMock* knownRemote = nullptr,
+    std::set<parac_module_type> modulesToLoad = { PARAC_MOD_BROKER,
+                                                  PARAC_MOD_RUNNER,
+                                                  PARAC_MOD_SOLVER,
+                                                  PARAC_MOD_COMMUNICATOR })
+    : m_threadRegistry(id) {
     version.major = 0;
     version.minor = 0;
     version.patch = 0;
@@ -52,11 +53,7 @@ class ParacoobaMock : public parac_handle {
     modules[PARAC_MOD_SOLVER] = nullptr;
     modules[PARAC_MOD_RUNNER] = nullptr;
 
-    static bool log_initialized = false;
-    if(!log_initialized) {
-      parac_log_init(thread_registry);
-      log_initialized = true;
-    }
+    parac_log_init(thread_registry);
 
     // Load from ModuleLoader
     m_moduleLoader = std::make_unique<paracooba::ModuleLoader>(

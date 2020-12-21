@@ -65,7 +65,10 @@ init_config(CommunicatorUserdata* u) {
   e[Config::TEMPORARY_DIRECTORY].registrar = PARAC_MOD_COMMUNICATOR;
   e[Config::TEMPORARY_DIRECTORY].type = PARAC_TYPE_STR;
 
-  u->temporary_directory = boost::filesystem::temp_directory_path().string();
+  u->temporary_directory =
+    (boost::filesystem::temp_directory_path() /
+     ("/paracooba-tmp-" + std::to_string(u->service.handle().id)))
+      .string();
   e[Config::TEMPORARY_DIRECTORY].default_value.string =
     u->temporary_directory.c_str();
 

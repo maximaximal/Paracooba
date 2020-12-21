@@ -7,6 +7,7 @@
 #include <string>
 
 struct parac_path;
+struct parac_handle;
 
 namespace CaDiCaL {
 class Solver;
@@ -18,14 +19,14 @@ class SolverAssignment;
 
 class CaDiCaLHandle {
   public:
-  CaDiCaLHandle(bool& stop, parac_id originatorId);
+  CaDiCaLHandle(parac_handle& handle, bool& stop, parac_id originatorId);
   CaDiCaLHandle(CaDiCaLHandle& o);
   ~CaDiCaLHandle();
 
   CaDiCaL::Solver& solver();
 
+  std::pair<parac_status, std::string> prepareString(std::string_view iCNF);
   parac_status parseFile(const std::string& path);
-  parac_status parseString(std::string_view iCNF);
 
   bool hasFormula() const { return m_hasFormula; }
 

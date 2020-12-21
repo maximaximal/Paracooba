@@ -2,6 +2,7 @@
 #define PARAC_COMMON_FILE_H
 
 #include "paracooba/common/status.h"
+#include "paracooba/common/types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,12 +11,15 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef void (*parac_file_cb)(void*, parac_status);
+struct parac_file;
+
+typedef void (*parac_file_cb)(struct parac_file*, parac_status);
 
 typedef struct parac_file {
-  char* path;
+  const char* path;
   void* userdata;
   parac_file_cb cb;
+  parac_id originator;
 } parac_file;
 
 /** @brief Free data in file struct.*/
@@ -35,6 +39,7 @@ class parac_file_wrapper : public parac_file {
   parac_file_wrapper(const parac_file& f) {
     path = f.path;
     userdata = f.userdata;
+    originator = f.originator;
     cb = f.cb;
   };
   ~parac_file_wrapper() { parac_file_free(this); }

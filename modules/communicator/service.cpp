@@ -1,4 +1,5 @@
 #include <atomic>
+#include <boost/filesystem/operations.hpp>
 #include <map>
 
 #include "paracooba/common/timeout.h"
@@ -49,6 +50,10 @@ Service::applyConfig(parac_config_entry* e) {
 
   assert(m_internal);
   assert(e);
+
+  if(!boost::filesystem::exists(temporaryDirectory())) {
+    boost::filesystem::create_directory(temporaryDirectory());
+  }
 
   m_internal->tcpAcceptor = std::make_unique<TCPAcceptor>();
 

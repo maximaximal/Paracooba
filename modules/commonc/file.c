@@ -8,5 +8,4 @@ PARAC_COMMON_EXPORT void
 parac_file_free(parac_file* file) {
   assert(file);
   assert(file->path);
-  free(file->path);
 }

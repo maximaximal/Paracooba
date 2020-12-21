@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <paracooba/common/message_kind.h>
 #include <paracooba/common/status.h>
+#include <paracooba/common/types.h>
 
 namespace parac::communicator {
 struct PacketHeader {
@@ -16,6 +17,7 @@ struct PacketHeader {
 };
 
 struct PacketFileHeader {
+  parac_id originator;
   char name[255];
 };
 }
