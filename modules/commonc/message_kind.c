@@ -26,6 +26,8 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "Solver-Description";
     case PARAC_MESSAGE_SOLVER_TASK:
       return "Solver-Task";
+    case PARAC_MESSAGE_TASK_RESULT:
+      return "Task-Result";
     case PARAC_MESSAGE_FILE:
       return "File";
     case PARAC_MESSAGE_ACK:

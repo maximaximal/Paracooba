@@ -22,7 +22,7 @@ namespace cubesource {
 class Source {
   public:
   Source() = default;
-  ~Source() = default;
+  virtual ~Source() = default;
 
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr) = 0;
   virtual bool split(parac_path p,
@@ -43,7 +43,7 @@ class Source {
 class PathDefined : public Source {
   public:
   PathDefined();
-  ~PathDefined();
+  virtual ~PathDefined();
 
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
@@ -66,7 +66,7 @@ class Supplied : public Source {
   Supplied();
   explicit Supplied(const Cube& cube)
     : m_cube(cube) {}
-  ~Supplied();
+  virtual ~Supplied();
 
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
@@ -90,7 +90,7 @@ class Supplied : public Source {
 class Unspecified : public Source {
   public:
   explicit Unspecified() = default;
-  ~Unspecified() = default;
+  virtual ~Unspecified() = default;
 
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
