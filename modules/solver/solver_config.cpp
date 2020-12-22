@@ -91,13 +91,12 @@ SolverConfig::extractFromConfigEntries() {
   m_marchCubes =
     m_config[static_cast<size_t>(Entry::MarchCubes)].value.boolean_switch;
 }
-}
-
 std::ostream&
-operator<<(std::ostream& o, const parac::solver::SolverConfig& config) {
+operator<<(std::ostream& o, const SolverConfig& config) {
   return o << "PredefinedCubes:" << config.PredefinedCubes()
            << ", CaDiCaLCubes:" << config.CaDiCaLCubes()
            << ", Resplit:" << config.Resplit()
            << ", InitialCubeDepth:" << config.InitialCubeDepth()
            << ", MarchCubes:" << config.MarchCubes();
+}
 }

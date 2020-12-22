@@ -55,7 +55,6 @@ class SolverConfig {
        cereal::make_nvp("marchCubes", m_marchCubes));
   }
 };
-}
-
 std::ostream&
-operator<<(std::ostream& o, const parac::solver::SolverConfig& config);
+operator<<(std::ostream& o, const SolverConfig& config);
+}

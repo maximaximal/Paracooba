@@ -133,11 +133,11 @@ class ComputeNode {
   std::optional<Description> m_description;
   Status m_status;
 };
+
+std::ostream&
+operator<<(std::ostream& o, const ComputeNode::Description& d);
+std::ostream&
+operator<<(std::ostream& o, const ComputeNode::SolverInstance& si);
+std::ostream&
+operator<<(std::ostream& o, const ComputeNode::Status& s);
 }
-std::ostream&
-operator<<(std::ostream& o, const parac::broker::ComputeNode::Description& d);
-std::ostream&
-operator<<(std::ostream& o,
-           const parac::broker::ComputeNode::SolverInstance& si);
-std::ostream&
-operator<<(std::ostream& o, const parac::broker::ComputeNode::Status& s);

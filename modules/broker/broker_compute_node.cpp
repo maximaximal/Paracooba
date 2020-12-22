@@ -365,25 +365,24 @@ ComputeNode::computeUtilization() const {
 
   return workQueueSize / workers;
 }
-}
 
 std::ostream&
-operator<<(std::ostream& o, const parac::broker::ComputeNode::Description& d) {
+operator<<(std::ostream& o, const ComputeNode::Description& d) {
   return o << d.name << "@" << d.host << " " << (d.daemon ? "daemon" : "client")
            << " with " << d.workers << " available workers";
 }
 std::ostream&
-operator<<(std::ostream& o,
-           const parac::broker::ComputeNode::SolverInstance& si) {
+operator<<(std::ostream& o, const ComputeNode::SolverInstance& si) {
   return o << (si.formula_parsed ? "parsed" : "unparsed") << ", "
            << si.workQueueSize << " tasks";
 }
 std::ostream&
-operator<<(std::ostream& o, const parac::broker::ComputeNode::Status& s) {
+operator<<(std::ostream& o, const ComputeNode::Status& s) {
   o << "Work queue size: " << s.workQueueSize() << ", containing "
     << s.solverInstances.size() << " instances:";
   for(auto& i : s.solverInstances) {
     o << " { " << i.first << ":" << i.second << " }";
   }
   return o;
+}
 }

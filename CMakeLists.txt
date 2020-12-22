@@ -8,7 +8,8 @@ set(BUILD_URL "" CACHE STRING "Unique URL to identify this build.")
 set(VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}+${BUILD_NUMBER})
 
 option(STATIC_BUILDS "also build static executable with included modules" ON)
-option(DEBUG_ENABLE_ADDRESS_SANITIZER "enable address sanitizer (GCC)" OFF)
+option(DEBUG_ENABLE_ADDRESS_SANITIZER "enable address sanitizer (GCC/Clang)" OFF)
+option(DEBUG_ENABLE_THREAD_SANITIZER "enable thread sanitizer (GCC/Clang)" OFF)
 option(DEBUG_ENABLE_CLANG_TIDY "enable clang-tidy check of source code" OFF)
 option(DEBUG_ENABLE_CLANG_TIDY_WITH_FIX "allow clang-tidy to modify source files and automatically fix issues. Very likely leads to uncompilable code, use selectively." OFF)
 
@@ -89,6 +90,15 @@ if(DEBUG_ENABLE_ADDRESS_SANITIZER)
     set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address  -fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined -fno-sanitize=vptr")
+endif()
+
+# Thread Sanitizer for Debug Builds
+if(DEBUG_ENABLE_THREAD_SANITIZER)
+    set(CMAKE_BUILD_TYPE Debug)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=thread")
+    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=thread")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fsanitize=thread")
 endif()
 
 add_subdirectory(third_party)
