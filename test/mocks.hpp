@@ -78,7 +78,8 @@ class ParacoobaMock : public parac_handle {
   }
 
   const std::string getConnectionString() {
-    while(!getCommunicator().tcp_acceptor_active) {
+    while(!getCommunicator().tcp_acceptor_active(
+      m_moduleLoader->mod(PARAC_MOD_COMMUNICATOR))) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     return "localhost:" + std::to_string(getCommunicator().tcp_listen_port);

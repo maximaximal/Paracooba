@@ -58,13 +58,12 @@ struct TaskStore::Internal {
 
   struct Task;
   template<typename T>
-  using Allocator = boost::fast_pool_allocator<
-    T,
-    boost::default_user_allocator_new_delete,
-    boost::details::pool::null_mutex,// No mutex required, as accesses are
-                                     // synchronized by containerMutex
-    64,
-    128>;
+  using Allocator =
+    boost::fast_pool_allocator<T,
+                               boost::default_user_allocator_new_delete,
+                               boost::details::pool::default_mutex,
+                               64,
+                               128>;
   using TaskList = std::list<Task, Allocator<Task>>;
 
   struct Task {
@@ -235,7 +234,7 @@ TaskStore::pop_offload(parac_compute_node* target, CheckOriginator check) {
     t->state = t->state | PARAC_TASK_OFFLOADED;
 
     Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
-      reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
+      reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
     ++taskWrapper->refcount;
   }
 
@@ -259,7 +258,7 @@ TaskStore::pop_work() {
     t->state = t->state | PARAC_TASK_WORKING;
 
     Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
-      reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
+      reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
     ++taskWrapper->refcount;
   }
 

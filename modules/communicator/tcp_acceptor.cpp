@@ -115,7 +115,7 @@ TCPAcceptor::start(Service& service,
             "Starting TCPAcceptor on endpoint {}.",
             m_internal->endpoint);
 
-  comm->tcp_acceptor_active = true;
+  m_internal->service.setTCPAcceptorActive();
 
   loop(boost::system::error_code());
 
@@ -150,9 +150,11 @@ TCPAcceptor::loop(const boost::system::error_code& ec) {
                     m_internal->newSocket->remote_endpoint());
 
           m_internal->newSocket->non_blocking(true);
-          m_internal->newSocket->set_option(boost::asio::ip::tcp::no_delay(true));
+          m_internal->newSocket->set_option(
+            boost::asio::ip::tcp::no_delay(true));
 
-          TCPConnection(m_internal->service, std::move(m_internal->newSocket), -1);
+          TCPConnection(
+            m_internal->service, std::move(m_internal->newSocket), -1);
         }
       }
     }

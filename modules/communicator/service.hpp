@@ -74,6 +74,9 @@ class Service {
                                     TCPConnectionPayloadPtr payload);
   TCPConnectionPayloadPtr retrieveTCPConnectionPayload(parac_id id);
 
+  void setTCPAcceptorActive();
+  bool isTCPAcceptorActive();
+
   private:
   parac_status run();
 

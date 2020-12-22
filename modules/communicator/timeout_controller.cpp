@@ -16,13 +16,12 @@ struct TimeoutController::Internal {
   struct Timeout;
   struct Task;
   template<typename T>
-  using Allocator = boost::fast_pool_allocator<
-    T,
-    boost::default_user_allocator_new_delete,
-    boost::details::pool::null_mutex,// No mutex required, as accesses are
-                                     // synchronized by containerMutex
-    64,
-    128>;
+  using Allocator =
+    boost::fast_pool_allocator<T,
+                               boost::default_user_allocator_new_delete,
+                               boost::details::pool::default_mutex,
+                               64,
+                               128>;
 
   using TimeoutList = std::list<Timeout, Allocator<Timeout>>;
 

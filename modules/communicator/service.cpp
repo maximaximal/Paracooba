@@ -32,6 +32,8 @@ struct Service::Internal {
   std::map<parac_id,
            std::pair<boost::asio::steady_timer, TCPConnectionPayloadPtr>>
     connectionPayloads;
+
+  std::atomic_bool tcpAcceptorActive;
 };
 
 Service::Service(parac_handle& handle)
@@ -153,6 +155,15 @@ Service::retrieveTCPConnectionPayload(parac_id id) {
     m_internal->connectionPayloads.erase(id);
   }
   return ptr;
+}
+
+void
+Service::setTCPAcceptorActive() {
+  m_internal->tcpAcceptorActive = true;
+}
+bool
+Service::isTCPAcceptorActive() {
+  return m_internal->tcpAcceptorActive;
 }
 
 io_context&

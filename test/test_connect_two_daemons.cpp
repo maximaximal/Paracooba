@@ -8,6 +8,7 @@
 
 #include "paracooba/common/log.h"
 
+#include <atomic>
 #include <catch2/catch.hpp>
 #include <chrono>
 #include <thread>
@@ -18,14 +19,31 @@
 
 TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   ParacoobaMock master(1);
-  ParacoobaMock daemon(2, nullptr, &master);
 
   auto master_cns = master.getBroker().compute_node_store;
-  auto daemon_cns = daemon.getBroker().compute_node_store;
 
   REQUIRE(master_cns->has(master_cns, 1));
   REQUIRE(!master_cns->has(master_cns, 2));
-  REQUIRE(!daemon_cns->has(daemon_cns, 1));
+
+  auto n2 = master_cns->get(master_cns, 2);
+
+  n2->receive_message_from = [](parac_compute_node* remote,
+                                parac_message* msg) {
+    assert(remote);
+    assert(msg->data);
+    if(msg->kind == PARAC_MESSAGE_NODE_STATUS) {
+      assert(msg->length == 3);
+      assert(msg->data[0] == 1);
+      assert(msg->data[1] == 2);
+      assert(msg->data[2] == 3);
+    }
+    msg->cb(msg, PARAC_OK);
+  };
+
+  ParacoobaMock daemon(2, nullptr, &master);
+  auto daemon_cns = daemon.getBroker().compute_node_store;
+  auto n1 = daemon_cns->get(daemon_cns, 1);
+  n1->receive_message_from = n2->receive_message_from;
   REQUIRE(daemon_cns->has(daemon_cns, 2));
 
   std::this_thread::sleep_for(std::chrono::milliseconds(2));
@@ -34,9 +52,6 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   REQUIRE(master_cns->has(master_cns, 2));
   REQUIRE(daemon_cns->has(daemon_cns, 1));
   REQUIRE(daemon_cns->has(daemon_cns, 2));
-
-  auto n1 = daemon_cns->get(daemon_cns, 1);
-  auto n2 = master_cns->get(master_cns, 2);
 
   REQUIRE(n1->send_message_to);
   REQUIRE(n2->send_message_to);
@@ -60,19 +75,6 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
     cb_called[0] = true;
   };
 
-  n2->receive_message_from = [](parac_compute_node* remote,
-                                parac_message* msg) {
-    (void)remote;
-    assert(remote);
-    assert(msg->data);
-    assert(msg->length == 3);
-    assert(msg->data[0] == 1);
-    assert(msg->data[1] == 2);
-    assert(msg->data[2] == 3);
-    msg->cb(msg, PARAC_OK);
-  };
-  n1->receive_message_from = n2->receive_message_from;
-
   REQUIRE(!message_cb_called[0]);
   REQUIRE(!message_cb_called[1]);
   REQUIRE(!message_cb_called[2]);
@@ -85,12 +87,12 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   REQUIRE(message_cb_called[1]);
   REQUIRE(message_cb_called[2]);
 
-  int counter = 0;
+  std::atomic_int counter = 0;
   msg.kind = PARAC_MESSAGE_ONLINE_ANNOUNCEMENT;
   msg.userdata = &counter;
   msg.cb = [](parac_message* msg, parac_status status) {
     (void)status;
-    int* counter = static_cast<int*>(msg->userdata);
+    std::atomic_int* counter = static_cast<std::atomic_int*>(msg->userdata);
     (*counter) += 1;
   };
 

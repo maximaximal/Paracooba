@@ -1,4 +1,5 @@
 #include "broker_compute_node_store.hpp"
+#include <atomic>
 #include <cassert>
 
 #include <cstring>
@@ -17,13 +18,15 @@
 
 namespace parac::broker {
 struct ComputeNodeStore::Internal {
-  std::mutex nodesMutex;
+  std::recursive_mutex nodesMutex;
 
   std::list<parac_compute_node_wrapper> nodesList;
 
   std::unordered_map<parac_id,
                      std::reference_wrapper<parac_compute_node_wrapper>>
     nodesRefMap;
+
+  std::atomic_bool sendingStatusToPeers;
 };
 
 ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
@@ -99,6 +102,8 @@ ComputeNodeStore::get_with_connection(
   parac_compute_node_message_func send_message_func,
   parac_compute_node_file_func send_file_func) {
 
+  std::unique_lock lock(m_internal->nodesMutex);
+
   parac_compute_node* n = get(id);
   n->communicator_free = communicator_free;
   n->communicator_userdata = communicator_userdata;
@@ -164,11 +169,24 @@ ComputeNodeStore::create(parac_id id) {
 
 void
 ComputeNodeStore::sendStatusToPeers() {
+  if(m_internal->sendingStatusToPeers) {
+    return;
+  }
+  m_internal->sendingStatusToPeers = true;
   if(!thisNode().status().dirty()) {
     return;
   }
   parac_message_wrapper msg;
   thisNode().status().serializeToMessage(msg);
+  msg.cb = [](parac_message* msg, parac_status s) {
+    if(s == PARAC_OK) {
+      assert(msg);
+      assert(msg->userdata);
+      std::atomic_bool* sending = static_cast<std::atomic_bool*>(msg->userdata);
+      *sending = false;
+    }
+  };
+  msg.userdata = static_cast<void*>(&m_internal->sendingStatusToPeers);
 
   std::unique_lock lock(m_internal->nodesMutex);
   for(auto& e : m_internal->nodesList) {

@@ -237,7 +237,7 @@ struct TCPConnection::State {
   boost::asio::steady_timer steadyTimer;
   std::atomic_int connectionTry = 0;
 
-  TransmitMode transmitMode = TransmitInit;
+  std::atomic<TransmitMode> transmitMode = TransmitInit;
   ResumeMode resumeMode = EndAfterShutdown;
 
   boost::asio::coroutine writeCoro;
@@ -467,6 +467,7 @@ TCPConnection::handleReceivedMessage() {
   };
   assert(msg.data);
 
+  assert(m_state->compute_node->receive_message_from);
   m_state->compute_node->receive_message_from(m_state->compute_node, &msg);
 
   // Callback must be called immediately! This gives the status that is
@@ -734,8 +735,6 @@ TCPConnection::readHandler(boost::system::error_code ec,
           return;
         }
 
-        assert(m_state->compute_node->receive_message_from);
-
         if(m_state->readHeader.size > MAX_BUF_SIZE) {
           parac_log(
             PARAC_COMMUNICATOR,
@@ -791,6 +790,8 @@ TCPConnection::writeHandler(boost::system::error_code ec,
                       *this,
                       std::placeholders::_1,
                       std::placeholders::_2);
+
+  std::unique_lock lock(m_state->sendQueueMutex);
 
   SendQueueEntry* e = nullptr;
   if(!m_state->sendQueue.empty()) {
@@ -879,17 +880,14 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         }
       }
 
-      {
-        std::unique_lock lock(m_state->sendQueueMutex);
-        if(e->header.kind != PARAC_MESSAGE_ACK &&
-           e->header.kind != PARAC_MESSAGE_END) {
-          auto n = e->header.number;
-          e->sent = std::chrono::steady_clock::now();
-          m_state->sentBuffer.try_emplace(
-            n, std::move(m_state->sendQueue.front()));
-        }
-        m_state->sendQueue.pop();
+      if(e->header.kind != PARAC_MESSAGE_ACK &&
+         e->header.kind != PARAC_MESSAGE_END) {
+        auto n = e->header.number;
+        e->sent = std::chrono::steady_clock::now();
+        m_state->sentBuffer.try_emplace(n,
+                                        std::move(m_state->sendQueue.front()));
       }
+      m_state->sendQueue.pop();
     }
   }
 }

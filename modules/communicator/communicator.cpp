@@ -160,6 +160,16 @@ init_config(CommunicatorUserdata* u) {
   e[Config::AUTOMATIC_LISTEN_PORT_ASSIGNMENT].type = PARAC_TYPE_SWITCH;
 }
 
+static bool is_tcpacceptor_active(parac_module *mod) {
+  assert(mod);
+  assert(mod->userdata);
+
+  CommunicatorUserdata* userdata =
+    static_cast<CommunicatorUserdata*>(mod->userdata);
+
+  return userdata->service.isTCPAcceptorActive();
+}
+
 static parac_status
 pre_init(parac_module* mod) {
   assert(mod);
@@ -167,7 +177,7 @@ pre_init(parac_module* mod) {
   assert(mod->handle);
   assert(mod->handle->config);
 
-  mod->communicator->tcp_acceptor_active = false;
+  mod->communicator->tcp_acceptor_active = is_tcpacceptor_active;
   mod->communicator->connect_to_remote = &connect_to_remote;
   mod->communicator->set_timeout = &set_timeout;
 

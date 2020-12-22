@@ -1,4 +1,5 @@
 #include <catch2/catch.hpp>
+#include <mutex>
 
 #include <paracooba/common/thread_registry.h>
 
@@ -11,9 +12,7 @@ TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
 
   parac_thread_registry_add_starting_callback(
     &registry, [](parac_thread_registry_handle* handle) {
-      REQUIRE(!handle->running);
-      REQUIRE(handle->thread_id == 1);
-      passed = true;
+      passed = !handle->running && handle->thread_id == 1;
     });
 
   REQUIRE(!passed);
@@ -22,9 +21,7 @@ TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
     &registry,
     nullptr,
     [](parac_thread_registry_handle* handle) {
-      REQUIRE(handle->running);
-      REQUIRE(handle->thread_id == 1);
-      return 10;
+      return handle->running && handle->thread_id == 1 ? 10 : 11;
     },
     &handle);
   REQUIRE(status == PARAC_OK);
