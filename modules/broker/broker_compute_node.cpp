@@ -308,6 +308,11 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
     if(task) {
       parac_message_wrapper msg;
       task->serialize(task, &msg);
+      parac_log(PARAC_BROKER,
+                PARAC_TRACE,
+                "Offload task on path {} to node {}.",
+                task->path,
+                m_node.id);
       m_node.send_message_to(&m_node, &msg);
     }
   }

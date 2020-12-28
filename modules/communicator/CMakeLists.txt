@@ -1,4 +1,6 @@
 set(PARACOOBA_COMMUNICATOR_SRCS
+    ${CMAKE_BINARY_DIR}/distrac_paracooba.h
+
     ${CMAKE_CURRENT_SOURCE_DIR}/communicator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/file_sender.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/service.cpp
@@ -11,3 +13,7 @@ set(PARACOOBA_COMMUNICATOR_SRCS
 )
 
 parac_module(parac_communicator "${PARACOOBA_COMMUNICATOR_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
+
+set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
+add_dependencies(parac_communicator_obj distrac_paracooba)
+target_link_libraries(parac_communicator_obj PUBLIC distrac)

@@ -273,6 +273,16 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
 
   task->state = task->state | PARAC_TASK_WORK_AVAILABLE;
 
+  if(task->received_from) {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Receive and insert task on path {} with originator {} from "
+              "remote node {}.",
+              task->path,
+              task->originator,
+              task->received_from->id);
+  }
+
   {
     std::unique_lock lock(m_internal->containerMutex);
     m_internal->tasksWaitingForWorkerQueue.insert(
@@ -285,10 +295,10 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
       *task);
 
     incrementWorkQueueInComputeNode(m_internal->handle, task->originator);
-  }
 
-  if(m_internal->store.ping_on_work) {
-    m_internal->store.ping_on_work(&m_internal->store);
+    if(m_internal->store.ping_on_work) {
+      m_internal->store.ping_on_work(&m_internal->store);
+    }
   }
 }
 

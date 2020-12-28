@@ -53,6 +53,7 @@ Worker::run() {
       continue;
     }
     assert(m_currentTask);
+    m_idle = false;
 
     assert(!(m_currentTask->state & PARAC_TASK_WORK_AVAILABLE));
 
@@ -108,35 +109,35 @@ Worker::run() {
 
 parac_task*
 Worker::getNextTask() {
-  // New task is available and no other task has cleared the flag yet!
-  // Immediately get next task and don't even lock the mutex.
   auto work = m_taskStore.pop_work(&m_taskStore);
   if(work) {
-    m_notifierCheck.store(false);
     return work;
   }
 
-  if(m_mod.handle->distrac) {
-    parac_ev_worker_idle worker_idle{ m_workerId };
-    distrac_push(m_mod.handle->distrac, &worker_idle, PARAC_EV_WORKER_IDLE);
-  }
-
-  parac_log(
-    PARAC_RUNNER, PARAC_TRACE, "Worker going into idle and waiting for tasks.");
-
   std::unique_lock lock(m_notifierMutex);
+
   while(!m_stop) {
-    bool pop = false;
-    if(!m_notifierCheck.exchange(false)) {
-      pop = true;
-    } else {
-      m_notifier.wait(lock);
-      if(m_notifierCheck.exchange(false) && !m_stop) {
-        pop = true;
-      }
+    auto work = m_taskStore.pop_work(&m_taskStore);
+    if(work) {
+      return work;
     }
 
-    if(pop) {
+    if(!m_notifierCheck.exchange(false)) {
+      if(!m_idle) {
+        m_idle = true;
+        parac_log(PARAC_RUNNER,
+                  PARAC_TRACE,
+                  "Worker going into idle and waiting for tasks.");
+        if(m_mod.handle->distrac) {
+          parac_ev_worker_idle worker_idle{ m_workerId };
+          distrac_push(
+            m_mod.handle->distrac, &worker_idle, PARAC_EV_WORKER_IDLE);
+        }
+      }
+      m_notifier.wait(lock);
+    }
+    work = m_taskStore.pop_work(&m_taskStore);
+    if(work && !m_stop) {
       // Only this thread has been woken up and catched the notifier! Return
       // next task.
       if(m_mod.handle->distrac) {
@@ -144,7 +145,7 @@ Worker::getNextTask() {
         distrac_push(
           m_mod.handle->distrac, &worker_working, PARAC_EV_WORKER_WORKING);
       }
-      return m_taskStore.pop_work(&m_taskStore);
+      return work;
     }
   }
 

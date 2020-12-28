@@ -43,6 +43,7 @@ class Worker {
   std::atomic_bool& m_notifierCheck;
   std::atomic_bool& m_stop;
   parac_worker m_workerId;
+  bool m_idle = false;
 
   std::atomic_bool m_working;
   std::unique_ptr<parac_thread_registry_handle> m_threadRegistryHandle;

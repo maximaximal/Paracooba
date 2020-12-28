@@ -24,7 +24,6 @@
 #include <boost/asio.hpp>
 #include <boost/asio/coroutine.hpp>
 #include <fstream>
-#include <netinet/tcp.h>
 
 #include <paracooba/common/compute_node.h>
 #include <paracooba/common/compute_node_store.h>
@@ -32,6 +31,8 @@
 #include <paracooba/common/log.h>
 #include <paracooba/common/message.h>
 #include <paracooba/module.h>
+
+#include <distrac_paracooba.h>
 
 #define REC_BUF_SIZE 4096u
 #define MAX_BUF_SIZE 10000000u
@@ -437,6 +438,15 @@ TCPConnection::handleReceivedACK(const PacketHeader& ack) {
   auto& sentItem = it->second;
   sentItem(ack.ack_status);
   sentItem(PARAC_TO_BE_DELETED);
+
+  auto distrac = m_state->service.handle().distrac;
+  if(distrac) {
+    parac_ev_send_msg_ack e{ m_state->remoteId(),
+                             sentItem.header.kind,
+                             sentItem.header.number };
+    distrac_push(distrac, &e, PARAC_EV_SEND_MSG_ACK);
+  }
+
   {
     std::unique_lock lock(m_state->sendQueueMutex);
     m_state->sentBuffer.erase(it);
@@ -662,6 +672,17 @@ TCPConnection::readHandler(boost::system::error_code ec,
         return;
       }
 
+      {
+        auto distrac = m_state->service.handle().distrac;
+        if(distrac) {
+          parac_ev_recv_msg e{ m_state->readHeader.size,
+                               m_state->remoteId(),
+                               m_state->readHeader.kind,
+                               m_state->readHeader.number };
+          distrac_push(distrac, &e, PARAC_EV_RECV_MSG);
+        }
+      }
+
       if(m_state->readHeader.kind == PARAC_MESSAGE_ACK) {
         if(!handleReceivedACK(m_state->readHeader)) {
           parac_log(
@@ -827,6 +848,18 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       e = &m_state->sendQueue.front();
 
       assert(e);
+      {
+        auto distrac = m_state->service.handle().distrac;
+        if(distrac && e->header.kind != PARAC_MESSAGE_ACK &&
+           e->header.kind != PARAC_MESSAGE_END) {
+          parac_ev_send_msg entry{ e->header.size,
+                                   m_state->remoteId(),
+                                   e->header.kind,
+                                   e->header.number };
+          distrac_push(distrac, &entry, PARAC_EV_SEND_MSG);
+        }
+      }
+
       m_state->transmitMode = e->transmitMode;
       yield async_write(*m_state->socket, BUF(e->header), wh);
 

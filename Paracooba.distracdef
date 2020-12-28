@@ -2,39 +2,26 @@ prefix="parac_";
 name="Paracooba";
 description="Distrac definition for Paracooba"
 
-send_msg_ipv4 : Issued by Communicator when a message was sent over IPv4. {
+send_msg: Issued by Communicator when a message was sent over IPv6. {
   size : uint64
-  target_id : int64
-  target_ipv4 : ipv4
-  message_type : uint8
+  target_id : uint64
+  message_kind : uint32
+  message_number : uint32
+}
+recv_msg: Issued by Communicator when a message was received over IPv6. {
+  size : uint64           [match = "size"]
+  source_id : uint64      [match = "_id"]
+  message_kind : uint32   [match = "message_kind"]
+  message_number : uint32 [match = "message_number"]
+}
+    [after = "send_msg"]
 
-  padd1 : uint8
-  padd2 : uint16
+send_msg_ack : Issued by Communicator when a message sent over IPv6 got acknowledged. {
+  target_id : uint64       [match = "_id"]
+  message_kind : uint32   [match = "message_kind"]
+  message_number : uint32 [match = "message_number"]
 }
-recv_msg_ipv4 : Issued by Communicator when a message was received over IPv4. {
-  size : uint64        [match = "size"]
-  source_id : int64    [match = "target_id"]
-  source_ipv4 : ipv4   [match = "target_ipv4"]
-  message_type : uint8 [match = "message_type"]
-
-  padd1 : uint8
-  padd2 : uint16
-}
-    [after = "send_msg_ipv4"]
-
-send_msg_ipv6 : Issued by Communicator when a message was sent over IPv6. {
-  size : uint64
-  target_id : int64
-  target_ipv6 : ipv6
-  message_type : uint64
-}
-recv_msg_ipv6 : Issued by Communicator when a message was received over IPv6. {
-  size : uint64        [match = "size"]
-  source_id : int64    [match = "target_id"]
-  source_ipv6 : ipv6   [match = "target_ipv6"]
-  message_type : uint64 [match = "message_type"]
-}
-    [after = "send_msg_ipv6"]
+    [after = "recv_msg"]
 
 offload_task : Issued by Broker when a task is offloaded to another node. {
   target_id : uint64
