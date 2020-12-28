@@ -11,6 +11,7 @@
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/steady_timer.hpp>
+#include <boost/exception/diagnostic_information.hpp>
 
 #include <paracooba/common/config.h>
 #include <paracooba/common/log.h>
@@ -97,7 +98,17 @@ Service::run() {
 
   connectToKnownRemotes();
 
-  m_internal->context.run();
+  try {
+    while(!m_internal->context.stopped()) {
+      m_internal->context.run();
+    }
+  } catch(std::exception& e) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_LOCALERROR,
+              "Exception in io context: {}, diagnostic info: {}",
+              e.what(),
+              boost::diagnostic_information(e));
+  }
   return PARAC_OK;
 }
 

@@ -126,8 +126,17 @@ Worker::getNextTask() {
 
   std::unique_lock lock(m_notifierMutex);
   while(!m_stop) {
-    m_notifier.wait(lock);
-    if(m_notifierCheck.exchange(false) && !m_stop) {
+    bool pop = false;
+    if(!m_notifierCheck.exchange(false)) {
+      pop = true;
+    } else {
+      m_notifier.wait(lock);
+      if(m_notifierCheck.exchange(false) && !m_stop) {
+        pop = true;
+      }
+    }
+
+    if(pop) {
       // Only this thread has been woken up and catched the notifier! Return
       // next task.
       if(m_mod.handle->distrac) {
