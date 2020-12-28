@@ -674,8 +674,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
 
       {
         auto distrac = m_state->service.handle().distrac;
-        if(distrac) {
-          parac_ev_recv_msg e{ m_state->readHeader.size,
+        if(distrac && m_state->readHeader.kind != PARAC_MESSAGE_ACK &&
+           m_state->readHeader.kind != PARAC_MESSAGE_END) {
+          parac_ev_recv_msg e{ m_state->readHeader.size +
+                                 sizeof(m_state->readHeader),
                                m_state->remoteId(),
                                m_state->readHeader.kind,
                                m_state->readHeader.number };
@@ -852,7 +854,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         auto distrac = m_state->service.handle().distrac;
         if(distrac && e->header.kind != PARAC_MESSAGE_ACK &&
            e->header.kind != PARAC_MESSAGE_END) {
-          parac_ev_send_msg entry{ e->header.size,
+          parac_ev_send_msg entry{ e->header.size + sizeof(e->header),
                                    m_state->remoteId(),
                                    e->header.kind,
                                    e->header.number };
