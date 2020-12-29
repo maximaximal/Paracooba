@@ -170,6 +170,8 @@ add_subdirectory(loader)
 add_subdirectory(modules)
 add_subdirectory(executable)
 
+add_subdirectory(distracvis wd_distracvis)
+
 set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
 
 add_executable(parac $<TARGET_OBJECTS:parac_executable>
