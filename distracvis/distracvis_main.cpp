@@ -18,9 +18,8 @@ main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  Platform::GLContext context{ NoCreate, argc, argv };
-
   argc = 1;
+  Platform::GLContext context{ NoCreate, argc, argv };
   auto app = Gtk::Application::create(argc, argv, "at.maxheisinger.distracvis");
 
   MainWindow window{ context, argv[1] };

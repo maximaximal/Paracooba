@@ -5,6 +5,7 @@
 #include <Magnum/Platform/GLContext.h>
 
 #include <gtkmm/glarea.h>
+#include <memory>
 
 namespace parac::distracvis {
 class TreeVisWidget : public Gtk::GLArea {
@@ -18,6 +19,9 @@ class TreeVisWidget : public Gtk::GLArea {
   void onResize(int width, int height);
   void onUnrealize();
 
-  Magnum::Platform::GLContext& _context;
+  Magnum::Platform::GLContext& m_context;
+
+  struct Internal;
+  std::unique_ptr<Internal> m_internal;
 };
 }

@@ -8,7 +8,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/modules"
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTKMM gtkmm-3.0)
-find_package(Magnum COMPONENTS GL QUIET)
+find_package(Magnum COMPONENTS GL Primitives MeshTools Shaders QUIET)
 
 if(Magnum_FOUND AND GTKMM_FOUND)
 
@@ -30,6 +30,9 @@ if(Magnum_FOUND AND GTKMM_FOUND)
         Magnum::GLContext
         Magnum::GL
         Magnum::Magnum
+        Magnum::Primitives
+        Magnum::MeshTools
+        Magnum::Shaders
         ${GTKMM_LIBRARIES}
         distrac-analysis)
 
