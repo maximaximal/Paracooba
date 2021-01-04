@@ -20,6 +20,7 @@ parac_path_left_aligned(parac_path p) {
 PARAC_COMMON_EXPORT bool
 parac_path_get_assignment(parac_path p, parac_path_length_type d) {
   assert(d <= PARAC_PATH_MAX_LENGTH);
+  assert(d >= 1);
   return p.rep & (long1 << ((sizeof(parac_path) * 8) - 1 - (d - 1)));
 }
 

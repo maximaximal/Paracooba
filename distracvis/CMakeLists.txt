@@ -34,7 +34,8 @@ if(Magnum_FOUND AND GTKMM_FOUND)
         Magnum::MeshTools
         Magnum::Shaders
         ${GTKMM_LIBRARIES}
-        distrac-analysis)
+        distrac-analysis
+        parac_common)
 
     target_compile_features(distracvis PRIVATE cxx_std_17)
 

@@ -7,13 +7,26 @@
 #include <gtkmm/glarea.h>
 #include <memory>
 
+namespace distrac {
+class tracefile;
+}
+
 namespace parac::distracvis {
 class TreeVisWidget : public Gtk::GLArea {
   public:
-  explicit TreeVisWidget(Magnum::Platform::GLContext& context);
+  explicit TreeVisWidget(distrac::tracefile& tracefile,
+                         Magnum::Platform::GLContext& context);
   virtual ~TreeVisWidget() noexcept override;
 
+  void queueUpdateShownTimespan(int64_t passedMs);
+
   private:
+  distrac::tracefile& m_tracefile;
+  int64_t m_passedMs = 0;
+  bool m_queueUpdateShownTimespan = false;
+
+  void updateShownTimespan();
+
   void onRealize();
   bool onRender(const Glib::RefPtr<Gdk::GLContext>& context);
   void onResize(int width, int height);

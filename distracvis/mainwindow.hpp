@@ -25,6 +25,8 @@ class MainWindow : public Gtk::ApplicationWindow {
   Magnum::Platform::GLContext& m_glContext;
   std::string m_file;
 
+  void timeSliderValueChanged();
+
   distrac::tracefile m_tracefile;
 
   TreeVisWidget m_treeVisWidget;
