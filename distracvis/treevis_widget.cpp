@@ -3,11 +3,17 @@
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/Math/Color.h>
 #include <Magnum/Math/Matrix4.h>
+#include <Magnum/Math/Vector2.h>
 #include <Magnum/MeshTools/CompressIndices.h>
 #include <Magnum/MeshTools/Interleave.h>
 #include <Magnum/Primitives/Cube.h>
 #include <Magnum/Shaders/Phong.h>
 #include <Magnum/Trade/MeshData.h>
+#include <gdkmm/device.h>
+#include <gdkmm/event.h>
+
+#include <gdkmm/screen.h>
+#include <iostream>
 
 using namespace Magnum;
 using namespace Magnum::Math::Literals;
@@ -17,6 +23,9 @@ struct TreeVisWidget::Internal {
   Magnum::GL::Mesh mesh;
   Magnum::Shaders::Phong shader;
   Magnum::Matrix4 transformation, projection;
+
+  bool rotating = false;
+  Vector2 lastMousePos;
 };
 
 // Following primitives guide from
@@ -37,11 +46,20 @@ TreeVisWidget::TreeVisWidget(Platform::GLContext& context)
   /* Set desired OpenGL version */
   set_required_version(4, 5);
 
+  add_events(Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_PRESS_MASK |
+             Gdk::BUTTON_RELEASE_MASK);
+
   /* Connect signals to their respective handlers */
   signal_realize().connect(sigc::mem_fun(this, &TreeVisWidget::onRealize));
   signal_render().connect(sigc::mem_fun(this, &TreeVisWidget::onRender));
   signal_resize().connect(sigc::mem_fun(this, &TreeVisWidget::onResize));
   signal_unrealize().connect(sigc::mem_fun(this, &TreeVisWidget::onUnrealize));
+  signal_motion_notify_event().connect(
+    sigc::mem_fun(this, &TreeVisWidget::onMotionEvent));
+  signal_button_press_event().connect(
+    sigc::mem_fun(this, &TreeVisWidget::onButtonEvent));
+  signal_button_release_event().connect(
+    sigc::mem_fun(this, &TreeVisWidget::onButtonEvent));
 }
 TreeVisWidget::~TreeVisWidget() {}
 
@@ -127,5 +145,46 @@ TreeVisWidget::onResize(int width, int height) {
 void
 TreeVisWidget::onUnrealize() {
   /* TODO: Add your clean-up code here */
+}
+
+bool
+TreeVisWidget::onButtonEvent(GdkEventButton* e) {
+  if(e->button == 3) {
+    switch(e->type) {
+      case GDK_BUTTON_PRESS:
+        m_internal->lastMousePos.x() = e->x;
+        m_internal->lastMousePos.y() = e->y;
+        m_internal->rotating = true;
+        return true;
+      case GDK_BUTTON_RELEASE:
+        handleMouseRotation(Vector2(e->x, e->y) - m_internal->lastMousePos);
+        m_internal->rotating = false;
+        return true;
+      default:
+        break;
+    }
+  }
+  return false;
+}
+
+bool
+TreeVisWidget::onMotionEvent(GdkEventMotion* e) {
+  if(m_internal->rotating) {
+    handleMouseRotation(Vector2(e->x, e->y) - m_internal->lastMousePos);
+    m_internal->lastMousePos.x() = e->x;
+    m_internal->lastMousePos.y() = e->y;
+    return true;
+  }
+  return false;
+}
+
+void
+TreeVisWidget::handleMouseRotation(Vector2 delta) {
+  delta /= get_screen()->get_resolution();
+
+  m_internal->transformation = Matrix4::rotationX(Rad{ delta.y() }) *
+                               m_internal->transformation *
+                               Matrix4::rotationY(Rad{ delta.x() });
+  queue_draw();
 }
 }
