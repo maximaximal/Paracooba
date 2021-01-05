@@ -44,26 +44,19 @@ getTransformationFromPathAndNodeId(size_t nodeId, parac_path path) {
   t.y() -= 1000;
 
   if(path.rep == PARAC_PATH_PARSER) {
-    return Matrix4().translation(t).scaling(Vector3(3, 3, 3));
+    return Matrix4().scaling(Vector3(3, 3, 3)).translation(t);
   } else if(parac_path_is_root(path)) {
-    return Matrix4().translation(t).scaling(Vector3(2, 2, 2));
+    return Matrix4().translation(t).scaling(Vector3(2, 2, 2)).translation(t);
   } else {
-    std::cout << path << std::endl;
-
     for(size_t i = 0; i < path.length; ++i) {
       if(parac_path_get_assignment(path, i + 1)) {
-        std::cout << "R;x=" << t.x() << " ";
         t.x() -= offset;
       } else {
-        std::cout << "L;z=" << t.z() << " ";
         t.z() -= offset;
       }
       offset /= 2;
     }
-    std::cout << std::endl;
   }
-
-  std::cout << t.x() << " " << t.y() << " " << t.z() << std::endl;
 
   return Matrix4().translation(t);
 }
@@ -228,7 +221,12 @@ TreeVisWidget::updateShownTimespan() {
     }
   }
 
-  m_internal->mesh.setInstanceCount(m_internal->tasks.size());
+  m_internal->mesh.setInstanceCount(m_internal->tasks.size())
+    .addVertexBufferInstanced(GL::Buffer(m_internal->tasks),
+                              1,
+                              0,
+                              Shaders::Phong::TransformationMatrix{},
+                              Shaders::Phong::NormalMatrix{});
 
   queue_draw();
 }
@@ -262,6 +260,13 @@ TreeVisWidget::onRealize() {
                      Shaders::Phong::Position{},
                      Shaders::Phong::Normal{})
     .setIndexBuffer(std::move(indices), 0, compressed.second);
+
+  m_internal->mesh.setInstanceCount(m_internal->tasks.size())
+    .addVertexBufferInstanced(GL::Buffer(m_internal->tasks),
+                              1,
+                              0,
+                              Shaders::Phong::TransformationMatrix{},
+                              Shaders::Phong::NormalMatrix{});
 
   onResize(get_width(), get_height());
 }
@@ -299,13 +304,6 @@ TreeVisWidget::onRender(const Glib::RefPtr<Gdk::GLContext>& context) {
     .setNormalMatrix(m_internal->transformation.normalMatrix())
     .setProjectionMatrix(m_internal->projection)
     .draw(m_internal->mesh);
-
-  m_internal->mesh.setInstanceCount(m_internal->tasks.size())
-    .addVertexBufferInstanced(GL::Buffer(m_internal->tasks),
-                              1,
-                              0,
-                              Shaders::Phong::TransformationMatrix{},
-                              Shaders::Phong::NormalMatrix{}, Shaders::Phong::);
 
   /* Clean up Magnum state and back to Gtkmm */
   GL::Context::current().resetState(GL::Context::State::EnterExternal);
