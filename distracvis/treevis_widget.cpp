@@ -7,6 +7,7 @@
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
+#include <Magnum/GL/AbstractFramebuffer.h>
 #include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/Math/Color.h>
@@ -35,26 +36,34 @@ using namespace Magnum::Math::Literals;
 namespace parac::distracvis {
 Matrix4
 getTransformationFromPathAndNodeId(size_t nodeId, parac_path path) {
-  Vector3 t;
+  Vector3 t(0, 0, 0);
 
   float offset = 1000;
 
   t.y() = nodeId * 10;
+  t.y() -= 1000;
 
-  if(path.rep == PARAC_PATH_PARSER || parac_path_is_root(path)) {
-    // Already ok.
+  if(path.rep == PARAC_PATH_PARSER) {
+    return Matrix4().translation(t).scaling(Vector3(3, 3, 3));
+  } else if(parac_path_is_root(path)) {
+    return Matrix4().translation(t).scaling(Vector3(2, 2, 2));
   } else {
+    std::cout << path << std::endl;
+
     for(size_t i = 0; i < path.length; ++i) {
       if(parac_path_get_assignment(path, i + 1)) {
+        std::cout << "R;x=" << t.x() << " ";
         t.x() -= offset;
       } else {
+        std::cout << "L;z=" << t.z() << " ";
         t.z() -= offset;
       }
       offset /= 2;
     }
+    std::cout << std::endl;
   }
 
-  t.y() -= 1000;
+  std::cout << t.x() << " " << t.y() << " " << t.z() << std::endl;
 
   return Matrix4().translation(t);
 }
@@ -169,8 +178,7 @@ TreeVisWidget::updateShownTimespan() {
       "result");
 
   auto filtered =
-    m_tracefile.filtered({ static_cast<uint8_t>(start_processing_task),
-                           static_cast<uint8_t>(finish_processing_task) });
+    m_tracefile.filtered({ static_cast<uint8_t>(finish_processing_task) });
 
   auto begin = filtered.begin();
 
@@ -220,12 +228,7 @@ TreeVisWidget::updateShownTimespan() {
     }
   }
 
-  m_internal->mesh.setInstanceCount(m_internal->tasks.size())
-    .addVertexBufferInstanced(GL::Buffer(m_internal->tasks),
-                              1,
-                              0,
-                              Shaders::Phong::TransformationMatrix{},
-                              Shaders::Phong::NormalMatrix{});
+  m_internal->mesh.setInstanceCount(m_internal->tasks.size());
 
   queue_draw();
 }
@@ -238,6 +241,7 @@ TreeVisWidget::onRealize() {
 
   GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
   GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
+  GL::Renderer::setDepthFunction(GL::Renderer::DepthFunction::Greater);
 
   m_internal = std::make_unique<Internal>();
 
@@ -278,7 +282,8 @@ TreeVisWidget::onRender(const Glib::RefPtr<Gdk::GLContext>& context) {
     GL::Framebuffer::wrap(framebufferID, { {}, { get_width(), get_height() } });
 
   /* Clear the frame */
-  gtkmmDefaultFramebuffer.clear(GL::FramebufferClear::Color);
+  gtkmmDefaultFramebuffer.clear(GL::FramebufferClear::Color |
+                                GL::FramebufferClear::Depth);
 
   auto color = Color3::fromHsv({ 35.0_degf, 1.0f, 1.0f });
 
@@ -295,6 +300,13 @@ TreeVisWidget::onRender(const Glib::RefPtr<Gdk::GLContext>& context) {
     .setProjectionMatrix(m_internal->projection)
     .draw(m_internal->mesh);
 
+  m_internal->mesh.setInstanceCount(m_internal->tasks.size())
+    .addVertexBufferInstanced(GL::Buffer(m_internal->tasks),
+                              1,
+                              0,
+                              Shaders::Phong::TransformationMatrix{},
+                              Shaders::Phong::NormalMatrix{}, Shaders::Phong::);
+
   /* Clean up Magnum state and back to Gtkmm */
   GL::Context::current().resetState(GL::Context::State::EnterExternal);
   return true;
@@ -304,8 +316,10 @@ void
 TreeVisWidget::onResize(int width, int height) {
   m_internal->projection =
     Matrix4::perspectiveProjection(
-      35.0_degf, Vector2(width, height).aspectRatio(), 0.01f, 10000.0f) *
+      35.0_degf, Vector2(width, height).aspectRatio(), 0.01f, 20000.0f) *
     Matrix4::translation(Vector3::zAxis(-100));
+
+  queue_draw();
 }
 
 void
