@@ -20,8 +20,8 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "NodeDescription";
     case PARAC_MESSAGE_TASK_REPARENT:
       return "ReparentTask";
-    case PARAC_MESSAGE_NEW_REMOTE_CONNECTED:
-      return "NewRemoteConnected";
+    case PARAC_MESSAGE_NEW_REMOTES:
+      return "NewRemotes";
     case PARAC_MESSAGE_SOLVER_DESCRIPTION:
       return "Solver-Description";
     case PARAC_MESSAGE_SOLVER_TASK:

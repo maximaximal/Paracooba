@@ -430,7 +430,6 @@ init(parac_module* mod) {
       auto thisNode = broker->compute_node_store->this_node;
       assert(thisNode);
       thisNode->solver_instance = instance;
-      parac_log(PARAC_SOLVER, PARAC_TRACE, "Set in {}!", thisNode->id);
     }
 
     status = initiate_root_solver_on_file(

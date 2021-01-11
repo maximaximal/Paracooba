@@ -58,6 +58,8 @@ typedef struct parac_compute_node {
   parac_id id;
   parac_compute_node_state state;
 
+  const char* connection_string;/// Set by Communicator if connection succeeds.
+
   void* broker_userdata;      /// Set by Broker.
   void* communicator_userdata;/// Set by Communicator.
 
@@ -70,8 +72,11 @@ typedef struct parac_compute_node {
 #ifdef __cplusplus
 }
 #include <ostream>
+#include <cassert>
 
 class parac_compute_node_wrapper : public parac_compute_node {
+  using IDConnectionStringPair = std::pair<parac_id, std::string>;
+
   public:
   parac_compute_node_wrapper() {
     send_message_to = nullptr;
@@ -85,12 +90,18 @@ class parac_compute_node_wrapper : public parac_compute_node {
     communicator_userdata = nullptr;
     state = PARAC_COMPUTE_NODE_NEW;
     solver_instance = nullptr;
+    connection_string = nullptr;
   }
   ~parac_compute_node_wrapper() {
     if(broker_free)
       broker_free(this);
     if(communicator_free)
       communicator_free(this);
+  }
+
+  IDConnectionStringPair getIDConnectionStringPair() const {
+    assert(connection_string);
+    return std::make_pair(id, connection_string);
   }
 };
 

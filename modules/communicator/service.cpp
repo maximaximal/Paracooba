@@ -1,5 +1,7 @@
 #include <atomic>
+#include <boost/exception/exception.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/system/error_code.hpp>
 #include <map>
 
 #include "paracooba/common/timeout.h"
@@ -12,6 +14,7 @@
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
 
 #include <paracooba/common/config.h>
 #include <paracooba/common/log.h>
@@ -90,24 +93,23 @@ Service::run() {
     PARAC_COMMUNICATOR, PARAC_DEBUG, "Starting communicator io_context.");
 
   if(m_internal->tcpAcceptor)
-    m_internal->tcpAcceptor->start(*this,
-                                   m_config[LISTEN_ADDRESS].value.string,
-                                   m_config[TCP_LISTEN_PORT].value.uint16);
+    m_internal->tcpAcceptor->start(
+      *this, m_config[LISTEN_ADDRESS].value.string, defaultTCPListenPort());
   if(m_internal->udpAcceptor)
     m_internal->udpAcceptor->start(*this);
 
   connectToKnownRemotes();
 
-  try {
-    while(!m_internal->context.stopped()) {
+  while(!m_internal->context.stopped()) {
+    try {
       m_internal->context.run();
+    } catch(std::exception& e) {
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_LOCALERROR,
+                "Exception in io context: {}, diagnostic info: {}",
+                e.what(),
+                boost::diagnostic_information(e));
     }
-  } catch(std::exception& e) {
-    parac_log(PARAC_COMMUNICATOR,
-              PARAC_LOCALERROR,
-              "Exception in io context: {}, diagnostic info: {}",
-              e.what(),
-              boost::diagnostic_information(e));
   }
   return PARAC_OK;
 }
@@ -122,7 +124,15 @@ Service::connectToKnownRemotes() {
 
 void
 Service::connectToRemote(const std::string& remote) {
-  TCPConnectionInitiator initiator(*this, remote);
+  try {
+    TCPConnectionInitiator initiator(*this, remote);
+  } catch(std::exception& e) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_LOCALERROR,
+              "Exception while trying to connect to remote {}: {}",
+              remote,
+              e.what());
+  }
 }
 
 parac_timeout*
@@ -197,6 +207,24 @@ uint16_t
 Service::defaultTCPTargetPort() const {
   assert(m_config);
   return m_config[TCP_TARGET_PORT].value.uint16;
+}
+
+uint16_t
+Service::defaultTCPListenPort() const {
+  assert(m_config);
+  return m_config[TCP_LISTEN_PORT].value.uint16;
+}
+
+uint16_t
+Service::currentTCPListenPort() const {
+  return m_handle.modules[PARAC_MOD_COMMUNICATOR]
+    ->communicator->tcp_listen_port;
+}
+
+uint16_t
+Service::currentUDPListenPort() const {
+  return m_handle.modules[PARAC_MOD_COMMUNICATOR]
+    ->communicator->udp_listen_port;
 }
 
 uint32_t

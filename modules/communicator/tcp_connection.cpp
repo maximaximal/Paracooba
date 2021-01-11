@@ -33,6 +33,7 @@
 #include <paracooba/module.h>
 
 #include <distrac_paracooba.h>
+#include <sstream>
 
 #define REC_BUF_SIZE 4096u
 #define MAX_BUF_SIZE 10000000u
@@ -43,6 +44,7 @@ struct TCPConnection::ACKTag {};
 
 struct TCPConnection::InitiatorMessage {
   parac_id sender_id;
+  uint16_t tcp_port;
 };
 
 using TCPConnectionSendQueue = std::queue<TCPConnection::SendQueueEntry>;
@@ -155,7 +157,8 @@ struct TCPConnection::State {
     , socket(std::move(socket))
     , steadyTimer(service.ioContext())
     , connectionTry(connectionTry)
-    , writeInitiatorMessage({ service.handle().id }) {
+    , writeInitiatorMessage(
+        { service.handle().id, service.currentTCPListenPort() }) {
     if(connectionTry < 0) {
       resumeMode = EndAfterShutdown;
     }
@@ -168,13 +171,15 @@ struct TCPConnection::State {
     , socket(std::move(socket))
     , steadyTimer(service.ioContext())
     , connectionTry(connectionTry)
-    , writeInitiatorMessage({ service.handle().id })
+    , writeInitiatorMessage(
+        { service.handle().id, service.currentTCPListenPort() })
     , sendQueue(std::move(ptr->queue))
     , sentBuffer(std::move(ptr->map)) {}
 
   ~State() {
     if(compute_node) {
       compute_node->communicator_free(compute_node);
+      compute_node->connection_string = nullptr;
       compute_node = nullptr;
     }
     if(service.ioContext().stopped()) {
@@ -193,11 +198,11 @@ struct TCPConnection::State {
             parac_log(PARAC_COMMUNICATOR,
                       PARAC_TRACE,
                       "Reconnect to endpoint {} (remote id {}), try {}.",
-                      socket->remote_endpoint(),
+                      remote_endpoint(),
                       remoteId(),
                       connectionTry);
             TCPConnectionInitiator initiator(
-              service, socket->remote_endpoint(), nullptr, ++connectionTry);
+              service, cachedRemoteEndpoint, nullptr, ++connectionTry);
 
             initiator.setTCPConnectionPayload(generatePayload());
           } else if(connectionTry == -1 && remoteId() != 0) {
@@ -259,11 +264,21 @@ struct TCPConnection::State {
   std::unique_ptr<FileOstream> readFileOstream;
 
   parac_compute_node* compute_node = nullptr;
+  std::string connectionString;
 
   parac_id remoteId() const {
     if(compute_node)
       return compute_node->id;
     return 0;
+  }
+  std::string remote_endpoint() {
+    if(socket->is_open()) {
+      std::stringstream s;
+      s << socket->remote_endpoint();
+      return s.str();
+    } else {
+      return "(socket closed)";
+    }
   }
 
   TCPConnectionPayloadPtr generatePayload() {
@@ -274,6 +289,7 @@ struct TCPConnection::State {
 
   Lifecycle lifecycle = Initializing;
   std::atomic_flag currentlySending = true;
+  boost::asio::ip::tcp::endpoint cachedRemoteEndpoint;
 
   std::queue<SendQueueEntry> sendQueue;
   using SentBuffer = std::map<decltype(PacketHeader::number), SendQueueEntry>;
@@ -420,6 +436,17 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
               init.sender_id);
     delete conn;
     return false;
+  }
+
+  {
+    std::stringstream connStr;
+    auto a = m_state->socket->remote_endpoint().address();
+    connStr << (a.is_v6() ? "[" : "") << a.to_string() << (a.is_v6() ? "]" : "")
+            << ':' << init.tcp_port;
+    m_state->connectionString = connStr.str();
+    m_state->compute_node->connection_string =
+      m_state->connectionString.c_str();
+    m_state->cachedRemoteEndpoint = m_state->socket->remote_endpoint();
   }
 
   return true;
@@ -634,7 +661,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
         PARAC_LOCALERROR,
         "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
         "reading initiator message: {}",
-        m_state->socket->remote_endpoint(),
+        m_state->remote_endpoint(),
         m_state->remoteId(),
         ec);
       return;
@@ -651,7 +678,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
           PARAC_LOCALERROR,
           "Error in TCPConnection to endpoint {} (ID {}) readHandler before "
           "reading: {}",
-          m_state->socket->remote_endpoint(),
+          m_state->remote_endpoint(),
           m_state->remoteId(),
           ec);
         return;
@@ -665,7 +692,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
           PARAC_LOCALERROR,
           "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
           "reading from socket: {} (read {} bytes)",
-          m_state->socket->remote_endpoint(),
+          m_state->remote_endpoint(),
           m_state->remoteId(),
           ec.message(),
           bytes_received);
@@ -692,7 +719,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
             PARAC_LOCALERROR,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
             "reading ACK!",
-            m_state->socket->remote_endpoint(),
+            m_state->remote_endpoint(),
             m_state->remoteId());
           return;
         }
@@ -704,7 +731,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
                     "Error in TCPConnection to endpoint {} (ID {}) readHandler "
                     "when reading "
                     "file header from message number {}! Error: {}",
-                    m_state->socket->remote_endpoint(),
+                    m_state->remote_endpoint(),
                     m_state->remoteId(),
                     m_state->readHeader.number,
                     ec.message());
@@ -726,7 +753,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
               "reading "
               "file chunk from file message number {}! Bytes left: {}. Error: "
               "{}",
-              m_state->socket->remote_endpoint(),
+              m_state->remote_endpoint(),
               m_state->remoteId(),
               m_state->readHeader.number,
               m_state->readHeader.size,
@@ -750,7 +777,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
             "processing received message of kind {}, size {}, and number {}! "
             "Compute node not defined!",
-            m_state->socket->remote_endpoint(),
+            m_state->remote_endpoint(),
             m_state->remoteId(),
             m_state->readHeader.kind,
             m_state->readHeader.size,
@@ -765,7 +792,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
             "reading message of kind {}, size {}, and number {}! "
             "Too big, buffer would be larger than MAX_BUF_SIZE {}!",
-            m_state->socket->remote_endpoint(),
+            m_state->remote_endpoint(),
             m_state->remoteId(),
             m_state->readHeader.kind,
             m_state->readHeader.size,
@@ -785,7 +812,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
             "reading message of kind {}, size {}, and number {}! "
             "Not enough bytes (only {}) read! Error: {}",
-            m_state->socket->remote_endpoint(),
+            m_state->remote_endpoint(),
             m_state->remoteId(),
             m_state->readHeader.kind,
             m_state->readHeader.size,
@@ -837,7 +864,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_LOCALERROR,
                 "Error when sending initiator packet to endpoint {}! Error: {}",
-                m_state->socket->remote_endpoint(),
+                m_state->remote_endpoint(),
                 ec.message());
       return;
     }
@@ -864,6 +891,12 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
       m_state->transmitMode = e->transmitMode;
       yield async_write(*m_state->socket, BUF(e->header), wh);
+
+      if(ec == boost::system::errc::broken_pipe) {
+        // Connection can be closed silently.
+        m_state->resumeMode = EndAfterShutdown;
+        return;
+      }
 
       if(ec) {
         parac_log(PARAC_COMMUNICATOR,

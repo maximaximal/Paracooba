@@ -1,7 +1,7 @@
 #pragma once
 
+#include <list>
 #include <memory>
-#include <unordered_map>
 
 #include <paracooba/common/compute_node.h>
 #include <paracooba/common/types.h>
@@ -43,6 +43,9 @@ class ComputeNodeStore {
   void formulaParsed(parac_id originator);
 
   ComputeNode& thisNode();
+
+  const std::list<parac_compute_node_wrapper>::iterator begin();
+  const std::list<parac_compute_node_wrapper>::iterator end();
 
   private:
   static parac_compute_node* static_get(parac_compute_node_store* store,

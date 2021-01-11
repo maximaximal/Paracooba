@@ -6,6 +6,7 @@
 #include "paracooba/common/message_kind.h"
 #include "paracooba/common/status.h"
 #include "paracooba/common/task.h"
+#include "paracooba/communicator/communicator.h"
 #include "paracooba/module.h"
 #include "paracooba/solver/solver.h"
 
@@ -181,14 +182,15 @@ ComputeNode::receiveMessageFrom(parac_message& msg) {
     case PARAC_MESSAGE_NODE_DESCRIPTION:
       receiveMessageDescriptionFrom(msg);
       break;
-    case PARAC_MESSAGE_NODE_STATUS: {
+    case PARAC_MESSAGE_NODE_STATUS:
       receiveMessageStatusFrom(msg);
       break;
-    }
-    case PARAC_MESSAGE_TASK_RESULT: {
+    case PARAC_MESSAGE_TASK_RESULT:
       receiveMessageTaskResultFrom(msg);
       break;
-    }
+    case PARAC_MESSAGE_NEW_REMOTES:
+      receiveMessageKnownRemotesFrom(msg);
+      break;
     default:
       parac_log(PARAC_BROKER,
                 PARAC_GLOBALERROR,
@@ -231,6 +233,10 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
     m_node.solver_instance =
       solver->add_instance(solverMod, m_node.id, &m_taskStore.store());
   }
+
+  // Send all known other nodes to the peer.
+  sendKnownRemotes();
+
   if(m_handle.input_file &&
      !m_status.solverInstances[m_handle.id].formula_received) {
     // Client node received a message from other node.
@@ -302,10 +308,12 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
     // Tasks need to be offloaded!
     parac_task* task =
       m_taskStore.pop_offload(&m_node, [this](parac_id originator) {
-        return status().isParsed(originator);
+        return m_store.thisNode().status().isParsed(originator);
       });
 
     if(task) {
+      assert(m_store.thisNode().status().isParsed(task->originator));
+
       parac_message_wrapper msg;
       task->serialize(task, &msg);
       parac_log(PARAC_BROKER,
@@ -322,6 +330,43 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
 void
 ComputeNode::receiveMessageTaskResultFrom(parac_message& msg) {
   m_taskStore.receiveTaskResultFromPeer(msg);
+}
+
+void
+ComputeNode::receiveMessageKnownRemotesFrom(parac_message& msg) {
+  boost::iostreams::stream<boost::iostreams::basic_array_source<char>> data(
+    msg.data, msg.length);
+  uint32_t remoteCount = 0;
+
+  {
+    cereal::BinaryInputArchive ia(data);
+    ia >> remoteCount;
+    for(uint32_t i = 0; i < remoteCount; ++i) {
+      parac_id id;
+      ia(id);
+
+      if(m_store.has(id)) {
+        continue;
+      }
+
+      std::string connectionString;
+      ia(connectionString);
+
+      parac_log(PARAC_BROKER,
+                PARAC_TRACE,
+                "New Known Remote from {}: {} @ {}. Trying to connect.",
+                m_node.id,
+                id,
+                connectionString);
+
+      assert(m_handle.modules);
+      auto mod_comm = m_handle.modules[PARAC_MOD_COMMUNICATOR];
+      auto comm = mod_comm->communicator;
+      comm->connect_to_remote(mod_comm, connectionString.c_str());
+    }
+  }
+
+  msg.cb(&msg, PARAC_OK);
 }
 
 void
@@ -369,6 +414,46 @@ ComputeNode::computeUtilization() const {
   float workQueueSize = status().workQueueSize();
 
   return workQueueSize / workers;
+}
+
+void
+ComputeNode::sendKnownRemotes() {
+  if(!m_knownRemotesOstream) {
+    m_knownRemotesOstream = std::make_unique<NoncopyOStringstream>();
+  } else {
+    *m_knownRemotesOstream = NoncopyOStringstream();
+  }
+
+  parac_message_wrapper msg;
+  msg.kind = PARAC_MESSAGE_NEW_REMOTES;
+
+  uint32_t remoteCount = 0;
+  auto stepOverNode = [this](const parac_compute_node_wrapper& node) {
+    return node.id == m_node.id || !node.send_message_to ||
+           !node.connection_string;
+  };
+  for(const auto& node : m_store) {
+    if(stepOverNode(node))
+      continue;
+    ++remoteCount;
+  }
+
+  {
+    cereal::BinaryOutputArchive oa(*m_knownRemotesOstream);
+    oa << remoteCount;
+    for(const auto& node : m_store) {
+      if(stepOverNode(node))
+        continue;
+      auto p = node.getIDConnectionStringPair();
+      oa(p.first);
+      oa(p.second);
+    }
+  }
+
+  msg.data = m_knownRemotesOstream->ptr();
+  msg.length = m_knownRemotesOstream->tellp();
+
+  m_node.send_message_to(&m_node, &msg);
 }
 
 std::ostream&

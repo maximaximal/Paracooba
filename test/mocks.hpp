@@ -56,6 +56,7 @@ class ParacoobaMock : public parac_handle {
     parac_log_init(thread_registry);
 
     // Load from ModuleLoader
+    assert(!m_moduleLoader);
     m_moduleLoader = std::make_unique<paracooba::ModuleLoader>(
       *static_cast<parac_handle*>(this));
 

@@ -56,6 +56,9 @@ class Service {
   int connectionRetries() const;
   const char* temporaryDirectory() const;
   uint16_t defaultTCPTargetPort() const;
+  uint16_t defaultTCPListenPort() const;
+  uint16_t currentTCPListenPort() const;
+  uint16_t currentUDPListenPort() const;
   uint32_t networkTimeoutMS() const;
   uint32_t retryTimeoutMS() const;
   bool automaticListenPortAssignment() const;

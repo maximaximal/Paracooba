@@ -105,6 +105,11 @@ ComputeNodeStore::get_with_connection(
   std::unique_lock lock(m_internal->nodesMutex);
 
   parac_compute_node* n = get(id);
+
+  if(n->send_message_to) {
+    return nullptr;
+  }
+
   n->communicator_free = communicator_free;
   n->communicator_userdata = communicator_userdata;
   n->send_message_to = send_message_func;
@@ -249,5 +254,14 @@ ComputeNodeStore::static_node_free(parac_compute_node* n) {
   if(broker_compute_node) {
     delete broker_compute_node;
   }
+}
+
+const std::list<parac_compute_node_wrapper>::iterator
+ComputeNodeStore::begin() {
+  return m_internal->nodesList.begin();
+}
+const std::list<parac_compute_node_wrapper>::iterator
+ComputeNodeStore::end() {
+  return m_internal->nodesList.end();
 }
 }

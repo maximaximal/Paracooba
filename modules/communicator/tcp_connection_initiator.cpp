@@ -1,3 +1,4 @@
+#include <boost/asio/ip/address.hpp>
 #include <chrono>
 #include <limits>
 #include <memory>
@@ -16,17 +17,27 @@
 #include <boost/bind.hpp>
 #include <boost/system/error_code.hpp>
 
+#include <boost/algorithm/string.hpp>
+
 namespace parac::communicator {
 static uint16_t
 ExtractPortFromConnectionString(std::string& connectionString,
                                 uint16_t defaultPort) {
   std::string port = std::to_string(defaultPort);
 
-  auto posOfColon = connectionString.find(":");
-  if(posOfColon != std::string::npos) {
-    port = connectionString.substr(posOfColon + 1, std::string::npos);
-    connectionString = connectionString.substr(0, posOfColon);
+  size_t offset = 2;
+  auto posOfColon = connectionString.rfind("]:");
+  if(posOfColon == std::string::npos) {
+    posOfColon = connectionString.rfind(":");
+    offset = 1;
   }
+  if(posOfColon != std::string::npos) {
+    port = connectionString.substr(posOfColon + offset, std::string::npos);
+    connectionString = connectionString.substr(0, posOfColon + offset - 1);
+  }
+
+  boost::erase_all(connectionString, "[");
+  boost::erase_all(connectionString, "]");
 
   int portNum = std::atoi(port.c_str());
 
@@ -134,10 +145,33 @@ TCPConnectionInitiator::TCPConnectionInitiator(Service& service,
   uint16_t port = ExtractPortFromConnectionString(
     connectionString, service.defaultTCPTargetPort());
 
-  m_state =
-    std::make_shared<State>(service, connectionString, port, cb, connectionTry);
-  try_connecting_to_host(boost::system::error_code(),
-                         boost::asio::ip::tcp::resolver::iterator());
+  parac_log(
+    PARAC_COMMUNICATOR,
+    PARAC_TRACE,
+    "Starting TCPConnectionInitiator to connect to host {} with port {}.",
+    host,
+    port);
+
+  boost::system::error_code ec;
+  auto address = boost::asio::ip::make_address_v6(connectionString, ec);
+  if(!ec) {
+    // The address could be parsed! This means we have a defined endpoint that
+    // does not have to be resolved.
+    auto endpoint = boost::asio::ip::tcp::endpoint(address, port);
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_TRACE,
+              "Parsed host {} to endpoint {}, which is tried instead of DNS.",
+              host,
+              endpoint);
+    m_state = std::make_shared<State>(service, endpoint, cb, connectionTry);
+    try_connecting_to_endpoint(boost::system::error_code());
+  } else {
+    // Definitely no address, so try to resolve using DNS.
+    m_state = std::make_shared<State>(
+      service, connectionString, port, cb, connectionTry);
+    try_connecting_to_host(boost::system::error_code(),
+                           boost::asio::ip::tcp::resolver::iterator());
+  }
 }
 TCPConnectionInitiator::TCPConnectionInitiator(
   Service& service,
@@ -145,6 +179,11 @@ TCPConnectionInitiator::TCPConnectionInitiator(
   Callback cb,
   int connectionTry)
   : m_state(std::make_shared<State>(service, endpoint, cb, connectionTry)) {
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_TRACE,
+            "Starting TCPConnectionInitiator to connect to endpoint {}.",
+            endpoint);
+
   try_connecting_to_endpoint(boost::system::error_code());
 }
 TCPConnectionInitiator::TCPConnectionInitiator(
@@ -260,12 +299,8 @@ TCPConnectionInitiator::try_connecting_to_host(
                   ec.message());
         m_state->socket = std::make_unique<boost::asio::ip::tcp::socket>(
           m_state->service.ioContext());
-
-        {
-          boost::asio::ip::tcp::no_delay option(true);
-          m_state->socket->set_option(option);
-        }
       } else {
+        assert(m_state->socket->is_open());
         parac_log(PARAC_COMMUNICATOR,
                   PARAC_TRACE,
                   "Successfully connected socket to host {} (endpoint {}). "
@@ -310,11 +345,17 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
                 m_state->endpoint(),
                 ec);
     } else {
+      assert(m_state->socket->is_open());
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_TRACE,
                 "Successfully connected socket to endpoint {}. "
                 "Starting Paracooba connection.",
                 m_state->socket->remote_endpoint());
+
+      TCPConnection(m_state->service,
+                    std::move(m_state->socket),
+                    m_state->connectionTry,
+                    std::move(m_state->payload));
     }
   }
 }

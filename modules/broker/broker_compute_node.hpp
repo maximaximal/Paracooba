@@ -119,12 +119,15 @@ class ComputeNode {
   void receiveMessageDescriptionFrom(parac_message& msg);
   void receiveMessageStatusFrom(parac_message& msg);
   void receiveMessageTaskResultFrom(parac_message& msg);
+  void receiveMessageKnownRemotesFrom(parac_message &msg);
 
   void receiveFileFrom(parac_file& file);
 
   float computeUtilization() const;
 
   private:
+  void sendKnownRemotes();
+
   parac_compute_node& m_node;
   parac_handle& m_handle;
   ComputeNodeStore& m_store;
@@ -132,6 +135,8 @@ class ComputeNode {
 
   std::optional<Description> m_description;
   Status m_status;
+
+  std::unique_ptr<NoncopyOStringstream> m_knownRemotesOstream;
 };
 
 std::ostream&
