@@ -481,7 +481,7 @@ TCPConnection::handleReceivedACK(const PacketHeader& ack) {
   return true;
 }
 
-void
+bool
 TCPConnection::handleReceivedMessage() {
   parac_message msg;
   struct data {
@@ -511,7 +511,12 @@ TCPConnection::handleReceivedMessage() {
   // then passed back.
   assert(d.returned);
 
+  if(d.status == PARAC_ABORT_CONNECTION) {
+    return false;
+  }
+
   sendACK(m_state->readHeader.number, d.status);
+  return true;
 }
 
 void
@@ -822,7 +827,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
           return;
         }
 
-        handleReceivedMessage();
+        if(!handleReceivedMessage()) {
+          // Connection is to be aborted!
+          return;
+        }
       }
     }
   }

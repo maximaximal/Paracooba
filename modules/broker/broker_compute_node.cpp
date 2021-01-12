@@ -1,6 +1,7 @@
 #include "broker_compute_node.hpp"
 #include "broker_compute_node_store.hpp"
 #include "broker_task_store.hpp"
+#include "cereal/details/helpers.hpp"
 #include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/file.h"
 #include "paracooba/common/message_kind.h"
@@ -212,30 +213,46 @@ ComputeNode::receiveMessageFrom(parac_message& msg) {
     return;
   }
 
-  switch(msg.kind) {
-    case PARAC_MESSAGE_NODE_DESCRIPTION:
-      receiveMessageDescriptionFrom(msg);
-      break;
-    case PARAC_MESSAGE_NODE_STATUS:
-      receiveMessageStatusFrom(msg);
-      break;
-    case PARAC_MESSAGE_TASK_RESULT:
-      receiveMessageTaskResultFrom(msg);
-      break;
-    case PARAC_MESSAGE_NEW_REMOTES:
-      receiveMessageKnownRemotesFrom(msg);
-      break;
-    default:
-      parac_log(PARAC_BROKER,
-                PARAC_GLOBALERROR,
-                "Invalid message kind received in compute node! Kind: {}, "
-                "size: {}, origin: {}, originator: {}",
-                msg.kind,
-                msg.length,
-                m_node.id,
-                msg.originator_id);
-      msg.cb(&msg, PARAC_UNKNOWN);
-      break;
+  try {
+    switch(msg.kind) {
+      case PARAC_MESSAGE_NODE_DESCRIPTION:
+        receiveMessageDescriptionFrom(msg);
+        break;
+      case PARAC_MESSAGE_NODE_STATUS:
+        receiveMessageStatusFrom(msg);
+        break;
+      case PARAC_MESSAGE_TASK_RESULT:
+        receiveMessageTaskResultFrom(msg);
+        break;
+      case PARAC_MESSAGE_NEW_REMOTES:
+        receiveMessageKnownRemotesFrom(msg);
+        break;
+      default:
+        parac_log(PARAC_BROKER,
+                  PARAC_GLOBALERROR,
+                  "Invalid message kind received in compute node! Kind: {}, "
+                  "size: {}, origin: {}, originator: {}",
+                  msg.kind,
+                  msg.length,
+                  m_node.id,
+                  msg.originator_id);
+        msg.cb(&msg, PARAC_UNKNOWN);
+        break;
+    }
+  } catch(cereal::Exception& e) {
+    msg.cb(&msg, PARAC_ABORT_CONNECTION);
+  } catch(std::exception& e) {
+    parac_log(PARAC_BROKER,
+              PARAC_LOCALERROR,
+              "Exception when processing message of kind: {}, "
+              "size: {}, origin: {}, originator: {}. Exception: {}",
+              msg.kind,
+              msg.length,
+              m_node.id,
+              msg.originator_id,
+              e.what());
+  } catch(...) {
+    assert(false);
   }
 }
 

@@ -83,7 +83,7 @@ class TCPConnection {
 
   bool handleInitiatorMessage(const InitiatorMessage& init);
   bool handleReceivedACK(const PacketHeader& ack);
-  void handleReceivedMessage();
+  bool handleReceivedMessage();
   void handleReceivedFileStart();
   void handleReceivedFileChunk();
   void handleReceivedFile();
