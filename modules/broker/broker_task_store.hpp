@@ -17,7 +17,7 @@ class TaskStore {
   explicit TaskStore(parac_handle& handle, parac_task_store& store);
   virtual ~TaskStore();
 
-  using CheckOriginator = std::function<bool(parac_id)>;
+  using TaskChecker = std::function<bool(parac_task&)>;
 
   bool empty() const;
   size_t size() const;
@@ -27,7 +27,7 @@ class TaskStore {
 
   /** @brief Pop task for offloading. */
   parac_task* pop_offload(parac_compute_node* target,
-                          CheckOriginator check = nullptr);
+                          TaskChecker check = nullptr);
   /** @brief Pop task for working. */
   parac_task* pop_work();
 

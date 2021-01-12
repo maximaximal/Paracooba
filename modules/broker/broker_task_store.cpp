@@ -211,36 +211,46 @@ TaskStore::newTask(parac_task* parent_task,
 }
 
 parac_task*
-TaskStore::pop_offload(parac_compute_node* target, CheckOriginator check) {
-  parac_task* t = nullptr;
+TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
   {
     std::unique_lock lock(m_internal->containerMutex);
     if(m_internal->tasksWaitingForWorkerQueue.empty()) {
       return nullptr;
     }
-    t = &m_internal->tasksWaitingForWorkerQueue.back().get();
 
-    if(check) {
-      if(!check(t->originator)) {
-        return nullptr;
-      }
+    // Reverse, so that shorter tasks are offloaded first.
+    for(auto it = m_internal->tasksWaitingForWorkerQueue.rbegin();
+        it != m_internal->tasksWaitingForWorkerQueue.rend();
+        ++it) {
+      parac_task& t = *it;
+
+      if(!t.serialize)
+        continue;
+
+      if(check && !check(t))
+        continue;
+
+      // Found a suitable task to offload!
+
+      // Erase the entry! Goes back to how to erase using a reverse_iterator:
+      // https://stackoverflow.com/a/1830240
+      m_internal->tasksWaitingForWorkerQueue.erase((++it).base());
+
+      auto rep = t.path.rep;
+      m_internal->offloadedTasks[target].insert({ rep, t });
+      t.state =
+        static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
+      t.state = t.state | PARAC_TASK_OFFLOADED;
+
+      Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+        reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
+      ++taskWrapper->refcount;
+
+      decrementWorkQueueInComputeNode(m_internal->handle, t.originator);
+      return &t;
     }
-
-    m_internal->tasksWaitingForWorkerQueue.pop_back();
-    auto rep = t->path.rep;
-    m_internal->offloadedTasks[target].insert({ rep, *t });
-    t->state =
-      static_cast<parac_task_state>(t->state & ~PARAC_TASK_WORK_AVAILABLE);
-    t->state = t->state | PARAC_TASK_OFFLOADED;
-
-    Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
-      reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
-    ++taskWrapper->refcount;
   }
-
-  decrementWorkQueueInComputeNode(m_internal->handle, t->originator);
-
-  return t;
+  return nullptr;
 }
 parac_task*
 TaskStore::pop_work() {

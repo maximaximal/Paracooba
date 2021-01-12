@@ -80,7 +80,11 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
 
   REQUIRE(store->get_waiting_for_worker_size(store) == 1);
 
+  task2->serialize = [](struct parac_task*, struct parac_message*) {
+    return PARAC_OK;
+  };
   REQUIRE(store->pop_offload(store, this_node) == task2);
+  task2->serialize = nullptr;
 
   REQUIRE(store->get_waiting_for_children_size(store) == 0);
   CAPTURE(task->state);

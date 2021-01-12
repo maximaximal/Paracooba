@@ -25,19 +25,16 @@ ExtractPortFromConnectionString(std::string& connectionString,
                                 uint16_t defaultPort) {
   std::string port = std::to_string(defaultPort);
 
-  size_t offset = 2;
+  std::string::size_type offset = 2;
   auto posOfColon = connectionString.rfind("]:");
   if(posOfColon == std::string::npos) {
     posOfColon = connectionString.rfind(":");
     offset = 1;
   }
   if(posOfColon != std::string::npos) {
-    port = connectionString.substr(posOfColon + offset, std::string::npos);
-    connectionString = connectionString.substr(0, posOfColon + offset - 1);
+    assert(posOfColon + offset < connectionString.size());
+    port = connectionString.substr(posOfColon + offset);
   }
-
-  boost::erase_all(connectionString, "[");
-  boost::erase_all(connectionString, "]");
 
   int portNum = std::atoi(port.c_str());
 
@@ -50,6 +47,17 @@ ExtractPortFromConnectionString(std::string& connectionString,
               connectionString,
               defaultPort);
     portNum = defaultPort;
+  } else {
+    connectionString = connectionString.substr(0, posOfColon + offset - 1);
+
+    if(std::string::size_type p = connectionString.find("[");
+       p != std::string::npos) {
+      connectionString.erase(connectionString.begin() + p);
+    }
+    if(std::string::size_type p = connectionString.find("]");
+       p != std::string::npos) {
+      connectionString.erase(connectionString.begin() + p);
+    }
   }
 
   return portNum;

@@ -125,6 +125,8 @@ class ComputeNode {
 
   float computeUtilization() const;
 
+  parac_module_solver_instance* getSolverInstance();
+
   private:
   void sendKnownRemotes();
 

@@ -13,6 +13,7 @@
 #include <mutex>
 
 #include "broker_compute_node.hpp"
+#include "paracooba/common/status.h"
 #include "paracooba/communicator/communicator.h"
 #include "paracooba/runner/runner.h"
 
@@ -27,6 +28,7 @@ struct ComputeNodeStore::Internal {
     nodesRefMap;
 
   std::atomic_bool sendingStatusToPeers;
+  std::atomic_bool sendingStatusToPeersAndThenResend;
 };
 
 ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
@@ -175,23 +177,31 @@ ComputeNodeStore::create(parac_id id) {
 void
 ComputeNodeStore::sendStatusToPeers() {
   if(m_internal->sendingStatusToPeers) {
+    m_internal->sendingStatusToPeersAndThenResend = true;
     return;
   }
+  m_internal->sendingStatusToPeersAndThenResend = false;
   m_internal->sendingStatusToPeers = true;
+
   if(!thisNode().status().dirty()) {
     return;
   }
   parac_message_wrapper msg;
   thisNode().status().serializeToMessage(msg);
   msg.cb = [](parac_message* msg, parac_status s) {
+    // Only re-send if there was no other issue.
     if(s == PARAC_OK) {
       assert(msg);
       assert(msg->userdata);
-      std::atomic_bool* sending = static_cast<std::atomic_bool*>(msg->userdata);
-      *sending = false;
+      ComputeNodeStore* store = static_cast<ComputeNodeStore*>(msg->userdata);
+      Internal* internal = store->m_internal.get();
+      internal->sendingStatusToPeers = false;
+      if(internal->sendingStatusToPeersAndThenResend) {
+        store->sendStatusToPeers();
+      }
     }
   };
-  msg.userdata = static_cast<void*>(&m_internal->sendingStatusToPeers);
+  msg.userdata = static_cast<void*>(this);
 
   std::unique_lock lock(m_internal->nodesMutex);
   for(auto& e : m_internal->nodesList) {

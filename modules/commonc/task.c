@@ -103,6 +103,7 @@ parac_task_init(parac_task* t) {
   t->left_child_ = NULL;
   t->right_child_ = NULL;
   t->task_store = NULL;
+  t->serialize = NULL;
   t->stop = false;
 }
 

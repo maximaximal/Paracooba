@@ -25,6 +25,8 @@
 #include <boost/range/numeric.hpp>
 
 #include <cereal/archives/binary.hpp>
+#include <cereal/types/string.hpp>
+#include <cereal/types/vector.hpp>
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
@@ -36,6 +38,36 @@ using std::bind;
 using std::mem_fn;
 
 namespace parac::broker {
+struct MessageKnownRemotes {
+  struct Remote {
+    Remote() = default;
+    Remote(parac_id id, const std::string& s)
+      : id(id)
+      , connectionString(s) {}
+    Remote(std::pair<parac_id, std::string> p)
+      : Remote(p.first, p.second) {}
+    parac_id id;
+    std::string connectionString;
+
+    template<class Archive>
+    void serialize(Archive& ar) {
+      ar(CEREAL_NVP(id), CEREAL_NVP(connectionString));
+    }
+  };
+  using Vec = std::vector<Remote>;
+  Vec remotes;
+
+  template<class Archive>
+  void serialize(Archive& ar) {
+    ar(CEREAL_NVP(remotes));
+  }
+
+  Vec::iterator begin() { return remotes.begin(); }
+  Vec::iterator end() { return remotes.end(); }
+  Vec::const_iterator begin() const { return remotes.begin(); }
+  Vec::const_iterator end() const { return remotes.end(); }
+};
+
 ComputeNode::ComputeNode(parac_compute_node& node,
                          parac_handle& handle,
                          ComputeNodeStore& store,
@@ -173,8 +205,10 @@ ComputeNode::applyStatus(const Status& s) {
 void
 ComputeNode::receiveMessageFrom(parac_message& msg) {
   if(parac_message_kind_is_for_solver(msg.kind)) {
-    assert(m_node.solver_instance);
-    m_node.solver_instance->handle_message(m_node.solver_instance, &msg);
+    ComputeNode* n = m_store.get_broker_compute_node(msg.originator_id);
+    assert(n);
+    parac_module_solver_instance* i = n->getSolverInstance();
+    i->handle_message(i, &msg);
     return;
   }
 
@@ -306,21 +340,21 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
   float utilization = computeUtilization();
   if(utilization < 3) {
     // Tasks need to be offloaded!
-    parac_task* task =
-      m_taskStore.pop_offload(&m_node, [this](parac_id originator) {
-        return m_store.thisNode().status().isParsed(originator);
-      });
+    parac_task* task = m_taskStore.pop_offload(&m_node, [this](parac_task& t) {
+      return status().isParsed(t.originator);
+    });
 
     if(task) {
-      assert(m_store.thisNode().status().isParsed(task->originator));
-
-      parac_message_wrapper msg;
-      task->serialize(task, &msg);
       parac_log(PARAC_BROKER,
                 PARAC_TRACE,
                 "Offload task on path {} to node {}.",
                 task->path,
                 m_node.id);
+
+      assert(status().isParsed(task->originator));
+
+      parac_message_wrapper msg;
+      task->serialize(task, &msg);
       m_node.send_message_to(&m_node, &msg);
     }
   }
@@ -336,34 +370,30 @@ void
 ComputeNode::receiveMessageKnownRemotesFrom(parac_message& msg) {
   boost::iostreams::stream<boost::iostreams::basic_array_source<char>> data(
     msg.data, msg.length);
-  uint32_t remoteCount = 0;
+
+  MessageKnownRemotes remotes;
 
   {
     cereal::BinaryInputArchive ia(data);
-    ia >> remoteCount;
-    for(uint32_t i = 0; i < remoteCount; ++i) {
-      parac_id id;
-      ia(id);
+    ia(remotes);
+  }
 
-      if(m_store.has(id)) {
-        continue;
-      }
-
-      std::string connectionString;
-      ia(connectionString);
-
-      parac_log(PARAC_BROKER,
-                PARAC_TRACE,
-                "New Known Remote from {}: {} @ {}. Trying to connect.",
-                m_node.id,
-                id,
-                connectionString);
-
-      assert(m_handle.modules);
-      auto mod_comm = m_handle.modules[PARAC_MOD_COMMUNICATOR];
-      auto comm = mod_comm->communicator;
-      comm->connect_to_remote(mod_comm, connectionString.c_str());
+  for(const auto& r : remotes) {
+    if(m_store.has(r.id)) {
+      continue;
     }
+
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "New Known Remote from {}: {} @ {}. Trying to connect.",
+              m_node.id,
+              r.id,
+              r.connectionString);
+
+    assert(m_handle.modules);
+    auto mod_comm = m_handle.modules[PARAC_MOD_COMMUNICATOR];
+    auto comm = mod_comm->communicator;
+    comm->connect_to_remote(mod_comm, r.connectionString.c_str());
   }
 
   msg.cb(&msg, PARAC_OK);
@@ -416,6 +446,11 @@ ComputeNode::computeUtilization() const {
   return workQueueSize / workers;
 }
 
+parac_module_solver_instance*
+ComputeNode::getSolverInstance() {
+  return m_node.solver_instance;
+}
+
 void
 ComputeNode::sendKnownRemotes() {
   if(!m_knownRemotesOstream) {
@@ -427,7 +462,8 @@ ComputeNode::sendKnownRemotes() {
   parac_message_wrapper msg;
   msg.kind = PARAC_MESSAGE_NEW_REMOTES;
 
-  uint32_t remoteCount = 0;
+  MessageKnownRemotes knownRemotes;
+
   auto stepOverNode = [this](const parac_compute_node_wrapper& node) {
     return node.id == m_node.id || !node.send_message_to ||
            !node.connection_string;
@@ -435,19 +471,12 @@ ComputeNode::sendKnownRemotes() {
   for(const auto& node : m_store) {
     if(stepOverNode(node))
       continue;
-    ++remoteCount;
+    knownRemotes.remotes.emplace_back(node.getIDConnectionStringPair());
   }
 
   {
     cereal::BinaryOutputArchive oa(*m_knownRemotesOstream);
-    oa << remoteCount;
-    for(const auto& node : m_store) {
-      if(stepOverNode(node))
-        continue;
-      auto p = node.getIDConnectionStringPair();
-      oa(p.first);
-      oa(p.second);
-    }
+    oa(knownRemotes);
   }
 
   msg.data = m_knownRemotesOstream->ptr();
