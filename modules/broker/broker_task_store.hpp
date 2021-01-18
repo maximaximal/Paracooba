@@ -10,11 +10,14 @@ struct parac_task;
 struct parac_message;
 struct parac_task_store;
 struct parac_compute_node;
+struct parac_timeout;
 
 namespace parac::broker {
 class TaskStore {
   public:
-  explicit TaskStore(parac_handle& handle, parac_task_store& store);
+  explicit TaskStore(parac_handle& handle,
+                     parac_task_store& store,
+                     uint32_t autoShutdownTimeout);
   virtual ~TaskStore();
 
   using TaskChecker = std::function<bool(parac_task&)>;
@@ -31,6 +34,8 @@ class TaskStore {
   /** @brief Pop task for working. */
   parac_task* pop_work();
 
+  void undo_offload(parac_task* t);
+
   void assess_task(parac_task* task);
 
   parac_task_store& store();
@@ -46,7 +51,12 @@ class TaskStore {
   void remove_from_tasksBeingWorkedOn(parac_task* task);
   void remove(parac_task* task);
 
+  void manageAutoShutdownTimer();
+  static void autoShutdownTimerExpired(parac_timeout* t);
+
   struct Internal;
   std::unique_ptr<Internal> m_internal;
+
+  uint32_t m_autoShutdownTimeout;
 };
 }

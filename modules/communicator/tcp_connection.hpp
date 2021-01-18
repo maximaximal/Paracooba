@@ -33,6 +33,10 @@ using TCPConnectionPayloadPtr =
  */
 class TCPConnection {
   public:
+  struct State;
+  using WeakStatePtr = std::weak_ptr<State>;
+  using SharedStatePtr = std::shared_ptr<State>;
+
   enum Lifecycle { Initializing, Active, Dead };
   enum TransmitMode {
     TransmitInit,
@@ -57,6 +61,13 @@ class TCPConnection {
     std::unique_ptr<boost::asio::ip::tcp::socket> socket,
     int connectionTry = 0,
     TCPConnectionPayloadPtr ptr = TCPConnectionPayloadPtr(nullptr, nullptr));
+
+  explicit TCPConnection(const TCPConnection& o, WeakStatePtr weakPtr)
+    : TCPConnection(o) {
+    // Reset the state store to use the weak variant instead.
+    m_stateStore = weakPtr;
+  }
+
   ~TCPConnection();
 
   void send(parac_message&& message);
@@ -71,8 +82,27 @@ class TCPConnection {
 
   private:
   struct InitiatorMessage;
-  struct State;
-  std::shared_ptr<State> m_state;
+
+  std::variant<WeakStatePtr, SharedStatePtr> m_stateStore;
+
+  SharedStatePtr state() {
+    if(m_stateStore.index() == 1) {
+      return std::get<SharedStatePtr>(m_stateStore);
+    } else {
+      auto weak = std::get<WeakStatePtr>(m_stateStore);
+      return weak.lock();
+    }
+  }
+  SharedStatePtr state() const {
+    if(m_stateStore.index() == 1) {
+      auto& p = std::get<SharedStatePtr>(m_stateStore);
+      assert(p);
+      return p;
+    } else {
+      auto weak = std::get<WeakStatePtr>(m_stateStore);
+      return weak.lock();
+    }
+  }
 
   void send(SendQueueEntry&& e);
 
@@ -100,6 +130,8 @@ class TCPConnection {
 
   template<typename S, typename B, typename CB>
   inline void async_read(S& socket, B&& buffer, CB cb);
+
+  void close();
 };
 
 constexpr const char*
@@ -115,5 +147,4 @@ ConnectionResumeModeToStr(TCPConnection::ResumeMode resumeMode) {
 
 std::ostream&
 operator<<(std::ostream& o, TCPConnection::ResumeMode resumeMode);
-
 }

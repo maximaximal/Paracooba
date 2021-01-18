@@ -25,6 +25,8 @@ typedef struct parac_task* (*parac_task_store_new_task)(
   parac_id originator);
 typedef void (*parac_task_store_assess_task)(struct parac_task_store*,
                                              struct parac_task*);
+typedef void (*parac_task_store_undo_offload)(struct parac_task_store*,
+                                              struct parac_task*);
 typedef struct parac_task* (*parac_task_store_pop_offload)(
   struct parac_task_store*,
   struct parac_compute_node*);
@@ -42,6 +44,7 @@ typedef struct parac_task_store {
   parac_task_store_pop_offload pop_offload;
   parac_task_store_pop_work pop_work;
   parac_task_store_assess_task assess_task;
+  parac_task_store_undo_offload undo_offload;
 
   void* userdata;
 

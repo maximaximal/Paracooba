@@ -21,6 +21,7 @@
 #include "paracooba/common/task.h"
 #include "paracooba/common/task_store.h"
 #include "paracooba/common/types.h"
+#include "paracooba/communicator/communicator.h"
 #include "paracooba/module.h"
 
 #include <boost/pool/pool_alloc.hpp>
@@ -109,10 +110,15 @@ struct TaskStore::Internal {
 
   std::atomic_size_t tasksSize = 0;
   std::atomic_size_t tasksWaitingForWorkerQueueSize = 0;
+
+  parac_timeout* autoShutdownTimeout = nullptr;
 };
 
-TaskStore::TaskStore(parac_handle& handle, parac_task_store& s)
-  : m_internal(std::make_unique<Internal>(handle, s)) {
+TaskStore::TaskStore(parac_handle& handle,
+                     parac_task_store& s,
+                     uint32_t autoShutdownTimeout)
+  : m_internal(std::make_unique<Internal>(handle, s))
+  , m_autoShutdownTimeout(autoShutdownTimeout) {
 
   s.userdata = this;
   s.empty = [](parac_task_store* store) {
@@ -151,6 +157,12 @@ TaskStore::TaskStore(parac_handle& handle, parac_task_store& s)
     assert(store->userdata);
     return static_cast<TaskStore*>(store->userdata)
       ->newTask(creator_task, new_path, originator);
+  };
+  s.undo_offload = [](parac_task_store* store, parac_task* t) {
+    assert(store);
+    assert(store->userdata);
+    assert(t);
+    return static_cast<TaskStore*>(store->userdata)->undo_offload(t);
   };
   s.pop_offload = [](parac_task_store* store, parac_compute_node* target) {
     assert(store);
@@ -213,6 +225,8 @@ TaskStore::newTask(parac_task* parent_task,
 
   ++m_internal->tasksSize;
 
+  manageAutoShutdownTimer();
+
   return task;
 }
 
@@ -241,6 +255,8 @@ TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
       // Erase the entry! Goes back to how to erase using a reverse_iterator:
       // https://stackoverflow.com/a/1830240
       m_internal->tasksWaitingForWorkerQueue.erase((++it).base());
+
+      t.offloaded_to = target;
 
       auto rep = t.path.rep;
       m_internal->offloadedTasks[target].insert({ rep, t });
@@ -283,6 +299,29 @@ TaskStore::pop_work() {
   decrementWorkQueueInComputeNode(m_internal->handle, t->originator);
 
   return t;
+}
+void
+TaskStore::undo_offload(parac_task* t) {
+  {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Undo offload of task on path {} from {} to this node.",
+              t->path,
+              t->offloaded_to->id);
+
+    std::unique_lock lock(m_internal->containerMutex);
+
+    m_internal->offloadedTasks[t->offloaded_to].erase(t->path.rep);
+    t->state = static_cast<parac_task_state>(t->state & ~PARAC_TASK_OFFLOADED);
+
+    Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+      reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
+    --taskWrapper->refcount;
+
+    t->offloaded_to = nullptr;
+  }
+
+  insert_into_tasksWaitingForWorkerQueue(t);
 }
 
 void
@@ -386,7 +425,49 @@ TaskStore::remove(parac_task* task) {
 
   --m_internal->tasksSize;
 
+  manageAutoShutdownTimer();
+
   m_internal->tasks.erase(taskWrapper->it);
+}
+
+void
+TaskStore::autoShutdownTimerExpired(parac_timeout* t) {
+  assert(t);
+  assert(t->expired_userdata);
+  TaskStore* store = static_cast<TaskStore*>(t->expired_userdata);
+  parac_handle& handle = store->m_internal->handle;
+  parac_log(PARAC_BROKER,
+            PARAC_INFO,
+            "Automatic Shutdown Timer (set to {}ms of inactivity, meaning no "
+            "tasks to work on) expired!",
+            store->m_autoShutdownTimeout);
+  handle.exit_status = PARAC_AUTO_SHUTDOWN_TRIGGERED;
+  handle.request_exit(&handle);
+}
+
+void
+TaskStore::manageAutoShutdownTimer() {
+  /// The container mutex MUST be locked at this point!
+
+  if(m_autoShutdownTimeout == 0)
+    return;
+
+  auto mod_comm = m_internal->handle.modules[PARAC_MOD_COMMUNICATOR];
+  assert(mod_comm);
+  parac_module_communicator* comm = mod_comm->communicator;
+
+  if(m_internal->tasksSize == 0) {
+    // No tasks are left in the broker, so trigger a new timeout for auto
+    // shutdown.
+    m_internal->autoShutdownTimeout =
+      comm->set_timeout(mod_comm,
+                        m_autoShutdownTimeout,
+                        this,
+                        &TaskStore::autoShutdownTimerExpired);
+  } else if(m_internal->autoShutdownTimeout) {
+    m_internal->autoShutdownTimeout->cancel(m_internal->autoShutdownTimeout);
+    m_internal->autoShutdownTimeout = nullptr;
+  }
 }
 
 void

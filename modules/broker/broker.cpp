@@ -21,20 +21,46 @@
 #define BROKER_VERSION_TWEAK 0
 
 struct BrokerUserdata {
-  BrokerUserdata(parac_handle& handle)
-    : taskStore(handle, task_store_interface)
-    , computeNodeStore(handle, compute_node_store_interface, taskStore) {
-    handle.modules[PARAC_MOD_BROKER]->broker->task_store =
-      &task_store_interface;
-    handle.modules[PARAC_MOD_BROKER]->broker->compute_node_store =
-      &compute_node_store_interface;
+  void pre_init(parac_handle& handle, uint32_t autoShutdownTimeout) {
+    internal = std::make_unique<Internal>(handle, autoShutdownTimeout);
   }
 
-  parac_compute_node_store compute_node_store_interface;
-  parac_task_store task_store_interface;
-  parac::broker::TaskStore taskStore;
-  parac::broker::ComputeNodeStore computeNodeStore;
+  struct Internal {
+    Internal(parac_handle& handle, uint32_t autoShutdownTimeout)
+      : taskStore(handle, task_store_interface, autoShutdownTimeout)
+      , computeNodeStore(handle, compute_node_store_interface, taskStore) {
+      handle.modules[PARAC_MOD_BROKER]->broker->task_store =
+        &task_store_interface;
+      handle.modules[PARAC_MOD_BROKER]->broker->compute_node_store =
+        &compute_node_store_interface;
+    }
+    parac_compute_node_store compute_node_store_interface;
+    parac_task_store task_store_interface;
+    parac::broker::TaskStore taskStore;
+    parac::broker::ComputeNodeStore computeNodeStore;
+  };
+
+  parac_config_entry* config_entries;
+  std::unique_ptr<Internal> internal;
+
+  enum Config { AutoShutdownTimeoutMilliseconds, _CONFIG_COUNT };
 };
+
+static void
+init_config(BrokerUserdata* u) {
+  parac_config_entry* e = u->config_entries;
+
+  parac_config_entry_set_str(
+    &e[BrokerUserdata::AutoShutdownTimeoutMilliseconds],
+    "auto-shutdown-timeout",
+    "Timeout (in ms) of inactivity in order to automatically exit. 0 "
+    "means "
+    "off. Only applies to daemon nodes.");
+  e[BrokerUserdata::AutoShutdownTimeoutMilliseconds].registrar =
+    PARAC_MOD_BROKER;
+  e[BrokerUserdata::AutoShutdownTimeoutMilliseconds].type = PARAC_TYPE_UINT32;
+  e[BrokerUserdata::AutoShutdownTimeoutMilliseconds].default_value.uint32 = 0;
+}
 
 static parac_status
 pre_init(parac_module* mod) {
@@ -43,8 +69,21 @@ pre_init(parac_module* mod) {
   assert(mod->handle);
   assert(mod->handle->config);
 
-  BrokerUserdata* userdata = new BrokerUserdata(*mod->handle);
-  mod->userdata = userdata;
+  BrokerUserdata* userdata = static_cast<BrokerUserdata*>(mod->userdata);
+
+  uint32_t autoShutdownTimeout =
+    userdata->config_entries[BrokerUserdata::AutoShutdownTimeoutMilliseconds]
+      .value.uint32;
+
+  if(mod->handle->input_file && autoShutdownTimeout > 0) {
+    parac_log(PARAC_BROKER,
+              PARAC_LOCALWARNING,
+              "--auto-shutdown-timeout only applies to daemon nodes and is "
+              "deactivated for master nodes!");
+    autoShutdownTimeout = 0;
+  }
+
+  userdata->pre_init(*mod->handle, autoShutdownTimeout);
 
   return PARAC_OK;
 }
@@ -59,7 +98,10 @@ init(parac_module* mod) {
   assert(mod->userdata);
 
   BrokerUserdata* userdata = static_cast<BrokerUserdata*>(mod->userdata);
-  userdata->computeNodeStore.updateThisNodeDescription();
+
+  assert(userdata->internal);
+
+  userdata->internal->computeNodeStore.updateThisNodeDescription();
 
   return PARAC_OK;
 }
@@ -104,6 +146,16 @@ parac_module_discover_broker(parac_handle* handle) {
   mod->init = init;
   mod->request_exit = mod_request_exit;
   mod->exit = mod_exit;
+  mod->handle = handle;
+
+  BrokerUserdata* userdata = new BrokerUserdata();
+  mod->userdata = userdata;
+
+  userdata->config_entries = parac_config_reserve(
+    handle->config, static_cast<size_t>(BrokerUserdata::_CONFIG_COUNT));
+  assert(userdata->config_entries);
+
+  init_config(userdata);
 
   return PARAC_OK;
 }

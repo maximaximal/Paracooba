@@ -183,7 +183,7 @@ struct TCPConnection::State {
       compute_node->connection_string = nullptr;
       compute_node = nullptr;
     }
-    if(service.ioContext().stopped()) {
+    if(!service.ioContext().stopped()) {
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_TRACE,
                 "Connection ended with resume mode {}.",
@@ -234,7 +234,7 @@ struct TCPConnection::State {
               *reinterpret_cast<int*>(
                 &readCoro),// Hacky reading for debugging purposes.
               *reinterpret_cast<int*>(&writeCoro));
-    */
+              */
   }
 
   Service& service;
@@ -317,13 +317,20 @@ TCPConnection::async_read(S& socket, B&& buffer, CB cb) {
     }
   };
 
-  m_state->readTimer.expires_from_now(
-    std::chrono::milliseconds(m_state->service.networkTimeoutMS()));
-  m_state->readTimer.async_wait(timeout_handler);
+  auto s = state();
+  if(!s)
+    return;
+
+  s->readTimer.expires_from_now(
+    std::chrono::milliseconds(s->service.networkTimeoutMS()));
+  s->readTimer.async_wait(timeout_handler);
 
   auto read_handler = [cb, *this](const boost::system::error_code& ec,
                                   size_t bytes_received) {
-    m_state->readTimer.cancel();
+    auto s = state();
+    if(!s)
+      return;
+    s->readTimer.cancel();
     std::function<void(boost::system::error_code, size_t)> cb_func = cb;
     cb_func(ec, bytes_received);
   };
@@ -337,42 +344,49 @@ TCPConnection::TCPConnection(
   int connectionTry,
   TCPConnectionPayloadPtr ptr) {
   if(ptr) {
-    m_state = std::make_shared<State>(
+    m_stateStore = std::make_shared<State>(
       service, std::move(socket), connectionTry, std::move(ptr));
   } else {
-    m_state =
+    m_stateStore =
       std::make_shared<State>(service, std::move(socket), connectionTry);
   }
 
   // Set at beginning, only unset if write_handler yields. Set again at
   // send(SendQueueItem&).
-  m_state->currentlySending.test_and_set();
+  state()->currentlySending.test_and_set();
 
-  writeHandler(boost::system::error_code(), 0);
+  auto weakConn = TCPConnection(*this, WeakStatePtr(state()));
+  weakConn.writeHandler(boost::system::error_code(), 0);
+
   readHandler(boost::system::error_code(), 0);
 }
 
 TCPConnection::~TCPConnection() {
-  /*
-  parac_log(PARAC_COMMUNICATOR,
-            PARAC_TRACE,
-            "TCPConnection to {} destruct. State use count is {}. Position in "
-            "readHandler {}, writeHandler {}.",
-            m_state->remoteId(),
-            m_state.use_count(),
-            *reinterpret_cast<int*>(
-              &m_state->readCoro),// Hacky reading for debugging purposes.
-            *reinterpret_cast<int*>(&m_state->writeCoro));
-  */
 
-  if(!m_state->service.ioContext().stopped()) {
-    if(m_state->transmitMode != TransmitEnd && m_state.use_count() == 1) {
-      // This is the last connection, so this is also the last one having a
-      // reference to the state. This is a clean shutdown of a connection, the
-      // socket will be ended. To differentiate between this clean shutdown
-      // and a dirty one, an EndToken must be transmitted. This is the last
-      // action.
-      TCPConnection(*this).send(EndTag{});
+  if(auto s = state()) {
+
+    /*
+    parac_log(
+      PARAC_COMMUNICATOR,
+      PARAC_LOCALERROR,
+      "TCPConnection to {} destruct. State use count is {}. Position in "
+      "readHandler {}, writeHandler {}.",
+      s->remoteId(),
+      s.use_count(),
+      *reinterpret_cast<int*>(
+        &s->readCoro),// Hacky reading for debugging purposes.
+      *reinterpret_cast<int*>(&s->writeCoro));
+      */
+
+    if(!s->service.ioContext().stopped()) {
+      if(s->transmitMode != TransmitEnd && s.use_count() == 1) {
+        // This is the last connection, so this is also the last one having a
+        // reference to the state. This is a clean shutdown of a connection, the
+        // socket will be ended. To differentiate between this clean shutdown
+        // and a dirty one, an EndToken must be transmitted. This is the last
+        // action.
+        TCPConnection(*this).send(EndTag{});
+      }
     }
   }
 }
@@ -408,27 +422,34 @@ TCPConnection::sendACK(uint32_t id, parac_status status) {
 
 void
 TCPConnection::send(SendQueueEntry&& e) {
+  auto s = state();
+  if(!s)
+    return;
   {
-    std::lock_guard lock(m_state->sendQueueMutex);
+    std::lock_guard lock(s->sendQueueMutex);
     if(e.header.kind != PARAC_MESSAGE_ACK) {
-      e.header.number = m_state->sendMessageNumber++;
+      e.header.number = s->sendMessageNumber++;
     }
-    m_state->sendQueue.emplace(std::move(e));
+    s->sendQueue.emplace(std::move(e));
   }
-  if(!m_state->currentlySending.test_and_set()) {
+  if(!s->currentlySending.test_and_set()) {
     writeHandler(boost::system::error_code(), 0);
   }
 }
 
 bool
 TCPConnection::shouldHandlerBeEnded() {
-  if(m_state->compute_node) {
-    auto s = m_state->compute_node->state;
-    if(s == PARAC_COMPUTE_NODE_TIMEOUT || s == PARAC_COMPUTE_NODE_EXITED) {
+  auto s = state();
+  if(!s)
+    return true;
+
+  if(s->compute_node) {
+    auto st = s->compute_node->state;
+    if(st == PARAC_COMPUTE_NODE_TIMEOUT || st == PARAC_COMPUTE_NODE_EXITED) {
       return true;
     }
   }
-  if(m_state->service.ioContext().stopped()) {
+  if(s->service.ioContext().stopped()) {
     return true;
   }
   return false;
@@ -436,13 +457,16 @@ TCPConnection::shouldHandlerBeEnded() {
 
 bool
 TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
+  auto s = state();
+  assert(s);
+
   parac_log(PARAC_COMMUNICATOR,
             PARAC_TRACE,
             "Handle initiator message on node {} from node {}.",
-            m_state->service.handle().id,
+            s->service.handle().id,
             init.sender_id);
 
-  if(init.sender_id == m_state->service.handle().id) {
+  if(init.sender_id == s->service.handle().id) {
     parac_log(PARAC_COMMUNICATOR,
               PARAC_DEBUG,
               "Not accepting connection from same node ({}).",
@@ -450,13 +474,13 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
     return false;
   }
 
-  auto compute_node_store = m_state->service.handle()
-                              .modules[PARAC_MOD_BROKER]
-                              ->broker->compute_node_store;
+  auto compute_node_store =
+    s->service.handle().modules[PARAC_MOD_BROKER]->broker->compute_node_store;
 
-  TCPConnection* conn = new TCPConnection(*this);
+  TCPConnection* conn = new TCPConnection(*this, WeakStatePtr(state()));
+  assert(conn->m_stateStore.index() == 0);
 
-  m_state->compute_node = compute_node_store->get_with_connection(
+  s->compute_node = compute_node_store->get_with_connection(
     compute_node_store,
     init.sender_id,
     &TCPConnection::compute_node_free_func,
@@ -464,7 +488,7 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
     &TCPConnection::compute_node_send_message_to_func,
     &TCPConnection::compute_node_send_file_to_func);
 
-  if(!m_state->compute_node) {
+  if(!s->compute_node) {
     parac_log(PARAC_COMMUNICATOR,
               PARAC_LOCALERROR,
               "Error when creating compute node {}!",
@@ -475,13 +499,12 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
 
   {
     std::stringstream connStr;
-    auto a = m_state->socket->remote_endpoint().address();
+    auto a = s->socket->remote_endpoint().address();
     connStr << (a.is_v6() ? "[" : "") << a.to_string() << (a.is_v6() ? "]" : "")
             << ':' << init.tcp_port;
-    m_state->connectionString = connStr.str();
-    m_state->compute_node->connection_string =
-      m_state->connectionString.c_str();
-    m_state->cachedRemoteEndpoint = m_state->socket->remote_endpoint();
+    s->connectionString = connStr.str();
+    s->compute_node->connection_string = s->connectionString.c_str();
+    s->cachedRemoteEndpoint = s->socket->remote_endpoint();
   }
 
   return true;
@@ -489,11 +512,14 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
 
 bool
 TCPConnection::handleReceivedACK(const PacketHeader& ack) {
+  auto s = state();
+  assert(s);
+
   State::SentBuffer::iterator it;
   {
-    std::unique_lock lock(m_state->sendQueueMutex);
-    it = m_state->sentBuffer.find(ack.number);
-    if(it == m_state->sentBuffer.end()) {
+    std::unique_lock lock(s->sendQueueMutex);
+    it = s->sentBuffer.find(ack.number);
+    if(it == s->sentBuffer.end()) {
       return false;
     }
   }
@@ -501,23 +527,26 @@ TCPConnection::handleReceivedACK(const PacketHeader& ack) {
   sentItem(ack.ack_status);
   sentItem(PARAC_TO_BE_DELETED);
 
-  auto distrac = m_state->service.handle().distrac;
+  auto distrac = s->service.handle().distrac;
   if(distrac) {
-    parac_ev_send_msg_ack e{ m_state->remoteId(),
+    parac_ev_send_msg_ack e{ s->remoteId(),
                              sentItem.header.kind,
                              sentItem.header.number };
     distrac_push(distrac, &e, PARAC_EV_SEND_MSG_ACK);
   }
 
   {
-    std::unique_lock lock(m_state->sendQueueMutex);
-    m_state->sentBuffer.erase(it);
+    std::unique_lock lock(s->sendQueueMutex);
+    s->sentBuffer.erase(it);
   }
   return true;
 }
 
 bool
 TCPConnection::handleReceivedMessage() {
+  auto s = state();
+  assert(s);
+
   parac_message msg;
   struct data {
     parac_status status;
@@ -525,13 +554,13 @@ TCPConnection::handleReceivedMessage() {
   };
   data d;
 
-  msg.kind = m_state->readHeader.kind;
-  msg.length = m_state->readHeader.size;
-  msg.data = static_cast<char*>(m_state->recvBuf.data());
+  msg.kind = s->readHeader.kind;
+  msg.length = s->readHeader.size;
+  msg.data = static_cast<char*>(s->recvBuf.data());
   msg.data_to_be_freed = false;
   msg.userdata = &d;
-  msg.originator_id = m_state->readHeader.originator;
-  msg.origin = m_state->compute_node;
+  msg.originator_id = s->readHeader.originator;
+  msg.origin = s->compute_node;
   msg.cb = [](parac_message* msg, parac_status status) {
     data* d = static_cast<data*>(msg->userdata);
     d->status = status;
@@ -539,8 +568,8 @@ TCPConnection::handleReceivedMessage() {
   };
   assert(msg.data);
 
-  assert(m_state->compute_node->receive_message_from);
-  m_state->compute_node->receive_message_from(m_state->compute_node, &msg);
+  assert(s->compute_node->receive_message_from);
+  s->compute_node->receive_message_from(s->compute_node, &msg);
 
   // Callback must be called immediately! This gives the status that is
   // then passed back.
@@ -550,18 +579,21 @@ TCPConnection::handleReceivedMessage() {
     return false;
   }
 
-  sendACK(m_state->readHeader.number, d.status);
+  sendACK(s->readHeader.number, d.status);
   return true;
 }
 
 void
 TCPConnection::handleReceivedFileStart() {
-  std::string name = m_state->readFileHeader.name;
+  auto s = state();
+  assert(s);
 
-  boost::filesystem::path p(m_state->service.temporaryDirectory());
+  std::string name = s->readFileHeader.name;
 
-  if(m_state->readHeader.originator != m_state->service.handle().id) {
-    p /= std::to_string(m_state->readHeader.originator);
+  boost::filesystem::path p(s->service.temporaryDirectory());
+
+  if(s->readHeader.originator != s->service.handle().id) {
+    p /= std::to_string(s->readHeader.originator);
     boost::filesystem::create_directory(p);
   }
   p /= name;
@@ -570,27 +602,33 @@ TCPConnection::handleReceivedFileStart() {
             PARAC_TRACE,
             "Start receiving file \"{}\" from {} to {}",
             name,
-            m_state->remoteId(),
+            s->remoteId(),
             p);
 
-  m_state->readFileOstream = std::make_unique<State::FileOstream>(
+  s->readFileOstream = std::make_unique<State::FileOstream>(
     State::FileOstream{ std::ofstream{ p.string().c_str(), std::ios::binary },
                         p.string(),
-                        m_state->readFileHeader.name });
+                        s->readFileHeader.name });
 
-  assert(m_state->readFileOstream->o);
-  assert(m_state->readFileOstream->o.is_open());
+  assert(s->readFileOstream->o);
+  assert(s->readFileOstream->o.is_open());
 }
 
 void
 TCPConnection::handleReceivedFileChunk() {
-  auto& o = m_state->readFileOstream;
+  auto s = state();
+  assert(s);
+
+  auto& o = s->readFileOstream;
   assert(o);
-  o->o.write(m_state->recvBuf.data(), m_state->recvBuf.size());
+  o->o.write(s->recvBuf.data(), s->recvBuf.size());
 }
 
 void
 TCPConnection::handleReceivedFile() {
+  auto s = state();
+  assert(s);
+
   parac_file file;
   struct data {
     parac_status status;
@@ -598,16 +636,16 @@ TCPConnection::handleReceivedFile() {
   };
   data d;
 
-  m_state->readFileOstream->o.flush();
+  s->readFileOstream->o.flush();
 
   parac_log(PARAC_COMMUNICATOR,
             PARAC_TRACE,
             "Finished receiving file to \"{}\" from {} with originator {}. "
             "Wrote {} bytes.",
-            m_state->readFileOstream->path,
-            m_state->remoteId(),
-            m_state->readHeader.originator,
-            m_state->readFileOstream->o.tellp());
+            s->readFileOstream->path,
+            s->remoteId(),
+            s->readHeader.originator,
+            s->readFileOstream->o.tellp());
 
   file.cb = [](parac_file* file, parac_status status) {
     data* d = static_cast<data*>(file->userdata);
@@ -615,19 +653,19 @@ TCPConnection::handleReceivedFile() {
     d->returned = true;
   };
   file.userdata = &d;
-  file.path = m_state->readFileOstream->path.c_str();
-  file.originator = m_state->readHeader.originator;
+  file.path = s->readFileOstream->path.c_str();
+  file.originator = s->readHeader.originator;
 
-  assert(m_state->compute_node);
-  assert(m_state->compute_node->receive_file_from);
+  assert(s->compute_node);
+  assert(s->compute_node->receive_file_from);
 
-  m_state->compute_node->receive_file_from(m_state->compute_node, &file);
+  s->compute_node->receive_file_from(s->compute_node, &file);
 
   // Callback must be called immediately! This gives the status that is
   // then passed back.
   assert(d.returned);
 
-  sendACK(m_state->readHeader.number, d.status);
+  sendACK(s->readHeader.number, d.status);
 }
 
 void
@@ -637,10 +675,13 @@ TCPConnection::compute_node_free_func(parac_compute_node* n) {
   n->send_message_to = nullptr;
   if(n->communicator_userdata) {
     TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
-    if(conn->m_state->compute_node == n) {
-      conn->m_state->compute_node = nullptr;
+    auto s = conn->state();
+    if(s) {
+      if(s->compute_node == n) {
+        s->compute_node = nullptr;
+      }
+      conn->send(EndTag());
     }
-    conn->send(EndTag());
     delete conn;
     n->communicator_userdata = nullptr;
   }
@@ -652,7 +693,10 @@ TCPConnection::compute_node_send_message_to_func(parac_compute_node* n,
   assert(n);
   assert(n->communicator_userdata);
   TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
-  conn->send(*msg);
+  auto s = conn->state();
+  if(s) {
+    conn->send(*msg);
+  }
 }
 
 void
@@ -661,7 +705,10 @@ TCPConnection::compute_node_send_file_to_func(parac_compute_node* n,
   assert(n);
   assert(n->communicator_userdata);
   TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
-  conn->send(*file);
+  auto s = conn->state();
+  if(s) {
+    conn->send(*file);
+  }
 }
 
 #define BUF(SOURCE) boost::asio::buffer(&SOURCE, sizeof(SOURCE))
@@ -677,8 +724,17 @@ TCPConnection::readHandler(boost::system::error_code ec,
                       std::placeholders::_1,
                       std::placeholders::_2);
 
+  auto s = state();
+  assert(s);
+
   if(shouldHandlerBeEnded()) {
+    s->socket->close();
     return;
+  }
+
+  if(ec) {
+    s->socket->cancel();
+    s->socket->close();
   }
 
   if(ec == boost::asio::error::eof) {
@@ -688,12 +744,12 @@ TCPConnection::readHandler(boost::system::error_code ec,
     return;
   }
 
-  if(m_state->compute_node) {
-    m_state->compute_node->bytes_received += bytes_received;
+  if(s->compute_node) {
+    s->compute_node->bytes_received += bytes_received;
   }
 
-  reenter(&m_state->readCoro) {
-    yield async_read(*m_state->socket, BUF(m_state->readInitiatorMessage), rh);
+  reenter(&s->readCoro) {
+    yield async_read(*s->socket, BUF(s->readInitiatorMessage), rh);
 
     if(ec) {
       parac_log(
@@ -701,13 +757,13 @@ TCPConnection::readHandler(boost::system::error_code ec,
         PARAC_LOCALERROR,
         "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
         "reading initiator message: {}",
-        m_state->remote_endpoint(),
-        m_state->remoteId(),
+        s->remote_endpoint(),
+        s->remoteId(),
         ec);
       return;
     }
 
-    if(!handleInitiatorMessage(m_state->readInitiatorMessage)) {
+    if(!handleInitiatorMessage(s->readInitiatorMessage)) {
       return;
     }
 
@@ -718,72 +774,75 @@ TCPConnection::readHandler(boost::system::error_code ec,
           PARAC_LOCALERROR,
           "Error in TCPConnection to endpoint {} (ID {}) readHandler before "
           "reading: {}",
-          m_state->remote_endpoint(),
-          m_state->remoteId(),
+          s->remote_endpoint(),
+          s->remoteId(),
           ec);
         return;
       }
 
-      yield async_read(*m_state->socket, BUF(m_state->readHeader), rh);
+      yield async_read(*s->socket, BUF(s->readHeader), rh);
 
       if(ec) {
+        if(ec == boost::system::errc::connection_reset) {
+          // No spamming about reset connections!
+          return;
+        }
         parac_log(
           PARAC_COMMUNICATOR,
           PARAC_LOCALERROR,
           "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
           "reading from socket: {} (read {} bytes)",
-          m_state->remote_endpoint(),
-          m_state->remoteId(),
+          s->remote_endpoint(),
+          s->remoteId(),
           ec.message(),
           bytes_received);
         return;
       }
 
       {
-        auto distrac = m_state->service.handle().distrac;
-        if(distrac && m_state->readHeader.kind != PARAC_MESSAGE_ACK &&
-           m_state->readHeader.kind != PARAC_MESSAGE_END) {
-          parac_ev_recv_msg e{ m_state->readHeader.size +
-                                 sizeof(m_state->readHeader),
-                               m_state->remoteId(),
-                               m_state->readHeader.kind,
-                               m_state->readHeader.number };
+        auto distrac = s->service.handle().distrac;
+        if(distrac && s->readHeader.kind != PARAC_MESSAGE_ACK &&
+           s->readHeader.kind != PARAC_MESSAGE_END) {
+          parac_ev_recv_msg e{ s->readHeader.size + sizeof(s->readHeader),
+                               s->remoteId(),
+                               s->readHeader.kind,
+                               s->readHeader.number };
           distrac_push(distrac, &e, PARAC_EV_RECV_MSG);
         }
       }
 
-      if(m_state->readHeader.kind == PARAC_MESSAGE_ACK) {
-        if(!handleReceivedACK(m_state->readHeader)) {
+      if(s->readHeader.kind == PARAC_MESSAGE_ACK) {
+        if(!handleReceivedACK(s->readHeader)) {
           parac_log(
             PARAC_COMMUNICATOR,
             PARAC_LOCALERROR,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
             "reading ACK!",
-            m_state->remote_endpoint(),
-            m_state->remoteId());
+            s->remote_endpoint(),
+            s->remoteId());
           return;
         }
-      } else if(m_state->readHeader.kind == PARAC_MESSAGE_FILE) {
-        yield async_read(*m_state->socket, BUF(m_state->readFileHeader), rh);
+      } else if(s->readHeader.kind == PARAC_MESSAGE_FILE) {
+        yield async_read(*s->socket, BUF(s->readFileHeader), rh);
         if(ec) {
           parac_log(PARAC_COMMUNICATOR,
                     PARAC_LOCALERROR,
                     "Error in TCPConnection to endpoint {} (ID {}) readHandler "
                     "when reading "
                     "file header from message number {}! Error: {}",
-                    m_state->remote_endpoint(),
-                    m_state->remoteId(),
-                    m_state->readHeader.number,
+                    s->remote_endpoint(),
+                    s->remoteId(),
+                    s->readHeader.number,
                     ec.message());
           return;
         }
 
         handleReceivedFileStart();
 
-        while(m_state->readHeader.size > 0) {
-          m_state->recvBuf.resize(
-            std::min((unsigned long)REC_BUF_SIZE, m_state->readHeader.size));
-          yield async_read(*m_state->socket, VBUF(m_state->recvBuf), rh);
+        while(s->readHeader.size > 0) {
+          s->recvBuf.resize(
+            std::min((unsigned long)REC_BUF_SIZE, s->readHeader.size));
+          yield async_read(*s->socket, VBUF(s->recvBuf), rh);
 
           if(ec) {
             parac_log(
@@ -793,70 +852,70 @@ TCPConnection::readHandler(boost::system::error_code ec,
               "reading "
               "file chunk from file message number {}! Bytes left: {}. Error: "
               "{}",
-              m_state->remote_endpoint(),
-              m_state->remoteId(),
-              m_state->readHeader.number,
-              m_state->readHeader.size,
+              s->remote_endpoint(),
+              s->remoteId(),
+              s->readHeader.number,
+              s->readHeader.size,
               ec.message());
             return;
           }
-          m_state->readHeader.size -= bytes_received;
+          s->readHeader.size -= bytes_received;
           handleReceivedFileChunk();
         }
         handleReceivedFile();
-      } else if(m_state->readHeader.kind == PARAC_MESSAGE_END) {
-        m_state->resumeMode = EndAfterShutdown;
+      } else if(s->readHeader.kind == PARAC_MESSAGE_END) {
+        s->resumeMode = EndAfterShutdown;
         return;
       } else {
         // Read rest of message, then pass on to handler function from compute
         // node.
-        if(!m_state->compute_node) {
+        if(!s->compute_node) {
           parac_log(
             PARAC_COMMUNICATOR,
             PARAC_LOCALERROR,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
             "processing received message of kind {}, size {}, and number {}! "
             "Compute node not defined!",
-            m_state->remote_endpoint(),
-            m_state->remoteId(),
-            m_state->readHeader.kind,
-            m_state->readHeader.size,
-            m_state->readHeader.number);
+            s->remote_endpoint(),
+            s->remoteId(),
+            s->readHeader.kind,
+            s->readHeader.size,
+            s->readHeader.number);
           return;
         }
 
-        if(m_state->readHeader.size > MAX_BUF_SIZE) {
+        if(s->readHeader.size > MAX_BUF_SIZE) {
           parac_log(
             PARAC_COMMUNICATOR,
             PARAC_LOCALERROR,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
             "reading message of kind {}, size {}, and number {}! "
             "Too big, buffer would be larger than MAX_BUF_SIZE {}!",
-            m_state->remote_endpoint(),
-            m_state->remoteId(),
-            m_state->readHeader.kind,
-            m_state->readHeader.size,
-            m_state->readHeader.number,
+            s->remote_endpoint(),
+            s->remoteId(),
+            s->readHeader.kind,
+            s->readHeader.size,
+            s->readHeader.number,
             bytes_received,
             MAX_BUF_SIZE);
           return;
         }
-        m_state->recvBuf.resize(m_state->readHeader.size);
-        yield async_read(*m_state->socket, VBUF(m_state->recvBuf), rh);
+        s->recvBuf.resize(s->readHeader.size);
+        yield async_read(*s->socket, VBUF(s->recvBuf), rh);
 
-        if(ec || bytes_received != m_state->readHeader.size ||
-           bytes_received != m_state->recvBuf.size()) {
+        if(ec || bytes_received != s->readHeader.size ||
+           bytes_received != s->recvBuf.size()) {
           parac_log(
             PARAC_COMMUNICATOR,
             PARAC_LOCALERROR,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
             "reading message of kind {}, size {}, and number {}! "
             "Not enough bytes (only {}) read! Error: {}",
-            m_state->remote_endpoint(),
-            m_state->remoteId(),
-            m_state->readHeader.kind,
-            m_state->readHeader.size,
-            m_state->readHeader.number,
+            s->remote_endpoint(),
+            s->remoteId(),
+            s->readHeader.kind,
+            s->readHeader.size,
+            s->readHeader.number,
             bytes_received,
             ec.message());
           return;
@@ -884,15 +943,28 @@ TCPConnection::writeHandler(boost::system::error_code ec,
                       std::placeholders::_1,
                       std::placeholders::_2);
 
-  std::unique_lock lock(m_state->sendQueueMutex);
-
-  SendQueueEntry* e = nullptr;
-  if(!m_state->sendQueue.empty()) {
-    e = &m_state->sendQueue.front();
+  auto s = state();
+  if(!s) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_TRACE,
+              "Ending write handler because state was destructed!");
+    return;
   }
 
-  if(m_state->compute_node) {
-    m_state->compute_node->bytes_sent += bytes_transferred;
+  if(ec) {
+    s->socket->cancel();
+    s->socket->close();
+  }
+
+  std::unique_lock lock(s->sendQueueMutex);
+
+  SendQueueEntry* e = nullptr;
+  if(!s->sendQueue.empty()) {
+    e = &s->sendQueue.front();
+  }
+
+  if(s->compute_node) {
+    s->compute_node->bytes_sent += bytes_transferred;
   }
 
   // Defined up here in order to be created when sending files. When it is
@@ -900,44 +972,43 @@ TCPConnection::writeHandler(boost::system::error_code ec,
   // to this connection's state.
   std::unique_ptr<FileSender> sender;
 
-  reenter(m_state->writeCoro) {
-    yield async_write(
-      *m_state->socket, BUF(m_state->writeInitiatorMessage), wh);
+  reenter(s->writeCoro) {
+    yield async_write(*s->socket, BUF(s->writeInitiatorMessage), wh);
     if(ec) {
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_LOCALERROR,
                 "Error when sending initiator packet to endpoint {}! Error: {}",
-                m_state->remote_endpoint(),
+                s->remote_endpoint(),
                 ec.message());
       return;
     }
 
     while(true) {
-      while(m_state->sendQueue.empty()) {
-        m_state->currentlySending.clear();
+      while(s->sendQueue.empty()) {
+        s->currentlySending.clear();
         yield;
       }
-      e = &m_state->sendQueue.front();
+      e = &s->sendQueue.front();
 
       assert(e);
       {
-        auto distrac = m_state->service.handle().distrac;
+        auto distrac = s->service.handle().distrac;
         if(distrac && e->header.kind != PARAC_MESSAGE_ACK &&
            e->header.kind != PARAC_MESSAGE_END) {
           parac_ev_send_msg entry{ e->header.size + sizeof(e->header),
-                                   m_state->remoteId(),
+                                   s->remoteId(),
                                    e->header.kind,
                                    e->header.number };
           distrac_push(distrac, &entry, PARAC_EV_SEND_MSG);
         }
       }
 
-      m_state->transmitMode = e->transmitMode;
-      yield async_write(*m_state->socket, BUF(e->header), wh);
+      s->transmitMode = e->transmitMode;
+      yield async_write(*s->socket, BUF(e->header), wh);
 
       if(ec == boost::system::errc::broken_pipe) {
         // Connection can be closed silently.
-        m_state->resumeMode = EndAfterShutdown;
+        s->resumeMode = EndAfterShutdown;
         return;
       }
 
@@ -945,7 +1016,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         parac_log(PARAC_COMMUNICATOR,
                   PARAC_LOCALERROR,
                   "Error when sending packet header to remote ID {}! Error: {}",
-                  m_state->remoteId(),
+                  s->remoteId(),
                   ec.message());
         return;
       }
@@ -958,7 +1029,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
         sender =
           std::make_unique<FileSender>(e->file().path,
-                                       *m_state->socket,
+                                       *s->socket,
                                        std::bind(&TCPConnection::writeHandler,
                                                  *this,
                                                  boost::system::error_code(),
@@ -971,20 +1042,19 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         if(e->message().data_is_inline) {
           assert(e->header.size <= PARAC_MESSAGE_INLINE_DATA_SIZE);
           yield async_write(
-            *m_state->socket,
+            *s->socket,
             const_buffer(e->message().inline_data, e->header.size),
             wh);
         } else {
-          yield async_write(*m_state->socket,
-                            const_buffer(e->message().data, e->header.size),
-                            wh);
+          yield async_write(
+            *s->socket, const_buffer(e->message().data, e->header.size), wh);
         }
 
         if(ec) {
           parac_log(PARAC_COMMUNICATOR,
                     PARAC_LOCALERROR,
                     "Error when sending message to remote ID {}! Error: {}",
-                    m_state->remoteId(),
+                    s->remoteId(),
                     ec.message());
           return;
         }
@@ -994,10 +1064,9 @@ TCPConnection::writeHandler(boost::system::error_code ec,
          e->header.kind != PARAC_MESSAGE_END) {
         auto n = e->header.number;
         e->sent = std::chrono::steady_clock::now();
-        m_state->sentBuffer.try_emplace(n,
-                                        std::move(m_state->sendQueue.front()));
+        s->sentBuffer.try_emplace(n, std::move(s->sendQueue.front()));
       }
-      m_state->sendQueue.pop();
+      s->sendQueue.pop();
     }
   }
 }

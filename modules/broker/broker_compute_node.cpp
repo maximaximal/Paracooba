@@ -7,6 +7,7 @@
 #include "paracooba/common/message_kind.h"
 #include "paracooba/common/status.h"
 #include "paracooba/common/task.h"
+#include "paracooba/common/task_store.h"
 #include "paracooba/communicator/communicator.h"
 #include "paracooba/module.h"
 #include "paracooba/solver/solver.h"
@@ -380,6 +381,20 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
 
       parac_message_wrapper msg;
       task->serialize(task, &msg);
+      msg.userdata = task;
+      msg.cb = [](parac_message* msg, parac_status s) {
+        if(s != PARAC_OK && s != PARAC_TO_BE_DELETED) {
+          // Message has been lost! Undo offload operation.
+          parac_task* t = static_cast<parac_task*>(msg->userdata);
+          parac_log(PARAC_BROKER,
+                    PARAC_LOCALERROR,
+                    "Offload operation of task on path {} to remote node {} "
+                    "failed! Undoing offload.",
+                    t->path,
+                    t->offloaded_to->id);
+          t->task_store->undo_offload(t->task_store, t);
+        }
+      };
       m_node.send_message_to(&m_node, &msg);
     }
   }

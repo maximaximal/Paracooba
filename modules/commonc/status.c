@@ -7,6 +7,8 @@ parac_status_to_str(parac_status status) {
   switch(status) {
     case PARAC_OK:
       return "Ok";
+    case PARAC_AUTO_SHUTDOWN_TRIGGERED:
+      return "Auto Shutdown Triggered";
     case PARAC_FULL:
       return "Full";
     case PARAC_PENDING:

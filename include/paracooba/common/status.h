@@ -7,6 +7,7 @@ extern "C" {
 
 typedef enum parac_status {
   PARAC_OK,
+  PARAC_AUTO_SHUTDOWN_TRIGGERED,
   PARAC_FULL,
   PARAC_PENDING,
   PARAC_UNDEFINED,
