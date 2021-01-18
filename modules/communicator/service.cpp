@@ -103,6 +103,11 @@ Service::run() {
   while(!m_internal->context.stopped()) {
     try {
       m_internal->context.run();
+    } catch(boost::exception_detail::clone_impl<
+            boost::exception_detail::error_info_injector<
+              boost::system::system_error>>& e) {
+      // Exceptions in connections should be able to be ignored, as connections
+      // are just dropped and re-initiated by their destructors if so required.
     } catch(std::exception& e) {
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_LOCALERROR,

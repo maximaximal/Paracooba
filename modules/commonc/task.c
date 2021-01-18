@@ -79,6 +79,10 @@ parac_task_default_assess(parac_task* t) {
         notify_result(t);
       }
     }
+  } else {
+    if(t->received_from && (t->result != PARAC_PENDING)) {
+      notify_result(t);
+    }
   }
 
   return t->state;
