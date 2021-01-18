@@ -102,6 +102,7 @@ init(parac_module* mod) {
   assert(userdata->internal);
 
   userdata->internal->computeNodeStore.updateThisNodeDescription();
+  userdata->internal->taskStore.manageAutoShutdownTimer();
 
   return PARAC_OK;
 }

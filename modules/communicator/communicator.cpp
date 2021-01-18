@@ -135,6 +135,15 @@ init_config(CommunicatorUserdata* u) {
   e[Config::RETRY_TIMEOUT].type = PARAC_TYPE_UINT32;
   e[Config::RETRY_TIMEOUT].default_value.uint32 = 1000;
 
+  parac_config_entry_set_str(&e[Config::KEEPALIVE_INTERVAL],
+                             "keepalive-interval",
+                             "Interval how often keepalive-packets should be "
+                             "sent (at least, if no other messages were sent). "
+                             "Must be smaller than network timeout of peers.");
+  e[Config::KEEPALIVE_INTERVAL].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::KEEPALIVE_INTERVAL].type = PARAC_TYPE_UINT32;
+  e[Config::KEEPALIVE_INTERVAL].default_value.uint32 = 1500;
+
   parac_config_entry_set_str(&e[Config::CONNECTION_RETRIES],
                              "connection-retries",
                              "Number of times making a connection to a remote "
@@ -160,7 +169,8 @@ init_config(CommunicatorUserdata* u) {
   e[Config::AUTOMATIC_LISTEN_PORT_ASSIGNMENT].type = PARAC_TYPE_SWITCH;
 }
 
-static bool is_tcpacceptor_active(parac_module *mod) {
+static bool
+is_tcpacceptor_active(parac_module* mod) {
   assert(mod);
   assert(mod->userdata);
 

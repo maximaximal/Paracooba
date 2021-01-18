@@ -34,6 +34,7 @@ enum Config {
   TCP_TARGET_PORT,
   NETWORK_TIMEOUT,
   RETRY_TIMEOUT,
+  KEEPALIVE_INTERVAL,
   CONNECTION_RETRIES,
   KNOWN_REMOTES,
   AUTOMATIC_LISTEN_PORT_ASSIGNMENT,
@@ -61,6 +62,7 @@ class Service {
   uint16_t currentUDPListenPort() const;
   uint32_t networkTimeoutMS() const;
   uint32_t retryTimeoutMS() const;
+  uint32_t keepaliveIntervalMS() const;
   bool automaticListenPortAssignment() const;
 
   const char* knownRemote(size_t i) const;

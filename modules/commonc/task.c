@@ -21,6 +21,7 @@ static void
 notify_result(parac_task* t) {
   assert(t);
   assert(t->received_from);
+  assert(t->received_from->send_message_to);
   parac_message msg;
   msg.kind = PARAC_MESSAGE_TASK_RESULT;
 

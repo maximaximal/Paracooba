@@ -42,6 +42,8 @@ class TaskStore {
 
   void receiveTaskResultFromPeer(parac_message& msg);
 
+  void manageAutoShutdownTimer();
+
   private:
   void insert_into_tasksWaitingForWorkerQueue(parac_task* task);
   void insert_into_tasksWaitingForChildren(parac_task* task);
@@ -51,7 +53,6 @@ class TaskStore {
   void remove_from_tasksBeingWorkedOn(parac_task* task);
   void remove(parac_task* task);
 
-  void manageAutoShutdownTimer();
   static void autoShutdownTimerExpired(parac_timeout* t);
 
   struct Internal;

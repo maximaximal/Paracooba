@@ -132,6 +132,8 @@ class TCPConnection {
   inline void async_read(S& socket, B&& buffer, CB cb);
 
   void close();
+
+  void setKeepaliveTimer();
 };
 
 constexpr const char*

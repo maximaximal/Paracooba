@@ -159,7 +159,8 @@ struct TCPConnection::State {
     , connectionTry(connectionTry)
     , writeInitiatorMessage(
         { service.handle().id, service.currentTCPListenPort() })
-    , readTimer(service.ioContext()) {
+    , readTimer(service.ioContext())
+    , keepaliveTimer(service.ioContext()) {
     if(connectionTry < 0) {
       resumeMode = EndAfterShutdown;
     }
@@ -175,7 +176,8 @@ struct TCPConnection::State {
         { service.handle().id, service.currentTCPListenPort() })
     , sendQueue(std::move(ptr->queue))
     , sentBuffer(std::move(ptr->map))
-    , readTimer(service.ioContext()) {}
+    , readTimer(service.ioContext())
+    , keepaliveTimer(service.ioContext()) {}
 
   ~State() {
     if(compute_node) {
@@ -296,6 +298,7 @@ struct TCPConnection::State {
   SentBuffer sentBuffer;
 
   boost::asio::steady_timer readTimer;
+  boost::asio::steady_timer keepaliveTimer;
 };
 
 template<typename S, typename B, typename CB>
@@ -866,6 +869,15 @@ TCPConnection::readHandler(boost::system::error_code ec,
       } else if(s->readHeader.kind == PARAC_MESSAGE_END) {
         s->resumeMode = EndAfterShutdown;
         return;
+      } else if(s->readHeader.kind == PARAC_MESSAGE_KEEPALIVE) {
+        // Nothing to do, this message just keeps the connection alive.
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_TRACE,
+                  "Receive Keepalive packet in TCPConnection to remote {} (ID: "
+                  "{}). Message number: {}.",
+                  s->remote_endpoint(),
+                  s->remoteId(),
+                  s->readHeader.number);
       } else {
         // Read rest of message, then pass on to handler function from compute
         // node.
@@ -986,8 +998,10 @@ TCPConnection::writeHandler(boost::system::error_code ec,
     while(true) {
       while(s->sendQueue.empty()) {
         s->currentlySending.clear();
+        setKeepaliveTimer();
         yield;
       }
+      setKeepaliveTimer();
       e = &s->sendQueue.front();
 
       assert(e);
@@ -1022,7 +1036,8 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       }
 
       if(e->header.kind == PARAC_MESSAGE_ACK ||
-         e->header.kind == PARAC_MESSAGE_END) {
+         e->header.kind == PARAC_MESSAGE_END ||
+         e->header.kind == PARAC_MESSAGE_KEEPALIVE) {
         // Nothing has to be done, message already finished.
       } else if(e->header.kind == PARAC_MESSAGE_FILE) {
         assert(e);
@@ -1061,7 +1076,8 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       }
 
       if(e->header.kind != PARAC_MESSAGE_ACK &&
-         e->header.kind != PARAC_MESSAGE_END) {
+         e->header.kind != PARAC_MESSAGE_END &&
+         e->header.kind != PARAC_MESSAGE_KEEPALIVE) {
         auto n = e->header.number;
         e->sent = std::chrono::steady_clock::now();
         s->sentBuffer.try_emplace(n, std::move(s->sendQueue.front()));
@@ -1075,6 +1091,27 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 #undef VBUF
 
 #include <boost/asio/unyield.hpp>
+
+void
+TCPConnection::setKeepaliveTimer() {
+  if(auto s = state()) {
+    s->keepaliveTimer.expires_from_now(
+      std::chrono::milliseconds(s->service.keepaliveIntervalMS()));
+    TCPConnection weakThis = TCPConnection(*this, WeakStatePtr(s));
+    s->keepaliveTimer.async_wait(
+      [weakThis{ std::move(weakThis) }](
+        const boost::system::error_code& ec) mutable {
+        if(!ec) {
+          // Timer expired! A message of type PARAC_MESSAGE_KEEPALIVE must be
+          // sent in order to keep the peer readHandler from running into a
+          // timeout!
+          parac_message_wrapper msg;
+          msg.kind = PARAC_MESSAGE_KEEPALIVE;
+          weakThis.send(msg);
+        }
+      });
+  }
+}
 
 std::ostream&
 operator<<(std::ostream& o, TCPConnection::ResumeMode resumeMode) {

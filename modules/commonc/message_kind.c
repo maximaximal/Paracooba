@@ -34,6 +34,8 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "Ack";
     case PARAC_MESSAGE_END:
       return "End";
+    case PARAC_MESSAGE_KEEPALIVE:
+      return "Keep-Alive";
   }
   return "";
 }

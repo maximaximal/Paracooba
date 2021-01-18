@@ -24,6 +24,7 @@ typedef enum parac_message_kind {
   PARAC_MESSAGE_FILE,
   PARAC_MESSAGE_ACK,
   PARAC_MESSAGE_END,
+  PARAC_MESSAGE_KEEPALIVE,
 
   PARAC_MESSAGE__COUNT
 } parac_message_kind;

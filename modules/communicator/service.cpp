@@ -244,6 +244,12 @@ Service::retryTimeoutMS() const {
   return m_config[RETRY_TIMEOUT].value.uint32;
 }
 
+uint32_t
+Service::keepaliveIntervalMS() const {
+  assert(m_config);
+  return m_config[KEEPALIVE_INTERVAL].value.uint32;
+}
+
 bool
 Service::automaticListenPortAssignment() const {
   assert(m_config);

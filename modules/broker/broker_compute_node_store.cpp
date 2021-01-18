@@ -143,12 +143,16 @@ ComputeNodeStore::has(parac_id id) const {
 void
 ComputeNodeStore::incrementThisNodeWorkQueueSize(parac_id originator) {
   thisNode().incrementWorkQueueSize(originator);
-  sendStatusToPeers();
+  if(thisNode().status().isParsed(originator)) {
+    sendStatusToPeers();
+  }
 }
 void
 ComputeNodeStore::decrementThisNodeWorkQueueSize(parac_id originator) {
   thisNode().decrementWorkQueueSize(originator);
-  sendStatusToPeers();
+  if(thisNode().status().isParsed(originator)) {
+    sendStatusToPeers();
+  }
 }
 void
 ComputeNodeStore::formulaParsed(parac_id originator) {
