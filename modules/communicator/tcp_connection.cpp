@@ -13,6 +13,7 @@
 #include <boost/asio/error.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/placeholders.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/system/error_code.hpp>
@@ -155,10 +156,10 @@ struct TCPConnection::State {
                  int connectionTry)
     : service(service)
     , socket(std::move(socket))
-    , steadyTimer(service.ioContext())
     , connectionTry(connectionTry)
     , writeInitiatorMessage(
-        { service.handle().id, service.currentTCPListenPort() }) {
+        { service.handle().id, service.currentTCPListenPort() })
+    , readTimer(service.ioContext()) {
     if(connectionTry < 0) {
       resumeMode = EndAfterShutdown;
     }
@@ -169,12 +170,12 @@ struct TCPConnection::State {
                  TCPConnectionPayloadPtr ptr)
     : service(service)
     , socket(std::move(socket))
-    , steadyTimer(service.ioContext())
     , connectionTry(connectionTry)
     , writeInitiatorMessage(
         { service.handle().id, service.currentTCPListenPort() })
     , sendQueue(std::move(ptr->queue))
-    , sentBuffer(std::move(ptr->map)) {}
+    , sentBuffer(std::move(ptr->map))
+    , readTimer(service.ioContext()) {}
 
   ~State() {
     if(compute_node) {
@@ -240,7 +241,6 @@ struct TCPConnection::State {
   std::unique_ptr<boost::asio::ip::tcp::socket> socket;
 
   std::vector<char> recvBuf;
-  boost::asio::steady_timer steadyTimer;
   std::atomic_int connectionTry = 0;
 
   std::atomic<TransmitMode> transmitMode = TransmitInit;
@@ -294,7 +294,42 @@ struct TCPConnection::State {
   std::queue<SendQueueEntry> sendQueue;
   using SentBuffer = std::map<decltype(PacketHeader::number), SendQueueEntry>;
   SentBuffer sentBuffer;
+
+  boost::asio::steady_timer readTimer;
 };
+
+template<typename S, typename B, typename CB>
+void
+TCPConnection::async_write(S& socket, B&& buffer, CB& cb) {
+  boost::asio::async_write(socket, buffer, cb);
+}
+
+template<typename S, typename B, typename CB>
+void
+TCPConnection::async_read(S& socket, B&& buffer, CB cb) {
+  auto timeout_handler = [cb](const boost::system::error_code& ec) {
+    if(!ec) {
+      // The read timed out! Call the CB with a timeout error.
+      std::function<void(boost::system::error_code, size_t)> timeout_func = cb;
+      timeout_func(boost::system::error_code(boost::system::errc::timed_out,
+                                             boost::system::generic_category()),
+                   0);
+    }
+  };
+
+  m_state->readTimer.expires_from_now(
+    std::chrono::milliseconds(m_state->service.networkTimeoutMS()));
+  m_state->readTimer.async_wait(timeout_handler);
+
+  auto read_handler = [cb, *this](const boost::system::error_code& ec,
+                                  size_t bytes_received) {
+    m_state->readTimer.cancel();
+    std::function<void(boost::system::error_code, size_t)> cb_func = cb;
+    cb_func(ec, bytes_received);
+  };
+
+  boost::asio::async_read(socket, buffer, read_handler);
+}
 
 TCPConnection::TCPConnection(
   Service& service,

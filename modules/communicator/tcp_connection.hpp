@@ -94,6 +94,12 @@ class TCPConnection {
                                                 parac_message* msg);
   static void compute_node_send_file_to_func(parac_compute_node* n,
                                              parac_file* file);
+
+  template<typename S, typename B, typename CB>
+  inline void async_write(S& socket, B&& buffer, CB& cb);
+
+  template<typename S, typename B, typename CB>
+  inline void async_read(S& socket, B&& buffer, CB cb);
 };
 
 constexpr const char*

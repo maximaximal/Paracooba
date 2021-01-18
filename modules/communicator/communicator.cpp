@@ -126,7 +126,7 @@ init_config(CommunicatorUserdata* u) {
                              "Timeout (in ms) for network connections.");
   e[Config::NETWORK_TIMEOUT].registrar = PARAC_MOD_COMMUNICATOR;
   e[Config::NETWORK_TIMEOUT].type = PARAC_TYPE_UINT32;
-  e[Config::NETWORK_TIMEOUT].default_value.uint32 = 10000;
+  e[Config::NETWORK_TIMEOUT].default_value.uint32 = 5000;
 
   parac_config_entry_set_str(&e[Config::RETRY_TIMEOUT],
                              "retry-timeout",
