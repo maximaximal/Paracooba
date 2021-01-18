@@ -1,6 +1,7 @@
 #pragma once
 
 #include "paracooba/common/types.h"
+#include <atomic>
 #include <string>
 
 #include <cereal/types/map.hpp>
@@ -89,11 +90,18 @@ class ComputeNode {
     void resetDirty() const { m_dirty = false; }
     bool isParsed(parac_id id) const;
 
+    void addStreamRef() const { ++m_streamRefs; }
+    void removeStreamRef() const { --m_streamRefs; }
+    bool checkStreamRefs() const { return m_streamRefs == 0; }
+    size_t streamRefs() const { return m_streamRefs; }
+
     private:
     mutable std::unique_ptr<NoncopyOStringstream> m_statusStream;
 
     friend class ComputeNode;
-    mutable bool m_dirty;
+    mutable std::atomic_bool m_dirty;
+    mutable std::atomic_flag m_writeFlag = ATOMIC_FLAG_INIT;
+    mutable std::atomic_size_t m_streamRefs = 0;
   };
 
   const Description* description() const {
@@ -119,7 +127,7 @@ class ComputeNode {
   void receiveMessageDescriptionFrom(parac_message& msg);
   void receiveMessageStatusFrom(parac_message& msg);
   void receiveMessageTaskResultFrom(parac_message& msg);
-  void receiveMessageKnownRemotesFrom(parac_message &msg);
+  void receiveMessageKnownRemotesFrom(parac_message& msg);
 
   void receiveFileFrom(parac_file& file);
 

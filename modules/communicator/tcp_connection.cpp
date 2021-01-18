@@ -923,7 +923,6 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
         sender =
           std::make_unique<FileSender>(e->file().path,
-                                       e->file().originator,
                                        *m_state->socket,
                                        std::bind(&TCPConnection::writeHandler,
                                                  *this,

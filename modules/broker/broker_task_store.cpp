@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <deque>
 #include <list>
@@ -105,6 +106,9 @@ struct TaskStore::Internal {
                                         std::equal_to<parac_path_type>,
                                         Allocator<TaskRef>>>
     offloadedTasks;
+
+  std::atomic_size_t tasksSize = 0;
+  std::atomic_size_t tasksWaitingForWorkerQueueSize = 0;
 };
 
 TaskStore::TaskStore(parac_handle& handle, parac_task_store& s)
@@ -125,7 +129,7 @@ TaskStore::TaskStore(parac_handle& handle, parac_task_store& s)
     assert(store);
     assert(store->userdata);
     return static_cast<TaskStore*>(store->userdata)
-      ->m_internal->tasksWaitingForWorkerQueue.size();
+      ->m_internal->tasksWaitingForWorkerQueueSize.load();
   };
   s.get_waiting_for_children_size = [](parac_task_store* store) {
     assert(store);
@@ -207,6 +211,8 @@ TaskStore::newTask(parac_task* parent_task,
     }
   }
 
+  ++m_internal->tasksSize;
+
   return task;
 }
 
@@ -245,6 +251,7 @@ TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
       Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
         reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
       ++taskWrapper->refcount;
+      --m_internal->tasksWaitingForWorkerQueueSize;
 
       decrementWorkQueueInComputeNode(m_internal->handle, t.originator);
       return &t;
@@ -270,6 +277,7 @@ TaskStore::pop_work() {
     Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
       reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
     ++taskWrapper->refcount;
+    --m_internal->tasksWaitingForWorkerQueueSize;
   }
 
   decrementWorkQueueInComputeNode(m_internal->handle, t->originator);
@@ -303,6 +311,8 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
                          return t.get().path.length > p.length;
                        }),
       *task);
+
+    ++m_internal->tasksWaitingForWorkerQueueSize;
 
     incrementWorkQueueInComputeNode(m_internal->handle, task->originator);
 
@@ -374,6 +384,8 @@ TaskStore::remove(parac_task* task) {
       task->parent_task_->right_child_ = nullptr;
   }
 
+  --m_internal->tasksSize;
+
   m_internal->tasks.erase(taskWrapper->it);
 }
 
@@ -395,8 +407,8 @@ TaskStore::assess_task(parac_task* task) {
             "{}, tasks in store: {}",
             task->path,
             task->state,
-            m_internal->tasksWaitingForWorkerQueue.size(),
-            m_internal->tasks.size());
+            m_internal->tasksWaitingForWorkerQueueSize,
+            m_internal->tasksSize);
 
   if(parac_task_state_is_done(s)) {
     assert(!(s & PARAC_TASK_WORK_AVAILABLE));

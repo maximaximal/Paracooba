@@ -13,7 +13,6 @@ class FileSender {
   using FinishedCB = std::function<void()>;
 
   FileSender(const std::string& source_file,
-             parac_id originator,
              boost::asio::ip::tcp::socket& socket,
              FinishedCB cb);
 

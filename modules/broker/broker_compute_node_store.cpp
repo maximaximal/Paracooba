@@ -27,8 +27,9 @@ struct ComputeNodeStore::Internal {
                      std::reference_wrapper<parac_compute_node_wrapper>>
     nodesRefMap;
 
-  std::atomic_bool sendingStatusToPeers;
-  std::atomic_bool sendingStatusToPeersAndThenResend;
+  std::atomic_bool sendingStatusToPeers = false;
+  std::atomic_bool sendingStatusToPeersAndThenResend = false;
+  std::atomic_size_t sendingStatusToPeersInTransit = 0;
 };
 
 ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
@@ -176,27 +177,25 @@ ComputeNodeStore::create(parac_id id) {
 
 void
 ComputeNodeStore::sendStatusToPeers() {
-  if(m_internal->sendingStatusToPeers) {
+  if(m_internal->sendingStatusToPeers.exchange(true)) {
     m_internal->sendingStatusToPeersAndThenResend = true;
     return;
   }
   m_internal->sendingStatusToPeersAndThenResend = false;
-  m_internal->sendingStatusToPeers = true;
 
-  if(!thisNode().status().dirty()) {
-    return;
-  }
   parac_message_wrapper msg;
   thisNode().status().serializeToMessage(msg);
   msg.cb = [](parac_message* msg, parac_status s) {
-    // Only re-send if there was no other issue.
-    if(s == PARAC_OK) {
+    // Handle all eventual sending outcomes.
+    if(s == PARAC_TO_BE_DELETED) {
       assert(msg);
       assert(msg->userdata);
       ComputeNodeStore* store = static_cast<ComputeNodeStore*>(msg->userdata);
       Internal* internal = store->m_internal.get();
-      internal->sendingStatusToPeers = false;
-      if(internal->sendingStatusToPeersAndThenResend) {
+      store->thisNode().status().removeStreamRef();
+      if(--internal->sendingStatusToPeersInTransit == 0 &&
+         internal->sendingStatusToPeersAndThenResend) {
+        internal->sendingStatusToPeers = false;
         store->sendStatusToPeers();
       }
     }
@@ -206,6 +205,8 @@ ComputeNodeStore::sendStatusToPeers() {
   std::unique_lock lock(m_internal->nodesMutex);
   for(auto& e : m_internal->nodesList) {
     if(e.send_message_to) {
+      ++m_internal->sendingStatusToPeersInTransit;
+      thisNode().status().addStreamRef();
       e.send_message_to(&e, &msg);
     }
   }

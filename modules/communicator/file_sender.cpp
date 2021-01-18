@@ -15,7 +15,6 @@ extern "C" {
 
 namespace parac::communicator {
 FileSender::FileSender(const std::string& source_file,
-                       parac_id originator,
                        boost::asio::ip::tcp::socket& socket,
                        FinishedCB cb)
   : m_state(std::make_shared<State>(socket)) {

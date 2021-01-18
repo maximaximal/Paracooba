@@ -17,6 +17,8 @@
 #include <paracooba/common/message.h>
 #include <paracooba/common/noncopy_ostream.hpp>
 
+#include "../commonc/spin_lock.hpp"
+
 #include <algorithm>
 #include <cassert>
 #include <initializer_list>
@@ -142,6 +144,8 @@ void
 ComputeNode::Status::serializeToMessage(parac_message& msg) const {
   msg.kind = PARAC_MESSAGE_NODE_STATUS;
 
+  assert(checkStreamRefs());
+
   if(!m_statusStream) {
     m_statusStream = std::make_unique<NoncopyOStringstream>();
   } else {
@@ -154,6 +158,7 @@ ComputeNode::Status::serializeToMessage(parac_message& msg) const {
     assert(m_statusStream->tellp() == 0);
 
     {
+      SpinLock lock(m_writeFlag);
       cereal::BinaryOutputArchive oa(*m_statusStream);
       oa(*this);
     }
@@ -172,16 +177,19 @@ ComputeNode::Status::isParsed(parac_id id) const {
 
 void
 ComputeNode::incrementWorkQueueSize(parac_id originator) {
+  SpinLock lock(m_status.m_writeFlag);
   ++m_status.solverInstances[originator].workQueueSize;
   m_status.m_dirty = true;
 }
 void
 ComputeNode::decrementWorkQueueSize(parac_id originator) {
+  SpinLock lock(m_status.m_writeFlag);
   --m_status.solverInstances[originator].workQueueSize;
   m_status.m_dirty = true;
 }
 void
 ComputeNode::formulaParsed(parac_id originator) {
+  SpinLock lock(m_status.m_writeFlag);
   m_status.solverInstances[originator].formula_parsed = true;
   m_status.m_dirty = true;
 }
