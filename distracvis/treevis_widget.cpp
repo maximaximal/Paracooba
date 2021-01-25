@@ -16,7 +16,7 @@
 #include <Magnum/MeshTools/CompressIndices.h>
 #include <Magnum/MeshTools/Interleave.h>
 #include <Magnum/Primitives/Cube.h>
-#include <Magnum/Shaders/Phong.h>
+#include <Magnum/Shaders/Flat.h>
 #include <Magnum/Trade/MeshData.h>
 #include <boost/pool/pool_alloc.hpp>
 #include <gdkmm/device.h>
@@ -65,10 +65,8 @@ struct TaskInstance {
   explicit TaskInstance(size_t nodeId,
                         parac_path path,
                         parac_status state = PARAC_UNKNOWN)
-    : transformation(getTransformationFromPathAndNodeId(nodeId, path))
-    , normal(transformation.normalMatrix()) {
+    : transformation(getTransformationFromPathAndNodeId(nodeId, path)) {
     (void)state;
-    /*
     if(state == PARAC_UNKNOWN) {
       color.b() = 1;
     }
@@ -82,18 +80,16 @@ struct TaskInstance {
     if(state == PARAC_UNSAT) {
       color.r() = 1;
     }
-    */
   }
 
   Matrix4 transformation;
-  Matrix3x3 normal;
-  // Color3 color = Color3(0, 0, 0);
+  Color3 color = Color3(0, 0, 0);
 };
 
 struct TreeVisWidget::Internal {
   Magnum::GL::Mesh mesh;
-  Magnum::Shaders::Phong shader =
-    Shaders::Phong(Shaders::Phong::Flag::InstancedTransformation);
+  Magnum::Shaders::Flat3D shader =
+    Shaders::Flat3D(Shaders::Flat3D::Flag::InstancedTransformation);
   Magnum::Matrix4 transformation, projection;
 
   bool rotating = false;
@@ -139,7 +135,7 @@ TreeVisWidget::TreeVisWidget(distrac::tracefile& tracefile,
   signal_button_release_event().connect(
     sigc::mem_fun(this, &TreeVisWidget::onButtonEvent));
 }
-TreeVisWidget::~TreeVisWidget() {}
+TreeVisWidget::~TreeVisWidget() noexcept {}
 
 void
 TreeVisWidget::queueUpdateShownTimespan(int64_t passedMs) {
@@ -171,7 +167,8 @@ TreeVisWidget::updateShownTimespan() {
       "result");
 
   auto filtered =
-    m_tracefile.filtered({ static_cast<uint8_t>(finish_processing_task) });
+    m_tracefile.filtered({ static_cast<uint8_t>(start_processing_task),
+                           static_cast<uint8_t>(finish_processing_task) });
 
   auto begin = filtered.begin();
 
@@ -225,8 +222,8 @@ TreeVisWidget::updateShownTimespan() {
     .addVertexBufferInstanced(GL::Buffer(m_internal->tasks),
                               1,
                               0,
-                              Shaders::Phong::TransformationMatrix{},
-                              Shaders::Phong::NormalMatrix{});
+                              Shaders::Flat3D::TransformationMatrix{},
+                              Shaders::Flat3D::Color3{});
 
   queue_draw();
 }
@@ -257,16 +254,15 @@ TreeVisWidget::onRealize() {
     .setCount(cube.indexCount())
     .addVertexBuffer(std::move(vertices),
                      0,
-                     Shaders::Phong::Position{},
-                     Shaders::Phong::Normal{})
+                     Shaders::Flat3D::Position{},
+                     Shaders::Flat3D::Color3{})
     .setIndexBuffer(std::move(indices), 0, compressed.second);
 
   m_internal->mesh.setInstanceCount(m_internal->tasks.size())
     .addVertexBufferInstanced(GL::Buffer(m_internal->tasks),
                               1,
                               0,
-                              Shaders::Phong::TransformationMatrix{},
-                              Shaders::Phong::NormalMatrix{});
+                              Shaders::Flat3D::TransformationMatrix{});
 
   onResize(get_width(), get_height());
 }
@@ -297,12 +293,9 @@ TreeVisWidget::onRender(const Glib::RefPtr<Gdk::GLContext>& context) {
     m_queueUpdateShownTimespan = false;
   }
 
-  m_internal->shader.setLightPositions({ { 7.0f, 5.0f, 2.5f, 0.0f } })
-    .setDiffuseColor(color)
-    .setAmbientColor(Color3::fromHsv({ color.hue(), 1.0f, 0.3f }))
-    .setTransformationMatrix(m_internal->transformation)
-    .setNormalMatrix(m_internal->transformation.normalMatrix())
-    .setProjectionMatrix(m_internal->projection)
+  m_internal->shader.setColor(color)
+    .setTransformationProjectionMatrix(m_internal->projection *
+                                       m_internal->transformation)
     .draw(m_internal->mesh);
 
   /* Clean up Magnum state and back to Gtkmm */
