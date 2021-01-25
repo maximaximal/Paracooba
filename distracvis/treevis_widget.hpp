@@ -25,6 +25,8 @@ class TreeVisWidget : public Gtk::GLArea {
   int64_t m_passedMs = 0;
   bool m_queueUpdateShownTimespan = false;
 
+  int m_z = -100;
+
   void updateShownTimespan();
 
   void onRealize();
@@ -34,6 +36,7 @@ class TreeVisWidget : public Gtk::GLArea {
 
   bool onButtonEvent(GdkEventButton*);
   bool onMotionEvent(GdkEventMotion*);
+  bool onScrollEvent(GdkEventScroll*);
 
   void handleMouseRotation(Magnum::Vector2 mouseDelta);
 

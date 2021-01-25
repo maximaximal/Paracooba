@@ -19,6 +19,8 @@
 #include <Magnum/Shaders/Flat.h>
 #include <Magnum/Trade/MeshData.h>
 #include <boost/pool/pool_alloc.hpp>
+#include <gdk/gdkkeysyms.h>
+#include <gdkmm/cursor.h>
 #include <gdkmm/device.h>
 #include <gdkmm/event.h>
 
@@ -121,7 +123,7 @@ TreeVisWidget::TreeVisWidget(distrac::tracefile& tracefile,
   set_required_version(4, 5);
 
   add_events(Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_PRESS_MASK |
-             Gdk::BUTTON_RELEASE_MASK);
+             Gdk::BUTTON_RELEASE_MASK | Gdk::SCROLL_MASK);
 
   /* Connect signals to their respective handlers */
   signal_realize().connect(sigc::mem_fun(this, &TreeVisWidget::onRealize));
@@ -134,6 +136,8 @@ TreeVisWidget::TreeVisWidget(distrac::tracefile& tracefile,
     sigc::mem_fun(this, &TreeVisWidget::onButtonEvent));
   signal_button_release_event().connect(
     sigc::mem_fun(this, &TreeVisWidget::onButtonEvent));
+  signal_scroll_event().connect(
+    sigc::mem_fun(this, &TreeVisWidget::onScrollEvent), false);
 }
 TreeVisWidget::~TreeVisWidget() noexcept {}
 
@@ -308,7 +312,7 @@ TreeVisWidget::onResize(int width, int height) {
   m_internal->projection =
     Matrix4::perspectiveProjection(
       35.0_degf, Vector2(width, height).aspectRatio(), 0.01f, 20000.0f) *
-    Matrix4::translation(Vector3::zAxis(-100));
+    Matrix4::translation(Vector3::zAxis(m_z));
 
   queue_draw();
 }
@@ -344,6 +348,21 @@ TreeVisWidget::onMotionEvent(GdkEventMotion* e) {
     handleMouseRotation(Vector2(e->x, e->y) - m_internal->lastMousePos);
     m_internal->lastMousePos.x() = e->x;
     m_internal->lastMousePos.y() = e->y;
+    return true;
+  }
+  return false;
+}
+
+bool
+TreeVisWidget::onScrollEvent(GdkEventScroll* scroll) {
+  if(scroll->direction == GDK_SCROLL_UP) {
+    m_z += 100;
+    onResize(get_width(), get_height());
+    return true;
+  }
+  if(scroll->direction == GDK_SCROLL_DOWN) {
+    m_z -= 100;
+    onResize(get_width(), get_height());
     return true;
   }
   return false;
