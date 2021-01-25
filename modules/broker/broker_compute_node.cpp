@@ -2,6 +2,8 @@
 #include "broker_compute_node_store.hpp"
 #include "broker_task_store.hpp"
 #include "cereal/details/helpers.hpp"
+#include "distrac/distrac.h"
+#include "distrac_paracooba.h"
 #include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/file.h"
 #include "paracooba/common/message_kind.h"
@@ -380,9 +382,16 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
 
   // Check if the target needs some tasks according to offloading heuristic.
   float utilization = computeUtilization();
-  if(utilization < 3) {
-    // Tasks need to be offloaded!
+  if(utilization < 1) {
+    // Tasks need to be offloaded, no matter the cost!
     tryToOffloadTask();
+  } else {
+    if(m_store.thisNode().computeUtilization() < 0.5) {
+      // The current node doesn't have enough work! Try to get more by sending
+      // status to all other known nodes. This saves waiting time for answers of
+      // previously sent status updates.
+      //m_store.sendStatusToPeers();
+    }
   }
 
   msg.cb(&msg, PARAC_OK);
@@ -394,8 +403,13 @@ ComputeNode::receiveMessageTaskResultFrom(parac_message& msg) {
 
 bool
 ComputeNode::tryToOffloadTask() {
-  assert(description());
+  if(!description()) {
+    return false;
+  }
   if(description()->workers == 0) {
+    return false;
+  }
+  if(!m_node.send_message_to) {
     return false;
   }
 
@@ -409,7 +423,16 @@ ComputeNode::tryToOffloadTask() {
               task->path,
               m_node.id);
 
-    assert(status().isParsed(task->originator));
+    if(m_handle.distrac) {
+      parac_ev_offload_task offload_task_ev{
+        m_node.id,
+        task->originator,
+        { .rep = task->path.rep },
+        m_store.thisNode().computeUtilization(),
+        computeUtilization()
+      };
+      distrac_push(m_handle.distrac, &offload_task_ev, PARAC_EV_OFFLOAD_TASK);
+    }
 
     parac_message_wrapper msg;
     task->serialize(task, &msg);
@@ -427,6 +450,7 @@ ComputeNode::tryToOffloadTask() {
         t->task_store->undo_offload(t->task_store, t);
       }
     };
+    assert(m_node.send_message_to);
     m_node.send_message_to(&m_node, &msg);
     return true;
   }
@@ -489,12 +513,13 @@ ComputeNode::receiveFileFrom(parac_file& file) {
         [](parac_module_solver_instance* instance,
            void* userdata,
            parac_status status) {
+          (void)userdata;
           (void)instance;
-
-          ComputeNode* self = static_cast<ComputeNode*>(userdata);
+          // ComputeNode* self = static_cast<ComputeNode*>(userdata);
 
           if(status == PARAC_OK) {
-            self->m_store.formulaParsed(self->m_node.id);
+            // The formula was parsed correctly! More callback chaining may
+            // follow here.
           }
         });
     }

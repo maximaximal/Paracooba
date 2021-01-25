@@ -173,6 +173,7 @@ initiate_root_solver_on_file(parac_module& mod,
     i->cadicalManager = std::make_unique<CaDiCaLManager>(
       mod, std::move(parsedFormula), i->config);
     i->config = solverUserdata->config;
+    i->configured = true;
 
     parac_task* task = task_store.new_task(
       &task_store, nullptr, parac_path_unknown(), originatorId);

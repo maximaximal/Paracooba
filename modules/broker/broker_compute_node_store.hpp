@@ -47,6 +47,8 @@ class ComputeNodeStore {
   const std::list<parac_compute_node_wrapper>::iterator begin();
   const std::list<parac_compute_node_wrapper>::iterator end();
 
+  void sendStatusToPeers();
+
   private:
   static parac_compute_node* static_get(parac_compute_node_store* store,
                                         parac_id id);
@@ -63,7 +65,6 @@ class ComputeNodeStore {
   static void static_node_free(parac_compute_node* node);
 
   parac_compute_node* create(parac_id id);
-  void sendStatusToPeers();
   void tryOffloadingTasks();
 
   struct Internal;

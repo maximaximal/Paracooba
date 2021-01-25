@@ -502,6 +502,11 @@ TaskStore::assess_task(parac_task* task) {
   if(parac_task_state_is_done(s)) {
     assert(!(s & PARAC_TASK_WORK_AVAILABLE));
 
+    if(task->path.rep == PARAC_PATH_PARSER) {
+      auto& computeNodeStore = extractComputeNodeStore(m_internal->handle);
+      computeNodeStore.formulaParsed(task->originator);
+    }
+
     remove_from_tasksBeingWorkedOn(task);
 
     if(m_internal->handle.input_file && parac_path_is_root(task->path)) {

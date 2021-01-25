@@ -27,15 +27,15 @@ offload_task : Issued by Broker when a task is offloaded to another node. {
   target_id : uint64
   originator_id: uint64
   path      : parac_path
-  localWorkQueueSize : uint32
-  perceivedRemoteWorkQueueSize : uint32
+  localUtilization : float
+  perceivedRemoteUtilization : float
 }
 receive_task : Issued by Broker when a task is received from another node. {
-  source_id : uint64 [match = "target_id"]
+  source_id : uint64 [match = "_id"]
   originator_id: uint64 [match = "originator_id"]
   path      : parac_path [match = "path"]
-  localWorkQueueSize : uint32
-  perceivedSrcRemoteWorkQueueSize : uint32
+  localUtilization : float
+  perceivedSrcUtilization : float
 }
     [after = "offload_task"]
 

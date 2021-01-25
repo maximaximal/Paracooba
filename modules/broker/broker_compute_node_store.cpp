@@ -11,6 +11,7 @@
 
 #include <list>
 #include <mutex>
+#include <vector>
 
 #include "broker_compute_node.hpp"
 #include "paracooba/common/status.h"
@@ -26,6 +27,8 @@ struct ComputeNodeStore::Internal {
   std::unordered_map<parac_id,
                      std::reference_wrapper<parac_compute_node_wrapper>>
     nodesRefMap;
+
+  std::vector<std::reference_wrapper<parac_compute_node_wrapper>> nodesRefVec;
 
   std::atomic_bool sendingStatusToPeers = false;
   std::atomic_bool sendingStatusToPeersAndThenResend = false;
@@ -147,7 +150,7 @@ ComputeNodeStore::incrementThisNodeWorkQueueSize(parac_id originator) {
     sendStatusToPeers();
 
     // Try finding offload targets if the current node utilization is okay.
-    if(thisNode().computeUtilization() > 2) {
+    if(thisNode().computeUtilization() > 1) {
       tryOffloadingTasks();
     }
   }
@@ -175,7 +178,9 @@ ComputeNodeStore::create(parac_id id) {
   auto& inserted_node = m_internal->nodesList.emplace_front();
   inserted_node.id = id;
   inserted_node.broker_free = &ComputeNodeStore::static_node_free;
+
   m_internal->nodesRefMap.try_emplace(id, inserted_node);
+  m_internal->nodesRefVec.emplace_back(inserted_node);
 
   ComputeNode* broker_compute_node =
     new ComputeNode(inserted_node, m_handle, *this, m_taskStore);
@@ -218,11 +223,14 @@ ComputeNodeStore::sendStatusToPeers() {
 
   std::unique_lock lock(m_internal->nodesMutex);
   for(auto& e : m_internal->nodesList) {
-    if(e.send_message_to) {
+    if(e.id != m_handle.id && e.send_message_to) {
       ++m_internal->sendingStatusToPeersInTransit;
       thisNode().status().addStreamRef();
       e.send_message_to(&e, &msg);
     }
+  }
+  if(m_internal->sendingStatusToPeersInTransit == 0) {
+    m_internal->sendingStatusToPeers = false;
   }
 }
 
@@ -243,21 +251,29 @@ compareWrappersByUtilization(const parac_compute_node_wrapper& first,
 void
 ComputeNodeStore::tryOffloadingTasks() {
   std::unique_lock lock(m_internal->nodesMutex);
-  //m_internal->nodesList.sort(&compareWrappersByUtilization);
-  for(auto& w : m_internal->nodesList) {
+  std::sort(m_internal->nodesRefVec.begin(),
+            m_internal->nodesRefVec.end(),
+            &compareWrappersByUtilization);
+  for(auto& wRef : m_internal->nodesRefVec) {
+    auto& w = wRef.get();
     if(w.id == m_handle.id) {
       continue;
     }
 
-    if(thisNode().computeUtilization() < 2) {
+    if(thisNode().computeUtilization() < 1.5) {
       break;
     }
 
     ComputeNode* node = static_cast<ComputeNode*>(w.broker_userdata);
-    // bool offloaded = node->tryToOffloadTask();
-    // if(!offloaded) {
-    //  break;
-    // }
+
+    if(node->computeUtilization() > 1.2) {
+      break;
+    }
+
+    bool offloaded = node->tryToOffloadTask();
+    if(!offloaded) {
+      break;
+    }
   }
 }
 
