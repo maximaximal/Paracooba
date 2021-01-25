@@ -64,6 +64,7 @@ class ComputeNodeStore {
 
   parac_compute_node* create(parac_id id);
   void sendStatusToPeers();
+  void tryOffloadingTasks();
 
   struct Internal;
   std::unique_ptr<Internal> m_internal;

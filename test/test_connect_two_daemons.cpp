@@ -102,7 +102,7 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
     // n1->send_message_to(n1, &msg);
   }
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(30));
+  std::this_thread::sleep_for(std::chrono::milliseconds(35));
 
   // REQUIRE(counter == 2 * send_count);
 
@@ -111,7 +111,7 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
     n2->send_message_to(n2, &msg);
   }
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(30));
+  std::this_thread::sleep_for(std::chrono::milliseconds(35));
 
   REQUIRE(counter == 2 * send_count);
 }

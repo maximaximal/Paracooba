@@ -99,9 +99,10 @@ class ComputeNode {
     mutable std::unique_ptr<NoncopyOStringstream> m_statusStream;
 
     friend class ComputeNode;
-    mutable std::atomic_bool m_dirty;
+    mutable std::atomic_bool m_dirty = true;
     mutable std::atomic_flag m_writeFlag = ATOMIC_FLAG_INIT;
     mutable std::atomic_size_t m_streamRefs = 0;
+    mutable uint64_t m_cachedWorkQueueSize = 0;
   };
 
   const Description* description() const {
@@ -134,6 +135,13 @@ class ComputeNode {
   float computeUtilization() const;
 
   parac_module_solver_instance* getSolverInstance();
+
+  bool tryToOffloadTask();
+
+  inline static bool compareByUtilization(const ComputeNode& first,
+                                          const ComputeNode& second) {
+    return first.computeUtilization() < second.computeUtilization();
+  }
 
   private:
   void sendKnownRemotes();

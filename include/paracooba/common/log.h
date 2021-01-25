@@ -8,6 +8,8 @@
 extern "C" {
 #endif
 
+struct parac_thread_registry;
+
 enum parac_log_severity {
   PARAC_TRACE,
   PARAC_DEBUG,
@@ -35,10 +37,10 @@ parac_status
 parac_log_init(struct parac_thread_registry* thread_registry);
 
 void
-parac_log_set_severity(parac_log_severity severity);
+parac_log_set_severity(enum parac_log_severity severity);
 
 void
-parac_log_set_channel_active(parac_log_channel channel, bool active);
+parac_log_set_channel_active(enum parac_log_channel channel, bool active);
 
 void
 parac_log_set_local_id(parac_id id);
@@ -47,18 +49,19 @@ void
 parac_log_set_local_name(const char* name);
 
 const char*
-parac_log_severity_to_str(parac_log_severity severity);
+parac_log_severity_to_str(enum parac_log_severity severity);
 
 const char*
-parac_log_channel_to_str(parac_log_channel channel);
+parac_log_channel_to_str(enum parac_log_channel channel);
 
 void
-parac_log(parac_log_channel channel,
-          parac_log_severity severity,
+parac_log(enum parac_log_channel channel,
+          enum parac_log_severity severity,
           const char* msg);
 
 bool
-parac_log_enabled(parac_log_channel channel, parac_log_severity severity);
+parac_log_enabled(enum parac_log_channel channel,
+                  enum parac_log_severity severity);
 
 #ifdef __cplusplus
 }

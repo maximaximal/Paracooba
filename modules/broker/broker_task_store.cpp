@@ -232,6 +232,7 @@ TaskStore::newTask(parac_task* parent_task,
 
 parac_task*
 TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
+  parac_task* returned = nullptr;
   {
     std::unique_lock lock(m_internal->containerMutex);
     if(m_internal->tasksWaitingForWorkerQueue.empty()) {
@@ -245,6 +246,9 @@ TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
       parac_task& t = *it;
 
       if(!t.serialize)
+        continue;
+
+      if(t.received_from)
         continue;
 
       if(check && !check(t))
@@ -269,11 +273,13 @@ TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
       ++taskWrapper->refcount;
       --m_internal->tasksWaitingForWorkerQueueSize;
 
-      decrementWorkQueueInComputeNode(m_internal->handle, t.originator);
-      return &t;
+      returned = &t;
+      break;
     }
   }
-  return nullptr;
+  if(returned)
+    decrementWorkQueueInComputeNode(m_internal->handle, returned->originator);
+  return returned;
 }
 parac_task*
 TaskStore::pop_work() {
@@ -341,15 +347,17 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
   }
 
   {
-    std::unique_lock lock(m_internal->containerMutex);
-    m_internal->tasksWaitingForWorkerQueue.insert(
-      std::lower_bound(m_internal->tasksWaitingForWorkerQueue.begin(),
-                       m_internal->tasksWaitingForWorkerQueue.end(),
-                       task->path,
-                       [](const Internal::TaskRef& t, parac_path p) {
-                         return t.get().path.length > p.length;
-                       }),
-      *task);
+    {
+      std::unique_lock lock(m_internal->containerMutex);
+      m_internal->tasksWaitingForWorkerQueue.insert(
+        std::lower_bound(m_internal->tasksWaitingForWorkerQueue.begin(),
+                         m_internal->tasksWaitingForWorkerQueue.end(),
+                         task->path,
+                         [](const Internal::TaskRef& t, parac_path p) {
+                           return t.get().path.length > p.length;
+                         }),
+        *task);
+    }
 
     ++m_internal->tasksWaitingForWorkerQueueSize;
 

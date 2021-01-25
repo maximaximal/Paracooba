@@ -180,17 +180,20 @@ struct TCPConnection::State {
     , keepaliveTimer(service.ioContext()) {}
 
   ~State() {
+    if(!service.ioContext().stopped()) {
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_TRACE,
+                "Connection to remote {} ended with resume mode {}.",
+                remoteId(),
+                resumeMode);
+    }
+
     if(compute_node) {
       compute_node->communicator_free(compute_node);
       compute_node->connection_string = nullptr;
       compute_node = nullptr;
     }
     if(!service.ioContext().stopped()) {
-      parac_log(PARAC_COMMUNICATOR,
-                PARAC_TRACE,
-                "Connection ended with resume mode {}.",
-                resumeMode);
-
       switch(resumeMode) {
         case RestartAfterShutdown: {
           if(connectionTry >= 0 &&
@@ -313,6 +316,10 @@ TCPConnection::async_read(S& socket, B&& buffer, CB cb) {
   auto timeout_handler = [cb](const boost::system::error_code& ec) {
     if(!ec) {
       // The read timed out! Call the CB with a timeout error.
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_GLOBALWARNING,
+                "Connection run into timeout!");
+
       std::function<void(boost::system::error_code, size_t)> timeout_func = cb;
       timeout_func(boost::system::error_code(boost::system::errc::timed_out,
                                              boost::system::generic_category()),
@@ -552,7 +559,7 @@ TCPConnection::handleReceivedMessage() {
 
   parac_message msg;
   struct data {
-    parac_status status;
+    parac_status status = PARAC_UNDEFINED;
     bool returned = false;
   };
   data d;
@@ -767,6 +774,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
     }
 
     if(!handleInitiatorMessage(s->readInitiatorMessage)) {
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_GLOBALERROR,
+                "Handle Initiator Message failed! Ending connection to unknown "
+                "remote.");
       return;
     }
 
@@ -788,6 +799,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
       if(ec) {
         if(ec == boost::system::errc::connection_reset) {
           // No spamming about reset connections!
+          parac_log(PARAC_COMMUNICATOR,
+                    PARAC_TRACE,
+                    "Connection to {} reset. Ending connection.",
+                    s->remoteId());
           return;
         }
         parac_log(
@@ -868,6 +883,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
         handleReceivedFile();
       } else if(s->readHeader.kind == PARAC_MESSAGE_END) {
         s->resumeMode = EndAfterShutdown;
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_TRACE,
+                  "Connection End-Tag received in connection to {}",
+                  s->remoteId());
         return;
       } else if(s->readHeader.kind == PARAC_MESSAGE_KEEPALIVE) {
         // Nothing to do, this message just keeps the connection alive.
@@ -935,6 +954,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
 
         if(!handleReceivedMessage()) {
           // Connection is to be aborted!
+          parac_log(PARAC_COMMUNICATOR,
+                    PARAC_TRACE,
+                    "Receive message failed! Exiting connection to {}",
+                    s->remoteId());
           return;
         }
       }

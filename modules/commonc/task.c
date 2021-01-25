@@ -6,6 +6,8 @@
 #include <paracooba/common/path.h>
 #include <paracooba/common/task.h>
 
+#include <paracooba/common/log.h>
+
 #include <parac_common_export.h>
 
 typedef struct parac_task_result_packet {
@@ -19,6 +21,9 @@ static_assert(sizeof(char) * PARAC_MESSAGE_INLINE_DATA_SIZE >=
 
 static void
 notify_result(parac_task* t) {
+  if(!t || !t->received_from || !t->received_from->send_message_to) {
+    parac_log(PARAC_GENERAL, PARAC_LOCALERROR, "I am asserting!!!");
+  }
   assert(t);
   assert(t->received_from);
   assert(t->received_from->send_message_to);

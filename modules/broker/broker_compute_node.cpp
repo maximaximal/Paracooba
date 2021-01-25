@@ -136,9 +136,14 @@ ComputeNode::Description::serializeToMessage(parac_message& msg) const {
 
 uint64_t
 ComputeNode::Status::workQueueSize() const {
-  return accumulate(solverInstances | map_values |
-                      transformed(mem_fn(&SolverInstance::workQueueSize)),
-                    0);
+  if(m_dirty) {
+    m_cachedWorkQueueSize =
+      accumulate(solverInstances | map_values |
+                   transformed(mem_fn(&SolverInstance::workQueueSize)),
+                 0);
+    resetDirty();
+  }
+  return m_cachedWorkQueueSize;
 }
 
 void
@@ -155,7 +160,7 @@ ComputeNode::Status::serializeToMessage(parac_message& msg) const {
     }
   }
 
-  if(dirty()) {
+  if(dirty() || m_statusStream->tellp() == 0) {
     assert(m_statusStream->tellp() == 0);
 
     {
@@ -163,6 +168,8 @@ ComputeNode::Status::serializeToMessage(parac_message& msg) const {
       cereal::BinaryOutputArchive oa(*m_statusStream);
       oa(*this);
     }
+
+    workQueueSize();
   }
 
   msg.data = m_statusStream->ptr();
@@ -249,6 +256,15 @@ ComputeNode::receiveMessageFrom(parac_message& msg) {
         break;
     }
   } catch(cereal::Exception& e) {
+    parac_log(PARAC_BROKER,
+              PARAC_GLOBALERROR,
+              "Could not parse message received in compute node! Kind: {}, "
+              "size: {}, origin: {}, originator: {}, error: {}",
+              msg.kind,
+              msg.length,
+              m_node.id,
+              msg.originator_id,
+              e.what());
     msg.cb(&msg, PARAC_ABORT_CONNECTION);
   } catch(std::exception& e) {
     parac_log(PARAC_BROKER,
@@ -366,37 +382,7 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
   float utilization = computeUtilization();
   if(utilization < 3) {
     // Tasks need to be offloaded!
-    parac_task* task = m_taskStore.pop_offload(&m_node, [this](parac_task& t) {
-      return status().isParsed(t.originator);
-    });
-
-    if(task) {
-      parac_log(PARAC_BROKER,
-                PARAC_TRACE,
-                "Offload task on path {} to node {}.",
-                task->path,
-                m_node.id);
-
-      assert(status().isParsed(task->originator));
-
-      parac_message_wrapper msg;
-      task->serialize(task, &msg);
-      msg.userdata = task;
-      msg.cb = [](parac_message* msg, parac_status s) {
-        if(s != PARAC_OK && s != PARAC_TO_BE_DELETED) {
-          // Message has been lost! Undo offload operation.
-          parac_task* t = static_cast<parac_task*>(msg->userdata);
-          parac_log(PARAC_BROKER,
-                    PARAC_LOCALERROR,
-                    "Offload operation of task on path {} to remote node {} "
-                    "failed! Undoing offload.",
-                    t->path,
-                    t->offloaded_to->id);
-          t->task_store->undo_offload(t->task_store, t);
-        }
-      };
-      m_node.send_message_to(&m_node, &msg);
-    }
+    tryToOffloadTask();
   }
 
   msg.cb(&msg, PARAC_OK);
@@ -404,6 +390,47 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
 void
 ComputeNode::receiveMessageTaskResultFrom(parac_message& msg) {
   m_taskStore.receiveTaskResultFromPeer(msg);
+}
+
+bool
+ComputeNode::tryToOffloadTask() {
+  assert(description());
+  if(description()->workers == 0) {
+    return false;
+  }
+
+  parac_task* task = m_taskStore.pop_offload(
+    &m_node, [this](parac_task& t) { return status().isParsed(t.originator); });
+
+  if(task) {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Offload task on path {} to node {}.",
+              task->path,
+              m_node.id);
+
+    assert(status().isParsed(task->originator));
+
+    parac_message_wrapper msg;
+    task->serialize(task, &msg);
+    msg.userdata = task;
+    msg.cb = [](parac_message* msg, parac_status s) {
+      if(s != PARAC_OK && s != PARAC_TO_BE_DELETED) {
+        // Message has been lost! Undo offload operation.
+        parac_task* t = static_cast<parac_task*>(msg->userdata);
+        parac_log(PARAC_BROKER,
+                  PARAC_LOCALERROR,
+                  "Offload operation of task on path {} to remote node {} "
+                  "failed! Undoing offload.",
+                  t->path,
+                  t->offloaded_to->id);
+        t->task_store->undo_offload(t->task_store, t);
+      }
+    };
+    m_node.send_message_to(&m_node, &msg);
+    return true;
+  }
+  return false;
 }
 
 void
@@ -482,6 +509,10 @@ ComputeNode::computeUtilization() const {
 
   float workers = description()->workers;
   float workQueueSize = status().workQueueSize();
+
+  if(workers == 0) {
+    return FP_INFINITE;
+  }
 
   return workQueueSize / workers;
 }

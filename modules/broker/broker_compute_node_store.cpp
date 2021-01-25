@@ -143,14 +143,19 @@ ComputeNodeStore::has(parac_id id) const {
 void
 ComputeNodeStore::incrementThisNodeWorkQueueSize(parac_id originator) {
   thisNode().incrementWorkQueueSize(originator);
-  if(thisNode().status().isParsed(originator)) {
+  if(m_handle.input_file || thisNode().status().isParsed(originator)) {
     sendStatusToPeers();
+
+    // Try finding offload targets if the current node utilization is okay.
+    if(thisNode().computeUtilization() > 2) {
+      tryOffloadingTasks();
+    }
   }
 }
 void
 ComputeNodeStore::decrementThisNodeWorkQueueSize(parac_id originator) {
   thisNode().decrementWorkQueueSize(originator);
-  if(thisNode().status().isParsed(originator)) {
+  if(m_handle.input_file || thisNode().status().isParsed(originator)) {
     sendStatusToPeers();
   }
 }
@@ -206,6 +211,11 @@ ComputeNodeStore::sendStatusToPeers() {
   };
   msg.userdata = static_cast<void*>(this);
 
+  parac_log(PARAC_BROKER,
+            PARAC_DEBUG,
+            "Send status {} to all peers.",
+            thisNode().status());
+
   std::unique_lock lock(m_internal->nodesMutex);
   for(auto& e : m_internal->nodesList) {
     if(e.send_message_to) {
@@ -213,6 +223,41 @@ ComputeNodeStore::sendStatusToPeers() {
       thisNode().status().addStreamRef();
       e.send_message_to(&e, &msg);
     }
+  }
+}
+
+inline static bool
+compareWrappersByUtilization(const parac_compute_node_wrapper& first,
+                             const parac_compute_node_wrapper& second) {
+  assert(first.broker_userdata);
+  assert(second.broker_userdata);
+
+  const ComputeNode& firstCN =
+    *static_cast<ComputeNode*>(first.broker_userdata);
+  const ComputeNode& secondCN =
+    *static_cast<ComputeNode*>(second.broker_userdata);
+
+  return ComputeNode::compareByUtilization(firstCN, secondCN);
+}
+
+void
+ComputeNodeStore::tryOffloadingTasks() {
+  std::unique_lock lock(m_internal->nodesMutex);
+  //m_internal->nodesList.sort(&compareWrappersByUtilization);
+  for(auto& w : m_internal->nodesList) {
+    if(w.id == m_handle.id) {
+      continue;
+    }
+
+    if(thisNode().computeUtilization() < 2) {
+      break;
+    }
+
+    ComputeNode* node = static_cast<ComputeNode*>(w.broker_userdata);
+    // bool offloaded = node->tryToOffloadTask();
+    // if(!offloaded) {
+    //  break;
+    // }
   }
 }
 
