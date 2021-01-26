@@ -152,8 +152,6 @@ void
 ComputeNode::Status::serializeToMessage(parac_message& msg) const {
   msg.kind = PARAC_MESSAGE_NODE_STATUS;
 
-  assert(checkStreamRefs());
-
   if(!m_statusStream) {
     m_statusStream = std::make_unique<NoncopyOStringstream>();
   } else {
@@ -183,6 +181,38 @@ ComputeNode::Status::isParsed(parac_id id) const {
   if(it == solverInstances.end())
     return false;
   return it->second.formula_parsed;
+}
+
+bool
+ComputeNode::Status::isDiffWorthwhile(const Status& s1, const Status& s2) {
+  return true;
+  SpinLock lock1(s1.m_writeFlag);
+  SpinLock lock2(s2.m_writeFlag);
+
+  if(s1.solverInstances.size() != s2.solverInstances.size())
+    return true;
+
+  if(s2.computeUtilization() < s1.computeUtilization() &&
+     s1.computeUtilization() < 0.8)
+    return false;
+
+  if(s2.computeUtilization() < 1.2f)
+    return true;
+
+  for(const auto& it2 : s2.solverInstances) {
+    const auto& it1 = s1.solverInstances.find(it2.first);
+    if(it1 == s1.solverInstances.end())
+      return true;
+
+    const auto& s1 = it1->second;
+    const auto& s2 = it2.second;
+
+    if(s1.formula_received != s2.formula_received ||
+       s1.formula_parsed != s2.formula_parsed)
+      return true;
+  }
+
+  return false;
 }
 
 void
@@ -390,7 +420,7 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
       // The current node doesn't have enough work! Try to get more by sending
       // status to all other known nodes. This saves waiting time for answers of
       // previously sent status updates.
-      //m_store.sendStatusToPeers();
+      // m_store.sendStatusToPeers();
     }
   }
 
@@ -455,6 +485,37 @@ ComputeNode::tryToOffloadTask() {
     return true;
   }
   return false;
+}
+
+void
+ComputeNode::conditionallySendStatusTo(const Status& s) {
+  if(!m_node.send_message_to)
+    return;
+  if(!Status::isDiffWorthwhile(m_remotelyKnownLocalStatus, s))
+    return;
+  if(m_sendingStatusTo.test_and_set())
+    return;
+
+  parac_log(
+    PARAC_BROKER, PARAC_TRACE, "Send local status {} to node {}", s, m_node.id);
+
+  m_remotelyKnownLocalStatus = s;
+
+  parac_message_wrapper msg;
+  m_remotelyKnownLocalStatus.serializeToMessage(msg);
+
+  msg.cb = [](parac_message* msg, parac_status s) {
+    // Handle all eventual sending outcomes.
+    if(s == PARAC_TO_BE_DELETED) {
+      assert(msg);
+      assert(msg->userdata);
+      ComputeNode& self = *static_cast<ComputeNode*>(msg->userdata);
+      self.m_sendingStatusTo.clear();
+    }
+  };
+  msg.userdata = static_cast<void*>(this);
+
+  m_node.send_message_to(&m_node, &msg);
 }
 
 void
@@ -532,14 +593,22 @@ ComputeNode::computeUtilization() const {
   if(!description())
     return FP_INFINITE;
 
-  float workers = description()->workers;
-  float workQueueSize = status().workQueueSize();
+  m_status.insertWorkerCount(description()->workers);
 
-  if(workers == 0) {
+  return m_status.computeUtilization();
+}
+
+float
+ComputeNode::Status::computeUtilization() const {
+  return computeFutureUtilization(workQueueSize());
+}
+
+float
+ComputeNode::Status::computeFutureUtilization(uint64_t workQueueSize) const {
+  if(m_workers == 0)
     return FP_INFINITE;
-  }
 
-  return workQueueSize / workers;
+  return static_cast<float>(workQueueSize) / m_workers;
 }
 
 parac_module_solver_instance*

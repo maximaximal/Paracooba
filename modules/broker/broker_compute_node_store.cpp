@@ -29,10 +29,6 @@ struct ComputeNodeStore::Internal {
     nodesRefMap;
 
   std::vector<std::reference_wrapper<parac_compute_node_wrapper>> nodesRefVec;
-
-  std::atomic_bool sendingStatusToPeers = false;
-  std::atomic_bool sendingStatusToPeersAndThenResend = false;
-  std::atomic_size_t sendingStatusToPeersInTransit = 0;
 };
 
 ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
@@ -191,46 +187,12 @@ ComputeNodeStore::create(parac_id id) {
 
 void
 ComputeNodeStore::sendStatusToPeers() {
-  if(m_internal->sendingStatusToPeers.exchange(true)) {
-    m_internal->sendingStatusToPeersAndThenResend = true;
-    return;
-  }
-  m_internal->sendingStatusToPeersAndThenResend = false;
-
-  parac_message_wrapper msg;
-  thisNode().status().serializeToMessage(msg);
-  msg.cb = [](parac_message* msg, parac_status s) {
-    // Handle all eventual sending outcomes.
-    if(s == PARAC_TO_BE_DELETED) {
-      assert(msg);
-      assert(msg->userdata);
-      ComputeNodeStore* store = static_cast<ComputeNodeStore*>(msg->userdata);
-      Internal* internal = store->m_internal.get();
-      store->thisNode().status().removeStreamRef();
-      if(--internal->sendingStatusToPeersInTransit == 0 &&
-         internal->sendingStatusToPeersAndThenResend) {
-        internal->sendingStatusToPeers = false;
-        store->sendStatusToPeers();
-      }
-    }
-  };
-  msg.userdata = static_cast<void*>(this);
-
-  parac_log(PARAC_BROKER,
-            PARAC_DEBUG,
-            "Send status {} to all peers.",
-            thisNode().status());
-
   std::unique_lock lock(m_internal->nodesMutex);
   for(auto& e : m_internal->nodesList) {
     if(e.id != m_handle.id && e.send_message_to) {
-      ++m_internal->sendingStatusToPeersInTransit;
-      thisNode().status().addStreamRef();
-      e.send_message_to(&e, &msg);
+      ComputeNode& computeNode = *static_cast<ComputeNode*>(e.broker_userdata);
+      computeNode.conditionallySendStatusTo(thisNode().status());
     }
-  }
-  if(m_internal->sendingStatusToPeersInTransit == 0) {
-    m_internal->sendingStatusToPeers = false;
   }
 }
 
@@ -254,25 +216,70 @@ ComputeNodeStore::tryOffloadingTasks() {
   std::sort(m_internal->nodesRefVec.begin(),
             m_internal->nodesRefVec.end(),
             &compareWrappersByUtilization);
+
+  float thisUtilization = thisNode().computeUtilization();
+  auto thisWorkQueueSize = thisNode().status().workQueueSize();
+
   for(auto& wRef : m_internal->nodesRefVec) {
     auto& w = wRef.get();
     if(w.id == m_handle.id) {
       continue;
     }
 
-    if(thisNode().computeUtilization() < 1.5) {
+    float thisFutureUtilization =
+      thisWorkQueueSize > 0
+        ? thisNode().status().computeFutureUtilization(thisWorkQueueSize - 1)
+        : 0;
+
+    // Do not starve the local node of work!
+    if(thisUtilization >= 1 && thisFutureUtilization < 1) {
+      parac_log(PARAC_BROKER,
+                PARAC_TRACE,
+                "Not offloading to {} (and breaking offload loop) because "
+                "thisUtilization {} > 1 && thisFutureUtilization {} < 1",
+                w.id,
+                thisUtilization,
+                thisFutureUtilization);
       break;
     }
 
     ComputeNode* node = static_cast<ComputeNode*>(w.broker_userdata);
+    float utilization = node->computeUtilization();
 
-    if(node->computeUtilization() > 1.2) {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Trying to offload to {}. Utilization {}, thisUtilization {}",
+              w.id,
+              utilization,
+              thisUtilization);
+
+    if(utilization > thisUtilization) {
+      parac_log(PARAC_BROKER,
+                PARAC_TRACE,
+                "Not offloading to {} (and breaking offload loop) because "
+                "utilization {} > thisUtilization {}",
+                w.id,
+                utilization,
+                thisUtilization);
+      break;
+    }
+
+    if(utilization > 1.2) {
+      parac_log(PARAC_BROKER,
+                PARAC_TRACE,
+                "Not offloading to {} (and breaking offload loop) because "
+                "utilization {} > 1.2",
+                w.id,
+                utilization,
+                thisUtilization);
       break;
     }
 
     bool offloaded = node->tryToOffloadTask();
     if(!offloaded) {
       break;
+    } else {
+      --thisWorkQueueSize;
     }
   }
 }

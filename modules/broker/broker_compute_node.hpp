@@ -90,18 +90,27 @@ class ComputeNode {
     void resetDirty() const { m_dirty = false; }
     bool isParsed(parac_id id) const;
 
-    void addStreamRef() const { ++m_streamRefs; }
-    void removeStreamRef() const { --m_streamRefs; }
-    bool checkStreamRefs() const { return m_streamRefs == 0; }
-    size_t streamRefs() const { return m_streamRefs; }
+    static bool isDiffWorthwhile(const Status& s1, const Status& s2);
+
+    void operator=(const Status& o) {
+      m_dirty = true;
+      m_writeFlag.clear();
+      solverInstances = o.solverInstances;
+    }
+
+    void insertWorkerCount(uint32_t workers) const { m_workers = workers; };
+
+    float computeUtilization() const;
+    float computeFutureUtilization(uint64_t workQueueSize) const;
 
     private:
+    mutable uint32_t m_workers = 0;
+
     mutable std::unique_ptr<NoncopyOStringstream> m_statusStream;
 
     friend class ComputeNode;
     mutable std::atomic_bool m_dirty = true;
     mutable std::atomic_flag m_writeFlag = ATOMIC_FLAG_INIT;
-    mutable std::atomic_size_t m_streamRefs = 0;
     mutable uint64_t m_cachedWorkQueueSize = 0;
   };
 
@@ -143,6 +152,8 @@ class ComputeNode {
     return first.computeUtilization() < second.computeUtilization();
   }
 
+  void conditionallySendStatusTo(const Status& s);
+
   private:
   void sendKnownRemotes();
 
@@ -153,6 +164,9 @@ class ComputeNode {
 
   std::optional<Description> m_description;
   Status m_status;
+  Status m_remotelyKnownLocalStatus;
+
+  std::atomic_flag m_sendingStatusTo = ATOMIC_FLAG_INIT;
 
   std::unique_ptr<NoncopyOStringstream> m_knownRemotesOstream;
 };
