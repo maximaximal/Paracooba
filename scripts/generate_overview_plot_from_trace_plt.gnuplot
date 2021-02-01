@@ -2,7 +2,7 @@
 # https://unix.stackexchange.com/a/617970
 dpi = 300 ## dpi (variable)
 width = 250 ## mm (variable)
-height = 600 ## mm (variable)
+height = 350 ## mm (variable)
 
 in2mm = 25.4 # mm (fixed)
 pt2mm = 0.3528 # mm (fixed)
@@ -21,6 +21,7 @@ set palette maxcolors 2
 
 set lmargin at screen 0.1
 set rmargin at screen 0.9
+set xrange [XMIN:XMAX]
 unset xtics
 set key autotitle columnheader
 

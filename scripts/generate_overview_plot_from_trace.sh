@@ -23,9 +23,12 @@ ensure_command_available "gnuplot";
 T=$1
 N=$(distrac $T --print-node-count)
 
-e>&2 cho "Working with $N nodes.";
+XMIN=$(distrac $T --print-start-ns)
+XMAX=$(distrac $T --print-end-ns)
 
-e>&2 cho "Generate Offload Chart Data...";
+>&2 echo "Working with $N nodes.";
+
+>&2 echo "Generate Offload Chart Data...";
 
 mkdir /dev/shm/overview
 
@@ -54,6 +57,6 @@ do
     echo ""
 done > /dev/shm/overview/utilization.data
 
-gnuplot -e 'utilization="/dev/shm/overview/utilization.data"' -e 'offloads="/dev/shm/overview/offloads.data"' -e 'timings="/dev/shm/overview/timings.data"' $DIR/generate_overview_plot_from_trace_plt.gnuplot > ${T}_plots.png
+gnuplot -e 'XMIN="'$XMIN'"' -e 'XMAX="'$XMAX'"' -e 'utilization="/dev/shm/overview/utilization.data"' -e 'offloads="/dev/shm/overview/offloads.data"' -e 'timings="/dev/shm/overview/timings.data"' $DIR/generate_overview_plot_from_trace_plt.gnuplot > ${T}_plots.png
 
 rm -rf /dev/shm/overview
