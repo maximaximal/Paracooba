@@ -18,6 +18,8 @@
 #include "paracooba/communicator/communicator.h"
 #include "paracooba/runner/runner.h"
 
+#include "../commonc/spin_lock.hpp"
+
 namespace parac::broker {
 struct ComputeNodeStore::Internal {
   std::recursive_mutex nodesMutex;
@@ -142,7 +144,7 @@ ComputeNodeStore::has(parac_id id) const {
 void
 ComputeNodeStore::incrementThisNodeWorkQueueSize(parac_id originator) {
   thisNode().incrementWorkQueueSize(originator);
-  if(m_handle.input_file || thisNode().status().isParsed(originator)) {
+  if(m_handle.input_file || thisNode().isParsed(originator)) {
     sendStatusToPeers();
 
     // Try finding offload targets if the current node utilization is okay.
@@ -154,7 +156,7 @@ ComputeNodeStore::incrementThisNodeWorkQueueSize(parac_id originator) {
 void
 ComputeNodeStore::decrementThisNodeWorkQueueSize(parac_id originator) {
   thisNode().decrementWorkQueueSize(originator);
-  if(m_handle.input_file || thisNode().status().isParsed(originator)) {
+  if(m_handle.input_file || thisNode().isParsed(originator)) {
     sendStatusToPeers();
   }
 }
@@ -191,7 +193,8 @@ ComputeNodeStore::sendStatusToPeers() {
   for(auto& e : m_internal->nodesList) {
     if(e.id != m_handle.id && e.send_message_to) {
       ComputeNode& computeNode = *static_cast<ComputeNode*>(e.broker_userdata);
-      computeNode.conditionallySendStatusTo(thisNode().status());
+      auto [s, l] = thisNode().status();
+      computeNode.conditionallySendStatusTo(s);
     }
   }
 }
@@ -218,7 +221,7 @@ ComputeNodeStore::tryOffloadingTasks() {
             &compareWrappersByUtilization);
 
   float thisUtilization = thisNode().computeUtilization();
-  auto thisWorkQueueSize = thisNode().status().workQueueSize();
+  auto thisWorkQueueSize = thisNode().workQueueSize();
 
   for(auto& wRef : m_internal->nodesRefVec) {
     auto& w = wRef.get();
@@ -228,11 +231,14 @@ ComputeNodeStore::tryOffloadingTasks() {
 
     float thisFutureUtilization =
       thisWorkQueueSize > 0
-        ? thisNode().status().computeFutureUtilization(thisWorkQueueSize - 1)
+        ? thisNode().computeFutureUtilization(thisWorkQueueSize - 1)
         : 0;
 
-    // Do not starve the local node of work!
-    if(thisUtilization >= 1 && thisFutureUtilization < 1) {
+    ComputeNode* node = static_cast<ComputeNode*>(w.broker_userdata);
+    float utilization = node->computeUtilization();
+
+    // Do not starve the local node of work if the situation is not too bad!
+    if(utilization > 0.5 && thisUtilization >= 1 && thisFutureUtilization < 1) {
       parac_log(PARAC_BROKER,
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
@@ -242,9 +248,6 @@ ComputeNodeStore::tryOffloadingTasks() {
                 thisFutureUtilization);
       break;
     }
-
-    ComputeNode* node = static_cast<ComputeNode*>(w.broker_userdata);
-    float utilization = node->computeUtilization();
 
     parac_log(PARAC_BROKER,
               PARAC_TRACE,

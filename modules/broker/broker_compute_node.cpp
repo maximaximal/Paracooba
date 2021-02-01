@@ -215,6 +215,26 @@ ComputeNode::Status::isDiffWorthwhile(const Status& s1, const Status& s2) {
   return false;
 }
 
+std::pair<const ComputeNode::Status&, SpinLock>
+ComputeNode::status() const {
+  return { m_status, SpinLock(m_modifyingStatus) };
+}
+bool
+ComputeNode::isParsed(parac_id originator) const {
+  auto [s, l] = status();
+  return s.isParsed(originator);
+}
+float
+ComputeNode::computeFutureUtilization(uint64_t workQueueSize) const {
+  auto [s, l] = status();
+  return s.computeFutureUtilization(workQueueSize);
+}
+uint64_t
+ComputeNode::workQueueSize() const {
+  auto [s, l] = status();
+  return s.workQueueSize();
+}
+
 void
 ComputeNode::incrementWorkQueueSize(parac_id originator) {
   SpinLock lock(m_status.m_writeFlag);
@@ -345,6 +365,8 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
   // Send all known other nodes to the peer.
   sendKnownRemotes();
 
+  SpinLock lock(m_modifyingStatus);
+
   if(m_handle.input_file &&
      !m_status.solverInstances[m_handle.id].formula_received) {
     // Client node received a message from other node.
@@ -400,27 +422,29 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
 
   {
     cereal::BinaryInputArchive ia(data);
-    ia(m_status);
-
-    parac_log(PARAC_BROKER,
-              PARAC_TRACE,
-              "Got status from {}: {}, message length: {}B",
-              msg.origin->id,
-              m_status,
-              msg.length);
+    {
+      SpinLock lock(m_modifyingStatus);
+      ia(m_status);
+    }
+    m_status.m_dirty = true;
   }
+  parac_log(PARAC_BROKER,
+            PARAC_TRACE,
+            "Got status from {}: {}, message length: {}B",
+            msg.origin->id,
+            m_status,
+            msg.length);
 
   // Check if the target needs some tasks according to offloading heuristic.
   float utilization = computeUtilization();
-  if(utilization < 1) {
-    // Tasks need to be offloaded, no matter the cost!
+  if(utilization < 1 && m_store.thisNode().computeUtilization() > 0.5) {
     tryToOffloadTask();
   } else {
     if(m_store.thisNode().computeUtilization() < 0.5) {
       // The current node doesn't have enough work! Try to get more by sending
       // status to all other known nodes. This saves waiting time for answers of
       // previously sent status updates.
-      // m_store.sendStatusToPeers();
+      m_store.sendStatusToPeers();
     }
   }
 
@@ -444,7 +468,7 @@ ComputeNode::tryToOffloadTask() {
   }
 
   parac_task* task = m_taskStore.pop_offload(
-    &m_node, [this](parac_task& t) { return status().isParsed(t.originator); });
+    &m_node, [this](parac_task& t) { return isParsed(t.originator); });
 
   if(task) {
     incrementWorkQueueSize(task->originator);
@@ -490,7 +514,10 @@ ComputeNode::tryToOffloadTask() {
       }
     };
     assert(m_node.send_message_to);
-    conditionallySendStatusTo(m_store.thisNode().status());
+    {
+      auto [s, l] = m_store.thisNode().status();
+      conditionallySendStatusTo(s);
+    }
     m_node.send_message_to(&m_node, &msg);
     return true;
   }
@@ -602,6 +629,8 @@ ComputeNode::computeUtilization() const {
   // Utilization cannot be computed, so it is assumed to be infinite.
   if(!description())
     return FP_INFINITE;
+
+  SpinLock lock(m_modifyingStatus);
 
   m_status.insertWorkerCount(description()->workers);
 

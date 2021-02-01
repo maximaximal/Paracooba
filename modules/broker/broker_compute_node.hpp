@@ -15,6 +15,7 @@ struct parac_handle;
 
 namespace parac {
 class NoncopyOStringstream;
+class SpinLock;
 }
 
 namespace parac::broker {
@@ -117,7 +118,10 @@ class ComputeNode {
   const Description* description() const {
     return m_description ? &m_description.value() : nullptr;
   }
-  const Status& status() const { return m_status; }
+  std::pair<const Status&, SpinLock> status() const;
+  bool isParsed(parac_id originator) const;
+  float computeFutureUtilization(uint64_t workQueueSize) const;
+  uint64_t workQueueSize() const;
 
   void incrementWorkQueueSize(parac_id originator);
   void decrementWorkQueueSize(parac_id originator);
@@ -167,6 +171,7 @@ class ComputeNode {
   Status m_remotelyKnownLocalStatus;
 
   std::atomic_flag m_sendingStatusTo = ATOMIC_FLAG_INIT;
+  mutable std::atomic_flag m_modifyingStatus = ATOMIC_FLAG_INIT;
 
   std::unique_ptr<NoncopyOStringstream> m_knownRemotesOstream;
 };
