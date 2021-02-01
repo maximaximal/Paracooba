@@ -447,6 +447,8 @@ ComputeNode::tryToOffloadTask() {
     &m_node, [this](parac_task& t) { return status().isParsed(t.originator); });
 
   if(task) {
+    incrementWorkQueueSize(task->originator);
+
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Offload task on path {} to node {}.",
@@ -477,10 +479,18 @@ ComputeNode::tryToOffloadTask() {
                   "failed! Undoing offload.",
                   t->path,
                   t->offloaded_to->id);
+
+        parac_compute_node* n = t->offloaded_to;
+        assert(n);
+        ComputeNode* cn = static_cast<ComputeNode*>(n->broker_userdata);
+        assert(cn);
+        cn->decrementWorkQueueSize(t->originator);
+
         t->task_store->undo_offload(t->task_store, t);
       }
     };
     assert(m_node.send_message_to);
+    conditionallySendStatusTo(m_store.thisNode().status());
     m_node.send_message_to(&m_node, &msg);
     return true;
   }
