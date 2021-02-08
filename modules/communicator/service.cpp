@@ -30,6 +30,9 @@ using boost::asio::io_context;
 
 namespace parac::communicator {
 struct Service::Internal {
+  using TCPConnectionPayloadPair =
+    std::pair<boost::asio::steady_timer, TCPConnectionPayloadPtr>;
+
   io_context context;
   parac_thread_registry_handle threadHandle;
 
@@ -37,9 +40,7 @@ struct Service::Internal {
   std::unique_ptr<UDPAcceptor> udpAcceptor;
   std::unique_ptr<TimeoutController> timeoutController;
 
-  std::map<parac_id,
-           std::pair<boost::asio::steady_timer, TCPConnectionPayloadPtr>>
-    connectionPayloads;
+  std::map<parac_id, TCPConnectionPayloadPair> connectionPayloads;
 
   std::atomic_bool tcpAcceptorActive;
 };
@@ -156,9 +157,8 @@ Service::registerTCPConnectionPayload(parac_id id,
                                       TCPConnectionPayloadPtr payload) {
   assert(id != 0);
 
-  decltype(Internal::connectionPayloads)::mapped_type entry{
-    boost::asio::steady_timer(ioContext()), std::move(payload)
-  };
+  Internal::TCPConnectionPayloadPair entry(
+    boost::asio::steady_timer(ioContext()), std::move(payload));
 
   entry.first.expires_from_now(std::chrono::milliseconds(retryTimeoutMS() * 4));
   entry.first.async_wait([this, id](const boost::system::error_code& error) {
