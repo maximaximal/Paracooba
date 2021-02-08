@@ -144,7 +144,19 @@ macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
     get_target_property(FMT_INCLUDE_DIRECTORIES fmt::fmt INCLUDE_DIRECTORIES)
     target_include_directories(${NAME}_obj PRIVATE ${FMT_INCLUDE_DIRECTORIES})
 
-    target_link_libraries(${NAME}_obj PUBLIC distrac parac_common parac_modules)
+    get_target_property(PARAC_COMMON_INCLUDE_DIRS parac_common INCLUDE_DIRECTORIES)
+    target_include_directories(${NAME}_obj PUBLIC ${PARAC_COMMON_INCLUDE_DIRS})
+
+    get_target_property(PARAC_MODULES_INCLUDE_DIRS parac_modules INCLUDE_DIRECTORIES)
+    target_include_directories(${NAME}_obj PUBLIC ${PARAC_MODULES_INCLUDE_DIRS})
+
+    get_target_property(DISTRAC_INCLUDE_DIRS distrac INCLUDE_DIRECTORIES)
+    target_include_directories(${NAME}_obj PUBLIC ${DISTRAC_INCLUDE_DIRS})
+
+    set_target_properties(${NAME}_obj PROPERTIES C_STANDARD 11)
+    target_compile_features(${NAME}_obj PUBLIC cxx_std_17)
+
+    set_property(TARGET ${NAME}_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac parac_common parac_modules)
     target_link_libraries(${NAME} PUBLIC distrac parac_common parac_modules fmt::fmt)
 
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
