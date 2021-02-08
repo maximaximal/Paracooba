@@ -157,8 +157,11 @@ Service::registerTCPConnectionPayload(parac_id id,
                                       TCPConnectionPayloadPtr payload) {
   assert(id != 0);
 
-  Internal::TCPConnectionPayloadPair entry(
-    boost::asio::steady_timer(ioContext()), std::move(payload));
+  auto [it, inserted] = m_internal->connectionPayloads.try_emplace(
+    id, ioContext(), std::move(payload));
+  assert(inserted);
+
+  auto& entry = it->second;
 
   entry.first.expires_from_now(std::chrono::milliseconds(retryTimeoutMS() * 4));
   entry.first.async_wait([this, id](const boost::system::error_code& error) {
@@ -173,7 +176,6 @@ Service::registerTCPConnectionPayload(parac_id id,
       }
     }
   });
-  m_internal->connectionPayloads.insert({ id, std::move(entry) });
 }
 
 TCPConnectionPayloadPtr
