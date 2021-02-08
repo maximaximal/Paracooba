@@ -1,5 +1,6 @@
 #include <cassert>
 
+#include "distrac/types.h"
 #include "paracooba/common/thread_registry.h"
 #include "runner_worker.hpp"
 
@@ -64,10 +65,10 @@ Worker::run() {
 
     int64_t startOfProcessing;
     if(m_mod.handle->distrac) {
+      distrac_parac_path dp;
+      dp.rep = m_currentTask->path.rep;
       parac_ev_start_processing_task start_processing_task{
-        m_currentTask->originator,
-        { .rep = m_currentTask->path.rep },
-        m_workerId
+        m_currentTask->originator, dp, m_workerId
       };
       startOfProcessing = distrac_push(m_mod.handle->distrac,
                                        &start_processing_task,
@@ -86,9 +87,11 @@ Worker::run() {
       uint32_t diff =
         (distrac_current_time(m_mod.handle->distrac) - startOfProcessing) /
         (1000);
+      distrac_parac_path dp;
+      dp.rep = m_currentTask->path.rep;
       parac_ev_finish_processing_task finish_processing_task{
         m_currentTask->originator,
-        distrac_parac_path{ .rep = m_currentTask->path.rep },
+        dp,
         static_cast<uint16_t>(m_workerId),
         static_cast<uint16_t>(m_currentTask->result),
         diff
@@ -157,7 +160,9 @@ Worker::currentTaskPath() const {
   if(m_currentTask) {
     return m_currentTask->path;
   } else {
-    return parac_path{ .rep = PARAC_PATH_EXPLICITLY_UNKNOWN };
+    parac_path p;
+    p.rep = PARAC_PATH_EXPLICITLY_UNKNOWN;
+    return p;
   }
 }
 

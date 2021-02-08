@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.10.2)
 project(paracooba
     VERSION 0.2.0)
 
