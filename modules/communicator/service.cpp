@@ -11,7 +11,7 @@
 #include "timeout_controller.hpp"
 #include "udp_acceptor.hpp"
 
-#if BOOST_VERSION > 106500
+#if BOOST_VERSION >= 106600
 #include <boost/asio/io_context.hpp>
 #else
 #include <boost/asio/io_service.hpp>

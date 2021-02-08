@@ -7,7 +7,7 @@
 #include <memory>
 
 namespace boost::asio {
-#if BOOST_VERSION > 106500
+#if BOOST_VERSION >= 106600
 class io_context;
 #else
 class io_service;
