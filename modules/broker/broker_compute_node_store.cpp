@@ -212,14 +212,16 @@ compareWrappersByUtilization(const ComputeNode* firstCN,
 void
 ComputeNodeStore::tryOffloadingTasks() {
   std::unique_lock lock(m_internal->nodesMutex);
-  std::sort(m_internal->nodesRefVec.begin(),
-            m_internal->nodesRefVec.end(),
-            &compareWrappersByUtilization);
+
+  std::vector<ComputeNode*> refVec(m_internal->nodesRefVec.begin(),
+                                   m_internal->nodesRefVec.end());
+
+  std::sort(refVec.begin(), refVec.end(), &compareWrappersByUtilization);
 
   float thisUtilization = thisNode().computeUtilization();
   auto thisWorkQueueSize = thisNode().workQueueSize();
 
-  for(auto node : m_internal->nodesRefVec) {
+  for(auto node : refVec) {
     if(node->id() == m_handle.id) {
       continue;
     }
@@ -337,6 +339,7 @@ ComputeNodeStore::static_node_free(parac_compute_node* n) {
               "Deleting broker compute node userdata of node {}.",
               n->id);
     delete broker_compute_node;
+    n->broker_userdata = nullptr;
   }
 }
 
