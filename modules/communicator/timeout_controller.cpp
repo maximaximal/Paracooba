@@ -26,8 +26,8 @@ struct TimeoutController::Internal {
   using TimeoutList = std::list<Timeout, Allocator<Timeout>>;
 
   struct Timeout {
-    parac_timeout timeout;
     TimeoutList::iterator it;
+    parac_timeout timeout;
     boost::asio::steady_timer timer;
 
     Timeout(Service& service)
