@@ -12,8 +12,20 @@ set_property(TARGET parac_executable PROPERTY CMAKE_CXX_VISIBILITY_PRESET defaul
 set_property(TARGET parac_executable PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_target_properties(parac_executable PROPERTIES CXX_STANDARD 17)
 target_compile_definitions(parac_executable PRIVATE "-DPARAC_LOG_INCLUDE_FMT")
-target_link_libraries(parac_executable PUBLIC distrac parac_modules Boost::filesystem Boost::coroutine Boost::context Boost::program_options ${CMAKE_DL_LIBS} fmt parac_loader)
+set_property(TARGET parac_executable APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac parac_modules Boost::filesystem Boost::coroutine Boost::context Boost::program_options ${CMAKE_DL_LIBS} fmt parac_loader)
 target_include_directories(parac_executable PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+get_target_property(PARAC_COMMON_INCLUDE_DIRS parac_common INCLUDE_DIRECTORIES)
+target_include_directories(parac_executable PUBLIC ${PARAC_COMMON_INCLUDE_DIRS})
+
+get_target_property(PARAC_MODULES_INCLUDE_DIRS parac_modules INCLUDE_DIRECTORIES)
+target_include_directories(parac_executable PUBLIC ${PARAC_MODULES_INCLUDE_DIRS})
+
+get_target_property(DISTRAC_INCLUDE_DIRS distrac INCLUDE_DIRECTORIES)
+target_include_directories(parac_executable PUBLIC ${DISTRAC_INCLUDE_DIRS})
+
+get_target_property(FMT_INCLUDE_DIRS fmt::fmt INCLUDE_DIRECTORIES)
+target_include_directories(parac_executable PUBLIC ${FMT_INCLUDE_DIRS})
 
 set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
 add_dependencies(parac_executable distrac_paracooba)
