@@ -1085,11 +1085,11 @@ TCPConnection::writeHandler(boost::system::error_code ec,
           assert(e->header.size <= PARAC_MESSAGE_INLINE_DATA_SIZE);
           yield async_write(
             *s->socket,
-            const_buffer(e->message().inline_data, e->header.size),
+            buffer(e->message().inline_data, e->header.size),
             wh);
         } else {
           yield async_write(
-            *s->socket, const_buffer(e->message().data, e->header.size), wh);
+            *s->socket, buffer(e->message().data, e->header.size), wh);
         }
 
         if(ec) {
