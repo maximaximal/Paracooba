@@ -235,6 +235,10 @@ ComputeNode::workQueueSize() const {
   auto [s, l] = status();
   return s.workQueueSize();
 }
+parac_id
+ComputeNode::id() const {
+  return m_node.id;
+}
 
 void
 ComputeNode::incrementWorkQueueSize(parac_id originator) {

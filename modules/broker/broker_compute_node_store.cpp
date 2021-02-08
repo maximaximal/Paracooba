@@ -30,7 +30,7 @@ struct ComputeNodeStore::Internal {
                      std::reference_wrapper<parac_compute_node_wrapper>>
     nodesRefMap;
 
-  std::vector<std::reference_wrapper<parac_compute_node_wrapper>> nodesRefVec;
+  std::vector<ComputeNode*> nodesRefVec;
 };
 
 ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
@@ -183,7 +183,7 @@ ComputeNodeStore::create(parac_id id) {
     new ComputeNode(inserted_node, m_handle, *this, m_taskStore);
   inserted_node.broker_userdata = broker_compute_node;
 
-  m_internal->nodesRefVec.emplace_back(inserted_node);
+  m_internal->nodesRefVec.emplace_back(broker_compute_node);
 
   return &inserted_node;
 }
@@ -201,20 +201,12 @@ ComputeNodeStore::sendStatusToPeers() {
 }
 
 inline static bool
-compareWrappersByUtilization(const std::reference_wrapper<parac_compute_node_wrapper>& first_r,
-                             const std::reference_wrapper<parac_compute_node_wrapper>& second_r) {
-  const auto &first = first_r.get();
-  const auto &second = second_r.get();
+compareWrappersByUtilization(const ComputeNode* firstCN,
+                             const ComputeNode* secondCN) {
+  assert(firstCN);
+  assert(secondCN);
 
-  assert(first.broker_userdata);
-  assert(second.broker_userdata);
-
-  const ComputeNode& firstCN =
-    *static_cast<ComputeNode*>(first.broker_userdata);
-  const ComputeNode& secondCN =
-    *static_cast<ComputeNode*>(second.broker_userdata);
-
-  return ComputeNode::compareByUtilization(firstCN, secondCN);
+  return ComputeNode::compareByUtilization(*firstCN, *secondCN);
 }
 
 void
@@ -227,9 +219,8 @@ ComputeNodeStore::tryOffloadingTasks() {
   float thisUtilization = thisNode().computeUtilization();
   auto thisWorkQueueSize = thisNode().workQueueSize();
 
-  for(auto& wRef : m_internal->nodesRefVec) {
-    auto& w = wRef.get();
-    if(w.id == m_handle.id) {
+  for(auto node : m_internal->nodesRefVec) {
+    if(node->id() == m_handle.id) {
       continue;
     }
 
@@ -238,7 +229,6 @@ ComputeNodeStore::tryOffloadingTasks() {
         ? thisNode().computeFutureUtilization(thisWorkQueueSize - 1)
         : 0;
 
-    ComputeNode* node = static_cast<ComputeNode*>(w.broker_userdata);
     float utilization = node->computeUtilization();
 
     // Do not starve the local node of work if the situation is not too bad!
@@ -247,7 +237,7 @@ ComputeNodeStore::tryOffloadingTasks() {
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
                 "thisUtilization {} > 1 && thisFutureUtilization {} < 1",
-                w.id,
+                node->id(),
                 thisUtilization,
                 thisFutureUtilization);
       break;
@@ -256,7 +246,7 @@ ComputeNodeStore::tryOffloadingTasks() {
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Trying to offload to {}. Utilization {}, thisUtilization {}",
-              w.id,
+              node->id(),
               utilization,
               thisUtilization);
 
@@ -265,7 +255,7 @@ ComputeNodeStore::tryOffloadingTasks() {
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
                 "utilization {} > thisUtilization {}",
-                w.id,
+                node->id(),
                 utilization,
                 thisUtilization);
       break;
@@ -276,7 +266,7 @@ ComputeNodeStore::tryOffloadingTasks() {
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
                 "utilization {} > 1.2",
-                w.id,
+                node->id(),
                 utilization,
                 thisUtilization);
       break;

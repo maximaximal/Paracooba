@@ -122,6 +122,7 @@ class ComputeNode {
   bool isParsed(parac_id originator) const;
   float computeFutureUtilization(uint64_t workQueueSize) const;
   uint64_t workQueueSize() const;
+  parac_id id() const;
 
   void incrementWorkQueueSize(parac_id originator);
   void decrementWorkQueueSize(parac_id originator);
