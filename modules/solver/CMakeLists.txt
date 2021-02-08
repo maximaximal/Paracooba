@@ -26,9 +26,9 @@ endif()
 if(ENABLE_TESTS)
     add_library(parac_solver_test SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/test_cube_source.cpp
-        )
+        $<TARGET_OBJECTS:parac_solver_obj>)
 
-    target_link_libraries(parac_solver_test PRIVATE parac_solver_obj fmt cereal)
+    target_link_libraries(parac_solver_test PRIVATE fmt cereal libcadical)
     target_link_libraries(parac_solver_test PUBLIC parac_common Catch2::Catch2 libcadical)
 
     set(test_libs ${test_libs} parac_solver_test CACHE INTERNAL "Libraries for Tests")
