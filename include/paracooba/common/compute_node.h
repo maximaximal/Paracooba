@@ -98,6 +98,8 @@ class parac_compute_node_wrapper : public parac_compute_node {
     if(communicator_free)
       communicator_free(this);
   }
+  parac_compute_node_wrapper(const parac_compute_node_wrapper& o) = delete;
+  parac_compute_node_wrapper(const parac_compute_node_wrapper&& o) = delete;
 
   IDConnectionStringPair getIDConnectionStringPair() const {
     assert(connection_string);
