@@ -16,4 +16,5 @@ parac_module(parac_communicator "${PARACOOBA_COMMUNICATOR_SRCS}" ${CMAKE_CURRENT
 
 set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
 add_dependencies(parac_communicator_obj distrac_paracooba)
-target_link_libraries(parac_communicator_obj PUBLIC distrac)
+
+set_property(TARGET parac_solver_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac)

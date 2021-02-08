@@ -12,13 +12,16 @@ set(PARAC_COMMON_SRCS
     )
 
 parac_module_def(parac_common "${PARAC_COMMON_SRCS}")
-target_link_libraries(parac_common_obj PUBLIC parac_headers parac_modules Threads::Threads)
+set_property(TARGET parac_common_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES parac_headers parac_modules Threads::Threads)
+#target_link_libraries(parac_common_obj PUBLIC parac_headers parac_modules Threads::Threads)
 target_compile_features(parac_common_obj PUBLIC cxx_std_17)
-target_link_libraries(parac_common_obj PRIVATE Boost::log fmt::fmt)
+set_property(TARGET parac_common_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES Boost::log fmt::fmt)
+#target_link_libraries(parac_common_obj PRIVATE Boost::log fmt::fmt)
 set_target_properties(parac_common_obj PROPERTIES C_STANDARD 11)
 target_include_directories(parac_common_obj PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
-target_link_libraries(parac_common_obj PUBLIC distrac)
+set_property(TARGET parac_common_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac)
+#target_link_libraries(parac_common_obj PUBLIC distrac)
 
 target_include_directories(parac_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 

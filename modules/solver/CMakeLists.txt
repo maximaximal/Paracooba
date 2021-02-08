@@ -9,8 +9,15 @@ set(PARACOOBA_SOLVER_SRCS
     )
 
 parac_module(parac_solver "${PARACOOBA_SOLVER_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
-target_link_libraries(parac_solver_obj PRIVATE libcadical cereal)
 target_link_libraries(parac_solver PRIVATE libcadical)
+
+get_target_property(CEREAL_INCLUDE_DIRS cereal INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(parac_solver_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
+
+get_target_property(CADICAL_INCLUDE_DIRS libcadical INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(parac_solver_obj PRIVATE ${CADICAL_INCLUDE_DIRS})
+
+set_property(TARGET parac_solver_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES libcadical cereal)
 
 if(STATIC_BUILDS)
     target_link_libraries(parac_solver_static PRIVATE libcadical)
