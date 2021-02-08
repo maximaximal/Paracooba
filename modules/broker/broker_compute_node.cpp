@@ -3,6 +3,7 @@
 #include "broker_task_store.hpp"
 #include "cereal/details/helpers.hpp"
 #include "distrac/distrac.h"
+#include "distrac/types.h"
 #include "distrac_paracooba.h"
 #include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/file.h"
@@ -480,10 +481,12 @@ ComputeNode::tryToOffloadTask() {
               m_node.id);
 
     if(m_handle.distrac) {
+      distrac_parac_path dp;
+      dp.rep = task->path.rep;
       parac_ev_offload_task offload_task_ev{
         m_node.id,
         task->originator,
-        { .rep = task->path.rep },
+        dp,
         m_store.thisNode().computeUtilization(),
         computeUtilization()
       };
