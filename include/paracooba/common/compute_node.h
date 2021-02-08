@@ -71,8 +71,14 @@ typedef struct parac_compute_node {
 
 #ifdef __cplusplus
 }
-#include <ostream>
 #include <cassert>
+#include <ostream>
+
+#ifndef PARAC_LOG_INCLUDE_FMT
+#define PARAC_LOG_INCLUDE_FMT
+#endif
+
+#include <paracooba/common/log.h>
 
 class parac_compute_node_wrapper : public parac_compute_node {
   using IDConnectionStringPair = std::pair<parac_id, std::string>;
@@ -93,6 +99,14 @@ class parac_compute_node_wrapper : public parac_compute_node {
     connection_string = nullptr;
   }
   ~parac_compute_node_wrapper() {
+    parac_log(
+      PARAC_GENERAL,
+      PARAC_DEBUG,
+      "Deleting compute node {}. Had communicator data {}, had broker data {}",
+      id,
+      communicator_userdata != nullptr,
+      broker_userdata != nullptr);
+
     if(broker_free)
       broker_free(this);
     if(communicator_free)
