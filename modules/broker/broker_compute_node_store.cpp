@@ -332,6 +332,10 @@ ComputeNodeStore::static_node_free(parac_compute_node* n) {
     static_cast<ComputeNode*>(n->broker_userdata);
 
   if(broker_compute_node) {
+    parac_log(PARAC_GENERAL,
+              PARAC_DEBUG,
+              "Deleting broker compute node userdata of node {}.",
+              n->id);
     delete broker_compute_node;
   }
 }
