@@ -86,14 +86,19 @@ struct TCPConnectionInitiator::State {
         std::make_unique<boost::asio::ip::tcp::socket>(service.ioContext()))
     , timer(service.ioContext())
     , connectionTry(connectionTry)
-    , conn(HostConnection{ host,
-                           port,
-                           boost::asio::ip::tcp::resolver(service.ioContext()),
-                           boost::asio::ip::tcp::resolver::query(
-                             host,
-                             std::to_string(port),
-                             boost::asio::ip::tcp::resolver::numeric_service),
-                           boost::asio::ip::tcp::endpoint() }) {}
+    , conn(HostConnection {
+      host, port, boost::asio::ip::tcp::resolver(service.ioContext()),
+        boost::asio::ip::tcp::resolver::query(
+          host,
+          std::to_string(port)
+#if BOOST_VERSION >= 106600
+            ,
+          boost::asio::ip::tcp::resolver::numeric_service
+#endif
+          ),
+        boost::asio::ip::tcp::endpoint()
+    }) {
+  }
   State(Service& service,
         boost::asio::ip::tcp::endpoint endpoint,
         Callback cb,
