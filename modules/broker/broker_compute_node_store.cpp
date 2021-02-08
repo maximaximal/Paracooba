@@ -21,6 +21,8 @@
 #include "../commonc/spin_lock.hpp"
 
 namespace parac::broker {
+using NodesRefVecEntry = std::pair<std::reference_wrapper<ComputeNode>, float>;
+
 struct ComputeNodeStore::Internal {
   std::recursive_mutex nodesMutex;
 
@@ -30,7 +32,14 @@ struct ComputeNodeStore::Internal {
                      std::reference_wrapper<parac_compute_node_wrapper>>
     nodesRefMap;
 
-  std::vector<ComputeNode*> nodesRefVec;
+  std::vector<NodesRefVecEntry> nodesRefVec;
+
+  void updateNodesRefVecUtilization() {
+    for(auto& e : nodesRefVec) {
+      auto& n = e.first.get();
+      e.second = n.computeUtilization();
+    }
+  }
 };
 
 ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
@@ -183,7 +192,7 @@ ComputeNodeStore::create(parac_id id) {
     new ComputeNode(inserted_node, m_handle, *this, m_taskStore);
   inserted_node.broker_userdata = broker_compute_node;
 
-  m_internal->nodesRefVec.emplace_back(broker_compute_node);
+  m_internal->nodesRefVec.emplace_back(*broker_compute_node, 0);
 
   return &inserted_node;
 }
@@ -201,28 +210,25 @@ ComputeNodeStore::sendStatusToPeers() {
 }
 
 inline static bool
-compareWrappersByUtilization(const ComputeNode* firstCN,
-                             const ComputeNode* secondCN) {
-  assert(firstCN);
-  assert(secondCN);
-
-  return ComputeNode::compareByUtilization(*firstCN, *secondCN);
+compareWrappersByUtilization(const NodesRefVecEntry& first,
+                             const NodesRefVecEntry& second) {
+  return first.second < second.second;
 }
 
 void
 ComputeNodeStore::tryOffloadingTasks() {
   std::unique_lock lock(m_internal->nodesMutex);
 
-  std::vector<ComputeNode*> refVec(m_internal->nodesRefVec.begin(),
-                                   m_internal->nodesRefVec.end());
-
-  std::sort(refVec.begin(), refVec.end(), &compareWrappersByUtilization);
+  std::sort(m_internal->nodesRefVec.begin(),
+            m_internal->nodesRefVec.end(),
+            &compareWrappersByUtilization);
 
   float thisUtilization = thisNode().computeUtilization();
   auto thisWorkQueueSize = thisNode().workQueueSize();
 
-  for(auto node : refVec) {
-    if(node->id() == m_handle.id) {
+  for(auto& e : m_internal->nodesRefVec) {
+    auto& node = e.first.get();
+    if(node.id() == m_handle.id) {
       continue;
     }
 
@@ -231,15 +237,13 @@ ComputeNodeStore::tryOffloadingTasks() {
         ? thisNode().computeFutureUtilization(thisWorkQueueSize - 1)
         : 0;
 
-    float utilization = node->computeUtilization();
-
     // Do not starve the local node of work if the situation is not too bad!
-    if(utilization > 0.5 && thisUtilization >= 1 && thisFutureUtilization < 1) {
+    if(e.second > 0.5 && thisUtilization >= 1 && thisFutureUtilization < 1) {
       parac_log(PARAC_BROKER,
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
                 "thisUtilization {} > 1 && thisFutureUtilization {} < 1",
-                node->id(),
+                node.id(),
                 thisUtilization,
                 thisFutureUtilization);
       break;
@@ -248,33 +252,33 @@ ComputeNodeStore::tryOffloadingTasks() {
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Trying to offload to {}. Utilization {}, thisUtilization {}",
-              node->id(),
-              utilization,
+              node.id(),
+              e.second,
               thisUtilization);
 
-    if(utilization > thisUtilization) {
+    if(e.second > thisUtilization) {
       parac_log(PARAC_BROKER,
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
                 "utilization {} > thisUtilization {}",
-                node->id(),
-                utilization,
+                node.id(),
+                e.second,
                 thisUtilization);
       break;
     }
 
-    if(utilization > 1.2) {
+    if(e.second > 1.2) {
       parac_log(PARAC_BROKER,
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
                 "utilization {} > 1.2",
-                node->id(),
-                utilization,
+                node.id(),
+                e.second,
                 thisUtilization);
       break;
     }
 
-    bool offloaded = node->tryToOffloadTask();
+    bool offloaded = node.tryToOffloadTask();
     if(!offloaded) {
       break;
     } else {
