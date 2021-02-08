@@ -70,6 +70,17 @@ struct TCPConnectionInitiator::State {
     boost::asio::ip::tcp::resolver resolver;
     boost::asio::ip::tcp::resolver::query query;
     boost::asio::ip::tcp::endpoint currentEndpoint;
+
+    HostConnection(std::string host,
+                   uint16_t port,
+                   boost::asio::ip::tcp::resolver resolver,
+                   boost::asio::ip::tcp::resolver::query query,
+                   boost::asio::ip::tcp::endpoint currentEndpoint)
+      : host(host)
+      , port(port)
+      , resolver(std::move(resolver))
+      , query(query)
+      , currentEndpoint(currentEndpoint) {}
   };
   struct EndpointConnection {
     boost::asio::ip::tcp::endpoint endpoint;
@@ -86,15 +97,15 @@ struct TCPConnectionInitiator::State {
         std::make_unique<boost::asio::ip::tcp::socket>(service.ioContext()))
     , timer(service.ioContext())
     , connectionTry(connectionTry)
-    , conn(HostConnection{
-        host,
-        port,
-        boost::asio::ip::tcp::resolver(service.ioContext()),
-        boost::asio::ip::tcp::resolver::query(
-          host,
-          std::to_string(port),
-          boost::asio::ip::tcp::resolver::query::numeric_service),
-        boost::asio::ip::tcp::endpoint() }) {}
+    , conn(std::in_place_type_t<HostConnection>(),
+           host,
+           port,
+           boost::asio::ip::tcp::resolver(service.ioContext()),
+           boost::asio::ip::tcp::resolver::query(
+             host,
+             std::to_string(port),
+             boost::asio::ip::tcp::resolver::query::numeric_service),
+           boost::asio::ip::tcp::endpoint{}) {}
   State(Service& service,
         boost::asio::ip::tcp::endpoint endpoint,
         Callback cb,
