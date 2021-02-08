@@ -74,13 +74,11 @@ struct TCPConnectionInitiator::State {
     HostConnection(std::string host,
                    uint16_t port,
                    boost::asio::ip::tcp::resolver resolver,
-                   boost::asio::ip::tcp::resolver::query query,
-                   boost::asio::ip::tcp::endpoint currentEndpoint)
+                   boost::asio::ip::tcp::resolver::query query)
       : host(host)
       , port(port)
       , resolver(std::move(resolver))
-      , query(query)
-      , currentEndpoint(currentEndpoint) {}
+      , query(query) {}
   };
   struct EndpointConnection {
     boost::asio::ip::tcp::endpoint endpoint;
@@ -104,8 +102,7 @@ struct TCPConnectionInitiator::State {
            boost::asio::ip::tcp::resolver::query(
              host,
              std::to_string(port),
-             boost::asio::ip::tcp::resolver::query::numeric_service),
-           boost::asio::ip::tcp::endpoint{}) {}
+             boost::asio::ip::tcp::resolver::query::numeric_service)) {}
   State(Service& service,
         boost::asio::ip::tcp::endpoint endpoint,
         Callback cb,
