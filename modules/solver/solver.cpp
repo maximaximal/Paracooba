@@ -260,11 +260,10 @@ instance_handle_message(parac_module_solver_instance* instance,
       {
         cereal::BinaryInputArchive ia(data);
         ia(pathType);
-
-        task = task_store->new_task(task_store,
-                                    nullptr,
-                                    parac_path{ .rep = pathType },
-                                    instance->originator_id);
+        parac_path p;
+        p.rep = pathType;
+        task =
+          task_store->new_task(task_store, nullptr, p, instance->originator_id);
         assert(task);
         task->received_from = msg->origin;
 
