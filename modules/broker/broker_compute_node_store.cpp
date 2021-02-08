@@ -201,8 +201,11 @@ ComputeNodeStore::sendStatusToPeers() {
 }
 
 inline static bool
-compareWrappersByUtilization(const parac_compute_node_wrapper& first,
-                             const parac_compute_node_wrapper& second) {
+compareWrappersByUtilization(const std::reference_wrapper<parac_compute_node_wrapper>& first_r,
+                             const std::reference_wrapper<parac_compute_node_wrapper>& second_r) {
+  const auto &first = first_r.get();
+  const auto &second = second_r.get();
+
   assert(first.broker_userdata);
   assert(second.broker_userdata);
 
