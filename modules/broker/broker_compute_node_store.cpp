@@ -232,6 +232,8 @@ ComputeNodeStore::tryOffloadingTasks() {
       continue;
     }
 
+    e.second = node.computeUtilization();
+
     float thisFutureUtilization =
       thisWorkQueueSize > 0
         ? thisNode().computeFutureUtilization(thisWorkQueueSize - 1)
