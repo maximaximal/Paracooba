@@ -219,6 +219,7 @@ void
 ComputeNodeStore::tryOffloadingTasks() {
   std::unique_lock lock(m_internal->nodesMutex);
 
+  m_internal->updateNodesRefVecUtilization();
   std::sort(m_internal->nodesRefVec.begin(),
             m_internal->nodesRefVec.end(),
             &compareWrappersByUtilization);
