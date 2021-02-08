@@ -48,6 +48,12 @@ parac_log_set_local_id(parac_id id);
 void
 parac_log_set_local_name(const char* name);
 
+parac_id
+parac_log_get_thread_local_id();
+
+parac_id
+parac_log_get_thread_number();
+
 const char*
 parac_log_severity_to_str(enum parac_log_severity severity);
 

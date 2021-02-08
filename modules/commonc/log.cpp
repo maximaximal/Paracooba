@@ -41,6 +41,9 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(parac_logger_timestamp,
                             "TimeStamp",
                             boost::posix_time::ptime)
 
+thread_local parac_id thread_local_id = 0;
+thread_local uint16_t thread_local_number = 0;
+
 static void
 log_new_thread_callback(parac_thread_registry_handle* handle) {
   assert(handle);
@@ -51,6 +54,9 @@ log_new_thread_callback(parac_thread_registry_handle* handle) {
     "LocalID",
     boost::log::attributes::constant<parac_id>(
       handle->registry->belongs_to_id));
+
+  thread_local_number = handle->thread_id;
+  thread_local_id = handle->registry->belongs_to_id;
 }
 
 PARAC_COMMON_EXPORT parac_status
@@ -125,6 +131,8 @@ parac_log_set_local_id(parac_id id) {
   local_id = id;
   boost::log::core::get()->add_thread_attribute(
     "LocalID", boost::log::attributes::constant<parac_id>(id));
+
+  thread_local_id = id;
 }
 
 PARAC_COMMON_EXPORT void
@@ -134,6 +142,16 @@ parac_log_set_local_name(const char* name) {
     global_logger.add_attribute("LocalName",
                                 attributes::make_constant(local_name));
   }
+}
+
+PARAC_COMMON_EXPORT parac_id
+parac_log_get_thread_local_id() {
+  return thread_local_id;
+}
+
+PARAC_COMMON_EXPORT parac_id
+parac_log_get_thread_number() {
+  return thread_local_number;
 }
 
 PARAC_COMMON_EXPORT void
