@@ -11,7 +11,11 @@
 #include "timeout_controller.hpp"
 #include "udp_acceptor.hpp"
 
+#if BOOST_VERSION > 106500
 #include <boost/asio/io_context.hpp>
+#else
+#include <boost/asio/io_service.hpp>
+#endif
 #include <boost/asio/steady_timer.hpp>
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
