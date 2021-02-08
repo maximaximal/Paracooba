@@ -178,11 +178,12 @@ ComputeNodeStore::create(parac_id id) {
   inserted_node.broker_free = &ComputeNodeStore::static_node_free;
 
   m_internal->nodesRefMap.try_emplace(id, inserted_node);
-  m_internal->nodesRefVec.emplace_back(inserted_node);
 
   ComputeNode* broker_compute_node =
     new ComputeNode(inserted_node, m_handle, *this, m_taskStore);
   inserted_node.broker_userdata = broker_compute_node;
+
+  m_internal->nodesRefVec.emplace_back(inserted_node);
 
   return &inserted_node;
 }
