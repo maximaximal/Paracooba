@@ -11,7 +11,11 @@
 #include <algorithm>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/error.hpp>
+#if BOOST_VERSION >= 106600
 #include <boost/asio/io_context.hpp>
+#else
+#include <boost/asio/io_service.hpp>
+#endif
 #include <boost/asio/placeholders.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/filesystem/operations.hpp>
