@@ -161,7 +161,12 @@ TCPConnectionInitiator::TCPConnectionInitiator(Service& service,
     port);
 
   boost::system::error_code ec;
+#if BOOST_VERSION >= 106600
   auto address = boost::asio::ip::make_address_v6(connectionString, ec);
+#else
+  auto address = boost::asio::ip::address_v6::from_string(connectionString, ec);
+#endif
+
   if(!ec) {
     // The address could be parsed! This means we have a defined endpoint that
     // does not have to be resolved.
