@@ -76,7 +76,9 @@ endif()
 
 # Add Catch2 unit testing framework.
 if(ENABLE_TESTS)
-    cmake_policy(SET CMP0079 NEW)
+    if(POLICY CMP0079)
+        cmake_policy(SET CMP0079 NEW)
+    endif()
     include(CTest)
     include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/catch/Catch2-2.13.0/contrib/Catch.cmake)
     enable_testing()
