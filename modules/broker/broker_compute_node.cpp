@@ -300,6 +300,9 @@ ComputeNode::receiveMessageFrom(parac_message& msg) {
       case PARAC_MESSAGE_NEW_REMOTES:
         receiveMessageKnownRemotesFrom(msg);
         break;
+      case PARAC_MESSAGE_END:
+        receiveMessageEnd(msg);
+        break;
       default:
         parac_log(PARAC_BROKER,
                   PARAC_GLOBALERROR,
@@ -628,6 +631,15 @@ ComputeNode::receiveFileFrom(parac_file& file) {
           }
         });
     }
+  }
+}
+
+void
+ComputeNode::receiveMessageEnd(parac_message& m) {
+  if(m_store.autoShutdownAfterFirstFinishedClient() && description() &&
+     !description()->daemon) {
+    m_handle.exit_status = PARAC_UNKNOWN;
+    m_handle.request_exit(&m_handle);
   }
 }
 

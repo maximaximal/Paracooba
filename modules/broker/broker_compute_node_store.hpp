@@ -17,7 +17,8 @@ class ComputeNodeStore {
   public:
   ComputeNodeStore(parac_handle& handle,
                    parac_compute_node_store& store,
-                   TaskStore& taskStore);
+                   TaskStore& taskStore,
+                   bool autoShutdownAfterFirstFinishedClient);
   virtual ~ComputeNodeStore();
 
   void updateThisNodeDescription();
@@ -49,6 +50,10 @@ class ComputeNodeStore {
 
   void sendStatusToPeers();
 
+  bool autoShutdownAfterFirstFinishedClient() const noexcept {
+    return m_autoShutdownAfterFirstFinishedClient;
+  }
+
   private:
   static parac_compute_node* static_get(parac_compute_node_store* store,
                                         parac_id id);
@@ -73,5 +78,6 @@ class ComputeNodeStore {
   parac_handle& m_handle;
   parac_compute_node_store& m_computeNodeStore;
   TaskStore& m_taskStore;
+  bool m_autoShutdownAfterFirstFinishedClient = false;
 };
 }

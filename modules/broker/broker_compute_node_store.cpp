@@ -44,11 +44,14 @@ struct ComputeNodeStore::Internal {
 
 ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
                                    parac_compute_node_store& store,
-                                   TaskStore& taskStore)
+                                   TaskStore& taskStore,
+                                   bool autoShutdownAfterFirstFinishedClient)
   : m_internal(std::make_unique<Internal>())
   , m_handle(handle)
   , m_computeNodeStore(store)
-  , m_taskStore(taskStore) {
+  , m_taskStore(taskStore)
+  , m_autoShutdownAfterFirstFinishedClient(
+      autoShutdownAfterFirstFinishedClient) {
   parac_log(PARAC_BROKER, PARAC_DEBUG, "Initialize ComputeNodeStore.");
 
   store.userdata = this;

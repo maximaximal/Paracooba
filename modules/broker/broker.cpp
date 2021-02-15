@@ -21,14 +21,22 @@
 #define BROKER_VERSION_TWEAK 0
 
 struct BrokerUserdata {
-  void pre_init(parac_handle& handle, uint32_t autoShutdownTimeout) {
-    internal = std::make_unique<Internal>(handle, autoShutdownTimeout);
+  void pre_init(parac_handle& handle,
+                uint32_t autoShutdownTimeout,
+                bool autoShutdownAfterFirstFinishedClient) {
+    internal = std::make_unique<Internal>(
+      handle, autoShutdownTimeout, autoShutdownAfterFirstFinishedClient);
   }
 
   struct Internal {
-    Internal(parac_handle& handle, uint32_t autoShutdownTimeout)
+    Internal(parac_handle& handle,
+             uint32_t autoShutdownTimeout,
+             bool autoShutdownAfterFirstFinishedClient)
       : taskStore(handle, task_store_interface, autoShutdownTimeout)
-      , computeNodeStore(handle, compute_node_store_interface, taskStore) {
+      , computeNodeStore(handle,
+                         compute_node_store_interface,
+                         taskStore,
+                         autoShutdownAfterFirstFinishedClient) {
       handle.modules[PARAC_MOD_BROKER]->broker->task_store =
         &task_store_interface;
       handle.modules[PARAC_MOD_BROKER]->broker->compute_node_store =
@@ -43,7 +51,11 @@ struct BrokerUserdata {
   parac_config_entry* config_entries;
   std::unique_ptr<Internal> internal;
 
-  enum Config { AutoShutdownTimeoutMilliseconds, _CONFIG_COUNT };
+  enum Config {
+    AutoShutdownTimeoutMilliseconds,
+    AutoShutdownAfterFinishedClient,
+    _CONFIG_COUNT
+  };
 };
 
 static void
@@ -60,6 +72,16 @@ init_config(BrokerUserdata* u) {
     PARAC_MOD_BROKER;
   e[BrokerUserdata::AutoShutdownTimeoutMilliseconds].type = PARAC_TYPE_UINT32;
   e[BrokerUserdata::AutoShutdownTimeoutMilliseconds].default_value.uint32 = 0;
+
+  parac_config_entry_set_str(
+    &e[BrokerUserdata::AutoShutdownAfterFinishedClient],
+    "auto-shutdown-after-finished-client",
+    "Exit program after the first client that connected sent end signal.");
+  e[BrokerUserdata::AutoShutdownAfterFinishedClient].registrar =
+    PARAC_MOD_BROKER;
+  e[BrokerUserdata::AutoShutdownAfterFinishedClient].type = PARAC_TYPE_SWITCH;
+  e[BrokerUserdata::AutoShutdownAfterFinishedClient]
+    .default_value.boolean_switch = false;
 }
 
 static parac_status
@@ -75,15 +97,28 @@ pre_init(parac_module* mod) {
     userdata->config_entries[BrokerUserdata::AutoShutdownTimeoutMilliseconds]
       .value.uint32;
 
+  bool autoShutdownAfterFirstFinishedClient =
+    userdata->config_entries[BrokerUserdata::AutoShutdownAfterFinishedClient]
+      .value.boolean_switch;
+
   if(mod->handle->input_file && autoShutdownTimeout > 0) {
     parac_log(PARAC_BROKER,
               PARAC_LOCALWARNING,
               "--auto-shutdown-timeout only applies to daemon nodes and is "
-              "deactivated for master nodes!");
+              "deactivated for client nodes!");
     autoShutdownTimeout = 0;
   }
+  if(mod->handle->input_file && autoShutdownAfterFirstFinishedClient) {
+    parac_log(PARAC_BROKER,
+              PARAC_LOCALWARNING,
+              "--auto-shutdown-after-finished-client only applies to daemon "
+              "nodes and is "
+              "deactivated for client nodes!");
+    autoShutdownAfterFirstFinishedClient = false;
+  }
 
-  userdata->pre_init(*mod->handle, autoShutdownTimeout);
+  userdata->pre_init(
+    *mod->handle, autoShutdownTimeout, autoShutdownAfterFirstFinishedClient);
 
   return PARAC_OK;
 }
