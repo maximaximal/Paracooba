@@ -217,7 +217,12 @@ compareWrappersByUtilization(const NodesRefVecEntry& first,
 
 void
 ComputeNodeStore::tryOffloadingTasks() {
-  std::unique_lock lock(m_internal->nodesMutex);
+  std::unique_lock lock(m_internal->nodesMutex, std::defer_lock);
+  if(!lock.try_lock()) {
+    // If the offloading is already in progress, the worker can resume, as the
+    // offloading will continue in the original thread that started it.
+    return;
+  }
 
   m_internal->updateNodesRefVecUtilization();
   std::sort(m_internal->nodesRefVec.begin(),
@@ -227,13 +232,12 @@ ComputeNodeStore::tryOffloadingTasks() {
   float thisUtilization = thisNode().computeUtilization();
   auto thisWorkQueueSize = thisNode().workQueueSize();
 
-  for(auto& e : m_internal->nodesRefVec) {
+  for(;;) {
+    auto& e = *m_internal->nodesRefVec.begin();
     auto& node = e.first.get();
     if(node.id() == m_handle.id) {
-      continue;
+      break;
     }
-
-    e.second = node.computeUtilization();
 
     float thisFutureUtilization =
       thisWorkQueueSize > 0
@@ -286,6 +290,11 @@ ComputeNodeStore::tryOffloadingTasks() {
       break;
     } else {
       --thisWorkQueueSize;
+
+      m_internal->updateNodesRefVecUtilization();
+      std::sort(m_internal->nodesRefVec.begin(),
+                m_internal->nodesRefVec.end(),
+                &compareWrappersByUtilization);
     }
   }
 }
