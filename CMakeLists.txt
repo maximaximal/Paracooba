@@ -47,7 +47,7 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost COMPONENTS log program_options thread filesystem system iostreams coroutine context REQUIRED)
+find_package(Boost COMPONENTS log program_options thread filesystem system iostreams coroutine context date_time REQUIRED)
 
 find_program(
     CLANG_TIDY_EXE
