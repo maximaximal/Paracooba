@@ -17,6 +17,8 @@ target_include_directories(parac_solver_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
 get_target_property(CADICAL_INCLUDE_DIRS libcadical INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_solver_obj PRIVATE ${CADICAL_INCLUDE_DIRS})
 
+add_dependencies(parac_solver_obj libcadical)
+
 set_property(TARGET parac_solver_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES libcadical cereal)
 
 if(STATIC_BUILDS)
