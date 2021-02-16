@@ -122,14 +122,21 @@ ComputeNodeStore::get_with_connection(
 
   parac_compute_node* n = get(id);
 
-  if(n->send_message_to) {
+  ComputeNode& computeNode = *static_cast<ComputeNode*>(n->broker_userdata);
+
+  parac_status s =
+    computeNode.applyCommunicatorConnection(communicator_free,
+                                            communicator_userdata,
+                                            send_message_func,
+                                            send_file_func);
+  if(s != PARAC_OK) {
+    parac_log(PARAC_BROKER,
+              PARAC_DEBUG,
+              "Connection to {} not linked to compute node because of {}",
+              id,
+              s);
     return nullptr;
   }
-
-  n->communicator_free = communicator_free;
-  n->communicator_userdata = communicator_userdata;
-  n->send_message_to = send_message_func;
-  n->send_file_to = send_file_func;
 
   parac_message_wrapper msg;
   assert(thisNode().description());
@@ -204,10 +211,22 @@ void
 ComputeNodeStore::sendStatusToPeers() {
   std::unique_lock lock(m_internal->nodesMutex);
   for(auto& e : m_internal->nodesList) {
-    if(e.id != m_handle.id && e.send_message_to) {
+    if(e.id != m_handle.id && e.available_to_send_to(&e)) {
       ComputeNode& computeNode = *static_cast<ComputeNode*>(e.broker_userdata);
       auto [s, l] = thisNode().status();
       computeNode.conditionallySendStatusTo(s);
+    }
+  }
+}
+void
+ComputeNodeStore::sendOfflineAnnouncementToPeers() {
+  std::unique_lock lock(m_internal->nodesMutex);
+  parac_message_wrapper msg;
+  msg.length = 0;
+  msg.kind = PARAC_MESSAGE_OFFLINE_ANNOUNCEMENT;
+  for(auto& e : m_internal->nodesList) {
+    if(e.id != m_handle.id && e.available_to_send_to(&e)) {
+      e.send_message_to(&e, &msg);
     }
   }
 }

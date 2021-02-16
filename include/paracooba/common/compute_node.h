@@ -32,6 +32,12 @@ typedef void (*parac_compute_node_set_work_queue_size)(
   parac_id originator,
   uint64_t work_queue_size);
 
+typedef void (*parac_compute_node_connection_dropped_func)(
+  struct parac_compute_node* compute_node);
+
+typedef bool (*parac_compute_node_available_to_send_to_func)(
+  struct parac_compute_node* compute_node);
+
 typedef void (*parac_compute_node_free_func)(
   struct parac_compute_node* compute_node);
 
@@ -54,6 +60,11 @@ typedef struct parac_compute_node {
 
   parac_compute_node_free_func broker_free;      /// Set by Broker.
   parac_compute_node_free_func communicator_free;/// Set by Communicator.
+
+  parac_compute_node_connection_dropped_func
+    connection_dropped;/// Set by Broker.
+  parac_compute_node_available_to_send_to_func
+    available_to_send_to;/// Set by Broker.
 
   parac_id id;
   parac_compute_node_state state;
@@ -97,6 +108,8 @@ class parac_compute_node_wrapper : public parac_compute_node {
     state = PARAC_COMPUTE_NODE_NEW;
     solver_instance = nullptr;
     connection_string = nullptr;
+    connection_dropped = nullptr;
+    available_to_send_to = [](parac_compute_node*) { return false; };
   }
   ~parac_compute_node_wrapper() {
     parac_log(
@@ -107,10 +120,10 @@ class parac_compute_node_wrapper : public parac_compute_node {
       communicator_userdata != nullptr,
       broker_userdata != nullptr);
 
-    if(broker_free)
-      broker_free(this);
     if(communicator_free)
       communicator_free(this);
+    if(broker_free)
+      broker_free(this);
   }
   parac_compute_node_wrapper(const parac_compute_node_wrapper& o) = delete;
   parac_compute_node_wrapper(const parac_compute_node_wrapper&& o) = delete;

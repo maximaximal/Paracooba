@@ -683,43 +683,8 @@ TCPConnection::handleReceivedFile() {
 }
 
 void
-TCPConnection::handleReceivedEndTag() {
-  auto s = state();
-  assert(s);
-
-  parac_message msg;
-  struct data {
-    parac_status status = PARAC_UNDEFINED;
-    bool returned = false;
-  };
-  data d;
-
-  msg.kind = s->readHeader.kind;
-  msg.length = s->readHeader.size;
-  msg.data_to_be_freed = false;
-  msg.userdata = &d;
-  msg.originator_id = s->readHeader.originator;
-  msg.origin = s->compute_node;
-  msg.cb = [](parac_message* msg, parac_status status) {
-    data* d = static_cast<data*>(msg->userdata);
-    d->status = status;
-    d->returned = true;
-  };
-  assert(msg.data);
-
-  assert(s->compute_node->receive_message_from);
-  s->compute_node->receive_message_from(s->compute_node, &msg);
-
-  // Callback must be called immediately! This gives the status that is
-  // then passed back.
-  assert(d.returned);
-}
-
-void
 TCPConnection::compute_node_free_func(parac_compute_node* n) {
   assert(n);
-  n->send_file_to = nullptr;
-  n->send_message_to = nullptr;
   if(n->communicator_userdata) {
     TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
     auto s = conn->state();
@@ -730,6 +695,7 @@ TCPConnection::compute_node_free_func(parac_compute_node* n) {
       conn->send(EndTag());
     }
     delete conn;
+    n->connection_dropped(n);
     n->communicator_userdata = nullptr;
   }
 }
@@ -738,7 +704,11 @@ void
 TCPConnection::compute_node_send_message_to_func(parac_compute_node* n,
                                                  parac_message* msg) {
   assert(n);
-  assert(n->communicator_userdata);
+  assert(msg);
+  if(!n->communicator_userdata) {
+    msg->cb(msg, PARAC_CONNECTION_CLOSED);
+    return;
+  }
   TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
   auto s = conn->state();
   if(s) {
@@ -924,7 +894,6 @@ TCPConnection::readHandler(boost::system::error_code ec,
                   PARAC_TRACE,
                   "Connection End-Tag received in connection to {}",
                   s->remoteId());
-        handleReceivedEndTag();
         return;
       } else if(s->readHeader.kind == PARAC_MESSAGE_KEEPALIVE) {
         // Nothing to do, this message just keeps the connection alive.

@@ -147,6 +147,13 @@ mod_request_exit(parac_module* mod) {
   assert(mod->broker);
   assert(mod->handle);
 
+  if(mod->userdata) {
+    BrokerUserdata* userdata = static_cast<BrokerUserdata*>(mod->userdata);
+    if(userdata->internal) {
+      userdata->internal->computeNodeStore.sendOfflineAnnouncementToPeers();
+    }
+  }
+
   return PARAC_OK;
 }
 

@@ -117,7 +117,6 @@ class TCPConnection {
   void handleReceivedFileStart();
   void handleReceivedFileChunk();
   void handleReceivedFile();
-  void handleReceivedEndTag();
 
   static void compute_node_free_func(parac_compute_node* n);
   static void compute_node_func(parac_compute_node* n);

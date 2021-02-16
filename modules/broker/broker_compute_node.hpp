@@ -1,8 +1,14 @@
 #pragma once
 
+#include "paracooba/common/compute_node.h"
+#include "paracooba/common/file.h"
+#include "paracooba/common/message.h"
 #include "paracooba/common/types.h"
 #include <atomic>
+#include <mutex>
+#include <queue>
 #include <string>
+#include <variant>
 
 #include <cereal/types/map.hpp>
 #include <cereal/types/string.hpp>
@@ -143,7 +149,7 @@ class ComputeNode {
   void receiveMessageStatusFrom(parac_message& msg);
   void receiveMessageTaskResultFrom(parac_message& msg);
   void receiveMessageKnownRemotesFrom(parac_message& msg);
-  void receiveMessageEnd(parac_message &msg);
+  void receiveMessageOfflineAnnouncement(parac_message& msg);
 
   void receiveFileFrom(parac_file& file);
 
@@ -160,8 +166,24 @@ class ComputeNode {
 
   void conditionallySendStatusTo(const Status& s);
 
+  parac_status applyCommunicatorConnection(
+    parac_compute_node_free_func communicator_free,
+    void* communicator_userdata,
+    parac_compute_node_message_func send_message_func,
+    parac_compute_node_file_func send_file_func);
+
+  void removeCommunicatorConnection();
+
   private:
   void sendKnownRemotes();
+
+  static void static_sendMessageTo(parac_compute_node* node,
+                                   parac_message* msg);
+  static void static_sendFileTo(parac_compute_node* node, parac_file* file);
+  static void static_connectionDropped(parac_compute_node* node);
+  static bool static_availableToSendTo(parac_compute_node* node);
+  void sendMessageTo(parac_message& msg);
+  void sendFileTo(parac_file& file);
 
   parac_compute_node& m_node;
   parac_handle& m_handle;
@@ -176,6 +198,12 @@ class ComputeNode {
   mutable std::atomic_flag m_modifyingStatus = ATOMIC_FLAG_INIT;
 
   std::unique_ptr<NoncopyOStringstream> m_knownRemotesOstream;
+
+  std::mutex m_commConnectionMutex;
+  std::atomic<parac_compute_node_message_func> m_commMessageFunc = nullptr;
+  std::atomic<parac_compute_node_file_func> m_commFileFunc = nullptr;
+  std::queue<std::variant<parac_message, parac_file>> m_commQueue;
+  void emptyCommQueue();
 };
 
 std::ostream&

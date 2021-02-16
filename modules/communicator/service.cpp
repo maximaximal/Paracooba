@@ -53,7 +53,9 @@ Service::Service(parac_handle& handle)
   m_internal->timeoutController = std::make_unique<TimeoutController>(*this);
 }
 
-Service::~Service() {}
+Service::~Service() {
+  parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Destroy Service.");
+}
 
 void
 Service::applyConfig(parac_config_entry* e) {

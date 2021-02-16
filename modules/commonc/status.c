@@ -47,6 +47,8 @@ parac_status_to_str(parac_status status) {
       return "Formula received twice Error";
     case PARAC_FILE_NOT_FOUND_ERROR:
       return "File not found Error";
+    case PARAC_CONNECTION_ALREADY_ESTABLISHED_ERROR:
+      return "Connection already established Error";
     case PARAC_GENERIC_ERROR:
       return "Generic Error";
   }
