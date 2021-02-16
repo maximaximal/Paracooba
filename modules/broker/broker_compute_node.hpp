@@ -80,6 +80,12 @@ class ComputeNode {
     void serialize(Archive& ar) {
       ar(CEREAL_NVP(formula_parsed), CEREAL_NVP(workQueueSize));
     }
+
+    inline bool operator==(const SolverInstance& o) const noexcept {
+      return formula_received == o.formula_received &&
+             formula_parsed == o.formula_parsed &&
+             workQueueSize == o.workQueueSize;
+    }
   };
 
   struct Status {
@@ -99,11 +105,14 @@ class ComputeNode {
 
     static bool isDiffWorthwhile(const Status& s1, const Status& s2);
 
+    Status() = default;
+    Status(const Status& o);
     void operator=(const Status& o) {
       m_dirty = true;
       m_writeFlag.clear();
       solverInstances = o.solverInstances;
     }
+    bool operator==(const Status& o) const noexcept;
 
     void insertWorkerCount(uint32_t workers) const { m_workers = workers; };
 
@@ -192,7 +201,7 @@ class ComputeNode {
 
   std::optional<Description> m_description;
   Status m_status;
-  Status m_remotelyKnownLocalStatus;
+  std::optional<Status> m_remotelyKnownLocalStatus;
 
   std::atomic_flag m_sendingStatusTo = ATOMIC_FLAG_INIT;
   mutable std::atomic_flag m_modifyingStatus = ATOMIC_FLAG_INIT;

@@ -223,7 +223,7 @@ mod_request_exit(parac_module* mod) {
 
   CommunicatorUserdata* userdata =
     static_cast<CommunicatorUserdata*>(mod->userdata);
-  userdata->service.stop();
+  userdata->service.requestStop();
 
   return PARAC_OK;
 }

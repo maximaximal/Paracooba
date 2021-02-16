@@ -42,7 +42,8 @@ struct Service::Internal {
 
   std::map<parac_id, TCPConnectionPayloadPair> connectionPayloads;
 
-  std::atomic_bool tcpAcceptorActive;
+  std::atomic_bool tcpAcceptorActive, stopRequested = false;
+  std::atomic_size_t outgoingMessageCounter = 0;
 };
 
 Service::Service(parac_handle& handle)
@@ -88,7 +89,26 @@ Service::start() {
 }
 
 void
+Service::requestStop() {
+  parac_log(
+    PARAC_COMMUNICATOR,
+    PARAC_DEBUG,
+    "Stopping communicator service requested. Outgoing message counter at {}",
+    m_internal->outgoingMessageCounter);
+
+  m_internal->stopRequested = true;
+
+  if(m_internal->outgoingMessageCounter == 0) {
+    stop();
+  }
+}
+
+void
 Service::stop() {
+  if(ioContext().stopped()) {
+    return;
+  }
+
   parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Stopping communicator service.");
 
   ioContext().stop();
@@ -189,6 +209,21 @@ Service::retrieveTCPConnectionPayload(parac_id id) {
     m_internal->connectionPayloads.erase(id);
   }
   return ptr;
+}
+
+void
+Service::addOutgoingMessageToCounter(size_t count) {
+  m_internal->outgoingMessageCounter += count;
+}
+void
+Service::removeOutgoingMessageFromCounter(size_t count) {
+  assert(m_internal->outgoingMessageCounter >= count);
+
+  m_internal->outgoingMessageCounter -= count;
+
+  if(m_internal->stopRequested && m_internal->outgoingMessageCounter == 0) {
+    stop();
+  }
 }
 
 void

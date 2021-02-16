@@ -49,8 +49,7 @@ class Service {
   void applyConfig(parac_config_entry* e);
 
   parac_status start();
-
-  void stop();
+  void requestStop();
 
   boost::asio::io_context& ioContext();
 
@@ -82,8 +81,12 @@ class Service {
   void setTCPAcceptorActive();
   bool isTCPAcceptorActive();
 
+  void addOutgoingMessageToCounter(size_t count = 1);
+  void removeOutgoingMessageFromCounter(size_t count = 1);
+
   private:
   parac_status run();
+  void stop();
 
   void connectToKnownRemotes();
 

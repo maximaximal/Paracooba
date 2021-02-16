@@ -191,7 +191,11 @@ ComputeNode::Status::isParsed(parac_id id) const {
 
 bool
 ComputeNode::Status::isDiffWorthwhile(const Status& s1, const Status& s2) {
-  return true;
+  if(s1 == s2)
+    return false;
+  else
+    return true;
+
   SpinLock lock1(s1.m_writeFlag);
   SpinLock lock2(s2.m_writeFlag);
 
@@ -202,7 +206,7 @@ ComputeNode::Status::isDiffWorthwhile(const Status& s1, const Status& s2) {
      s1.computeUtilization() < 0.8)
     return false;
 
-  if(s2.computeUtilization() < 1.2f)
+  if(s2.computeUtilization() < 1.2f && s1.workQueueSize() != s2.workQueueSize())
     return true;
 
   for(const auto& it2 : s2.solverInstances) {
@@ -219,6 +223,16 @@ ComputeNode::Status::isDiffWorthwhile(const Status& s1, const Status& s2) {
   }
 
   return false;
+}
+ComputeNode::Status::Status(const Status& o)
+  : solverInstances(o.solverInstances) {}
+
+bool
+ComputeNode::Status::operator==(const Status& o) const noexcept {
+  SpinLock lock1(m_writeFlag), lock2(o.m_writeFlag);
+
+  return std::equal(
+    solverInstances.begin(), solverInstances.end(), o.solverInstances.begin());
 }
 
 std::pair<const ComputeNode::Status&, SpinLock>
@@ -541,20 +555,28 @@ ComputeNode::tryToOffloadTask() {
 
 void
 ComputeNode::conditionallySendStatusTo(const Status& s) {
-  if(!m_node.send_message_to)
+  if(!m_node.available_to_send_to(&m_node))
     return;
-  if(!Status::isDiffWorthwhile(m_remotelyKnownLocalStatus, s))
+  if(m_remotelyKnownLocalStatus.has_value() &&
+     !Status::isDiffWorthwhile(*m_remotelyKnownLocalStatus, s))
     return;
   if(m_sendingStatusTo.test_and_set())
     return;
 
-  parac_log(
-    PARAC_BROKER, PARAC_TRACE, "Send local status {} to node {}", s, m_node.id);
+  if(m_remotelyKnownLocalStatus.has_value()) {
+    parac_log(
+      PARAC_BROKER,
+      PARAC_TRACE,
+      "Send local status {} to node {}. Previously known status was {}.",
+      s,
+      m_node.id,
+      *m_remotelyKnownLocalStatus);
+  }
 
   m_remotelyKnownLocalStatus = s;
 
   parac_message_wrapper msg;
-  m_remotelyKnownLocalStatus.serializeToMessage(msg);
+  m_remotelyKnownLocalStatus.value().serializeToMessage(msg);
 
   msg.cb = [](parac_message* msg, parac_status s) {
     // Handle all eventual sending outcomes.

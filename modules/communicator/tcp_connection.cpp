@@ -181,7 +181,9 @@ struct TCPConnection::State {
     , sendQueue(std::move(ptr->queue))
     , sentBuffer(std::move(ptr->map))
     , readTimer(service.ioContext())
-    , keepaliveTimer(service.ioContext()) {}
+    , keepaliveTimer(service.ioContext()) {
+    service.addOutgoingMessageToCounter(sendQueue.size());
+  }
 
   ~State() {
     if(!service.ioContext().stopped()) {
@@ -197,6 +199,7 @@ struct TCPConnection::State {
       compute_node->connection_string = nullptr;
       compute_node = nullptr;
     }
+    service.removeOutgoingMessageFromCounter(sendQueue.size());
     if(!service.ioContext().stopped()) {
       switch(resumeMode) {
         case RestartAfterShutdown: {
@@ -444,6 +447,13 @@ TCPConnection::send(SendQueueEntry&& e) {
     if(e.header.kind != PARAC_MESSAGE_ACK) {
       e.header.number = s->sendMessageNumber++;
     }
+
+    if(e.header.kind != PARAC_MESSAGE_KEEPALIVE) {
+      s->service.addOutgoingMessageToCounter();
+    } else {
+      assert(s->sendQueue.size() == 0);
+    }
+
     s->sendQueue.emplace(std::move(e));
   }
   if(!s->currentlySending.test_and_set()) {
@@ -537,6 +547,7 @@ TCPConnection::handleReceivedACK(const PacketHeader& ack) {
       return false;
     }
   }
+
   auto& sentItem = it->second;
   sentItem(ack.ack_status);
   sentItem(PARAC_TO_BE_DELETED);
@@ -694,9 +705,9 @@ TCPConnection::compute_node_free_func(parac_compute_node* n) {
       }
       conn->send(EndTag());
     }
-    delete conn;
     n->connection_dropped(n);
     n->communicator_userdata = nullptr;
+    delete conn;
   }
 }
 
@@ -842,9 +853,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
             PARAC_COMMUNICATOR,
             PARAC_LOCALERROR,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
-            "reading ACK!",
+            "reading ACK for message id {}!",
             s->remote_endpoint(),
-            s->remoteId());
+            s->remoteId(),
+            s->readHeader.number);
           return;
         }
       } else if(s->readHeader.kind == PARAC_MESSAGE_FILE) {
@@ -1065,6 +1077,22 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         return;
       }
 
+      if(e->header.kind != PARAC_MESSAGE_ACK &&
+         e->header.kind != PARAC_MESSAGE_END &&
+         e->header.kind != PARAC_MESSAGE_KEEPALIVE) {
+        auto n = e->header.number;
+        e->sent = std::chrono::steady_clock::now();
+        s->sentBuffer.try_emplace(n, std::move(s->sendQueue.front()));
+
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_TRACE,
+                  "Send message of kind {} with id {} to remote {} and waiting "
+                  "for ACK.",
+                  e->header.kind,
+                  e->header.number,
+                  s->remoteId());
+      }
+
       if(e->header.kind == PARAC_MESSAGE_ACK ||
          e->header.kind == PARAC_MESSAGE_END ||
          e->header.kind == PARAC_MESSAGE_KEEPALIVE) {
@@ -1103,13 +1131,10 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         }
       }
 
-      if(e->header.kind != PARAC_MESSAGE_ACK &&
-         e->header.kind != PARAC_MESSAGE_END &&
-         e->header.kind != PARAC_MESSAGE_KEEPALIVE) {
-        auto n = e->header.number;
-        e->sent = std::chrono::steady_clock::now();
-        s->sentBuffer.try_emplace(n, std::move(s->sendQueue.front()));
+      if(e->header.kind != PARAC_MESSAGE_KEEPALIVE) {
+        s->service.removeOutgoingMessageFromCounter();
       }
+
       s->sendQueue.pop();
     }
   }
