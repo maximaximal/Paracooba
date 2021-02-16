@@ -7,6 +7,7 @@
 #include <atomic>
 #include <mutex>
 #include <queue>
+#include <shared_mutex>
 #include <string>
 #include <variant>
 
@@ -107,11 +108,7 @@ class ComputeNode {
 
     Status() = default;
     Status(const Status& o);
-    void operator=(const Status& o) {
-      m_dirty = true;
-      m_writeFlag.clear();
-      solverInstances = o.solverInstances;
-    }
+    void operator=(const Status& o);
     bool operator==(const Status& o) const noexcept;
 
     void insertWorkerCount(uint32_t workers) const { m_workers = workers; };
@@ -205,6 +202,7 @@ class ComputeNode {
 
   std::atomic_flag m_sendingStatusTo = ATOMIC_FLAG_INIT;
   mutable std::atomic_flag m_modifyingStatus = ATOMIC_FLAG_INIT;
+  mutable std::shared_mutex m_descriptionMutex;
 
   std::unique_ptr<NoncopyOStringstream> m_knownRemotesOstream;
 

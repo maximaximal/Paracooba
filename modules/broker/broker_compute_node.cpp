@@ -144,6 +144,7 @@ ComputeNode::Description::serializeToMessage(parac_message& msg) const {
 
 uint64_t
 ComputeNode::Status::workQueueSize() const {
+  SpinLock lock(m_writeFlag);
   if(m_dirty) {
     m_cachedWorkQueueSize =
       accumulate(solverInstances | map_values |
@@ -226,6 +227,14 @@ ComputeNode::Status::isDiffWorthwhile(const Status& s1, const Status& s2) {
 }
 ComputeNode::Status::Status(const Status& o)
   : solverInstances(o.solverInstances) {}
+
+void
+ComputeNode::Status::operator=(const Status& o) {
+  SpinLock l1(m_writeFlag), l2(o.m_writeFlag);
+  m_dirty = true;
+  m_writeFlag.clear();
+  solverInstances = o.solverInstances;
+}
 
 bool
 ComputeNode::Status::operator==(const Status& o) const noexcept {
@@ -365,6 +374,8 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
   boost::iostreams::stream<boost::iostreams::basic_array_source<char>> data(
     msg.data, msg.length);
 
+  std::unique_lock descriptionLock(m_descriptionMutex);
+
   assert(msg.origin->id == m_node.id);
 
   m_description = Description();
@@ -393,6 +404,7 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
   sendKnownRemotes();
 
   SpinLock lock(m_modifyingStatus);
+  m_status.insertWorkerCount(m_description->workers);
 
   if(m_handle.input_file &&
      !m_status.solverInstances[m_handle.id].formula_received) {
@@ -714,12 +726,13 @@ ComputeNode::receiveMessageOfflineAnnouncement(parac_message& m) {
 float
 ComputeNode::computeUtilization() const {
   // Utilization cannot be computed, so it is assumed to be infinite.
-  if(!description())
-    return FP_INFINITE;
+  {
+    std::shared_lock lock(m_descriptionMutex);
+    if(!description())
+      return FP_INFINITE;
+  }
 
   SpinLock lock(m_modifyingStatus);
-
-  m_status.insertWorkerCount(description()->workers);
 
   return m_status.computeUtilization();
 }
