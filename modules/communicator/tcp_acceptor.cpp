@@ -124,12 +124,13 @@ TCPAcceptor::start(Service& service,
 
 std::string
 TCPAcceptor::listenAddress() const {
-  return m_internal->endpoint.address().to_string();
+  return m_internal->acceptor->local_endpoint().address().to_string();
 }
 
 std::string
 TCPAcceptor::connectionString() const {
-  return listenAddress() + ":" + std::to_string(m_internal->endpoint.port());
+  return listenAddress() + ":" +
+         std::to_string(m_internal->acceptor->local_endpoint().port());
 }
 
 #include <boost/asio/yield.hpp>

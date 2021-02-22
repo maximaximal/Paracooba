@@ -79,7 +79,8 @@ UDPAcceptor::start(Service& service) {
 #if BOOST_VERSION >= 106600
   auto address = boost::asio::ip::make_address_v4(m_listenAddressStr, ec);
 #else
-  auto address = boost::asio::ip::address_v4::from_string(m_listenAddressStr, ec);
+  auto address =
+    boost::asio::ip::address_v4::from_string(m_listenAddressStr, ec);
 #endif
   if(ec) {
     parac_log(PARAC_COMMUNICATOR,
@@ -97,7 +98,7 @@ UDPAcceptor::start(Service& service) {
   m_internal->socket.bind(m_internal->listenEndpoint, ec);
 
   m_internal->socket.set_option(boost::asio::socket_base::broadcast(true));
-  //m_internal->socket.set_option(
+  // m_internal->socket.set_option(
   //  boost::asio::ip::udp::socket::reuse_address(true));
 
   if(ec) {
@@ -141,7 +142,9 @@ UDPAcceptor::startAnnouncements(const std::string& connectionString,
   std::stringstream bodyOS;
   {
     cereal::BinaryOutputArchive oa(bodyOS);
-    UDPAnnouncement a{ m_internal->service.id(), connectionString };
+    UDPAnnouncement a{ m_internal->service.id(),
+                       connectionString,
+                       m_internal->service.currentTCPListenPort() };
     oa(a);
   }
   body = bodyOS.str();
@@ -194,12 +197,21 @@ UDPAcceptor::readHandler(const ::boost::system::error_code& ec, size_t bytes) {
           PARAC_COMMUNICATOR,
           PARAC_DEBUG,
           "Receive {} bytes over UDP from endpoint {} (ID {}), containing "
-          "connection string {} which is now used to start a TCP connection.",
+          "connection string {} and TCP listen port {}. Using endpoint and "
+          "TCP port to start a TCP connection.",
           bytes,
           m_internal->remoteEndpoint,
           announcement.id,
-          announcement.tcpConnectionString);
-        m_internal->service.connectToRemote(announcement.tcpConnectionString);
+          announcement.tcpConnectionString,
+          announcement.tcpListenPort);
+
+        auto endpoint = m_internal->remoteEndpoint;
+        endpoint.port(announcement.tcpListenPort);
+
+        std::stringstream s;
+        s << endpoint;
+
+        m_internal->service.connectToRemote(s.str());
       }
     } catch(cereal::Exception& e) {
       parac_log(PARAC_COMMUNICATOR,
@@ -220,7 +232,7 @@ void
 UDPAcceptor::accept() {
   m_internal->socket.async_receive_from(
     STRBUF(m_internal->readBuf),
-    m_internal->listenEndpoint,
+    m_internal->remoteEndpoint,
     [this](auto& ec, auto b) { readHandler(ec, b); });
 }
 
