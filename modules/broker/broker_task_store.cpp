@@ -302,8 +302,6 @@ TaskStore::pop_work() {
     --m_internal->tasksWaitingForWorkerQueueSize;
   }
 
-  decrementWorkQueueInComputeNode(m_internal->handle, t->originator);
-
   return t;
 }
 void
@@ -500,6 +498,10 @@ TaskStore::assess_task(parac_task* task) {
             m_internal->tasksSize);
 
   if(parac_task_state_is_done(s)) {
+    if(!(task->state & PARAC_TASK_OFFLOADED)) {
+      decrementWorkQueueInComputeNode(m_internal->handle, task->originator);
+    }
+
     assert(!(s & PARAC_TASK_WORK_AVAILABLE));
 
     if(task->path.rep == PARAC_PATH_PARSER) {
