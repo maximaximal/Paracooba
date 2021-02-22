@@ -17,4 +17,7 @@ parac_module(parac_communicator "${PARACOOBA_COMMUNICATOR_SRCS}" ${CMAKE_CURRENT
 set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
 add_dependencies(parac_communicator_obj distrac_paracooba)
 
+get_target_property(CEREAL_INCLUDE_DIRS cereal INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(parac_communicator_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
+
 set_property(TARGET parac_solver_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac)

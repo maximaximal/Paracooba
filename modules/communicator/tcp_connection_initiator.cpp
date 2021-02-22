@@ -357,7 +357,7 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
                 PARAC_LOCALERROR,
                 "Could not connect to endpoint {}! Connection error: {}",
                 m_state->endpoint(),
-                ec);
+                ec.message());
     } else {
       assert(m_state->socket->is_open());
       parac_log(PARAC_COMMUNICATOR,

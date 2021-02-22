@@ -49,6 +49,8 @@ parac_status_to_str(parac_status status) {
       return "File not found Error";
     case PARAC_CONNECTION_ALREADY_ESTABLISHED_ERROR:
       return "Connection already established Error";
+    case PARAC_BIND_ERROR:
+      return "Bind Error";
     case PARAC_GENERIC_ERROR:
       return "Generic Error";
   }

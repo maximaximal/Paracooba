@@ -71,9 +71,11 @@ Service::applyConfig(parac_config_entry* e) {
 
   m_internal->tcpAcceptor = std::make_unique<TCPAcceptor>();
 
-  m_internal->udpAcceptor =
-    std::make_unique<UDPAcceptor>(m_config[LISTEN_ADDRESS].value.string,
-                                  m_config[UDP_LISTEN_PORT].value.uint16);
+  if(enableUDP()) {
+    m_internal->udpAcceptor =
+      std::make_unique<UDPAcceptor>(m_config[UDP_LISTEN_ADDRESS].value.string,
+                                    m_config[UDP_LISTEN_PORT].value.uint16);
+  }
 }
 
 parac_status
@@ -121,9 +123,16 @@ Service::run() {
 
   if(m_internal->tcpAcceptor)
     m_internal->tcpAcceptor->start(
-      *this, m_config[LISTEN_ADDRESS].value.string, defaultTCPListenPort());
-  if(m_internal->udpAcceptor)
+      *this, m_config[TCP_LISTEN_ADDRESS].value.string, defaultTCPListenPort());
+
+  if(m_internal->udpAcceptor) {
     m_internal->udpAcceptor->start(*this);
+
+    if(enableUDPAnnouncements()) {
+      m_internal->udpAcceptor->startAnnouncements(
+        m_internal->tcpAcceptor->connectionString(), udpAnnouncementInterval());
+    }
+  }
 
   connectToKnownRemotes();
 
@@ -226,6 +235,11 @@ Service::removeOutgoingMessageFromCounter(size_t count) {
   }
 }
 
+parac_id
+Service::id() const {
+  return m_handle.id;
+}
+
 void
 Service::setTCPAcceptorActive() {
   m_internal->tcpAcceptorActive = true;
@@ -299,6 +313,35 @@ Service::automaticListenPortAssignment() const {
   // The option is to disable (as the default is to enable it) and this function
   // asks if it is enabled, so the ! is required.
   return !m_config[AUTOMATIC_LISTEN_PORT_ASSIGNMENT].value.boolean_switch;
+}
+
+bool
+Service::enableUDP() const {
+  assert(m_config);
+  return m_config[ENABLE_UDP].value.boolean_switch || enableUDPAnnouncements();
+}
+
+const char*
+Service::broadcastAddress() const {
+  assert(m_config);
+  return m_config[BROADCAST_ADDRESS].value.string;
+}
+
+bool
+Service::enableUDPAnnouncements() const {
+  return udpAnnouncementInterval() > 0;
+}
+
+uint32_t
+Service::udpAnnouncementInterval() const {
+  assert(m_config);
+  return m_config[UDP_ANNOUNCEMENT_INTERVAL_MS].value.uint32;
+}
+
+uint16_t
+Service::udpTargetPort() const {
+  assert(m_config);
+  return m_config[UDP_TARGET_PORT].value.uint16;
 }
 
 const char*

@@ -122,6 +122,16 @@ TCPAcceptor::start(Service& service,
   return PARAC_OK;
 }
 
+std::string
+TCPAcceptor::listenAddress() const {
+  return m_internal->endpoint.address().to_string();
+}
+
+std::string
+TCPAcceptor::connectionString() const {
+  return listenAddress() + ":" + std::to_string(m_internal->endpoint.port());
+}
+
 #include <boost/asio/yield.hpp>
 void
 TCPAcceptor::loop(const boost::system::error_code& ec) {

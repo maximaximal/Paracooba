@@ -24,6 +24,9 @@ class TCPAcceptor {
                      const std::string& listenAddressStr,
                      uint16_t listenPort);
 
+  std::string listenAddress() const;
+  std::string connectionString() const;
+
   private:
   struct Internal;
   std::unique_ptr<Internal> m_internal;

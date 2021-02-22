@@ -12,6 +12,7 @@
 #include <parac_communicator_export.h>
 
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ip/udp.hpp>
 
 #define COMMUNICATOR_NAME "cpp_asio_tcpconnections"
 #define COMMUNICATOR_VERSION_MAJOR 1
@@ -26,7 +27,8 @@ struct CommunicatorUserdata {
   parac::communicator::Service service;
 
   std::string temporary_directory;
-  std::string default_listen_address;
+  std::string default_tcp_listen_address;
+  std::string default_udp_listen_address;
   std::string default_broadcast_address;
 
   parac_config_entry* config_entries;
@@ -73,15 +75,26 @@ init_config(CommunicatorUserdata* u) {
     u->temporary_directory.c_str();
 
   parac_config_entry_set_str(
-    &e[Config::LISTEN_ADDRESS],
-    "listen-address",
-    "Address to listen on for incoming UDP or TCP messages.");
-  e[Config::LISTEN_ADDRESS].registrar = PARAC_MOD_COMMUNICATOR;
-  e[Config::LISTEN_ADDRESS].type = PARAC_TYPE_STR;
+    &e[Config::TCP_LISTEN_ADDRESS],
+    "tcp-listen-address",
+    "Address to listen on for incoming TCP connections.");
+  e[Config::TCP_LISTEN_ADDRESS].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::TCP_LISTEN_ADDRESS].type = PARAC_TYPE_STR;
 
-  u->default_listen_address = "";
-  e[Config::LISTEN_ADDRESS].default_value.string =
-    u->default_listen_address.c_str();
+  u->default_tcp_listen_address = "";
+  e[Config::TCP_LISTEN_ADDRESS].default_value.string =
+    u->default_tcp_listen_address.c_str();
+
+  parac_config_entry_set_str(&e[Config::UDP_LISTEN_ADDRESS],
+                             "udp-listen-address",
+                             "Address to listen on for incoming UDP messages.");
+  e[Config::UDP_LISTEN_ADDRESS].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::UDP_LISTEN_ADDRESS].type = PARAC_TYPE_STR;
+
+  u->default_udp_listen_address =
+    boost::asio::ip::address_v4::any().to_string();
+  e[Config::UDP_LISTEN_ADDRESS].default_value.string =
+    u->default_udp_listen_address.c_str();
 
   parac_config_entry_set_str(&e[Config::BROADCAST_ADDRESS],
                              "broadcast-address",
@@ -167,6 +180,23 @@ init_config(CommunicatorUserdata* u) {
   e[Config::AUTOMATIC_LISTEN_PORT_ASSIGNMENT].registrar =
     PARAC_MOD_COMMUNICATOR;
   e[Config::AUTOMATIC_LISTEN_PORT_ASSIGNMENT].type = PARAC_TYPE_SWITCH;
+
+  parac_config_entry_set_str(
+    &e[Config::ENABLE_UDP],
+    "enable-udp",
+    "Enables listening for incoming UDP announcements");
+  e[Config::ENABLE_UDP].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::ENABLE_UDP].type = PARAC_TYPE_SWITCH;
+
+  parac_config_entry_set_str(
+    &e[Config::UDP_ANNOUNCEMENT_INTERVAL_MS],
+    "udp-announcement-interval",
+    "Interval for UDP online announcements in milliseconds. Automatically "
+    "discovers other nodes which have --enable-udp. 0 means no announcements "
+    "from this node. Automatically activates this node's --enable-udp.");
+  e[Config::UDP_ANNOUNCEMENT_INTERVAL_MS].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::UDP_ANNOUNCEMENT_INTERVAL_MS].type = PARAC_TYPE_UINT32;
+  e[Config::UDP_ANNOUNCEMENT_INTERVAL_MS].default_value.uint32 = 0;
 }
 
 static bool

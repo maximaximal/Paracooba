@@ -26,7 +26,8 @@ using TCPConnectionPayloadPtr =
 
 enum Config {
   TEMPORARY_DIRECTORY,
-  LISTEN_ADDRESS,
+  TCP_LISTEN_ADDRESS,
+  UDP_LISTEN_ADDRESS,
   BROADCAST_ADDRESS,
   UDP_LISTEN_PORT,
   UDP_TARGET_PORT,
@@ -38,6 +39,8 @@ enum Config {
   CONNECTION_RETRIES,
   KNOWN_REMOTES,
   AUTOMATIC_LISTEN_PORT_ASSIGNMENT,
+  ENABLE_UDP,
+  UDP_ANNOUNCEMENT_INTERVAL_MS,
   _COUNT
 };
 
@@ -59,10 +62,15 @@ class Service {
   uint16_t defaultTCPListenPort() const;
   uint16_t currentTCPListenPort() const;
   uint16_t currentUDPListenPort() const;
+  uint16_t udpTargetPort() const;
   uint32_t networkTimeoutMS() const;
   uint32_t retryTimeoutMS() const;
   uint32_t keepaliveIntervalMS() const;
   bool automaticListenPortAssignment() const;
+
+  bool enableUDP() const;
+  bool enableUDPAnnouncements() const;
+  uint32_t udpAnnouncementInterval() const;
 
   const char* knownRemote(size_t i) const;
   size_t knownRemoteCount() const;
@@ -83,6 +91,9 @@ class Service {
 
   void addOutgoingMessageToCounter(size_t count = 1);
   void removeOutgoingMessageFromCounter(size_t count = 1);
+
+  parac_id id() const;
+  const char* broadcastAddress() const;
 
   private:
   parac_status run();
