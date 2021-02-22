@@ -267,7 +267,7 @@ ComputeNodeStore::tryOffloadingTasks() {
         : 0;
 
     // Do not starve the local node of work if the situation is not too bad!
-    if(e.second > 0.5 && thisUtilization >= 1 && thisFutureUtilization < 1) {
+    if(e.second > 0.8 && thisUtilization >= 1 && thisFutureUtilization < 1) {
       parac_log(PARAC_BROKER,
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
@@ -296,7 +296,7 @@ ComputeNodeStore::tryOffloadingTasks() {
       break;
     }
 
-    if(e.second > 1.2) {
+    if(e.second > 2) {
       parac_log(PARAC_BROKER,
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
