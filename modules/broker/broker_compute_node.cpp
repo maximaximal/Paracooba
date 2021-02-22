@@ -476,10 +476,10 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
 
   // Check if the target needs some tasks according to offloading heuristic.
   float utilization = computeUtilization();
-  if(utilization < 1 && m_store.thisNode().computeUtilization() > 0.5) {
+  if(utilization < 1.5 && m_store.thisNode().computeUtilization() >= 1) {
     tryToOffloadTask();
   } else {
-    if(m_store.thisNode().computeUtilization() < 0.5) {
+    if(m_store.thisNode().computeUtilization() < 1) {
       // The current node doesn't have enough work! Try to get more by sending
       // status to all other known nodes. This saves waiting time for answers of
       // previously sent status updates.
