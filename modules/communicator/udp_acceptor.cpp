@@ -79,7 +79,7 @@ UDPAcceptor::start(Service& service) {
 #if BOOST_VERSION >= 106600
   auto address = boost::asio::ip::make_address_v4(m_listenAddressStr, ec);
 #else
-  auto address = boost::asio::ip::address_v4::from_string(connectionString, ec);
+  auto address = boost::asio::ip::address_v4::from_string(m_listenAddressStr, ec);
 #endif
   if(ec) {
     parac_log(PARAC_COMMUNICATOR,
