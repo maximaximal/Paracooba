@@ -476,7 +476,7 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
 
   // Check if the target needs some tasks according to offloading heuristic.
   float utilization = computeUtilization();
-  if(utilization < 1.5 && m_store.thisNode().computeUtilization() >= 1) {
+  if(utilization < 1.5 && m_store.thisNode().computeUtilization() >= 0.5) {
     tryToOffloadTask();
   } else {
     if(m_store.thisNode().computeUtilization() < 1) {

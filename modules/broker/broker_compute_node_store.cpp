@@ -258,7 +258,7 @@ ComputeNodeStore::tryOffloadingTasks() {
     auto& e = *m_internal->nodesRefVec.begin();
     auto& node = e.first.get();
     if(node.id() == m_handle.id) {
-      break;
+      continue;
     }
 
     float thisFutureUtilization =
@@ -266,8 +266,8 @@ ComputeNodeStore::tryOffloadingTasks() {
         ? thisNode().computeFutureUtilization(thisWorkQueueSize - 1)
         : 0;
 
-    // Do not starve the local node of work if the situation is not too bad!
-    if(e.second > 0.8 && thisUtilization >= 1 && thisFutureUtilization < 1) {
+    // Do not starve the local node of work
+    if(thisFutureUtilization < 1) {
       parac_log(PARAC_BROKER,
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
