@@ -82,7 +82,8 @@ ComputeNode::ComputeNode(parac_compute_node& node,
   : m_node(node)
   , m_handle(handle)
   , m_store(store)
-  , m_taskStore(taskStore) {
+  , m_taskStore(taskStore)
+  , m_knownRemotesOstream(std::make_unique<NoncopyOStringstream>()) {
   node.receive_message_from = [](parac_compute_node* n, parac_message* msg) {
     assert(n);
     assert(n->broker_userdata);
@@ -402,6 +403,19 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
 
   // Send all known other nodes to the peer.
   sendKnownRemotes();
+
+  // Notify other nodes on newly created node.
+  for(const auto& n : m_store) {
+    if(n.id == m_handle.id || n.id == m_node.id)
+      continue;
+
+    ComputeNode* bn = static_cast<ComputeNode*>(n.broker_userdata);
+    assert(bn);
+
+    // This static cast is okay, since all nodes in the task store are stored as
+    // wrappers. This is the same module, so no breakage should occur.
+    bn->notifyOfNewRemote(static_cast<parac_compute_node_wrapper&>(m_node));
+  }
 
   SpinLock lock(m_modifyingStatus);
   m_status.insertWorkerCount(m_description->workers);
@@ -756,18 +770,51 @@ ComputeNode::getSolverInstance() {
 }
 
 void
-ComputeNode::sendKnownRemotes() {
-  if(!m_knownRemotesOstream) {
-    m_knownRemotesOstream = std::make_unique<NoncopyOStringstream>();
-  } else {
-    *m_knownRemotesOstream = NoncopyOStringstream();
-  }
+ComputeNode::notifyOfNewRemote(const parac_compute_node_wrapper& node) {
+  m_newRemotesToNotifyAbout.emplace_back(node.getIDConnectionStringPair());
+
+  doNotifyOfNewRemotes();
+}
+
+void
+ComputeNode::doNotifyOfNewRemotes() {
+  if(m_sendingKnownRemotes.test_and_set())
+    return;
 
   parac_message_wrapper msg;
   msg.kind = PARAC_MESSAGE_NEW_REMOTES;
 
   MessageKnownRemotes knownRemotes;
 
+  std::copy(m_newRemotesToNotifyAbout.begin(),
+            m_newRemotesToNotifyAbout.end(),
+            std::back_inserter(knownRemotes.remotes));
+
+  *m_knownRemotesOstream = NoncopyOStringstream();
+
+  {
+    cereal::BinaryOutputArchive oa(*m_knownRemotesOstream);
+    oa(knownRemotes);
+  }
+
+  m_newRemotesToNotifyAbout.clear();
+
+  msg.data = m_knownRemotesOstream->ptr();
+  msg.length = m_knownRemotesOstream->tellp();
+
+  msg.userdata = this;
+  msg.cb = [](parac_message* msg, parac_status s) {
+    if(s == PARAC_TO_BE_DELETED) {
+      ComputeNode* self = static_cast<ComputeNode*>(msg->userdata);
+      self->m_sendingKnownRemotes.clear();
+    }
+  };
+
+  m_node.send_message_to(&m_node, &msg);
+}
+
+void
+ComputeNode::sendKnownRemotes() {
   auto stepOverNode = [this](const parac_compute_node_wrapper& node) {
     return node.id == m_node.id || !node.send_message_to ||
            !node.connection_string;
@@ -775,18 +822,10 @@ ComputeNode::sendKnownRemotes() {
   for(const auto& node : m_store) {
     if(stepOverNode(node))
       continue;
-    knownRemotes.remotes.emplace_back(node.getIDConnectionStringPair());
+    m_newRemotesToNotifyAbout.emplace_back(node.getIDConnectionStringPair());
   }
 
-  {
-    cereal::BinaryOutputArchive oa(*m_knownRemotesOstream);
-    oa(knownRemotes);
-  }
-
-  msg.data = m_knownRemotesOstream->ptr();
-  msg.length = m_knownRemotesOstream->tellp();
-
-  m_node.send_message_to(&m_node, &msg);
+  doNotifyOfNewRemotes();
 }
 
 void

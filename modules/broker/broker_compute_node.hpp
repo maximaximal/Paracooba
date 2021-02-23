@@ -10,6 +10,7 @@
 #include <shared_mutex>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include <cereal/types/map.hpp>
 #include <cereal/types/string.hpp>
@@ -180,8 +181,11 @@ class ComputeNode {
 
   void removeCommunicatorConnection();
 
+  void notifyOfNewRemote(const parac_compute_node_wrapper &node);
+
   private:
   void sendKnownRemotes();
+  void doNotifyOfNewRemotes();
 
   static void static_sendMessageTo(parac_compute_node* node,
                                    parac_message* msg);
@@ -205,6 +209,9 @@ class ComputeNode {
   mutable std::shared_mutex m_descriptionMutex;
 
   std::unique_ptr<NoncopyOStringstream> m_knownRemotesOstream;
+
+  std::atomic_flag m_sendingKnownRemotes = ATOMIC_FLAG_INIT;
+  std::vector<parac_compute_node_wrapper::IDConnectionStringPair> m_newRemotesToNotifyAbout;
 
   std::mutex m_commConnectionMutex;
   std::atomic<parac_compute_node_message_func> m_commMessageFunc = nullptr;

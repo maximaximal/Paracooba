@@ -92,9 +92,9 @@ typedef struct parac_compute_node {
 #include <paracooba/common/log.h>
 
 class parac_compute_node_wrapper : public parac_compute_node {
+  public:
   using IDConnectionStringPair = std::pair<parac_id, std::string>;
 
-  public:
   parac_compute_node_wrapper() {
     send_message_to = nullptr;
     receive_message_from = nullptr;
