@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/error.hpp>
+#include <boost/system/detail/errc.hpp>
 #if BOOST_VERSION >= 106600
 #include <boost/asio/io_context.hpp>
 #else
@@ -757,8 +758,9 @@ TCPConnection::readHandler(boost::system::error_code ec,
   }
 
   if(ec) {
-    s->socket->cancel();
-    s->socket->close();
+    boost::system::error_code ec;
+    s->socket->cancel(ec);
+    s->socket->close(ec);
   }
 
   if(ec == boost::asio::error::eof) {
@@ -808,7 +810,8 @@ TCPConnection::readHandler(boost::system::error_code ec,
       yield async_read(*s->socket, BUF(s->readHeader), rh);
 
       if(ec) {
-        if(ec == boost::system::errc::connection_reset) {
+        if(ec == boost::system::errc::connection_reset ||
+           ec == boost::system::errc::operation_canceled) {
           // No spamming about reset connections!
           parac_log(PARAC_COMMUNICATOR,
                     PARAC_TRACE,
@@ -999,8 +1002,10 @@ TCPConnection::writeHandler(boost::system::error_code ec,
   }
 
   if(ec) {
-    s->socket->cancel();
-    s->socket->close();
+    boost::system::error_code ec;
+    s->socket->cancel(ec);
+    s->socket->close(ec);
+    return;
   }
 
   std::unique_lock lock(s->sendQueueMutex);
@@ -1058,7 +1063,8 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       s->transmitMode = e->transmitMode;
       yield async_write(*s->socket, BUF(e->header), wh);
 
-      if(ec == boost::system::errc::broken_pipe) {
+      if(ec == boost::system::errc::broken_pipe ||
+         ec == boost::system::errc::connection_reset) {
         // Connection can be closed silently.
         s->resumeMode = EndAfterShutdown;
         return;
