@@ -117,15 +117,14 @@ FileSender::send_chunk(bool first) {
                   m_state->target_socket.remote_endpoint());
         return m_state->cb(boost::asio::error::basic_errors::shut_down);
       } else {
-        parac_log(PARAC_COMMUNICATOR,
-                  PARAC_LOCALWARNING,
-                  "Got EAGAIN during sendfile to endpoint {}! Waiting for {}ms "
-                  "(network timeout ms) and trying again (try {}).",
-                  m_state->target_socket.remote_endpoint(),
-                  m_state->service.networkTimeoutMS(),
-                  m_state->eagainTries);
-        m_state->eagainTimer.expires_from_now(
-          std::chrono::milliseconds(m_state->service.networkTimeoutMS()));
+        parac_log(
+          PARAC_COMMUNICATOR,
+          PARAC_LOCALWARNING,
+          "Got EAGAIN during sendfile to endpoint {}! Waiting for 500ms "
+          "(network timeout ms) and trying again (try {}).",
+          m_state->target_socket.remote_endpoint(),
+          m_state->eagainTries);
+        m_state->eagainTimer.expires_from_now(std::chrono::milliseconds(500));
         return m_state->eagainTimer.async_wait(sc);
       }
     } else {
