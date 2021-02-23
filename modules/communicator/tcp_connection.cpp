@@ -513,10 +513,6 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
     &TCPConnection::compute_node_send_file_to_func);
 
   if(!s->compute_node) {
-    parac_log(PARAC_COMMUNICATOR,
-              PARAC_LOCALERROR,
-              "Error when creating compute node {}!",
-              init.sender_id);
     delete conn;
     return false;
   }
@@ -792,10 +788,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
     }
 
     if(!handleInitiatorMessage(s->readInitiatorMessage)) {
-      parac_log(PARAC_COMMUNICATOR,
-                PARAC_GLOBALERROR,
-                "Handle Initiator Message failed! Ending connection to unknown "
-                "remote.");
+      // This only means that the connection was already created.
       return;
     }
 
@@ -1023,8 +1016,11 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 
   // Defined up here in order to be created when sending files. When it is
   // deleted, it has already been copied internally and carries on the reference
-  // to this connection's state.
-  std::unique_ptr<FileSender> sender;
+  // to this connection's state. This does not hold any state itself, it must
+  // first be created using the proper constructor - this variable is nothing
+  // but a workaround for switch & stackless coroutine variable declaration
+  // issues.
+  FileSender fileSender;
 
   reenter(s->writeCoro) {
     yield async_write(*s->socket, BUF(s->writeInitiatorMessage), wh);
@@ -1100,17 +1096,16 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       } else if(e->header.kind == PARAC_MESSAGE_FILE) {
         assert(e);
 
-        sender =
-          std::make_unique<FileSender>(e->file().path,
-                                       *s->socket,
-                                       std::bind(&TCPConnection::writeHandler,
-                                                 *this,
-                                                 boost::system::error_code(),
-                                                 0));
+        fileSender = FileSender(
+          e->file().path,
+          *s->socket,
+          std::bind(
+            &TCPConnection::writeHandler, *this, std::placeholders::_1, 0),
+          s->service);
         // Handles the sending internally and calls the callback to this
         // function when it's done. If there is some error, the connection is
         // dropped and re-established.
-        yield sender->send();
+        yield fileSender.send();
       } else {
         if(e->message().data_is_inline) {
           assert(e->header.size <= PARAC_MESSAGE_INLINE_DATA_SIZE);

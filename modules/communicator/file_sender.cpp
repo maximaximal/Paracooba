@@ -1,5 +1,6 @@
 #include "file_sender.hpp"
 #include "packet.hpp"
+#include <boost/asio/error.hpp>
 #include <boost/filesystem/path.hpp>
 #include <cassert>
 #include <cstring>
@@ -11,13 +12,16 @@ extern "C" {
 #include <sys/types.h>
 }
 
+#include "service.hpp"
+
 #include <paracooba/common/log.h>
 
 namespace parac::communicator {
 FileSender::FileSender(const std::string& source_file,
                        boost::asio::ip::tcp::socket& socket,
-                       FinishedCB cb)
-  : m_state(std::make_shared<State>(socket)) {
+                       FinishedCB cb,
+                       Service& service)
+  : m_state(std::make_shared<State>(socket, service)) {
   m_state->source_file = source_file;
   m_state->cb = cb;
 
@@ -91,9 +95,11 @@ FileSender::send() {
 void
 FileSender::send_chunk(bool first) {
   if(!first && m_state->offset >= m_state->file_size) {
-    m_state->cb();
+    m_state->cb(boost::system::error_code());
     return;
   }
+
+  auto sc = std::bind(&FileSender::send_chunk, *this, false);
 
   int ret = sendfile(m_state->target_socket.native_handle(),
                      m_state->fd,
@@ -101,15 +107,45 @@ FileSender::send_chunk(bool first) {
                      m_state->file_size);
 
   if(ret == -1) {
-    parac_log(PARAC_COMMUNICATOR,
-              PARAC_LOCALERROR,
-              "Error during sendfile! Error: {}",
-              std::strerror(errno));
-    return;
+    if(errno == EAGAIN) {
+      if(++m_state->eagainTries > 3) {
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_LOCALERROR,
+                  "Got EAGAIN for the {}th time during sendfile to endpoint "
+                  "{}! Exiting connection with error.",
+                  m_state->eagainTries,
+                  m_state->target_socket.remote_endpoint());
+        return m_state->cb(boost::asio::error::basic_errors::shut_down);
+      } else {
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_LOCALWARNING,
+                  "Got EAGAIN during sendfile to endpoint {}! Waiting for {}ms "
+                  "(network timeout ms) and trying again (try {}).",
+                  m_state->target_socket.remote_endpoint(),
+                  m_state->service.networkTimeoutMS(),
+                  m_state->eagainTries);
+        m_state->eagainTimer.expires_from_now(
+          std::chrono::milliseconds(m_state->service.networkTimeoutMS()));
+        return m_state->eagainTimer.async_wait(sc);
+      }
+    } else {
+      parac_log(
+        PARAC_COMMUNICATOR,
+        PARAC_LOCALERROR,
+        "Unknown error during sendfile! Error: {}. Giving error to connection.",
+        std::strerror(errno));
+      m_state->cb(boost::asio::error::basic_errors::shut_down);
+      return;
+    }
   }
 
-  m_state->target_socket.async_write_some(
-    boost::asio::null_buffers(),
-    std::bind(&FileSender::send_chunk, *this, false));
+  m_state->eagainTries = 0;
+
+  m_state->target_socket.async_write_some(boost::asio::null_buffers(), sc);
 }
+
+FileSender::State::State(boost::asio::ip::tcp::socket& s, Service& service)
+  : target_socket(s)
+  , service(service)
+  , eagainTimer(service.ioContext()) {}
 }

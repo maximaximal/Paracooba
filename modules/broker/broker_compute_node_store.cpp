@@ -121,6 +121,7 @@ ComputeNodeStore::get_with_connection(
   std::unique_lock lock(m_internal->nodesMutex);
 
   parac_compute_node* n = get(id);
+  assert(n);
 
   ComputeNode& computeNode = *static_cast<ComputeNode*>(n->broker_userdata);
 
@@ -142,6 +143,8 @@ ComputeNodeStore::get_with_connection(
   assert(thisNode().description());
   thisNode().description()->serializeToMessage(msg);
   send_message_func(n, &msg);
+
+  assert(n);
 
   return n;
 }
