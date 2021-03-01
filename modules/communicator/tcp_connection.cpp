@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/error.hpp>
-#include <boost/system/detail/errc.hpp>
 #if BOOST_VERSION >= 106600
 #include <boost/asio/io_context.hpp>
 #else

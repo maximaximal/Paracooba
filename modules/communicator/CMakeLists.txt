@@ -20,4 +20,6 @@ add_dependencies(parac_communicator_obj distrac_paracooba)
 get_target_property(CEREAL_INCLUDE_DIRS cereal INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_communicator_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
 
+target_include_directories(parac_communicator_obj PRIVATE ${BOOST_INCLUDE_DIRECTORIES})
+
 set_property(TARGET parac_solver_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac)
