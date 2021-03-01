@@ -611,6 +611,7 @@ CNF::receive(boost::asio::ip::tcp::socket* socket,
         }
 
         m_ofstream.write(buf, length);
+        m_ofstream.flush();
         length = 0;
         break;
     }
