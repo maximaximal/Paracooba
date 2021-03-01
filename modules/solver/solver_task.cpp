@@ -2,6 +2,7 @@
 
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
+#include "cube_source.hpp"
 #include "paracooba/common/message_kind.h"
 #include "paracooba/common/noncopy_ostream.hpp"
 #include "paracooba/common/path.h"
@@ -10,9 +11,14 @@
 #include "paracooba/common/types.h"
 #include "paracooba/module.h"
 #include "paracooba/solver/cube_iterator.hpp"
+#include "paracooba/solver/solver.h"
+#include "parser_task.hpp"
 #include "solver_assignment.hpp"
 #include "solver_config.hpp"
 #include "solver_task.hpp"
+
+#include <paracooba/communicator/communicator.h>
+#include <paracooba/runner/runner.h>
 
 #include <chrono>
 #include <paracooba/common/log.h>
@@ -26,40 +32,6 @@
 #include <set>
 
 namespace parac::solver {
-class FastSplit {
-  public:
-  operator bool() const { return fastSplit; }
-  void half_tick(bool b) { local_situation = b; }
-  void tick(bool b) {
-    assert(beta <= alpha);
-    const bool full_tick = (b || local_situation);
-    if(full_tick)
-      ++beta;
-    else
-      fastSplit = false;
-    ++alpha;
-
-    if(alpha == period) {
-      fastSplit = (beta >= period / 2);
-      beta = 0;
-      alpha = 0;
-      if(fastSplit)
-        ++depth;
-      else
-        --depth;
-    }
-  }
-  int split_depth() { return fastSplit ? depth : 0; }
-
-  private:
-  unsigned alpha = 0;
-  unsigned beta = 0;
-  bool fastSplit = true;
-  const unsigned period = 8;
-  int depth = 1;
-  bool local_situation = true;
-};
-
 SolverTask::SolverTask() {}
 
 SolverTask::~SolverTask() {}
@@ -76,6 +48,7 @@ SolverTask::init(CaDiCaLManager& manager,
   task.work = &static_work;
   task.serialize = &static_serialize;
   task.userdata = this;
+  task.terminate = &static_terminate;
 
   task.free_userdata = [](parac_task* t) {
     assert(t);
@@ -86,6 +59,25 @@ SolverTask::init(CaDiCaLManager& manager,
     manager->deleteSolverTask(solverTask);
     return PARAC_OK;
   };
+
+  manager.addWaitingSolverTask();
+}
+
+static parac_timeout*
+setTimeout(CaDiCaLManager& manager,
+           uint64_t ms,
+           void* userdata,
+           parac_timeout_expired expired_cb) {
+  parac_handle* paracHandle = manager.mod().handle;
+  assert(paracHandle);
+  parac_module* paracCommMod = paracHandle->modules[PARAC_MOD_COMMUNICATOR];
+  if(!paracCommMod)
+    return nullptr;
+  parac_module_communicator* paracComm = paracCommMod->communicator;
+  if(!paracComm)
+    return nullptr;
+
+  return paracComm->set_timeout(paracCommMod, ms, userdata, expired_cb);
 }
 
 parac_status
@@ -93,12 +85,18 @@ SolverTask::work(parac_worker worker) {
   auto handlePtr = m_manager->getHandleForWorker(worker);
   auto& handle = *handlePtr.ptr;
 
+  m_activeHandle = &handle;
+
   assert(m_manager);
   assert(m_task);
   assert(m_task->task_store);
   assert(m_cubeSource);
 
+  m_manager->removeWaitingSolverTask();
+
   bool split_left, split_right;
+
+  parac_status s;
 
   if(m_cubeSource->split(
        m_task->path, *m_manager, handle, split_left, split_right)) {
@@ -146,18 +144,113 @@ SolverTask::work(parac_worker worker) {
       m_task->right_result = PARAC_UNSAT;
     }
 
-    return PARAC_PENDING;
+    s = PARAC_PENDING;
   } else {
-    m_task->state = PARAC_TASK_DONE;
+    auto& config = m_manager->config();
+    uint64_t averageSolvingTime = m_manager->averageSolvingTimeMS();
+    m_fastSplit.tick(m_manager->waitingSolverTasks() <= 1);
+    const float multiplicationFactor = m_fastSplit ? 0.5 : 2;
+    uint64_t duration = multiplicationFactor * averageSolvingTime;
+
     auto cube = m_cubeSource->cube(m_task->path, *m_manager);
     handle.applyCubeAsAssumption(cube);
-    parac_status s = handle.solve();
+
+    if(config.Resplit()) {
+      parac_log(PARAC_CUBER,
+                PARAC_TRACE,
+                "Start solving CNF formula on path {} using CaDiCaL CNF solver "
+                "for roughly "
+                "{}ms before aborting it (fastSplit = {}, "
+                "averageSolvingTimeMS: {}, waitingSolverTasks: {})",
+                path(),
+                duration,
+                m_fastSplit,
+                averageSolvingTime,
+                m_manager->waitingSolverTasks());
+    } else {
+      parac_log(PARAC_CUBER,
+                PARAC_TRACE,
+                "Start solving CNF formula on path {} using CaDiCaL CNF "
+                "solver. No resplitting is carried out here.",
+                path());
+    }
+
+    if(config.Resplit() && m_task->path.length < PARAC_PATH_MAX_LENGTH - 1) {
+      m_timeout =
+        setTimeout(*m_manager, duration, this, [](parac_timeout* timeout) {
+          SolverTask* self =
+            static_cast<SolverTask*>(timeout->expired_userdata);
+          assert(self);
+          parac_log(PARAC_CUBER,
+                    PARAC_TRACE,
+                    "CNF formula for path {} will be interrupted.",
+                    self->path());
+          self->m_interruptSolving = true;
+          CaDiCaLHandle* handle = self->m_activeHandle;
+          assert(handle);
+          handle->terminate();
+        });
+    }
+
+    auto start = std::chrono::steady_clock::now();
+    s = handle.solve();
+    auto end = std::chrono::steady_clock::now();
+
+    if(m_timeout && !m_interruptSolving) {
+      m_timeout->cancel(m_timeout);
+    }
+
+    uint64_t solverRuntimeMS =
+      std::chrono::duration_cast<std::chrono::milliseconds>(1'000 *
+                                                            (end - start))
+        .count();
+
+    parac_log(PARAC_CUBER,
+              PARAC_TRACE,
+              "Stopped solving after roughly {}ms. Interrupted: {}",
+              solverRuntimeMS,
+              m_interruptSolving);
+
+    if(m_interruptSolving) {
+      switch(s) {
+        case PARAC_ABORTED: {
+          auto [resplit_status, cubes, splitting_duration] = resplit(duration);
+
+          if(resplit_status == PARAC_SPLITTED) {
+            for(auto [task, _] : cubes) {
+              s = PARAC_PENDING;
+              task->task_store->assess_task(task->task_store, task);
+            }
+          } else {
+            s = resplit_status;
+          }
+
+          m_manager->updateAverageSolvingTime(duration + splitting_duration);
+
+          break;
+        }
+        case PARAC_SAT:
+          m_manager->updateAverageSolvingTime(duration);
+          break;
+        case PARAC_UNSAT:
+          m_manager->updateAverageSolvingTime(duration);
+          break;
+        default:
+          s = PARAC_UNDEFINED;
+      }
+    }
+
+    if(s == PARAC_SAT || s == PARAC_UNSAT) {
+      m_task->state = PARAC_TASK_DONE;
+    }
 
     if(s == PARAC_SAT) {
       m_manager->handleSatisfyingAssignmentFound(handle.takeSolverAssignment());
     }
-    return s;
   }
+
+  m_activeHandle = nullptr;
+  return s;
 }
 parac_status
 SolverTask::serialize_to_msg(parac_message* tgt_msg) {
@@ -178,6 +271,9 @@ SolverTask::serialize_to_msg(parac_message* tgt_msg) {
   tgt_msg->data = m_serializationOutStream->ptr();
   tgt_msg->length = m_serializationOutStream->tellp();
   tgt_msg->originator_id = m_task->originator;
+
+  assert(m_manager);
+  m_manager->removeWaitingSolverTask();
 
   return PARAC_OK;
 }
@@ -218,6 +314,16 @@ SolverTask::static_serialize(parac_task* task, parac_message* tgt_msg) {
   return t->serialize_to_msg(tgt_msg);
 }
 
+void
+SolverTask::static_terminate(parac_task* task) {
+  assert(task);
+  assert(task->userdata);
+  SolverTask* t = static_cast<SolverTask*>(task->userdata);
+  if(t->m_activeHandle) {
+    t->m_activeHandle->terminate();
+  }
+}
+
 const parac_path&
 SolverTask::path() const {
   assert(m_task);
@@ -227,5 +333,161 @@ parac_path&
 SolverTask::path() {
   assert(m_task);
   return m_task->path;
+}
+
+/******************************************************************
+ * RESPLITTING
+ ******************************************************************/
+
+static parac_task*
+makeTaskFromCube(CaDiCaLManager* manager,
+                 parac_task* parent,
+                 parac_path path,
+                 const Cube& cube) {
+  assert(
+    std::none_of(cube.begin(), cube.end(), [](Literal l) { return l == 0; }));
+
+  parent->state =
+    PARAC_TASK_SPLITTED | PARAC_TASK_WAITING_FOR_SPLITS | PARAC_TASK_DONE;
+
+  parac_task* new_task = parent->task_store->new_task(
+    parent->task_store, parent, path, parent->originator);
+  assert(new_task);
+  SolverTask::create(
+    *new_task, *manager, std::make_shared<cubesource::Supplied>(cube));
+
+  if(parac_path_get_next_left(parent->path) == path) {
+    parent->left_result = PARAC_PENDING;
+  } else if(parac_path_get_next_right(parent->path) == path) {
+    parent->right_result = PARAC_PENDING;
+  } else {
+    assert(false);
+  }
+
+  new_task->result = PARAC_PENDING;
+
+  return new_task;
+}
+
+static std::vector<SolverTask::CubeTreeElem>
+expandLeftAndRightCube(CaDiCaLManager* manager,
+                       parac_task* t,
+                       parac_path p,
+                       const std::pair<Cube, Cube>& c) {
+  assert(std::none_of(
+    c.first.begin(), c.first.end(), [](Literal l) { return l == 0; }));
+  assert(std::none_of(
+    c.second.begin(), c.second.end(), [](Literal l) { return l == 0; }));
+
+  return { { makeTaskFromCube(manager, t, parac_path_get_next_left(p), c.first),
+             c.first },
+           { makeTaskFromCube(
+               manager, t, parac_path_get_next_right(p), c.second),
+             c.second } };
+}
+
+std::pair<parac_status, std::vector<SolverTask::CubeTreeElem>>
+SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
+  Cube literals2(literals);
+  parac_log(
+    PARAC_CUBER, PARAC_TRACE, "Cubing path {} at depth {}.", path, depth);
+
+  m_activeHandle->applyCubeAsAssumption(literals);
+
+  auto [status, left_right_cube] = m_activeHandle->resplitOnce(path, literals);
+  if(status != PARAC_SPLITTED) {
+    return { status, {} };
+  }
+
+  assert(left_right_cube.has_value());
+
+  std::vector<CubeTreeElem> cubes{ expandLeftAndRightCube(
+    m_manager, m_task, m_task->path, left_right_cube.value()) };
+
+  auto path_depth = 1 + path.length;
+  for(int i = path_depth;
+      i < depth && i < PARAC_PATH_MAX_LENGTH && !m_interruptSolving;
+      ++i) {
+    parac_log(PARAC_CUBER, PARAC_TRACE, "Cubing path {} at depth {}", path, i);
+    auto cubes2{ std::move(cubes) };
+    cubes.clear();
+    for(auto&& [task, cube] : cubes2) {
+      auto [status, left_and_right_cube] =
+        m_activeHandle->resplitOnce(task->path, cube);
+      if(status != PARAC_SPLITTED) {
+        // The cube was not splitted again! This means that this path is already
+        // solved!
+        task->state = PARAC_TASK_DONE;
+        task->result = status;
+        parac_log(PARAC_CUBER,
+                  PARAC_DEBUG,
+                  "Cubing of path {} at depth {} led to result {}!",
+                  path,
+                  i,
+                  status);
+        continue;
+      }
+      assert(left_and_right_cube.has_value());
+      auto pcubes = expandLeftAndRightCube(
+        m_manager, task, task->path, left_and_right_cube.value());
+      std::copy(pcubes.begin(), pcubes.end(), std::back_inserter(cubes));
+    }
+    parac_log(PARAC_CUBER,
+              PARAC_TRACE,
+              "CNF recubing from path {} at depth {} is finished.",
+              path,
+              1 + i);
+  }
+
+  m_timeout->cancel(m_timeout);
+  return { PARAC_SPLITTED, cubes };
+}
+
+std::tuple<parac_status, std::vector<SolverTask::CubeTreeElem>, uint64_t>
+SolverTask::resplit(uint64_t durationMS) {
+  m_interruptSolving = false;
+
+  parac_log(PARAC_CUBER,
+            PARAC_TRACE,
+            "CNF formula for path {} must be resplitted. Giving it {}ms time.",
+            path(),
+            durationMS);
+
+  m_timeout =
+    setTimeout(*m_manager, durationMS, this, [](parac_timeout* timeout) {
+      SolverTask* self = static_cast<SolverTask*>(timeout->expired_userdata);
+      parac_log(PARAC_CUBER,
+                PARAC_TRACE,
+                "CNF lookahead for path {} will be interrupted!",
+                self->path());
+
+      self->m_activeHandle->terminate();
+      self->m_interruptSolving = true;
+    });
+
+  auto start = std::chrono::steady_clock::now();
+  const int depth = m_fastSplit.split_depth();
+
+  CubeIteratorRange range = m_cubeSource->cube(path(), *m_manager);
+  Cube literals(range.begin(), range.end());
+
+  auto cubes = resplitDepth(path(), literals, depth);
+  auto end = std::chrono::steady_clock::now();
+
+  parac_log(PARAC_CUBER,
+            PARAC_TRACE,
+            "Splitting path {} took {}ms. Produced {} sub-tasks.",
+            m_task->path,
+            std::chrono::duration<double>(
+              std::chrono::duration_cast<std::chrono::milliseconds>(
+                1'000 * (end - start)))
+              .count(),
+            cubes.second.size());
+
+  uint64_t duration_splitting =
+    std::chrono::duration_cast<std::chrono::milliseconds>(1'000 * (end - start))
+      .count();
+
+  return { cubes.first, cubes.second, duration_splitting };
 }
 }

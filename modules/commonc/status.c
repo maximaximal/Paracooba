@@ -25,6 +25,8 @@ parac_status_to_str(parac_status status) {
       return "UNKNOWN";
     case PARAC_ABORTED:
       return "ABORTED";
+    case PARAC_SPLITTED:
+      return "SPLITTED";
     case PARAC_ABORT_CONNECTION:
       return "Abort Connection";
     case PARAC_CONNECTION_CLOSED:

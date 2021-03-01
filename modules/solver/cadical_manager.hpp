@@ -63,6 +63,13 @@ class CaDiCaLManager {
 
   const CaDiCaLHandle& parsedFormulaHandle() const;
 
+  void updateAverageSolvingTime(double ms) const;
+  double averageSolvingTimeMS();
+
+  void addWaitingSolverTask();
+  void removeWaitingSolverTask();
+  size_t waitingSolverTasks() const;
+
   private:
   struct Internal;
   std::unique_ptr<Internal> m_internal;

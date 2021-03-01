@@ -115,6 +115,7 @@ parac_task_init(parac_task* t) {
   t->task_store = NULL;
   t->serialize = NULL;
   t->stop = false;
+  t->terminate = NULL;
 }
 
 PARAC_COMMON_EXPORT

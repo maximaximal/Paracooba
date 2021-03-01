@@ -24,6 +24,8 @@ class SolverConfig {
     InitialCubeDepth,
     InitialMinimalCubeDepth,
     MarchCubes,
+    FastSplitMultiplicationFactor,
+    SplitMultiplicationFactor,
     _COUNT
   };
 
@@ -33,6 +35,12 @@ class SolverConfig {
   uint16_t InitialCubeDepth() const { return m_initialCubeDepth; }
   uint16_t InitialMinimalCubeDepth() const { return m_initialMinimalCubeDepth; }
   bool MarchCubes() const { return m_marchCubes; }
+  float FastSplitMultiplicationFactor() const {
+    return m_fastSplitMultiplicationFactor;
+  }
+  float SplitMultiplicationFactor() const {
+    return m_splitMultiplicationFactor;
+  }
 
   private:
   parac_config_entry* m_config = nullptr;
@@ -43,6 +51,8 @@ class SolverConfig {
   uint16_t m_initialCubeDepth = 0;
   uint16_t m_initialMinimalCubeDepth = 0;
   bool m_marchCubes = false;
+  float m_fastSplitMultiplicationFactor = 0.5;
+  float m_splitMultiplicationFactor = 2;
 
   friend class cereal::access;
   template<class Archive>
@@ -52,7 +62,11 @@ class SolverConfig {
        cereal::make_nvp("resplit", m_resplit),
        cereal::make_nvp("initialCubeDepth", m_initialCubeDepth),
        cereal::make_nvp("initialMinimalCubeDepth", m_initialMinimalCubeDepth),
-       cereal::make_nvp("marchCubes", m_marchCubes));
+       cereal::make_nvp("marchCubes", m_marchCubes),
+       cereal::make_nvp("fastSplitMultiplicationFactor",
+                        m_fastSplitMultiplicationFactor),
+       cereal::make_nvp("splitMultiplicationFactor",
+                        m_splitMultiplicationFactor));
   }
 };
 std::ostream&

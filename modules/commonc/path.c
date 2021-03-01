@@ -1,6 +1,7 @@
 #include "paracooba/common/status.h"
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <paracooba/common/path.h>
 
@@ -164,6 +165,13 @@ parac_path_to_str(parac_path p, char* out_str) {
     out_str[i] = parac_path_get_assignment(p, i + 1) + '0';
   }
   out_str[p.length] = '\0';
+}
+
+PARAC_COMMON_EXPORT void
+parac_path_print(parac_path p) {
+  char buf[PARAC_PATH_MAX_LENGTH];
+  parac_path_to_str(p, buf);
+  printf("%s\n", buf);
 }
 
 parac_status

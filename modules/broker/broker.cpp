@@ -151,6 +151,7 @@ mod_request_exit(parac_module* mod) {
     BrokerUserdata* userdata = static_cast<BrokerUserdata*>(mod->userdata);
     if(userdata->internal) {
       userdata->internal->computeNodeStore.sendOfflineAnnouncementToPeers();
+      userdata->internal->taskStore.terminateAllTasks();
     }
   }
 

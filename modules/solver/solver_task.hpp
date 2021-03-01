@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <optional>
 #include <vector>
 
@@ -16,6 +17,8 @@
 
 struct parac_task;
 struct parac_message;
+struct parac_handle;
+struct parac_timeout;
 
 namespace parac {
 class NoncopyOStringstream;
@@ -43,16 +46,66 @@ class SolverTask {
   static parac_status static_work(parac_task* task, parac_worker worker);
   static parac_status static_serialize(parac_task* task,
                                        parac_message* tgt_msg);
+  static void static_terminate(parac_task* task);
 
   parac_path& path();
   const parac_path& path() const;
   CaDiCaLManager* manager() { return m_manager; }
 
+  struct CubeTreeElem {
+    parac_task* task;
+    Cube cube;
+  };
+
   private:
+  class FastSplit {
+    public:
+    operator bool() const { return fastSplit; }
+    void half_tick(bool b) { local_situation = b; }
+    void tick(bool b) {
+      assert(beta <= alpha);
+      const bool full_tick = (b || local_situation);
+      if(full_tick)
+        ++beta;
+      else
+        fastSplit = false;
+      ++alpha;
+
+      if(alpha == period) {
+        fastSplit = (beta >= period / 2);
+        beta = 0;
+        alpha = 0;
+        if(fastSplit)
+          ++depth;
+        else
+          --depth;
+      }
+    }
+    int split_depth() { return fastSplit ? depth : 0; }
+
+    private:
+    unsigned alpha = 0;
+    unsigned beta = 0;
+    bool fastSplit = true;
+    const unsigned period = 8;
+    int depth = 1;
+    bool local_situation = true;
+  };
+
   CaDiCaLManager* m_manager = nullptr;
   parac_task* m_task = nullptr;
+  FastSplit m_fastSplit;
+  parac_timeout* m_timeout = nullptr;
+  CaDiCaLHandle* m_activeHandle = nullptr;
+  bool m_interruptSolving = false;
 
   std::shared_ptr<cubesource::Source> m_cubeSource;
+
+  std::pair<parac_status, std::vector<CubeTreeElem>>
+  resplitDepth(parac_path path, Cube literals, int depth);
+
+  std::tuple<parac_status, std::vector<CubeTreeElem>, uint64_t> resplit(
+    uint64_t durationMS);
 
   friend class ::cereal::access;
   template<class Archive>

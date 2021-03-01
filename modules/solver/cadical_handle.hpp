@@ -39,12 +39,23 @@ class CaDiCaLHandle {
   size_t getNormalizedPathLength() const;
 
   void applyCubeAsAssumption(CubeIteratorRange cube);
+  void applyCubeAsAssumption(Cube cube);
 
   /** @brief Calls solve on the internal CaDiCaL Solver instance.
    *
    * @returns PARAC_ABORTED, PARAC_SAT, PARAC_UNSAT, or PARAC_UNKNOWN
    */
   parac_status solve();
+
+  void terminate();
+
+  /** @brief Try to resplit the current cube.
+   *
+   * The returned pair is (left, right)
+   */
+  std::pair<parac_status, std::optional<std::pair<Cube, Cube>>> resplitOnce(
+    parac_path path,
+    Cube literals);
 
   std::unique_ptr<SolverAssignment> takeSolverAssignment();
 

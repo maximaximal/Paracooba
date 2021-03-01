@@ -477,6 +477,17 @@ TaskStore::manageAutoShutdownTimer() {
 }
 
 void
+TaskStore::terminateAllTasks() {
+  std::unique_lock lock(m_internal->containerMutex);
+  for(auto t : m_internal->tasksBeingWorkedOn) {
+    auto& task = t.get();
+    if(task.terminate) {
+      task.terminate(&task);
+    }
+  }
+}
+
+void
 TaskStore::assess_task(parac_task* task) {
   assert(task);
   assert(task->assess);

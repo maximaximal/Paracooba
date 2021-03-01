@@ -226,13 +226,25 @@ CaDiCaLHandle::generateJumplist() {
     m_internal->normalizedPathLength);
 }
 
-void
-CaDiCaLHandle::applyCubeAsAssumption(CubeIteratorRange cube) {
+template<typename T>
+static void
+applyCubeAsAssumptionToSolver(T cube, CaDiCaL::Solver& s) {
   for(auto lit : cube) {
     assert(lit != 0);
-    m_internal->solver.assume(lit);
+    s.assume(lit);
   }
 }
+
+void
+CaDiCaLHandle::applyCubeAsAssumption(CubeIteratorRange cube) {
+  applyCubeAsAssumptionToSolver(cube, m_internal->solver);
+}
+
+void
+CaDiCaLHandle::applyCubeAsAssumption(Cube cube) {
+  applyCubeAsAssumptionToSolver(cube, m_internal->solver);
+}
+
 parac_status
 CaDiCaLHandle::solve() {
   int r = m_internal->solver.solve();
@@ -259,8 +271,47 @@ CaDiCaLHandle::solve() {
   }
 }
 
+void
+CaDiCaLHandle::terminate() {
+  m_internal->solver.terminate();
+}
+
 std::unique_ptr<SolverAssignment>
 CaDiCaLHandle::takeSolverAssignment() {
   return std::move(m_solverAssignment);
+}
+
+std::pair<parac_status, std::optional<std::pair<Cube, Cube>>>
+CaDiCaLHandle::resplitOnce(parac_path path, Cube literals) {
+  parac_log(
+    PARAC_CUBER, PARAC_TRACE, "CNF formula for path {} resplitted.", path);
+
+  Cube literals2(literals);
+  for(auto lit : literals) {
+    parac_log(PARAC_CUBER, PARAC_TRACE, "Cube lit: {}", lit);
+    m_internal->solver.assume(lit);
+  }
+
+  Literal lit_to_split = m_internal->solver.lookahead();
+  m_internal->solver.reset_assumptions();
+  if(lit_to_split == 0) {
+    if(m_internal->solver.state() == CaDiCaL::SATISFIED) {
+      return { PARAC_SAT, {} };
+    } else if(m_internal->solver.state() == CaDiCaL::UNSATISFIED) {
+      return { PARAC_UNSAT, {} };
+    } else {
+      assert(false);
+    }
+  }
+
+  parac_log(PARAC_CUBER,
+            PARAC_TRACE,
+            "CNF formula for path {} resplitted on literal {}.",
+            path,
+            lit_to_split);
+  literals.push_back(lit_to_split);
+  literals2.push_back(-lit_to_split);
+  m_internal->solver.reset_assumptions();
+  return { PARAC_SPLITTED, { { literals, literals2 } } };
 }
 }

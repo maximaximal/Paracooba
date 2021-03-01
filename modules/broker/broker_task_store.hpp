@@ -44,6 +44,8 @@ class TaskStore {
 
   void manageAutoShutdownTimer();
 
+  void terminateAllTasks();
+
   private:
   void insert_into_tasksWaitingForWorkerQueue(parac_task* task);
   void insert_into_tasksWaitingForChildren(parac_task* task);

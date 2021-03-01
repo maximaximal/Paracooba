@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <list>
 #include <memory>
+#include <shared_mutex>
 #include <vector>
 
 #include "cadical_handle.hpp"
@@ -16,11 +18,20 @@
 #include <paracooba/runner/runner.h>
 #include <paracooba/solver/cube_iterator.hpp>
 
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/rolling_mean.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/pool/pool_alloc.hpp>
 
 namespace parac::solver {
 struct CaDiCaLManager::Internal {
+  static const size_t CNFStatisticsNodeWindowSize = 10;
+  Internal(size_t availableWorkers)
+    : acc_averageSolvingTime(
+        boost::accumulators::tag::rolling_window::window_size =
+          CNFStatisticsNodeWindowSize * availableWorkers) {}
+
   template<typename T>
   using Allocator =
     boost::fast_pool_allocator<T,
@@ -43,16 +54,40 @@ struct CaDiCaLManager::Internal {
   boost::container::vector<bool>
     borrowed;// Default constructor of bool is false. Must be a boost vector, as
              // std vector is a bitset, which breaks multithreading.
+
+  std::mutex averageSolvingTimeMutex;
+  ::boost::accumulators::accumulator_set<
+    double,
+    ::boost::accumulators::stats<::boost::accumulators::tag::rolling_mean>>
+    acc_averageSolvingTime;
+
+  std::atomic_size_t waitingSolverTasks = 0;
 };
 
 CaDiCaLManager::Internal::SolverTaskWrapperList
   CaDiCaLManager::Internal::solverTasks;
 std::mutex CaDiCaLManager::Internal::solverTasksMutex;
 
+static size_t
+getAvailableWorkersFromMod(parac_module& mod) {
+  parac_handle* handle = mod.handle;
+  assert(handle);
+  auto modRunner = handle->modules[PARAC_MOD_RUNNER];
+  if(!modRunner) {
+    return 0;
+  }
+  auto runner = modRunner->runner;
+  if(!runner) {
+    return 0;
+  }
+  assert(runner);
+  return runner->available_worker_count;
+}
+
 CaDiCaLManager::CaDiCaLManager(parac_module& mod,
                                CaDiCaLHandlePtr parsedFormula,
                                SolverConfig& solverConfig)
-  : m_internal(std::make_unique<Internal>())
+  : m_internal(std::make_unique<Internal>(getAvailableWorkersFromMod(mod)))
   , m_mod(mod)
   , m_parsedFormula(std::move(parsedFormula))
   , m_solverConfig(solverConfig) {
@@ -206,5 +241,33 @@ CaDiCaLManager::createRootCubeSource() {
 const CaDiCaLHandle&
 CaDiCaLManager::parsedFormulaHandle() const {
   return *m_parsedFormula;
+}
+
+void
+CaDiCaLManager::updateAverageSolvingTime(double ms) const {
+  auto& avg = m_internal->acc_averageSolvingTime;
+  std::unique_lock lock(m_internal->averageSolvingTimeMutex);
+  avg(ms);
+}
+double
+CaDiCaLManager::averageSolvingTimeMS() {
+  std::unique_lock lock(m_internal->averageSolvingTimeMutex);
+
+  auto duration =
+    boost::accumulators::rolling_mean(m_internal->acc_averageSolvingTime);
+  return duration < 1000 ? 1000 : duration;
+}
+
+void
+CaDiCaLManager::addWaitingSolverTask() {
+  ++m_internal->waitingSolverTasks;
+}
+void
+CaDiCaLManager::removeWaitingSolverTask() {
+  --m_internal->waitingSolverTasks;
+}
+size_t
+CaDiCaLManager::waitingSolverTasks() const {
+  return m_internal->waitingSolverTasks;
 }
 }

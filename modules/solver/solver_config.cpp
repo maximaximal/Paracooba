@@ -73,6 +73,29 @@ SolverConfig::SolverConfig(parac_config* config) {
   m_config[static_cast<size_t>(Entry::MarchCubes)].type = PARAC_TYPE_SWITCH;
   m_config[static_cast<size_t>(Entry::MarchCubes)]
     .default_value.boolean_switch = false;
+
+  parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)],
+    "cubing-fast-split-multiplication-factor",
+    "The multiplication factor when in fast-split mode (when not enough work "
+    "is in the queue)");
+  m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)]
+    .registrar = PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)].type =
+    PARAC_TYPE_FLOAT;
+  m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)]
+    .default_value.f = m_fastSplitMultiplicationFactor;
+
+  parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(Entry::SplitMultiplicationFactor)],
+    "cubing-split-multiplication-factor",
+    "The multiplication factor when in normal splitting mode");
+  m_config[static_cast<size_t>(Entry::SplitMultiplicationFactor)].registrar =
+    PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::SplitMultiplicationFactor)].type =
+    PARAC_TYPE_FLOAT;
+  m_config[static_cast<size_t>(Entry::SplitMultiplicationFactor)]
+    .default_value.f = m_splitMultiplicationFactor;
 }
 
 void
@@ -90,6 +113,10 @@ SolverConfig::extractFromConfigEntries() {
     m_config[static_cast<size_t>(Entry::InitialMinimalCubeDepth)].value.uint16;
   m_marchCubes =
     m_config[static_cast<size_t>(Entry::MarchCubes)].value.boolean_switch;
+  m_fastSplitMultiplicationFactor =
+    m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)].value.f;
+  m_splitMultiplicationFactor =
+    m_config[static_cast<size_t>(Entry::SplitMultiplicationFactor)].value.f;
 }
 std::ostream&
 operator<<(std::ostream& o, const SolverConfig& config) {
@@ -97,6 +124,10 @@ operator<<(std::ostream& o, const SolverConfig& config) {
            << ", CaDiCaLCubes:" << config.CaDiCaLCubes()
            << ", Resplit:" << config.Resplit()
            << ", InitialCubeDepth:" << config.InitialCubeDepth()
-           << ", MarchCubes:" << config.MarchCubes();
+           << ", MarchCubes:" << config.MarchCubes()
+           << ", FastSplitMultiplicationFactor:"
+           << config.FastSplitMultiplicationFactor()
+           << ", SplitMultiplicationFactor:"
+           << config.SplitMultiplicationFactor();
 }
 }

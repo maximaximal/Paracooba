@@ -28,6 +28,10 @@ typedef struct __attribute__((__packed__)) parac_path {
     };
     parac_path_type rep;
   };
+
+#ifdef __cplusplus
+  bool operator==(const parac_path& p) const { return rep == p.rep; }
+#endif
 } parac_path;
 
 parac_path_type
@@ -69,6 +73,9 @@ parac_path_from_str(const char* str, size_t len, parac_path* tgt);
 void
 parac_path_to_str(parac_path p, char* out_str);
 
+void
+parac_path_print(parac_path p);
+
 parac_path
 parac_path_unknown();
 
@@ -76,6 +83,7 @@ parac_path_unknown();
 }
 #include <iostream>
 #include <string>
+#include <type_traits>
 
 template<typename T>
 parac_path
