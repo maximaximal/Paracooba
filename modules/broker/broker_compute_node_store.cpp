@@ -261,7 +261,7 @@ ComputeNodeStore::tryOffloadingTasks() {
     auto& e = *m_internal->nodesRefVec.begin();
     auto& node = e.first.get();
     if(node.id() == m_handle.id) {
-      continue;
+      break;
     }
 
     float thisFutureUtilization =

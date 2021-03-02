@@ -744,7 +744,7 @@ ComputeNode::computeUtilization() const {
   {
     std::shared_lock lock(m_descriptionMutex);
     if(!description())
-      return FP_INFINITE;
+      return 1000000;
   }
 
   SpinLock lock(m_modifyingStatus);
@@ -760,7 +760,7 @@ ComputeNode::Status::computeUtilization() const {
 float
 ComputeNode::Status::computeFutureUtilization(uint64_t workQueueSize) const {
   if(m_workers == 0)
-    return FP_INFINITE;
+    return 1000000;
 
   return static_cast<float>(workQueueSize) / m_workers;
 }
