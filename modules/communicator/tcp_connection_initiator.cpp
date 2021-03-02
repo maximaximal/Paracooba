@@ -297,6 +297,18 @@ TCPConnectionInitiator::try_connecting_to_host(
                 m_state->host(),
                 m_state->currentEndpoint());
 
+      if(isEndpointSameAsLocalTCPAcceptor(m_state->currentEndpoint())) {
+        parac_log(
+          PARAC_COMMUNICATOR,
+          PARAC_TRACE,
+          "Aborting trying to connect to endpoint {}, as it is the same as "
+          "the local TCP listen address {} and port {}.",
+          m_state->currentEndpoint(),
+          m_state->service.tcpAcceptorAddress(),
+          m_state->service.currentTCPListenPort());
+        return;
+      }
+
       yield m_state->socket->async_connect(
         m_state->currentEndpoint(),
         boost::bind(&TCPConnectionInitiator::try_connecting_to_host,
@@ -341,6 +353,17 @@ void
 TCPConnectionInitiator::try_connecting_to_endpoint(
   const ::boost::system::error_code& ec) {
   reenter(m_state->coro) {
+    if(isEndpointSameAsLocalTCPAcceptor(m_state->endpoint())) {
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_TRACE,
+                "Not trying to connect to endpoint {}, as it is the same as "
+                "the local TCP listen address {} and port {}.",
+                m_state->endpoint(),
+                m_state->service.tcpAcceptorAddress(),
+                m_state->service.currentTCPListenPort());
+      return;
+    }
+
     parac_log(PARAC_COMMUNICATOR,
               PARAC_TRACE,
               "Trying to connect to endpoint {}.",
@@ -374,4 +397,11 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
   }
 }
 #include <boost/asio/unyield.hpp>
+
+bool
+TCPConnectionInitiator::isEndpointSameAsLocalTCPAcceptor(
+  const boost::asio::ip::tcp::endpoint& e) const {
+  return e.port() == m_state->service.currentTCPListenPort() &&
+         e.address() == m_state->service.tcpAcceptorAddress();
+}
 }

@@ -173,4 +173,8 @@ TCPAcceptor::loop(const boost::system::error_code& ec) {
 }
 #include <boost/asio/unyield.hpp>
 
+boost::asio::ip::address
+TCPAcceptor::address() const {
+  return m_internal->acceptor->local_endpoint().address();
+}
 }

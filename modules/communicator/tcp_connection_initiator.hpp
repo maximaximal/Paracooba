@@ -34,6 +34,9 @@ class TCPConnectionInitiator {
     ::boost::asio::ip::tcp::resolver::iterator endpoint_iterator);
   void try_connecting_to_endpoint(const ::boost::system::error_code& ec);
 
+  bool isEndpointSameAsLocalTCPAcceptor(
+    const boost::asio::ip::tcp::endpoint& e) const;
+
   void setTCPConnectionPayload(
     std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>
       payload);

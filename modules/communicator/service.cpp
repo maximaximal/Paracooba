@@ -355,4 +355,10 @@ Service::knownRemoteCount() const {
   assert(m_config);
   return m_config[KNOWN_REMOTES].value.string_vector.size;
 }
+
+boost::asio::ip::address
+Service::tcpAcceptorAddress() const {
+  assert(m_internal->tcpAcceptor);
+  return m_internal->tcpAcceptor->address();
+}
 }

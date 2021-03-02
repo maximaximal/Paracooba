@@ -5,6 +5,7 @@
 #include "paracooba/common/types.h"
 #include <boost/version.hpp>
 #include <memory>
+#include <optional>
 
 namespace boost::asio {
 #if BOOST_VERSION >= 106600
@@ -13,6 +14,9 @@ class io_context;
 class io_service;
 typedef io_service io_context;
 #endif
+namespace ip {
+class address;
+}
 }
 
 struct parac_handle;
@@ -94,6 +98,8 @@ class Service {
 
   parac_id id() const;
   const char* broadcastAddress() const;
+
+  boost::asio::ip::address tcpAcceptorAddress() const;
 
   private:
   parac_status run();

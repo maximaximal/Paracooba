@@ -6,8 +6,13 @@
 
 #include <paracooba/common/status.h>
 
-namespace boost::system {
+namespace boost {
+namespace system {
 class error_code;
+}
+namespace asio::ip {
+class address;
+}
 }
 
 struct parac_handle;
@@ -26,6 +31,8 @@ class TCPAcceptor {
 
   std::string listenAddress() const;
   std::string connectionString() const;
+
+  boost::asio::ip::address address() const;
 
   private:
   struct Internal;
