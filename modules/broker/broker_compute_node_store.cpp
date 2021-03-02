@@ -257,8 +257,7 @@ ComputeNodeStore::tryOffloadingTasks() {
   float thisUtilization = thisNode().computeUtilization();
   auto thisWorkQueueSize = thisNode().workQueueSize();
 
-  for(;;) {
-    auto& e = *m_internal->nodesRefVec.begin();
+  for(auto& e : m_internal->nodesRefVec) {
     auto& node = e.first.get();
     if(node.id() == m_handle.id) {
       break;
@@ -311,15 +310,8 @@ ComputeNodeStore::tryOffloadingTasks() {
     }
 
     bool offloaded = node.tryToOffloadTask();
-    if(!offloaded) {
-      break;
-    } else {
+    if(offloaded) {
       --thisWorkQueueSize;
-
-      m_internal->updateNodesRefVecUtilization();
-      std::sort(m_internal->nodesRefVec.begin(),
-                m_internal->nodesRefVec.end(),
-                &compareWrappersByUtilization);
     }
   }
 }
