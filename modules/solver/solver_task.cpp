@@ -155,38 +155,44 @@ SolverTask::work(parac_worker worker) {
     auto cube = m_cubeSource->cube(m_task->path, *m_manager);
     handle.applyCubeAsAssumption(cube);
 
+    s = PARAC_UNKNOWN;
+    uint64_t solving_duration = 0;
     if(config.Resplit()) {
-      parac_log(PARAC_CUBER,
-                PARAC_TRACE,
-                "Start solving CNF formula on path {} using CaDiCaL CNF solver "
-                "for roughly "
-                "{}ms before aborting it (fastSplit = {}, "
-                "averageSolvingTimeMS: {}, waitingSolverTasks: {})",
-                path(),
-                duration,
-                m_fastSplit,
-                averageSolvingTime,
-                m_manager->waitingSolverTasks());
+      if(path().length >= config.InitialMinimalCubeDepth()) {
+        parac_log(
+          PARAC_CUBER,
+          PARAC_TRACE,
+          "Start solving CNF formula on path {} using CaDiCaL CNF solver "
+          "for roughly "
+          "{}ms before aborting it (fastSplit = {}, "
+          "averageSolvingTimeMS: {}, waitingSolverTasks: {})",
+          path(),
+          duration,
+          m_fastSplit,
+          averageSolvingTime,
+          m_manager->waitingSolverTasks());
+        auto r = solveOrConditionallyAbort(config, handle, duration);
+        s = r.first;
+        solving_duration = r.second;
+      } else {
+        parac_log(
+          PARAC_CUBER,
+          PARAC_TRACE,
+          "Skip calling CaDiCaL .solve() for path {} because depth {} "
+          "< initial minimal cube depth {}. Going directly to splitting.",
+          path(),
+          path().length,
+          config.InitialMinimalCubeDepth());
+        s = PARAC_ABORTED;
+        solving_duration = 0;
+        m_interruptSolving = true;
+      }
     } else {
       parac_log(PARAC_CUBER,
                 PARAC_TRACE,
                 "Start solving CNF formula on path {} using CaDiCaL CNF "
                 "solver. No resplitting is carried out here.",
                 path());
-    }
-
-    s = PARAC_UNKNOWN;
-    uint64_t solving_duration = 0;
-    if(config.Resplit()) {
-      if(path().length >= config.InitialMinimalCubeDepth()) {
-        auto r = solveOrConditionallyAbort(config, handle, duration);
-        s = r.first;
-        solving_duration = r.second;
-      } else {
-        s = PARAC_ABORTED;
-        solving_duration = 0;
-      }
-    } else {
       auto r = solveOrConditionallyAbort(config, handle, duration);
       s = r.first;
       solving_duration = r.second;
