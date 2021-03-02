@@ -241,8 +241,10 @@ bool
 ComputeNode::Status::operator==(const Status& o) const noexcept {
   SpinLock lock1(m_writeFlag), lock2(o.m_writeFlag);
 
-  return std::equal(
-    solverInstances.begin(), solverInstances.end(), o.solverInstances.begin());
+  return solverInstances.size() == o.solverInstances.size() &&
+         std::equal(solverInstances.begin(),
+                    solverInstances.end(),
+                    o.solverInstances.begin());
 }
 
 std::pair<const ComputeNode::Status&, SpinLock>
@@ -615,7 +617,7 @@ ComputeNode::conditionallySendStatusTo(const Status& s) {
               PARAC_TRACE,
               "Not sending status {} to {} because diff not worthwhile (old "
               "status: {}).",
-              m_status,
+              s,
               m_node.id,
               *m_remotelyKnownLocalStatus);
     return;
