@@ -157,7 +157,7 @@ macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
     target_compile_features(${NAME}_obj PUBLIC cxx_std_17)
 
     set_property(TARGET ${NAME}_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac parac_common parac_modules)
-    target_link_libraries(${NAME} PUBLIC distrac parac_common parac_modules fmt::fmt)
+    target_link_libraries(${NAME} PUBLIC distrac parac_modules fmt::fmt)
 
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
