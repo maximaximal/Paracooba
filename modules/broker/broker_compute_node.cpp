@@ -298,6 +298,7 @@ ComputeNode::initDescription(const std::string& name,
                              bool local) {
   m_description = Description(
     name, host, workers, udpListenPort, tcpListenPort, demon, local);
+  m_status.insertWorkerCount(workers);
 }
 
 void

@@ -170,7 +170,7 @@ ComputeNodeStore::incrementThisNodeWorkQueueSize(parac_id originator) {
     sendStatusToPeers();
 
     // Try finding offload targets if the current node utilization is okay.
-    if(thisNode().computeUtilization() > 1) {
+    if(thisNode().computeUtilization() > 0.5) {
       tryOffloadingTasks();
     }
   }
@@ -270,11 +270,11 @@ ComputeNodeStore::tryOffloadingTasks() {
         : 0;
 
     // Do not starve the local node of work
-    if(thisFutureUtilization < 1) {
+    if(thisFutureUtilization < 0.5) {
       parac_log(PARAC_BROKER,
                 PARAC_TRACE,
                 "Not offloading to {} (and breaking offload loop) because "
-                "thisUtilization {} > 1 && thisFutureUtilization {} < 1",
+                "thisUtilization {} > 0.5 && thisFutureUtilization {} < 0.5",
                 node.id(),
                 thisUtilization,
                 thisFutureUtilization);
