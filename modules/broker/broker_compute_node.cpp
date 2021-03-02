@@ -601,13 +601,28 @@ ComputeNode::tryToOffloadTask() {
 
 void
 ComputeNode::conditionallySendStatusTo(const Status& s) {
-  if(!m_node.available_to_send_to(&m_node))
+  if(!m_node.available_to_send_to(&m_node)) {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Cannot send status {} to {} because not available to send to.",
+              m_status,
+              m_node.id);
     return;
+  }
   if(m_remotelyKnownLocalStatus.has_value() &&
-     !Status::isDiffWorthwhile(*m_remotelyKnownLocalStatus, s))
+     !Status::isDiffWorthwhile(*m_remotelyKnownLocalStatus, s)) {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Not sending status {} to {} because diff not worthwhile (old "
+              "status: {}).",
+              m_status,
+              m_node.id,
+              *m_remotelyKnownLocalStatus);
     return;
-  if(m_sendingStatusTo.test_and_set())
+  }
+  if(m_sendingStatusTo.test_and_set()) {
     return;
+  }
 
   if(m_remotelyKnownLocalStatus.has_value()) {
     parac_log(
@@ -631,6 +646,12 @@ ComputeNode::conditionallySendStatusTo(const Status& s) {
       assert(msg->userdata);
       ComputeNode& self = *static_cast<ComputeNode*>(msg->userdata);
       self.m_sendingStatusTo.clear();
+
+      auto [s, lock] = self.m_store.thisNode().status();
+      if(self.m_remotelyKnownLocalStatus.has_value() &&
+         Status::isDiffWorthwhile(*self.m_remotelyKnownLocalStatus, s)) {
+        self.conditionallySendStatusTo(s);
+      }
     }
   };
   msg.userdata = static_cast<void*>(this);
