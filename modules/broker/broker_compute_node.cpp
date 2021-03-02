@@ -512,12 +512,24 @@ ComputeNode::receiveMessageTaskResultFrom(parac_message& msg) {
 bool
 ComputeNode::tryToOffloadTask() {
   if(!description()) {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Not offloading to {} because description is missing.",
+              m_node.id);
     return false;
   }
   if(description()->workers == 0) {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Not offloading to {} because it has no workers.",
+              m_node.id);
     return false;
   }
-  if(!m_node.send_message_to) {
+  if(!m_commMessageFunc) {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Not offloading to {} because it has no send message func.",
+              m_node.id);
     return false;
   }
 
@@ -576,6 +588,13 @@ ComputeNode::tryToOffloadTask() {
     }
     m_node.send_message_to(&m_node, &msg);
     return true;
+  } else {
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Not offloading to {} because no fitting task was found (status "
+              "of this node: {}).",
+              m_node.id,
+              m_status);
   }
   return false;
 }
