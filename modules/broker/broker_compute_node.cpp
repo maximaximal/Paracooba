@@ -434,7 +434,7 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Send solver config to node ID {}!",
-              m_handle.id);
+              m_node.id);
 
     parac_message_wrapper msg;
     instance->serialize_config_to_msg(instance, &msg);
@@ -454,7 +454,7 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
                   "Send formula in file {} with originator {} to node ID {}!",
                   self->m_handle.input_file,
                   instance->originator_id,
-                  self->m_handle.id);
+                  self->m_node.id);
 
         // This is a client node with an input file! Send the input file to the
         // peer. Once the formula was parsed, a status is sent.
