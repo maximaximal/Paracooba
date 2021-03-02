@@ -276,13 +276,10 @@ struct TCPConnection::State {
   std::unique_ptr<FileOstream> readFileOstream;
 
   parac_compute_node* compute_node = nullptr;
+  parac_id remoteIdCache = 0;
   std::string connectionString;
 
-  parac_id remoteId() const {
-    if(compute_node)
-      return compute_node->id;
-    return 0;
-  }
+  parac_id remoteId() const { return remoteIdCache; }
   std::string remote_endpoint() {
     if(socket->is_open()) {
       std::stringstream s;
@@ -516,6 +513,8 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
     delete conn;
     return false;
   }
+
+  s->remoteIdCache = s->compute_node->id;
 
   {
     std::stringstream connStr;
