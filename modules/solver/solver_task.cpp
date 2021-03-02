@@ -175,41 +175,22 @@ SolverTask::work(parac_worker worker) {
                 path());
     }
 
-    if(config.Resplit() && m_task->path.length < PARAC_PATH_MAX_LENGTH - 1) {
-      m_timeout =
-        setTimeout(*m_manager, duration, this, [](parac_timeout* timeout) {
-          SolverTask* self =
-            static_cast<SolverTask*>(timeout->expired_userdata);
-          assert(self);
-          parac_log(PARAC_CUBER,
-                    PARAC_TRACE,
-                    "CNF formula for path {} will be interrupted.",
-                    self->path());
-          self->m_interruptSolving = true;
-          CaDiCaLHandle* handle = self->m_activeHandle;
-          assert(handle);
-          handle->terminate();
-        });
+    s = PARAC_UNKNOWN;
+    uint64_t solving_duration = 0;
+    if(config.Resplit()) {
+      if(path().length >= config.InitialMinimalCubeDepth()) {
+        auto r = solveOrConditionallyAbort(config, handle, duration);
+        s = r.first;
+        solving_duration = r.second;
+      } else {
+        s = PARAC_ABORTED;
+        solving_duration = 0;
+      }
+    } else {
+      auto r = solveOrConditionallyAbort(config, handle, duration);
+      s = r.first;
+      solving_duration = r.second;
     }
-
-    auto start = std::chrono::steady_clock::now();
-    s = handle.solve();
-    auto end = std::chrono::steady_clock::now();
-
-    if(m_timeout && !m_interruptSolving) {
-      m_timeout->cancel(m_timeout);
-    }
-
-    uint64_t solverRuntimeMS =
-      std::chrono::duration_cast<std::chrono::milliseconds>(1'000 *
-                                                            (end - start))
-        .count();
-
-    parac_log(PARAC_CUBER,
-              PARAC_TRACE,
-              "Stopped solving after roughly {}ms. Interrupted: {}",
-              solverRuntimeMS,
-              m_interruptSolving);
 
     if(m_interruptSolving) {
       switch(s) {
@@ -217,6 +198,7 @@ SolverTask::work(parac_worker worker) {
           auto [resplit_status, cubes, splitting_duration] = resplit(duration);
 
           if(resplit_status == PARAC_SPLITTED) {
+            m_task->result = PARAC_PENDING;
             for(auto [task, _] : cubes) {
               s = PARAC_PENDING;
               task->task_store->assess_task(task->task_store, task);
@@ -225,7 +207,8 @@ SolverTask::work(parac_worker worker) {
             s = resplit_status;
           }
 
-          m_manager->updateAverageSolvingTime(duration + splitting_duration);
+          m_manager->updateAverageSolvingTime(solving_duration +
+                                              splitting_duration);
 
           break;
         }
@@ -489,5 +472,46 @@ SolverTask::resplit(uint64_t durationMS) {
       .count();
 
   return { cubes.first, cubes.second, duration_splitting };
+}
+std::pair<parac_status, uint64_t>
+SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
+                                      CaDiCaLHandle& handle,
+                                      uint64_t duration) {
+  if(config.Resplit() && m_task->path.length < PARAC_PATH_MAX_LENGTH - 1) {
+    m_interruptSolving = false;
+    m_timeout =
+      setTimeout(*m_manager, duration, this, [](parac_timeout* timeout) {
+        SolverTask* self = static_cast<SolverTask*>(timeout->expired_userdata);
+        assert(self);
+        parac_log(PARAC_CUBER,
+                  PARAC_TRACE,
+                  "CNF formula for path {} will be interrupted.",
+                  self->path());
+        self->m_interruptSolving = true;
+        CaDiCaLHandle* handle = self->m_activeHandle;
+        assert(handle);
+        handle->terminate();
+      });
+  }
+
+  auto start = std::chrono::steady_clock::now();
+  parac_status s = handle.solve();
+  auto end = std::chrono::steady_clock::now();
+
+  if(m_timeout && !m_interruptSolving) {
+    m_timeout->cancel(m_timeout);
+  }
+
+  uint64_t solverRuntimeMS =
+    std::chrono::duration_cast<std::chrono::milliseconds>(1'000 * (end - start))
+      .count();
+
+  parac_log(PARAC_CUBER,
+            PARAC_TRACE,
+            "Stopped solving after roughly {}ms. Interrupted: {}",
+            solverRuntimeMS,
+            m_interruptSolving);
+
+  return { s, solverRuntimeMS };
 }
 }

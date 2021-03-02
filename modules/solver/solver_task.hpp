@@ -26,6 +26,7 @@ class NoncopyOStringstream;
 
 namespace parac::solver {
 class CaDiCaLManager;
+class SolverConfig;
 
 class SolverTask {
   public:
@@ -106,6 +107,11 @@ class SolverTask {
 
   std::tuple<parac_status, std::vector<CubeTreeElem>, uint64_t> resplit(
     uint64_t durationMS);
+
+  std::pair<parac_status, uint64_t> solveOrConditionallyAbort(
+    const SolverConfig& config,
+    CaDiCaLHandle& handle,
+    uint64_t duration);
 
   friend class ::cereal::access;
   template<class Archive>
