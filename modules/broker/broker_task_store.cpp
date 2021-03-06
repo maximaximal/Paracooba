@@ -100,12 +100,13 @@ struct TaskStore::Internal {
   std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>> tasksBeingWorkedOn;
   std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>> tasksWaitingForChildren;
 
-  std::unordered_map<parac_compute_node*,
-                     std::unordered_map<parac_path_type,
-                                        TaskRef,
-                                        std::hash<parac_path_type>,
-                                        std::equal_to<parac_path_type>,
-                                        Allocator<TaskRef>>>
+  std::unordered_map<
+    parac_compute_node*,
+    std::unordered_map<const parac_path_type,
+                       TaskRef,
+                       std::hash<parac_path_type>,
+                       std::equal_to<parac_path_type>,
+                       Allocator<std::pair<const parac_path_type, TaskRef>>>>
     offloadedTasks;
 
   std::atomic_size_t tasksSize = 0;

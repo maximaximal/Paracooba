@@ -7,7 +7,17 @@
 
 extern "C" {
 #include <fcntl.h>
+
+#ifdef __FreeBSD__
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#endif
+
+#ifdef __linux__
 #include <sys/sendfile.h>
+#endif
+
 #include <sys/stat.h>
 #include <sys/types.h>
 }
@@ -101,10 +111,22 @@ FileSender::send_chunk(bool first) {
 
   auto sc = std::bind(&FileSender::send_chunk, *this, false);
 
+#ifdef __FreeBSD__
+  int ret = sendfile(m_state->fd,
+                     m_state->target_socket.native_handle(),
+                     m_state->offset,
+                     m_state->file_size,
+                     NULL,
+                     &m_state->offset,
+                     0);
+#endif
+
+#ifdef __linux__
   int ret = sendfile(m_state->target_socket.native_handle(),
                      m_state->fd,
                      &m_state->offset,
                      m_state->file_size);
+#endif
 
   if(ret == -1) {
     if(errno == EAGAIN) {

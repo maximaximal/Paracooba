@@ -25,6 +25,8 @@ set_property(TARGET parac_common_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES di
 
 target_include_directories(parac_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
+target_include_directories(parac_common_obj PRIVATE ${Boost_INCLUDE_DIRS})
+
 target_link_libraries(parac_common PRIVATE Boost::log fmt::fmt)
 
 target_compile_features(parac_common PUBLIC cxx_std_17)
@@ -32,6 +34,10 @@ target_compile_features(parac_common PUBLIC cxx_std_17)
 if(STATIC_BUILDS)
     target_compile_features(parac_common_static PUBLIC cxx_std_17)
     target_include_directories(parac_common_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    target_link_libraries(parac_common PUBLIC "-lstdthreads")
 endif()
 
 if(ENABLE_TESTS)

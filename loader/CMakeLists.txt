@@ -13,6 +13,8 @@ target_link_libraries(parac_loader PUBLIC parac_modules fmt ${CMAKE_DL_LIBS})
 
 target_compile_definitions(parac_loader PRIVATE "-DPARAC_LOG_INCLUDE_FMT")
 
+target_include_directories(parac_loader PRIVATE ${Boost_INCLUDE_DIRS})
+
 set_property(TARGET parac_loader PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 generate_export_header(parac_loader)

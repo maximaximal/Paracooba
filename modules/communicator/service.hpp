@@ -59,6 +59,7 @@ class Service {
   void requestStop();
 
   boost::asio::io_context& ioContext();
+  bool stopped() const;
 
   int connectionRetries() const;
   const char* temporaryDirectory() const;

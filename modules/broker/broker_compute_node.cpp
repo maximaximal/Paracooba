@@ -126,17 +126,16 @@ void
 ComputeNode::Description::serializeToMessage(parac_message& msg) const {
   msg.kind = PARAC_MESSAGE_NODE_DESCRIPTION;
 
+  // Serialize only once, re-send the old serialized value the next time.
   if(!m_descriptionStream) {
     m_descriptionStream = std::make_unique<NoncopyOStringstream>();
-  } else {
-    *m_descriptionStream = NoncopyOStringstream();
-  }
 
-  assert(m_descriptionStream->tellp() == 0);
+    assert(m_descriptionStream->tellp() == 0);
 
-  {
-    cereal::BinaryOutputArchive oa(*m_descriptionStream);
-    oa(*this);
+    {
+      cereal::BinaryOutputArchive oa(*m_descriptionStream);
+      oa(*this);
+    }
   }
 
   msg.data = m_descriptionStream->ptr();

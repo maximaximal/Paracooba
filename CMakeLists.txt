@@ -18,7 +18,8 @@ option(ENABLE_TRACING_SUPPORT "enable support for writing binary event traces to
 option(ENABLE_TESTS "enable building and integrating unit tests" ON)
 
 # Libraries
-find_package(Threads)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 # Generate Export Header
 include(GenerateExportHeader)
@@ -38,6 +39,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     if ( MSVC )
         set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /W4")
     endif()
+endif()
+
+set(MAKE_COMMAND "make")
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    set(MAKE_COMMAND "gmake")
 endif()
 
 # Ubuntu standard package is lame.
@@ -115,6 +121,7 @@ macro(parac_static_shared_combined NAME SRCS SHARED_EXTRA_SRCS)
         BASE_NAME ${NAME}
     )
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    target_include_directories(${NAME}_obj PRIVATE ${Boost_INCLUDE_DIRS})
 
     add_library(${NAME} SHARED $<TARGET_OBJECTS:${NAME}_obj> ${SHARED_EXTRA_SRCS})
     if(STATIC_BUILDS)
@@ -190,7 +197,14 @@ set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES G
 
 add_executable(parac $<TARGET_OBJECTS:parac_executable>
     ${CMAKE_CURRENT_SOURCE_DIR}/loader/StaticModuleLoader.cpp)
-target_link_libraries(parac PUBLIC distrac parac_common parac_modules parac_loader Boost::filesystem Boost::coroutine Boost::context Boost::program_options Boost::date_time ${CMAKE_DL_LIBS} fmt)
+target_link_libraries(parac PUBLIC distrac Threads::Threads parac_common parac_modules parac_loader Boost::filesystem Boost::coroutine Boost::context Boost::program_options Boost::date_time ${CMAKE_DL_LIBS} fmt)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    message(STATUS "FreeBSD BUILD")
+    target_link_libraries(parac PUBLIC "-lstdthreads")
+else()
+    message(STATUS "NO FreeBSD BUILD")
+endif()
 
 if(STATIC_BUILDS)
     add_executable(paracs $<TARGET_OBJECTS:parac_executable>

@@ -52,24 +52,6 @@ struct TCPConnection::InitiatorMessage {
   uint16_t tcp_port;
 };
 
-using TCPConnectionSendQueue = std::queue<TCPConnection::SendQueueEntry>;
-using TCPConnectionSentMap =
-  std::map<decltype(PacketHeader::number), TCPConnection::SendQueueEntry>;
-
-struct TCPConnectionPayload {
-  TCPConnectionPayload(TCPConnectionSendQueue&& q, TCPConnectionSentMap&& m)
-    : queue(std::move(q))
-    , map(std::move(m)) {}
-
-  TCPConnectionSendQueue queue;
-  TCPConnectionSentMap map;
-};
-
-void
-TCPConnectionPayloadDestruct(TCPConnectionPayload* payload) {
-  delete payload;
-}
-
 struct TCPConnection::SendQueueEntry {
   SendQueueEntry(const SendQueueEntry& e) = default;
   SendQueueEntry(SendQueueEntry&& e) = default;
@@ -154,6 +136,24 @@ struct TCPConnection::SendQueueEntry {
   ~SendQueueEntry() {}
 };
 
+using TCPConnectionSendQueue = std::queue<TCPConnection::SendQueueEntry>;
+using TCPConnectionSentMap =
+  std::map<decltype(PacketHeader::number), TCPConnection::SendQueueEntry>;
+
+struct TCPConnectionPayload {
+  TCPConnectionPayload(TCPConnectionSendQueue&& q, TCPConnectionSentMap&& m)
+    : queue(std::move(q))
+    , map(std::move(m)) {}
+
+  TCPConnectionSendQueue queue;
+  TCPConnectionSentMap map;
+};
+
+void
+TCPConnectionPayloadDestruct(TCPConnectionPayload* payload) {
+  delete payload;
+}
+
 struct TCPConnection::State {
   explicit State(Service& service,
                  std::unique_ptr<boost::asio::ip::tcp::socket> socket,
@@ -186,7 +186,7 @@ struct TCPConnection::State {
   }
 
   ~State() {
-    if(!service.ioContext().stopped()) {
+    if(!service.stopped()) {
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_TRACE,
                 "Connection to remote {} ended with resume mode {}.",
@@ -200,7 +200,7 @@ struct TCPConnection::State {
       compute_node = nullptr;
     }
     service.removeOutgoingMessageFromCounter(sendQueue.size());
-    if(!service.ioContext().stopped()) {
+    if(!service.stopped()) {
       switch(resumeMode) {
         case RestartAfterShutdown: {
           if(connectionTry >= 0 &&
@@ -392,7 +392,7 @@ TCPConnection::~TCPConnection() {
       *reinterpret_cast<int*>(&s->writeCoro));
       */
 
-    if(!s->service.ioContext().stopped()) {
+    if(!s->service.stopped()) {
       if(s->transmitMode != TransmitEnd && s.use_count() == 1) {
         // This is the last connection, so this is also the last one having a
         // reference to the state. This is a clean shutdown of a connection, the
@@ -470,7 +470,7 @@ TCPConnection::shouldHandlerBeEnded() {
       return true;
     }
   }
-  if(s->service.ioContext().stopped()) {
+  if(s->service.stopped()) {
     return true;
   }
   return false;

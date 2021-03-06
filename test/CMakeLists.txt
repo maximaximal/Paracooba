@@ -9,17 +9,22 @@ set(TEST_SRCS
 
 add_executable(parac_test ${TEST_SRCS})
 
-set_property(TARGET parac_test PROPERTY CXX_STANDARD 17)
+target_compile_features(parac_test PUBLIC cxx_std_17)
 
 target_link_libraries(parac_test Catch2::Catch2)
 
 target_link_libraries(parac_test ${test_libs})
+
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    target_link_libraries(parac_test "-lstdthreads")
+endif()
 
 target_link_libraries(
     parac_test
     parac_modules
     parac_loader
     Boost::filesystem Boost::log
-    fmt)
+    fmt
+    libcadical)
 
 catch_discover_tests(parac_test)

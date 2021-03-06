@@ -222,10 +222,14 @@ Service::retrieveTCPConnectionPayload(parac_id id) {
 
 void
 Service::addOutgoingMessageToCounter(size_t count) {
+  if(!m_internal)
+    return;
   m_internal->outgoingMessageCounter += count;
 }
 void
 Service::removeOutgoingMessageFromCounter(size_t count) {
+  if(!m_internal)
+    return;
   assert(m_internal->outgoingMessageCounter >= count);
 
   m_internal->outgoingMessageCounter -= count;
@@ -251,7 +255,16 @@ Service::isTCPAcceptorActive() {
 
 io_context&
 Service::ioContext() {
+  assert(m_internal);
   return m_internal->context;
+}
+
+bool
+Service::stopped() const {
+  if(m_internal) {
+    return m_internal->context.stopped();
+  }
+  return true;
 }
 
 int

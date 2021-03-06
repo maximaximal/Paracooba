@@ -16,6 +16,14 @@
 #include <unistd.h>
 #include <vector>
 
+#ifdef __FreeBSD__
+#define PARAC_DEFAULT_TEMP_PATH "/tmp"
+#endif
+
+#ifdef __linux__
+#define PARAC_DEFAULT_TEMP_PATH "/dev/shm"
+#endif
+
 namespace parac::solver {
 struct CaDiCaLHandle::Internal {
   Internal(parac_handle& handle,
@@ -85,7 +93,8 @@ CaDiCaLHandle::solver() {
 std::pair<parac_status, std::string>
 CaDiCaLHandle::prepareString(std::string_view iCNF) {
   auto h = std::hash<std::string_view>{}(iCNF);
-  std::string path = "/dev/shm/paracooba-tmp-dimacs-file-" + std::to_string(h);
+  std::string path =
+    PARAC_DEFAULT_TEMP_PATH "/paracooba-tmp-dimacs-file-" + std::to_string(h);
   parac_log(PARAC_SOLVER,
             PARAC_TRACE,
             "Writing temp file \"{}\" in order to parse DIMACS from string.",
