@@ -293,7 +293,7 @@ CaDiCaLHandle::takeSolverAssignment() {
 std::pair<parac_status, std::optional<std::pair<Cube, Cube>>>
 CaDiCaLHandle::resplitOnce(parac_path path, Cube literals) {
   parac_log(
-    PARAC_CUBER, PARAC_TRACE, "CNF formula for path {} resplitted.", path);
+    PARAC_CUBER, PARAC_TRACE, "CNF formula for path {} splitted.", path);
 
   Cube literals2(literals);
   for(auto lit : literals) {

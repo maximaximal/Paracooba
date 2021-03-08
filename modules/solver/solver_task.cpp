@@ -169,15 +169,15 @@ SolverTask::work(parac_worker worker) {
                 path(),
                 path().length,
                 config.InitialMinimalCubeDepth());
-      s = PARAC_ABORTED;
-      solving_duration = 0;
-      m_interruptSolving = true;
-
       auto [splitting_status_, splitting_cubes_, splitting_duration_] =
         resplit(duration);
       splitting_status = splitting_status_;
       splitting_cubes = splitting_cubes_;
       splitting_duration = splitting_duration_;
+
+      s = PARAC_ABORTED;
+      solving_duration = 0;
+      m_interruptSolving = true;
     }
 
     if(path().length >= config.InitialMinimalCubeDepth() ||
