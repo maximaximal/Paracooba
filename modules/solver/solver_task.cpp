@@ -170,14 +170,14 @@ SolverTask::work(parac_worker worker) {
                 path(),
                 path().length,
                 config.InitialMinimalCubeDepth());
-      auto [solve_status, duration] =
+      auto [solve_status, duration_] =
         solveOrConditionallyAbort(config, handle, 80);
       if(solve_status == PARAC_ABORTED) {
         auto [splitting_status_, splitting_cubes_, splitting_duration_] =
           resplit(duration);
         splitting_status = splitting_status_;
         splitting_cubes = splitting_cubes_;
-        splitting_duration = splitting_duration_ + duration;
+        splitting_duration = splitting_duration_ + duration_;
 
         s = PARAC_ABORTED;
         solving_duration = 0;
@@ -186,7 +186,7 @@ SolverTask::work(parac_worker worker) {
         // Solver directly found result even though it ran only a short amount
         // of time!
         s = solve_status;
-        solving_duration = duration;
+        solving_duration = duration_;
       }
     }
 
