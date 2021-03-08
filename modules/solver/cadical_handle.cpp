@@ -351,6 +351,16 @@ CaDiCaLHandle::lookahead(size_t depth, size_t min_depth) {
 
   auto& pregeneratedCubes = *m_internal->pregeneratedCubes;
 
+  if(!pregeneratedCubes.empty()) {
+    parac_log(PARAC_CUBER,
+              PARAC_LOCALWARNING,
+              "Pregenerated cubes already found in formula! This will "
+              "overwrite them, because --cadical-cubes was used.",
+              depth);
+    pregeneratedCubes.clear();
+    m_internal->pregeneratedCubesCount = 0;
+    m_internal->pregeneratedCubesJumplist->clear();
+  }
   assert(pregeneratedCubes.empty());
 
   parac_timeout* timeout =
