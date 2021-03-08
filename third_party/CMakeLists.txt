@@ -1,4 +1,5 @@
 add_subdirectory(cadical)
+add_subdirectory(kissat)
 add_subdirectory(catch)
 
 set(libcadical_INCLUDE_DIRS ${libcadical_INCLUDE_DIRS} PARENT_SCOPE)
