@@ -29,7 +29,7 @@ if(ENABLE_TESTS)
     add_library(parac_solver_test SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/test_cube_source.cpp)
 
-    if(${CMAKE_VERSION} VERSION_GREATER "3.18.0")
+    if(${CMAKE_VERSION} VERSION_GREATER "3.11.0")
         target_link_libraries(parac_solver_test PRIVATE parac_solver_obj)
     else()
         target_link_libraries(parac_solver_test PRIVATE parac_solver)
