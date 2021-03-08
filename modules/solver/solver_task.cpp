@@ -164,20 +164,30 @@ SolverTask::work(parac_worker worker) {
     if(path().length < config.InitialMinimalCubeDepth()) {
       parac_log(PARAC_CUBER,
                 PARAC_TRACE,
-                "Skip calling CaDiCaL .solve() for path {} because depth {} "
+                "Skip calling full CaDiCaL .solve() for path {} and only solve "
+                "for 80ms because depth {} "
                 "< initial minimal cube depth {}. Going directly to splitting.",
                 path(),
                 path().length,
                 config.InitialMinimalCubeDepth());
-      auto [splitting_status_, splitting_cubes_, splitting_duration_] =
-        resplit(duration);
-      splitting_status = splitting_status_;
-      splitting_cubes = splitting_cubes_;
-      splitting_duration = splitting_duration_;
+      auto [solve_status, duration] =
+        solveOrConditionallyAbort(config, handle, 80);
+      if(solve_status == PARAC_ABORTED) {
+        auto [splitting_status_, splitting_cubes_, splitting_duration_] =
+          resplit(duration);
+        splitting_status = splitting_status_;
+        splitting_cubes = splitting_cubes_;
+        splitting_duration = splitting_duration_ + duration;
 
-      s = PARAC_ABORTED;
-      solving_duration = 0;
-      m_interruptSolving = true;
+        s = PARAC_ABORTED;
+        solving_duration = 0;
+        m_interruptSolving = true;
+      } else {
+        // Solver directly found result even though it ran only a short amount
+        // of time!
+        s = solve_status;
+        solving_duration = duration;
+      }
     }
 
     if(path().length >= config.InitialMinimalCubeDepth() ||
@@ -206,7 +216,7 @@ SolverTask::work(parac_worker worker) {
                   "solver. No resplitting is carried out here.",
                   path());
         splitting_status = PARAC_PENDING;
-        auto r = solveOrConditionallyAbort(config, handle, duration);
+        auto r = solveOrConditionallyAbort(config, handle, 0);
         s = r.first;
         solving_duration = r.second;
       }
@@ -507,7 +517,8 @@ std::pair<parac_status, uint64_t>
 SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
                                       CaDiCaLHandle& handle,
                                       uint64_t duration) {
-  if(config.Resplit() && m_task->path.length < PARAC_PATH_MAX_LENGTH - 1) {
+  if((config.Resplit() || duration != 0) &&
+     m_task->path.length < PARAC_PATH_MAX_LENGTH - 1) {
     m_interruptSolving = false;
     m_timeout =
       setTimeout(*m_manager, duration, this, [](parac_timeout* timeout) {
