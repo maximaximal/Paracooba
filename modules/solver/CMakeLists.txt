@@ -29,7 +29,7 @@ if(ENABLE_TESTS)
     add_library(parac_solver_test SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/test_cube_source.cpp)
 
-    target_link_libraries(parac_solver_test PRIVATE parac_solver_obj fmt cereal libcadical)
+    target_link_libraries(parac_solver_test PRIVATE parac_solver fmt cereal libcadical)
     target_link_libraries(parac_solver_test PUBLIC parac_common Catch2::Catch2 libcadical)
 
     target_include_directories(parac_solver_test PRIVATE ${Boost_INCLUDE_DIRS})
