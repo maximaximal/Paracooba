@@ -363,17 +363,18 @@ CaDiCaLHandle::lookahead(size_t depth, size_t min_depth) {
   }
   assert(pregeneratedCubes.empty());
 
-  parac_timeout* timeout =
+  m_lookaheadTimeout =
     setTimeout(m_internal->handle, 30000, this, [](parac_timeout* t) {
       CaDiCaLHandle* handle = static_cast<CaDiCaLHandle*>(t->expired_userdata);
       handle->terminate();
       handle->m_interruptedLookahead = true;
+      handle->m_lookaheadTimeout = nullptr;
     });
 
   auto cubes{ m_internal->solver.generate_cubes(depth, min_depth) };
 
-  if(timeout) {
-    timeout->cancel(timeout);
+  if(m_lookaheadTimeout) {
+    m_lookaheadTimeout->cancel(m_lookaheadTimeout);
   }
 
   m_interruptedLookahead = true;

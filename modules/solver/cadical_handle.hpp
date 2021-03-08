@@ -8,6 +8,7 @@
 
 struct parac_path;
 struct parac_handle;
+struct parac_timeout;
 
 namespace CaDiCaL {
 class Solver;
@@ -70,5 +71,7 @@ class CaDiCaLHandle {
 
   bool m_hasFormula = false;
   bool m_interruptedLookahead = false;
+
+  parac_timeout* m_lookaheadTimeout = nullptr;
 };
 }
