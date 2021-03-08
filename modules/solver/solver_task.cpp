@@ -161,7 +161,7 @@ SolverTask::work(parac_worker worker) {
     std::vector<CubeTreeElem> splitting_cubes;
     uint64_t splitting_duration = 0;
 
-    if(path().length >= config.InitialMinimalCubeDepth()) {
+    if(path().length < config.InitialMinimalCubeDepth()) {
       parac_log(PARAC_CUBER,
                 PARAC_TRACE,
                 "Skip calling CaDiCaL .solve() for path {} because depth {} "
@@ -180,7 +180,7 @@ SolverTask::work(parac_worker worker) {
       splitting_duration = splitting_duration_;
     }
 
-    if(path().length >= config.InitialMinimalCubeDepth() &&
+    if(path().length >= config.InitialMinimalCubeDepth() ||
        splitting_status == PARAC_NO_SPLITS_LEFT) {
       if(config.Resplit()) {
         parac_log(
@@ -199,7 +199,7 @@ SolverTask::work(parac_worker worker) {
         auto r = solveOrConditionallyAbort(config, handle, duration);
         s = r.first;
         solving_duration = r.second;
-      } else if(splitting_status == PARAC_NO_SPLITS_LEFT) {
+      } else {
         parac_log(PARAC_CUBER,
                   PARAC_TRACE,
                   "Start solving CNF formula on path {} using CaDiCaL CNF "
