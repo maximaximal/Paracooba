@@ -161,65 +161,32 @@ SolverTask::work(parac_worker worker) {
     std::vector<CubeTreeElem> splitting_cubes;
     uint64_t splitting_duration = 0;
 
-    if(path().length < config.InitialMinimalCubeDepth()) {
+    if(config.Resplit()) {
       parac_log(PARAC_CUBER,
                 PARAC_TRACE,
-                "Skip calling full CaDiCaL .solve() for path {} and only solve "
-                "for 80ms because depth {} "
-                "< initial minimal cube depth {}. Going directly to splitting.",
+                "Start solving CNF formula on path {} using CaDiCaL CNF solver "
+                "for roughly "
+                "{}ms before aborting it (fastSplit = {}, "
+                "averageSolvingTimeMS: {}, waitingSolverTasks: {})",
                 path(),
-                path().length,
-                config.InitialMinimalCubeDepth());
-      auto [solve_status, duration_] =
-        solveOrConditionallyAbort(config, handle, 80);
-      if(solve_status == PARAC_ABORTED) {
-        auto [splitting_status_, splitting_cubes_, splitting_duration_] =
-          resplit(duration);
-        splitting_status = splitting_status_;
-        splitting_cubes = splitting_cubes_;
-        splitting_duration = splitting_duration_ + duration_;
-
-        s = PARAC_ABORTED;
-        solving_duration = 0;
-        m_interruptSolving = true;
-      } else {
-        // Solver directly found result even though it ran only a short amount
-        // of time!
-        s = solve_status;
-        solving_duration = duration_;
-      }
-    }
-
-    if(path().length >= config.InitialMinimalCubeDepth() ||
-       splitting_status == PARAC_NO_SPLITS_LEFT) {
-      if(config.Resplit()) {
-        parac_log(
-          PARAC_CUBER,
-          PARAC_TRACE,
-          "Start solving CNF formula on path {} using CaDiCaL CNF solver "
-          "for roughly "
-          "{}ms before aborting it (fastSplit = {}, "
-          "averageSolvingTimeMS: {}, waitingSolverTasks: {})",
-          path(),
-          duration,
-          m_fastSplit,
-          averageSolvingTime,
-          m_manager->waitingSolverTasks());
-        splitting_status = PARAC_PENDING;
-        auto r = solveOrConditionallyAbort(config, handle, duration);
-        s = r.first;
-        solving_duration = r.second;
-      } else {
-        parac_log(PARAC_CUBER,
-                  PARAC_TRACE,
-                  "Start solving CNF formula on path {} using CaDiCaL CNF "
-                  "solver. No resplitting is carried out here.",
-                  path());
-        splitting_status = PARAC_PENDING;
-        auto r = solveOrConditionallyAbort(config, handle, 0);
-        s = r.first;
-        solving_duration = r.second;
-      }
+                duration,
+                m_fastSplit,
+                averageSolvingTime,
+                m_manager->waitingSolverTasks());
+      splitting_status = PARAC_PENDING;
+      auto r = solveOrConditionallyAbort(config, handle, duration);
+      s = r.first;
+      solving_duration = r.second;
+    } else {
+      parac_log(PARAC_CUBER,
+                PARAC_TRACE,
+                "Start solving CNF formula on path {} using CaDiCaL CNF "
+                "solver. No resplitting is carried out here.",
+                path());
+      splitting_status = PARAC_PENDING;
+      auto r = solveOrConditionallyAbort(config, handle, 0);
+      s = r.first;
+      solving_duration = r.second;
     }
 
     if(m_interruptSolving) {

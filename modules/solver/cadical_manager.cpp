@@ -113,6 +113,18 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
 
     m_internal->solvers.resize(workers);
     m_internal->borrowed.resize(workers);
+
+    // Generate cubes if required.
+    if(solverConfig.CaDiCaLCubes()) {
+      parac_log(PARAC_SOLVER,
+                PARAC_TRACE,
+                "Because --cadical-cubes is active, pregenerate cubes as part "
+                "of formula parsing step of {} from {}.",
+                m_parsedFormula->path(),
+                m_parsedFormula->originatorId());
+      m_parsedFormula->lookahead(solverConfig.InitialCubeDepth(),
+                                 solverConfig.InitialMinimalCubeDepth());
+    }
   } else {
     parac_log(PARAC_SOLVER,
               PARAC_TRACE,

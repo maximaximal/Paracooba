@@ -57,6 +57,8 @@ class CaDiCaLHandle {
     parac_path path,
     Cube literals);
 
+  parac_status lookahead(size_t depth, size_t min_depth);
+
   std::unique_ptr<SolverAssignment> takeSolverAssignment();
 
   private:
@@ -67,5 +69,6 @@ class CaDiCaLHandle {
   void generateJumplist();
 
   bool m_hasFormula = false;
+  bool m_interruptedLookahead = false;
 };
 }

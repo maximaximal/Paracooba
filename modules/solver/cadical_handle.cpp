@@ -6,12 +6,15 @@
 #include "paracooba/module.h"
 #include "solver_assignment.hpp"
 
+#include "paracooba/common/timeout.h"
+#include "paracooba/communicator/communicator.h"
 #include "paracooba/solver/cube_iterator.hpp"
 
 #include <cadical/cadical.hpp>
 #include <cassert>
 #include <cstdio>
 #include <fstream>
+#include <iterator>
 #include <string_view>
 #include <unistd.h>
 #include <vector>
@@ -325,5 +328,76 @@ CaDiCaLHandle::resplitOnce(parac_path path, Cube literals) {
   literals2.push_back(-lit_to_split);
   m_internal->solver.reset_assumptions();
   return { PARAC_SPLITTED, { { literals, literals2 } } };
+}
+
+static parac_timeout*
+setTimeout(parac_handle& paracHandle,
+           uint64_t ms,
+           void* userdata,
+           parac_timeout_expired expired_cb) {
+  parac_module* paracCommMod = paracHandle.modules[PARAC_MOD_COMMUNICATOR];
+  if(!paracCommMod)
+    return nullptr;
+  parac_module_communicator* paracComm = paracCommMod->communicator;
+  if(!paracComm)
+    return nullptr;
+
+  return paracComm->set_timeout(paracCommMod, ms, userdata, expired_cb);
+}
+
+parac_status
+CaDiCaLHandle::lookahead(size_t depth, size_t min_depth) {
+  parac_log(PARAC_CUBER, PARAC_TRACE, "Generating cubes of length {}", depth);
+
+  auto& pregeneratedCubes = *m_internal->pregeneratedCubes;
+
+  assert(pregeneratedCubes.empty());
+
+  parac_timeout* timeout =
+    setTimeout(m_internal->handle, 30000, this, [](parac_timeout* t) {
+      CaDiCaLHandle* handle = static_cast<CaDiCaLHandle*>(t->expired_userdata);
+      handle->terminate();
+      handle->m_interruptedLookahead = true;
+    });
+
+  auto cubes{ m_internal->solver.generate_cubes(depth, min_depth) };
+
+  if(timeout) {
+    timeout->cancel(timeout);
+  }
+
+  m_interruptedLookahead = true;
+  if(cubes.status == 20)
+    return PARAC_UNSAT;
+  else if(cubes.status == 10)
+    return PARAC_SAT;
+  std::vector<int> flatCubes;
+  size_t max_depth = 0;
+
+  for(const auto& cube : cubes.cubes) {
+    std::copy(begin(cube), end(cube), std::back_inserter(pregeneratedCubes));
+    pregeneratedCubes.emplace_back(0);
+    max_depth = std::max(max_depth, cube.size());
+  }
+
+  parac_log(PARAC_CUBER,
+            PARAC_TRACE,
+            "Generated {} cubes. Max depth = {}",
+            cubes.cubes.size(),
+            max_depth);
+
+  generateJumplist();
+
+  parac_log(PARAC_SOLVER,
+            PARAC_DEBUG,
+            "Finished generating CaDiCaL cubes for DIMACS file \"{}\" with {} "
+            "variables and {} "
+            "pregenerated cubes. Normalized path length is {}.",
+            m_internal->path,
+            m_internal->vars,
+            m_internal->pregeneratedCubesCount,
+            m_internal->normalizedPathLength);
+
+  return PARAC_SPLITTED;
 }
 }
