@@ -285,7 +285,7 @@ CaDiCaLHandle::solve() {
 
 void
 CaDiCaLHandle::terminate() {
-  m_internal->solver.terminate();
+  m_internal->terminator.terminateLocally();
 }
 
 std::unique_ptr<SolverAssignment>

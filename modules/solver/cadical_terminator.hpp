@@ -9,11 +9,13 @@ class CaDiCaLTerminator : public CaDiCaL::Terminator {
     : m_terminated(terminated) {}
   virtual ~CaDiCaLTerminator() {}
 
-  virtual bool terminate() { return m_terminated; }
+  virtual bool terminate() { return m_terminated || m_locallyTerminated; }
 
   bool& stopRef() const { return m_terminated; }
+  void terminateLocally() { m_locallyTerminated = true; }
 
   private:
   bool& m_terminated;
+  bool m_locallyTerminated = false;
 };
 }
