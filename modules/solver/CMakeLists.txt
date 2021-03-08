@@ -6,6 +6,7 @@ set(PARACOOBA_SOLVER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/cadical_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cube_source.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/solver_config.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/kissat_task.cpp
     )
 
 parac_module(parac_solver "${PARACOOBA_SOLVER_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
@@ -40,7 +41,7 @@ if(ENABLE_TESTS)
 
     target_link_libraries(parac_solver_test PRIVATE fmt cereal libcadical libkissat)
 
-    target_link_libraries(parac_solver_test PUBLIC parac_common Catch2::Catch2 libcadical)
+    target_link_libraries(parac_solver_test PUBLIC parac_common Catch2::Catch2 libcadical libkissat)
 
     target_include_directories(parac_solver_test PRIVATE ${Boost_INCLUDE_DIRS})
 
