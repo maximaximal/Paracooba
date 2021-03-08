@@ -195,6 +195,7 @@ SolverTask::work(parac_worker worker) {
           m_fastSplit,
           averageSolvingTime,
           m_manager->waitingSolverTasks());
+        splitting_status = PARAC_PENDING;
         auto r = solveOrConditionallyAbort(config, handle, duration);
         s = r.first;
         solving_duration = r.second;
@@ -204,6 +205,7 @@ SolverTask::work(parac_worker worker) {
                   "Start solving CNF formula on path {} using CaDiCaL CNF "
                   "solver. No resplitting is carried out here.",
                   path());
+        splitting_status = PARAC_PENDING;
         auto r = solveOrConditionallyAbort(config, handle, duration);
         s = r.first;
         solving_duration = r.second;
@@ -213,16 +215,21 @@ SolverTask::work(parac_worker worker) {
     if(m_interruptSolving) {
       switch(s) {
         case PARAC_ABORTED: {
-          auto [resplit_status, cubes, splitting_duration] = resplit(duration);
+          if(splitting_status == PARAC_PENDING) {
+            auto [resplit_status, cubes, resplit_duration] = resplit(duration);
+            splitting_cubes = std::move(cubes);
+            splitting_status = resplit_status;
+            splitting_duration = resplit_duration;
+          }
 
-          if(resplit_status == PARAC_SPLITTED) {
+          if(splitting_status == PARAC_SPLITTED) {
             m_task->result = PARAC_PENDING;
-            for(auto [task, _] : cubes) {
+            for(auto [task, _] : splitting_cubes) {
               s = PARAC_PENDING;
               task->task_store->assess_task(task->task_store, task);
             }
           } else {
-            s = resplit_status;
+            s = splitting_status;
           }
 
           m_manager->updateAverageSolvingTime(solving_duration +
