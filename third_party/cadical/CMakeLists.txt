@@ -11,7 +11,7 @@ ExternalProject_Add(cadical
     PREFIX cadical
     URL ${CMAKE_CURRENT_SOURCE_DIR}/cadical-799cd8c.tar.gz
     BUILD_IN_SOURCE 1
-    BUILD_COMMAND bash -c "./configure -g CXX=${CMAKE_CXX_COMPILER} CXXFLAGS=\"-fPIC ${CADICAL_SANITIZER_OPTIONS}\" -q && ${MAKE_COMMAND} -C build libcadical.a"
+    BUILD_COMMAND bash -c "./configure -g CXX=${CMAKE_CXX_COMPILER} CXXFLAGS=\"-fPIC ${CADICAL_SANITIZER_OPTIONS} -fvisibility=hidden\" -q && ${MAKE_COMMAND} -C build libcadical.a"
     UPDATE_COMMAND ""
     INSTALL_COMMAND ""
     CONFIGURE_COMMAND ""
