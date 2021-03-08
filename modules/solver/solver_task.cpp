@@ -157,8 +157,32 @@ SolverTask::work(parac_worker worker) {
 
     s = PARAC_UNKNOWN;
     uint64_t solving_duration = 0;
-    if(config.Resplit()) {
-      if(path().length >= config.InitialMinimalCubeDepth()) {
+    parac_status splitting_status = PARAC_PENDING;
+    std::vector<CubeTreeElem> splitting_cubes;
+    uint64_t splitting_duration = 0;
+
+    if(path().length >= config.InitialMinimalCubeDepth()) {
+      parac_log(PARAC_CUBER,
+                PARAC_TRACE,
+                "Skip calling CaDiCaL .solve() for path {} because depth {} "
+                "< initial minimal cube depth {}. Going directly to splitting.",
+                path(),
+                path().length,
+                config.InitialMinimalCubeDepth());
+      s = PARAC_ABORTED;
+      solving_duration = 0;
+      m_interruptSolving = true;
+
+      auto [splitting_status_, splitting_cubes_, splitting_duration_] =
+        resplit(duration);
+      splitting_status = splitting_status_;
+      splitting_cubes = splitting_cubes_;
+      splitting_duration = splitting_duration_;
+    }
+
+    if(path().length >= config.InitialMinimalCubeDepth() &&
+       splitting_status == PARAC_NO_SPLITS_LEFT) {
+      if(config.Resplit()) {
         parac_log(
           PARAC_CUBER,
           PARAC_TRACE,
@@ -174,28 +198,16 @@ SolverTask::work(parac_worker worker) {
         auto r = solveOrConditionallyAbort(config, handle, duration);
         s = r.first;
         solving_duration = r.second;
-      } else {
-        parac_log(
-          PARAC_CUBER,
-          PARAC_TRACE,
-          "Skip calling CaDiCaL .solve() for path {} because depth {} "
-          "< initial minimal cube depth {}. Going directly to splitting.",
-          path(),
-          path().length,
-          config.InitialMinimalCubeDepth());
-        s = PARAC_ABORTED;
-        solving_duration = 0;
-        m_interruptSolving = true;
+      } else if(splitting_status == PARAC_NO_SPLITS_LEFT) {
+        parac_log(PARAC_CUBER,
+                  PARAC_TRACE,
+                  "Start solving CNF formula on path {} using CaDiCaL CNF "
+                  "solver. No resplitting is carried out here.",
+                  path());
+        auto r = solveOrConditionallyAbort(config, handle, duration);
+        s = r.first;
+        solving_duration = r.second;
       }
-    } else {
-      parac_log(PARAC_CUBER,
-                PARAC_TRACE,
-                "Start solving CNF formula on path {} using CaDiCaL CNF "
-                "solver. No resplitting is carried out here.",
-                path());
-      auto r = solveOrConditionallyAbort(config, handle, duration);
-      s = r.first;
-      solving_duration = r.second;
     }
 
     if(m_interruptSolving) {
@@ -403,6 +415,9 @@ SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
     for(auto&& [task, cube] : cubes2) {
       auto [status, left_and_right_cube] =
         m_activeHandle->resplitOnce(task->path, cube);
+      if(status == PARAC_NO_SPLITS_LEFT) {
+        continue;
+      }
       if(status != PARAC_SPLITTED) {
         // The cube was not splitted again! This means that this path is already
         // solved!
@@ -429,7 +444,7 @@ SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
   }
 
   m_timeout->cancel(m_timeout);
-  return { PARAC_SPLITTED, cubes };
+  return { cubes.size() > 0 ? PARAC_SPLITTED : PARAC_NO_SPLITS_LEFT, cubes };
 }
 
 std::tuple<parac_status, std::vector<SolverTask::CubeTreeElem>, uint64_t>
@@ -463,15 +478,17 @@ SolverTask::resplit(uint64_t durationMS) {
   auto cubes = resplitDepth(path(), literals, depth);
   auto end = std::chrono::steady_clock::now();
 
-  parac_log(PARAC_CUBER,
-            PARAC_TRACE,
-            "Splitting path {} took {}ms. Produced {} sub-tasks.",
-            m_task->path,
-            std::chrono::duration<double>(
-              std::chrono::duration_cast<std::chrono::milliseconds>(
-                1'000 * (end - start)))
-              .count(),
-            cubes.second.size());
+  parac_log(
+    PARAC_CUBER,
+    PARAC_TRACE,
+    "Splitting path {} took {}ms. Produced {} sub-tasks. Returned status {}",
+    m_task->path,
+    std::chrono::duration<double>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(1'000 *
+                                                            (end - start)))
+      .count(),
+    cubes.second.size(),
+    cubes.first);
 
   uint64_t duration_splitting =
     std::chrono::duration_cast<std::chrono::milliseconds>(1'000 * (end - start))

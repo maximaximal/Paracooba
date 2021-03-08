@@ -27,6 +27,8 @@ parac_status_to_str(parac_status status) {
       return "ABORTED";
     case PARAC_SPLITTED:
       return "SPLITTED";
+    case PARAC_NO_SPLITS_LEFT:
+      return "No Splits Left";
     case PARAC_ABORT_CONNECTION:
       return "Abort Connection";
     case PARAC_CONNECTION_CLOSED:

@@ -309,7 +309,10 @@ CaDiCaLHandle::resplitOnce(parac_path path, Cube literals) {
     } else if(m_internal->solver.state() == CaDiCaL::UNSATISFIED) {
       return { PARAC_UNSAT, {} };
     } else {
-      assert(false);
+      parac_log(PARAC_CUBER,
+                PARAC_TRACE,
+                "Cannot split further, as lookahead returned 0");
+      return { PARAC_NO_SPLITS_LEFT, {} };
     }
   }
 
