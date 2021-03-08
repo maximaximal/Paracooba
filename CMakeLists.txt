@@ -200,10 +200,7 @@ add_executable(parac $<TARGET_OBJECTS:parac_executable>
 target_link_libraries(parac PUBLIC distrac Threads::Threads parac_common parac_modules parac_loader Boost::filesystem Boost::coroutine Boost::context Boost::program_options Boost::date_time ${CMAKE_DL_LIBS} fmt)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-    message(STATUS "FreeBSD BUILD")
     target_link_libraries(parac PUBLIC "-lstdthreads")
-else()
-    message(STATUS "NO FreeBSD BUILD")
 endif()
 
 if(STATIC_BUILDS)
