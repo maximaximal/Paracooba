@@ -17,12 +17,15 @@ target_include_directories(parac_solver_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
 get_target_property(CADICAL_INCLUDE_DIRS libcadical INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_solver_obj PRIVATE ${CADICAL_INCLUDE_DIRS})
 
+get_target_property(KISSAT_INCLUDE_DIRS libkissat INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(parac_solver_obj PRIVATE ${KISSAT_INCLUDE_DIRS})
+
 add_dependencies(parac_solver_obj libcadical)
 
-set_property(TARGET parac_solver_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES libcadical cereal)
+set_property(TARGET parac_solver_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES libcadical libkissat cereal)
 
 if(STATIC_BUILDS)
-    target_link_libraries(parac_solver_static PRIVATE libcadical)
+    target_link_libraries(parac_solver_static PRIVATE libcadical libkissat)
 endif()
 
 if(ENABLE_TESTS)
@@ -35,7 +38,7 @@ if(ENABLE_TESTS)
         target_link_libraries(parac_solver_test PRIVATE parac_solver)
     endif()
 
-    target_link_libraries(parac_solver_test PRIVATE fmt cereal libcadical)
+    target_link_libraries(parac_solver_test PRIVATE fmt cereal libcadical libkissat)
 
     target_link_libraries(parac_solver_test PUBLIC parac_common Catch2::Catch2 libcadical)
 

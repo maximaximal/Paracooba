@@ -25,6 +25,7 @@ target_link_libraries(
     parac_loader
     Boost::filesystem Boost::log
     fmt
-    libcadical)
+    libcadical
+    libkissat)
 
 catch_discover_tests(parac_test)
