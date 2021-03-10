@@ -5,7 +5,7 @@ ExternalProject_Add(kissat
     PREFIX kissat
     URL ${CMAKE_CURRENT_SOURCE_DIR}/kissat-sc2020-039805f2.tar.xz
     BUILD_IN_SOURCE 1
-    BUILD_COMMAND bash -c "C=${CMAKE_C_COMPILER} CFLAGS=-fPIC ./configure && ${MAKE_COMMAND} -C build libkissat.a"
+    BUILD_COMMAND bash -c "CC=${CMAKE_C_COMPILER} ./configure -fPIC && ${MAKE_COMMAND} -C build libkissat.a"
     UPDATE_COMMAND ""
     INSTALL_COMMAND ""
     CONFIGURE_COMMAND ""

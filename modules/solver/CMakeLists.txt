@@ -10,7 +10,7 @@ set(PARACOOBA_SOLVER_SRCS
     )
 
 parac_module(parac_solver "${PARACOOBA_SOLVER_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
-target_link_libraries(parac_solver PRIVATE libcadical)
+target_link_libraries(parac_solver PRIVATE libcadical libkissat)
 
 get_target_property(CEREAL_INCLUDE_DIRS cereal INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_solver_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
@@ -21,7 +21,7 @@ target_include_directories(parac_solver_obj PRIVATE ${CADICAL_INCLUDE_DIRS})
 get_target_property(KISSAT_INCLUDE_DIRS libkissat INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_solver_obj PRIVATE ${KISSAT_INCLUDE_DIRS})
 
-add_dependencies(parac_solver_obj libcadical)
+add_dependencies(parac_solver_obj libcadical libkissat)
 
 set_property(TARGET parac_solver_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES libcadical libkissat cereal)
 
@@ -39,7 +39,7 @@ if(ENABLE_TESTS)
         target_link_libraries(parac_solver_test PRIVATE parac_solver)
     endif()
 
-    target_link_libraries(parac_solver_test PRIVATE fmt cereal libcadical libkissat)
+    target_link_libraries(parac_solver_test PRIVATE fmt cereal)
 
     target_link_libraries(parac_solver_test PUBLIC parac_common Catch2::Catch2 libcadical libkissat)
 

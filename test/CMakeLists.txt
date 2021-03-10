@@ -13,19 +13,20 @@ target_compile_features(parac_test PUBLIC cxx_std_17)
 
 target_link_libraries(parac_test Catch2::Catch2)
 
-target_link_libraries(parac_test ${test_libs})
-
-if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-    target_link_libraries(parac_test "-lstdthreads")
-endif()
-
 target_link_libraries(
     parac_test
     parac_modules
     parac_loader
     Boost::filesystem Boost::log
     fmt
+    libkissat
     libcadical
-    libkissat)
+    )
+
+target_link_libraries(parac_test ${test_libs})
+
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    target_link_libraries(parac_test "-lstdthreads")
+endif()
 
 catch_discover_tests(parac_test)

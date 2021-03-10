@@ -3,13 +3,21 @@
 #include <paracooba/common/log.h>
 #include <paracooba/module.h>
 
+extern "C" {
+const char*
+kissat_signal_name(int sig) {
+  (void)sig;
+  return "CUSTOMSIGNALNAME";
+}
+
 #include <kissat/kissat.h>
+}
 
 namespace parac::solver {
 struct KissatTask::Internal {
   Internal(parac_handle& handle)
     : handle(handle)
-  /*, solver(kissat_init()) */ {}
+    , solver(kissat_init()) {}
 
   parac_handle& handle;
 
