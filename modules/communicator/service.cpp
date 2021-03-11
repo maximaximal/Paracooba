@@ -114,6 +114,9 @@ Service::stop() {
   parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Stopping communicator service.");
 
   ioContext().stop();
+
+  // All timeouts are now run out! Else they would be stuck.
+  m_internal->timeoutController.reset();
 }
 
 parac_status

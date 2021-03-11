@@ -1,4 +1,5 @@
 #include "timeout_controller.hpp"
+#include "paracooba/common/log.h"
 #include "paracooba/common/timeout.h"
 #include "service.hpp"
 
@@ -31,7 +32,12 @@ struct TimeoutController::Internal {
 
     Timeout(Service& service)
       : timer(service.ioContext()) {}
-    ~Timeout() { timer.cancel(); }
+    ~Timeout() {
+      if(timeout.expired) {
+        timeout.expired(&timeout);
+      }
+      timer.cancel();
+    }
   };
 
   TimeoutList timeoutList;
@@ -39,8 +45,12 @@ struct TimeoutController::Internal {
 
 TimeoutController::TimeoutController(Service& service)
   : m_internal(std::make_unique<Internal>())
-  , m_service(service) {}
-TimeoutController::~TimeoutController() {}
+  , m_service(service) {
+  parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Create TimeoutController");
+}
+TimeoutController::~TimeoutController() {
+  parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Destroy TimeoutController");
+}
 
 parac_timeout*
 TimeoutController::setTimeout(uint64_t ms,
@@ -80,6 +90,8 @@ TimeoutController::setTimeout(uint64_t ms,
 void
 TimeoutController::cancel(parac_timeout* timeout) {
   assert(timeout);
+
+  timeout->expired = nullptr;
 
   Internal::Timeout* t =
     reinterpret_cast<Internal::Timeout*>(reinterpret_cast<std::byte*>(timeout) -

@@ -1,4 +1,5 @@
 #include <boost/filesystem/operations.hpp>
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <paracooba/common/log.h>
@@ -83,6 +84,37 @@ InterruptHandler(int s) {
   }
 }
 
+struct ProgramRuntimeHelper {
+  ProgramRuntimeHelper() {}
+  ~ProgramRuntimeHelper() {
+    // Printing inspired from https://stackoverflow.com/a/22069038
+    using namespace std::chrono;
+    using day_t = duration<long, std::ratio<3600 * 24>>;
+
+    auto end = high_resolution_clock::now();
+
+    auto dur = end - start;
+    auto d = duration_cast<day_t>(dur);
+    auto h = duration_cast<hours>(dur -= d);
+    auto m = duration_cast<minutes>(dur -= h);
+    auto s = duration_cast<seconds>(dur -= m);
+
+    auto totalSeconds = duration_cast<seconds>(end - start);
+
+    parac_log(PARAC_GENERAL,
+              PARAC_DEBUG,
+              "Wall-clock runtime: {}s ({}d, {}h, {}min, {}s)",
+              totalSeconds.count(),
+              d.count(),
+              h.count(),
+              m.count(),
+              s.count());
+  }
+
+  std::chrono::high_resolution_clock::time_point start =
+    std::chrono::high_resolution_clock::now();
+};
+
 int
 main(int argc, char* argv[]) {
   // Workaround for wonky locales.
@@ -103,13 +135,15 @@ main(int argc, char* argv[]) {
   ConfigWrapper config;
   CLI cli(config);
 
-  parac_log_init(&thread_registry);
+
+  ProgramRuntimeHelper runtimeHelper;
 
   if(!cli.parseGlobalArgs(argc, argv)) {
     return EXIT_SUCCESS;
   }
 
   thread_registry.belongs_to_id = cli.getId();
+  parac_log_init(&thread_registry);
 
   ModuleLoader loader(thread_registry,
                       config,
