@@ -99,7 +99,7 @@ struct ProgramRuntimeHelper {
     auto m = duration_cast<minutes>(dur -= h);
     auto s = duration_cast<seconds>(dur -= m);
 
-    auto totalSeconds = duration_cast<seconds>(end - start);
+    auto totalSeconds = duration_cast<duration<float>>(end - start);
 
     parac_log(PARAC_GENERAL,
               PARAC_DEBUG,
@@ -124,6 +124,8 @@ main(int argc, char* argv[]) {
     setenv("LC_ALL", "C", 1);
   }
 
+  ProgramRuntimeHelper runtimeHelper;
+
   // Workaround for empty args.
   static char* argv_default[] = { (char*)"", nullptr };
   if(argc == 0 && argv == nullptr) {
@@ -134,9 +136,6 @@ main(int argc, char* argv[]) {
   ThreadRegistryWrapper thread_registry(0);
   ConfigWrapper config;
   CLI cli(config);
-
-
-  ProgramRuntimeHelper runtimeHelper;
 
   if(!cli.parseGlobalArgs(argc, argv)) {
     return EXIT_SUCCESS;
