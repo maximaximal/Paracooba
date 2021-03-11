@@ -64,8 +64,7 @@ struct TaskStore::Internal {
     boost::fast_pool_allocator<T,
                                boost::default_user_allocator_new_delete,
                                boost::details::pool::default_mutex,
-                               64,
-                               128>;
+                               64>;
   using TaskList = std::list<Task, Allocator<Task>>;
 
   struct Task {

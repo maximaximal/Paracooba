@@ -37,8 +37,7 @@ struct CaDiCaLManager::Internal {
     boost::fast_pool_allocator<T,
                                boost::default_user_allocator_new_delete,
                                boost::details::pool::default_mutex,
-                               64,
-                               128>;
+                               8>;
   struct SolverTaskWrapper;
   using SolverTaskWrapperList =
     std::list<SolverTaskWrapper, Allocator<SolverTaskWrapper>>;
