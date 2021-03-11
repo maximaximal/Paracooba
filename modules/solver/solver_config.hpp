@@ -26,6 +26,7 @@ class SolverConfig {
     MarchCubes,
     FastSplitMultiplicationFactor,
     SplitMultiplicationFactor,
+    DisableLocalKissat,
     _COUNT
   };
 
@@ -41,6 +42,7 @@ class SolverConfig {
   float SplitMultiplicationFactor() const {
     return m_splitMultiplicationFactor;
   }
+  bool DisableLocalKissat() const { return m_disableLocalKissat; }
 
   private:
   parac_config_entry* m_config = nullptr;
@@ -48,6 +50,7 @@ class SolverConfig {
   bool m_predefinedCubes = false;
   bool m_CaDiCaLCubes = false;
   bool m_resplit = false;
+  bool m_disableLocalKissat = false;
   uint16_t m_initialCubeDepth = 0;
   uint16_t m_initialMinimalCubeDepth = 0;
   bool m_marchCubes = false;
@@ -60,6 +63,7 @@ class SolverConfig {
     ar(cereal::make_nvp("predefinedCubes", m_predefinedCubes),
        cereal::make_nvp("CaDiCaLCubes", m_CaDiCaLCubes),
        cereal::make_nvp("resplit", m_resplit),
+       cereal::make_nvp("disableLocalKissat", m_disableLocalKissat),
        cereal::make_nvp("initialCubeDepth", m_initialCubeDepth),
        cereal::make_nvp("initialMinimalCubeDepth", m_initialMinimalCubeDepth),
        cereal::make_nvp("marchCubes", m_marchCubes),

@@ -2,6 +2,7 @@
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
 #include "cereal/archives/binary.hpp"
+#include "kissat_task.hpp"
 #include "paracooba/common/compute_node.h"
 #include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/log.h"
@@ -35,6 +36,7 @@
 #define SOLVER_VERSION_TWEAK 0
 
 using parac::solver::CaDiCaLManager;
+using parac::solver::KissatTask;
 using parac::solver::ParserTask;
 using parac::solver::SolverConfig;
 using parac::solver::SolverTask;
@@ -148,9 +150,14 @@ initiate_root_solver_on_file(parac_module& mod,
   assert(mod.handle->input_file);
 
   assert(mod.handle->modules[PARAC_MOD_BROKER]);
+  assert(mod.handle->modules[PARAC_MOD_BROKER]->broker);
   auto& broker = *mod.handle->modules[PARAC_MOD_BROKER]->broker;
   assert(broker.task_store);
   auto& task_store = *broker.task_store;
+
+  assert(mod.handle->modules[PARAC_MOD_RUNNER]);
+  assert(mod.handle->modules[PARAC_MOD_RUNNER]->runner);
+  auto& runner = *mod.handle->modules[PARAC_MOD_RUNNER]->runner;
 
   auto parserDone = [&mod, &task_store, originatorId, instance](
                       parac_status status,
@@ -182,7 +189,22 @@ initiate_root_solver_on_file(parac_module& mod,
     task_store.assess_task(&task_store, task);
   };
 
-  return parse_formula_file(mod, file, originatorId, parserDone);
+  parac_status status = parse_formula_file(mod, file, originatorId, parserDone);
+  assert(instance->userdata);
+  SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
+  if(runner.available_worker_count > 1 && !i->config.DisableLocalKissat()) {
+    parac_log(PARAC_SOLVER, PARAC_DEBUG, "Create local Kissat solver task.");
+    parac_task* task = task_store.new_task(
+      &task_store, nullptr, parac_path_root(), originatorId);
+    assert(task);
+    new KissatTask(*mod.handle, file, *task);
+    task_store.assess_task(&task_store, task);
+  } else {
+    parac_log(
+      PARAC_SOLVER, PARAC_DEBUG, "Local Kissat solver task not created.");
+  }
+
+  return status;
 }
 
 static parac_status

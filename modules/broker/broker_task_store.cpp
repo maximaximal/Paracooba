@@ -523,7 +523,8 @@ TaskStore::assess_task(parac_task* task) {
 
     remove_from_tasksBeingWorkedOn(task);
 
-    if(m_internal->handle.input_file && parac_path_is_root(task->path)) {
+    if(m_internal->handle.input_file && parac_path_is_root(task->path) &&
+       task->result != PARAC_ABORTED) {
       m_internal->handle.request_exit(&m_internal->handle);
       m_internal->handle.exit_status = task->result;
     }

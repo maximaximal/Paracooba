@@ -40,6 +40,18 @@ SolverConfig::SolverConfig(parac_config* config) {
     false;
 
   parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(Entry::DisableLocalKissat)],
+    "disable-local-kissat",
+    "Disable starting Kissat parallel to the distributed cube-and-conquer "
+    "algorithm. Automatically disabled if available worker count < 2.");
+  m_config[static_cast<size_t>(Entry::DisableLocalKissat)].registrar =
+    PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::DisableLocalKissat)].type =
+    PARAC_TYPE_SWITCH;
+  m_config[static_cast<size_t>(Entry::DisableLocalKissat)]
+    .default_value.boolean_switch = false;
+
+  parac_config_entry_set_str(
     &m_config[static_cast<size_t>(Entry::InitialCubeDepth)],
     "initial-cube-depth",
     "Initial size of the cubes (requires option --cadical-cubes) to have an "
@@ -107,6 +119,9 @@ SolverConfig::extractFromConfigEntries() {
     m_config[static_cast<size_t>(Entry::CaDiCaLCubes)].value.boolean_switch;
   m_resplit =
     m_config[static_cast<size_t>(Entry::Resplit)].value.boolean_switch;
+  m_disableLocalKissat =
+    m_config[static_cast<size_t>(Entry::DisableLocalKissat)]
+      .value.boolean_switch;
   m_initialCubeDepth =
     m_config[static_cast<size_t>(Entry::InitialCubeDepth)].value.uint16;
   m_initialMinimalCubeDepth =
@@ -123,6 +138,7 @@ operator<<(std::ostream& o, const SolverConfig& config) {
   return o << "PredefinedCubes:" << config.PredefinedCubes()
            << ", CaDiCaLCubes:" << config.CaDiCaLCubes()
            << ", Resplit:" << config.Resplit()
+           << ", DisableLocalKissat:" << config.DisableLocalKissat()
            << ", InitialCubeDepth:" << config.InitialCubeDepth()
            << ", MarchCubes:" << config.MarchCubes()
            << ", FastSplitMultiplicationFactor:"

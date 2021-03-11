@@ -79,6 +79,9 @@ parac_path_print(parac_path p);
 parac_path
 parac_path_unknown();
 
+parac_path
+parac_path_root();
+
 #ifdef __cplusplus
 }
 #include <iostream>

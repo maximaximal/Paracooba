@@ -200,3 +200,11 @@ parac_path_unknown() {
   p.rep = PARAC_PATH_EXPLICITLY_UNKNOWN;
   return p;
 }
+
+PARAC_COMMON_EXPORT parac_path
+parac_path_root() {
+  parac_path p;
+  p.length = 0;
+  p.path = 0;
+  return p;
+}
