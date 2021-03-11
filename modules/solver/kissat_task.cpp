@@ -89,8 +89,17 @@ KissatTask::work(parac_worker worker) {
                 "Kissat found the formula {} to be UNSAT!",
                 m_file);
       return PARAC_UNSAT;
+    case 1:
+      parac_log(PARAC_SOLVER,
+                PARAC_DEBUG,
+                "Kissat returned 1, which means it could not parse the input.");
+      return PARAC_UNDEFINED;
     default:
-      return PARAC_UNKNOWN;
+      parac_log(PARAC_SOLVER,
+                PARAC_DEBUG,
+                "Kissat returned {} which is not handled!",
+                result);
+      return PARAC_UNDEFINED;
   }
 }
 void

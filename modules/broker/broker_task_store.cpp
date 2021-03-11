@@ -501,10 +501,12 @@ TaskStore::assess_task(parac_task* task) {
 
   parac_log(PARAC_BROKER,
             PARAC_TRACE,
-            "Assessing task on path {} to state {}. Work available in store: "
+            "Assessing task on path {} to state {}. Current result {}. Work "
+            "available in store: "
             "{}, tasks in store: {}",
             task->path,
             task->state,
+            task->result,
             m_internal->tasksWaitingForWorkerQueueSize,
             m_internal->tasksSize);
 
@@ -523,7 +525,8 @@ TaskStore::assess_task(parac_task* task) {
     remove_from_tasksBeingWorkedOn(task);
 
     if(m_internal->handle.input_file && parac_path_is_root(task->path) &&
-       task->result != PARAC_ABORTED) {
+       (task->result != PARAC_ABORTED && task->result != PARAC_UNDEFINED) &&
+       m_internal->handle.exit_status == PARAC_UNDEFINED) {
       m_internal->handle.request_exit(&m_internal->handle);
       m_internal->handle.exit_status = task->result;
     }

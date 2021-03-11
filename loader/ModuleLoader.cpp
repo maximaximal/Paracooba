@@ -139,7 +139,7 @@ ModuleLoader::initHandle() {
   handle().userdata = this;
   handle().prepare = &ModuleLoader::prepare;
   handle().request_exit = &static_request_exit;
-  handle().exit_status = PARAC_UNKNOWN;
+  handle().exit_status = PARAC_UNDEFINED;
   handle().assignment_highest_literal = nullptr;
   handle().assignment_is_set = nullptr;
   handle().assignment_data = nullptr;

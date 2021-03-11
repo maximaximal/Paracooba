@@ -261,13 +261,7 @@ main(int argc, char* argv[]) {
       break;
     case PARAC_UNKNOWN:
     case PARAC_ABORTED:
-      std::cout << "s UNKNOWN" << std::endl;
-      break;
     default:
-      parac_log(PARAC_GENERAL,
-                PARAC_LOCALERROR,
-                "Unknown exit return code with parac status {}!",
-                loader.handle().exit_status);
       std::cout << "s UNKNOWN" << std::endl;
       break;
   }
