@@ -6,6 +6,8 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 #let DAEMON_THREADS=DAEMON_THREADS/2
 
 if [ -z ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS+x} ]; then
+    ip=$(hostname -I | cut -d' ' -f1)
+    echo "main IP: ${ip}"
     aws s3 cp s3://${S3_BKT}/${COMP_S3_PROBLEM_PATH} $DIR/build/problem.cnf
     $DIR/build/paracs --cadical-cubes --initial-cube-depth 17 --initial-minimal-cube-depth 12 --resplit $DIR/build/problem.cnf --worker $NUM_PROCESSES -d $@
 else
