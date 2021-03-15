@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM public.ecr.aws/ubuntu/ubuntu:20.04
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get upgrade -y && apt-get install libboost-system-dev libasio-dev libboost-program-options-dev libboost-iostreams-dev libboost-coroutine-dev libboost-log-dev pkg-config cmake g++ make git awscli -y
 ADD . paracooba
