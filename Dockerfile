@@ -1,9 +1,8 @@
-FROM ubuntu:19.10
+FROM ubuntu:20.04
 ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get upgrade -y && apt-get install libboost-system-dev libasio-dev libboost-program-options-dev libboost-log-dev cmake g++ make git awscli -y
+RUN apt-get update && apt-get upgrade -y && apt-get install libboost-system-dev libasio-dev libboost-program-options-dev libboost-iostreams-dev libboost-coroutine-dev libboost-log-dev pkg-config cmake g++ make git awscli -y
 ADD . paracooba
-RUN cd paracooba && mkdir build && cd build && cmake .. -DENABLE_TESTS=OFF && make
+RUN cd paracooba && mkdir build && cd build && cmake .. -DENABLE_TESTS=OFF -DBUILD_STATIC=ON -DCMAKE_BUILD_TYPE=Release && make -j2
 EXPOSE 18001/tcp
-EXPOSE 18080/tcp
 ENTRYPOINT ["paracooba/aws-run.sh"]
 CMD []
