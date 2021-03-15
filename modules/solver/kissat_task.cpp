@@ -1,6 +1,8 @@
 #include "kissat_task.hpp"
+#include "cadical_manager.hpp"
 #include "paracooba/common/status.h"
 #include "paracooba/common/task.h"
+#include "solver_assignment.hpp"
 
 #include <cassert>
 
@@ -14,17 +16,22 @@ extern "C" {
 
 namespace parac::solver {
 struct KissatTask::Internal {
-  Internal(parac_handle& handle)
+  Internal(parac_handle& handle, CaDiCaLManager& cadicalManager)
     : handle(handle)
+    , cadicalManager(cadicalManager)
     , solver(kissat_init(), kissat_release) {}
 
   parac_handle& handle;
+  CaDiCaLManager& cadicalManager;
 
   std::unique_ptr<kissat, void (*)(kissat*)> solver;
 };
 
-KissatTask::KissatTask(parac_handle& handle, const char* file, parac_task& task)
-  : m_internal(std::make_unique<Internal>(handle))
+KissatTask::KissatTask(parac_handle& handle,
+                       const char* file,
+                       parac_task& task,
+                       CaDiCaLManager& cadicalManager)
+  : m_internal(std::make_unique<Internal>(handle, cadicalManager))
   , m_file(file)
   , m_task(task) {
   task.state = PARAC_TASK_WORK_AVAILABLE;
@@ -77,12 +84,22 @@ KissatTask::work(parac_worker worker) {
     case 0:
       parac_log(PARAC_SOLVER, PARAC_DEBUG, "Kissat was aborted!", m_file);
       return PARAC_ABORTED;
-    case 10:
+    case 10: {
       parac_log(PARAC_SOLVER,
                 PARAC_DEBUG,
                 "Kissat found the formula {} to be SAT!",
                 m_file);
+
+      std::unique_ptr<SolverAssignment> assignment =
+        std::make_unique<SolverAssignment>();
+      assignment->SerializeAssignmentFromSolver(
+        kissat_get_vars(m_internal->solver.get()), *m_internal->solver);
+
+      m_internal->cadicalManager.handleSatisfyingAssignmentFound(
+        std::move(assignment));
+
       return PARAC_SAT;
+    }
     case 20:
       parac_log(PARAC_SOLVER,
                 PARAC_DEBUG,

@@ -26,6 +26,8 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "Solver-Description";
     case PARAC_MESSAGE_SOLVER_TASK:
       return "Solver-Task";
+    case PARAC_MESSAGE_SOLVER_SAT_ASSIGNMENT:
+      return "Solver-SAT-Assignment";
     case PARAC_MESSAGE_TASK_RESULT:
       return "Task-Result";
     case PARAC_MESSAGE_FILE:
@@ -45,6 +47,7 @@ parac_message_kind_is_for_solver(parac_message_kind kind) {
   switch(kind) {
     case PARAC_MESSAGE_SOLVER_TASK:
     case PARAC_MESSAGE_SOLVER_DESCRIPTION:
+    case PARAC_MESSAGE_SOLVER_SAT_ASSIGNMENT:
       return true;
     default:
       return false;

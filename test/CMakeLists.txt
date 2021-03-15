@@ -4,6 +4,7 @@ set(TEST_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/../loader/StaticModuleLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/test_connect_two_daemons.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/test_connect_daemon_and_client.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_master_daemon_sat.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/test_task_store.cpp
 )
 

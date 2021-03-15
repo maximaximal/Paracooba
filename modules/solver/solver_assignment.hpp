@@ -10,6 +10,10 @@
 
 #include <paracooba/solver/types.hpp>
 
+extern "C" {
+#include <kissat/kissat.h>
+}
+
 namespace parac::solver {
 
 #define PC_SHIFT(X) (((getter(i + X)) & 0b00000001) << (7 - X))
@@ -81,6 +85,12 @@ class SolverAssignment {
   void SerializeAssignmentFromSolver(const int varCount, Solver& solver) {
     SerializeAssignment(varCount,
                         [&solver](int i) { return solver.val(i + 1); });
+  }
+
+  template<>
+  void SerializeAssignmentFromSolver(const int varCount, kissat& solver) {
+    SerializeAssignment(
+      varCount, [&solver](int i) { return kissat_value(&solver, i + 1); });
   }
 
   void SerializeAssignmentFromArray(const int varCount,

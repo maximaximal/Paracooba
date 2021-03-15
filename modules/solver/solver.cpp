@@ -9,6 +9,7 @@
 #include "paracooba/common/noncopy_ostream.hpp"
 #include "paracooba/common/task_store.h"
 #include "parser_task.hpp"
+#include "solver_assignment.hpp"
 #include "solver_config.hpp"
 #include "solver_task.hpp"
 #include <paracooba/broker/broker.h>
@@ -38,6 +39,7 @@
 using parac::solver::CaDiCaLManager;
 using parac::solver::KissatTask;
 using parac::solver::ParserTask;
+using parac::solver::SolverAssignment;
 using parac::solver::SolverConfig;
 using parac::solver::SolverTask;
 
@@ -197,7 +199,7 @@ initiate_root_solver_on_file(parac_module& mod,
     parac_task* task = task_store.new_task(
       &task_store, nullptr, parac_path_root(), originatorId);
     assert(task);
-    new KissatTask(*mod.handle, file, *task);
+    new KissatTask(*mod.handle, file, *task, *i->cadicalManager);
     task_store.assess_task(&task_store, task);
   } else {
     parac_log(
@@ -311,6 +313,22 @@ instance_handle_message(parac_module_solver_instance* instance,
                 msg->origin->id,
                 solverInstance->config);
       msg->cb(msg, PARAC_OK);
+      break;
+    }
+    case PARAC_MESSAGE_SOLVER_SAT_ASSIGNMENT: {
+      assert(solverInstance->cadicalManager);
+
+      std::unique_ptr<SolverAssignment> assignment{
+        std::make_unique<SolverAssignment>()
+      };
+
+      {
+        cereal::BinaryInputArchive ia(data);
+        ia(*assignment);
+      }
+
+      solverInstance->cadicalManager->handleSatisfyingAssignmentFound(
+        std::move(assignment));
       break;
     }
     default:
