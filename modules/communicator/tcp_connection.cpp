@@ -37,7 +37,10 @@
 #include <paracooba/common/message.h>
 #include <paracooba/module.h>
 
+#ifdef ENABLE_DISTRAC
 #include <distrac_paracooba.h>
+#endif
+
 #include <sstream>
 
 #define REC_BUF_SIZE 4096u
@@ -547,6 +550,7 @@ TCPConnection::handleReceivedACK(const PacketHeader& ack) {
   sentItem(ack.ack_status);
   sentItem(PARAC_TO_BE_DELETED);
 
+#ifdef ENABLE_DISTRAC
   auto distrac = s->service.handle().distrac;
   if(distrac) {
     parac_ev_send_msg_ack e{ s->remoteId(),
@@ -554,6 +558,7 @@ TCPConnection::handleReceivedACK(const PacketHeader& ack) {
                              sentItem.header.number };
     distrac_push(distrac, &e, PARAC_EV_SEND_MSG_ACK);
   }
+#endif
 
   {
     std::unique_lock lock(s->sendQueueMutex);
@@ -829,6 +834,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
         return;
       }
 
+#ifdef ENABLE_DISTRAC
       {
         auto distrac = s->service.handle().distrac;
         if(distrac && s->readHeader.kind != PARAC_MESSAGE_ACK &&
@@ -840,6 +846,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
           distrac_push(distrac, &e, PARAC_EV_RECV_MSG);
         }
       }
+#endif
 
       if(s->readHeader.kind == PARAC_MESSAGE_ACK) {
         if(!handleReceivedACK(s->readHeader)) {
@@ -1046,6 +1053,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       e = &s->sendQueue.front();
 
       assert(e);
+#ifdef ENABLE_DISTRAC
       {
         auto distrac = s->service.handle().distrac;
         if(distrac && e->header.kind != PARAC_MESSAGE_ACK &&
@@ -1057,6 +1065,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
           distrac_push(distrac, &entry, PARAC_EV_SEND_MSG);
         }
       }
+#endif
 
       s->transmitMode = e->transmitMode;
       yield async_write(*s->socket, BUF(e->header), wh);

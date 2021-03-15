@@ -1,6 +1,5 @@
 #include <cassert>
 
-#include "distrac/types.h"
 #include "paracooba/common/thread_registry.h"
 #include "runner_worker.hpp"
 
@@ -10,8 +9,11 @@
 #include <paracooba/common/task_store.h>
 #include <paracooba/module.h>
 
+#ifdef ENABLE_DISTRAC
 #include <distrac/distrac.h>
+#include <distrac/types.h>
 #include <distrac_paracooba.h>
+#endif
 
 namespace parac::runner {
 Worker::Worker(parac_module& mod,
@@ -64,6 +66,8 @@ Worker::run() {
               m_currentTask->path);
 
     int64_t startOfProcessing;
+
+#ifdef ENABLE_DISTRAC
     if(m_mod.handle->distrac) {
       distrac_parac_path dp;
       dp.rep = m_currentTask->path.rep;
@@ -74,6 +78,7 @@ Worker::run() {
                                        &start_processing_task,
                                        PARAC_EV_START_PROCESSING_TASK);
     }
+#endif
 
     if(m_currentTask->work) {
       m_currentTask->result = m_currentTask->work(m_currentTask, m_workerId);
@@ -83,6 +88,7 @@ Worker::run() {
                                                          ~PARAC_TASK_WORKING) |
                            PARAC_TASK_DONE;
 
+#ifdef ENABLE_DISTRAC
     if(m_mod.handle->distrac) {
       uint32_t diff =
         (distrac_current_time(m_mod.handle->distrac) - startOfProcessing) /
@@ -100,6 +106,7 @@ Worker::run() {
                    &finish_processing_task,
                    PARAC_EV_FINISH_PROCESSING_TASK);
     }
+#endif
 
     if(!(m_currentTask->state & PARAC_TASK_SPLITTED)) {
       m_taskStore.assess_task(&m_taskStore, m_currentTask);
@@ -131,11 +138,13 @@ Worker::getNextTask() {
         parac_log(PARAC_RUNNER,
                   PARAC_TRACE,
                   "Worker going into idle and waiting for tasks.");
+#ifdef ENABLE_DISTRAC
         if(m_mod.handle->distrac) {
           parac_ev_worker_idle worker_idle{ m_workerId };
           distrac_push(
             m_mod.handle->distrac, &worker_idle, PARAC_EV_WORKER_IDLE);
         }
+#endif
       }
       m_notifier.wait(lock);
     }
@@ -143,11 +152,13 @@ Worker::getNextTask() {
     if(work && !m_stop) {
       // Only this thread has been woken up and catched the notifier! Return
       // next task.
+#ifdef ENABLE_DISTRAC
       if(m_mod.handle->distrac) {
         parac_ev_worker_working worker_working{ m_workerId };
         distrac_push(
           m_mod.handle->distrac, &worker_working, PARAC_EV_WORKER_WORKING);
       }
+#endif
       return work;
     }
   }

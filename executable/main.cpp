@@ -5,18 +5,21 @@
 #include <paracooba/common/log.h>
 #include <paracooba/common/thread_registry.h>
 
+#ifdef ENABLE_DISTRAC
 #include <distrac/distrac.h>
-
-#include "CLI.hpp"
-#include "distrac/headers.h"
-#include "paracooba/common/status.h"
-#include <paracooba/loader/ModuleLoader.hpp>
+#include <distrac/headers.h>
 
 #define DISTRAC_DEFINITION
 #include <distrac_paracooba.h>
+#endif
+
+#include "CLI.hpp"
+#include "paracooba/common/status.h"
+#include <paracooba/loader/ModuleLoader.hpp>
 
 using namespace paracooba;
 
+#ifdef ENABLE_DISTRAC
 static void
 distracInit(distrac_wrapper& wrapper, const CLI& cli) {
   if(cli.isMainNode()) {
@@ -59,6 +62,7 @@ distracInit(distrac_wrapper& wrapper, const CLI& cli) {
             PARAC_DEBUG,
             "Successfully initialized distrac! Trace will be generated.");
 }
+#endif
 
 static bool
 isDirectoryEmpty(std::string path) {
@@ -152,11 +156,13 @@ main(int argc, char* argv[]) {
   GlobalModuleLoader = &loader;
   signal(SIGINT, InterruptHandler);
 
+#ifdef ENABLE_DISTRAC
   distrac_wrapper distracWrapper;
   if(cli.distracEnabled()) {
     distracInit(distracWrapper, cli);
     loader.handle().distrac = &distracWrapper;
   }
+#endif
 
   parac_log(PARAC_GENERAL, PARAC_DEBUG, "Starting ModuleLoader.");
   if(!loader.load()) {
@@ -175,10 +181,17 @@ main(int argc, char* argv[]) {
     inputFile = cli.getInputFile().c_str();
 
     if(loader.handle().distrac) {
+#ifdef ENABLE_DISTRAC
       strncpy(loader.handle().distrac->definition.file_header.problem_name,
               inputFile,
               DISTRAC_LONGNAME_LENGTH);
       loader.handle().distrac->is_main_node = true;
+#else
+      parac_log(PARAC_GENERAL,
+                PARAC_LOCALERROR,
+                "Cannot initialize distrac, as distrac support is not compiled "
+                "into binary! Enable using -DENABLE_DISTRAC");
+#endif
     }
   }
   loader.handle().input_file = inputFile;
@@ -224,6 +237,7 @@ main(int argc, char* argv[]) {
   parac_log(
     PARAC_GENERAL, PARAC_DEBUG, "All threads exited, ending Paracooba.");
 
+#ifdef ENABLE_DISTRAC
   if(cli.distracEnabled()) {
     distracWrapper.finalize(loader.handle().offsetNS);
 
@@ -237,6 +251,7 @@ main(int argc, char* argv[]) {
                 distracWrapper.working_directory);
     }
   }
+#endif
 
   switch(loader.handle().exit_status) {
     case PARAC_SAT:
