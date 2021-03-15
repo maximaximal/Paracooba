@@ -7,7 +7,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 if [ "$AWS_BATCH_JOB_MAIN_NODE_INDEX" = "$AWS_BATCH_JOB_NODE_INDEX" ]; then
     # Main node detected!
-    ip=$(ip addr show dev eth0 | awk '/inet/ {print $2;}' | sed 's|\(.*\)/.*|\1|')
+    ip=$(ip addr show  | awk '/inet/ {print $2;}' | grep -v "127.\|172." | sed 's|\(.*\)/.*|\1|')
     echo "main IP: ${ip}"
     aws s3 cp s3://${S3_BKT}/${COMP_S3_PROBLEM_PATH} $DIR/build/problem.cnf
     $DIR/build/paracs --cadical-cubes --initial-cube-depth 17 --initial-minimal-cube-depth 12 --resplit $DIR/build/problem.cnf --worker $NUM_PROCESSES -d --tcp-listen-address 0.0.0.0 $@
