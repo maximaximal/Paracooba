@@ -87,8 +87,7 @@ class SolverAssignment {
                         [&solver](int i) { return solver.val(i + 1); });
   }
 
-  template<>
-  void SerializeAssignmentFromSolver(const int varCount, kissat& solver) {
+  void SerializeAssignmentFromKissatSolver(const int varCount, kissat& solver) {
     SerializeAssignment(
       varCount, [&solver](int i) { return kissat_value(&solver, i + 1); });
   }

@@ -92,7 +92,7 @@ KissatTask::work(parac_worker worker) {
 
       std::unique_ptr<SolverAssignment> assignment =
         std::make_unique<SolverAssignment>();
-      assignment->SerializeAssignmentFromSolver(
+      assignment->SerializeAssignmentFromKissatSolver(
         kissat_get_vars(m_internal->solver.get()), *m_internal->solver);
 
       m_internal->cadicalManager.handleSatisfyingAssignmentFound(
