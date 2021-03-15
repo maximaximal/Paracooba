@@ -78,14 +78,6 @@ SolverConfig::SolverConfig(parac_config* config) {
      static_cast<int>(std::log2(10 * std::thread::hardware_concurrency()))) /
     2;
 
-  parac_config_entry_set_str(&m_config[static_cast<size_t>(Entry::MarchCubes)],
-                             "march-cubes",
-                             "Call March to split cubes.");
-  m_config[static_cast<size_t>(Entry::MarchCubes)].registrar = PARAC_MOD_SOLVER;
-  m_config[static_cast<size_t>(Entry::MarchCubes)].type = PARAC_TYPE_SWITCH;
-  m_config[static_cast<size_t>(Entry::MarchCubes)]
-    .default_value.boolean_switch = false;
-
   parac_config_entry_set_str(
     &m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)],
     "cubing-fast-split-multiplication-factor",
@@ -126,8 +118,6 @@ SolverConfig::extractFromConfigEntries() {
     m_config[static_cast<size_t>(Entry::InitialCubeDepth)].value.uint16;
   m_initialMinimalCubeDepth =
     m_config[static_cast<size_t>(Entry::InitialMinimalCubeDepth)].value.uint16;
-  m_marchCubes =
-    m_config[static_cast<size_t>(Entry::MarchCubes)].value.boolean_switch;
   m_fastSplitMultiplicationFactor =
     m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)].value.f;
   m_splitMultiplicationFactor =
@@ -140,7 +130,6 @@ operator<<(std::ostream& o, const SolverConfig& config) {
            << ", Resplit:" << config.Resplit()
            << ", DisableLocalKissat:" << config.DisableLocalKissat()
            << ", InitialCubeDepth:" << config.InitialCubeDepth()
-           << ", MarchCubes:" << config.MarchCubes()
            << ", FastSplitMultiplicationFactor:"
            << config.FastSplitMultiplicationFactor()
            << ", SplitMultiplicationFactor:"
