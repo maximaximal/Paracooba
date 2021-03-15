@@ -14,8 +14,10 @@ set(PARACOOBA_COMMUNICATOR_SRCS
 
 parac_module(parac_communicator "${PARACOOBA_COMMUNICATOR_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
 
-set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
-add_dependencies(parac_communicator_obj distrac_paracooba)
+if(ENABLE_DISTRAC)
+    set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
+    add_dependencies(parac_communicator_obj distrac_paracooba)
+endif()
 
 get_target_property(CEREAL_INCLUDE_DIRS cereal INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_communicator_obj PRIVATE ${CEREAL_INCLUDE_DIRS})

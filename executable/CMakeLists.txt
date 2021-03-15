@@ -21,13 +21,17 @@ target_include_directories(parac_executable PUBLIC ${PARAC_COMMON_INCLUDE_DIRS})
 get_target_property(PARAC_MODULES_INCLUDE_DIRS parac_modules INCLUDE_DIRECTORIES)
 target_include_directories(parac_executable PUBLIC ${PARAC_MODULES_INCLUDE_DIRS})
 
-get_target_property(DISTRAC_INCLUDE_DIRS distrac INCLUDE_DIRECTORIES)
-target_include_directories(parac_executable PUBLIC ${DISTRAC_INCLUDE_DIRS})
+if(ENABLE_DISTRAC)
+    get_target_property(DISTRAC_INCLUDE_DIRS distrac INCLUDE_DIRECTORIES)
+    target_include_directories(parac_executable PUBLIC ${DISTRAC_INCLUDE_DIRS})
+endif()
 
 get_target_property(FMT_INCLUDE_DIRS fmt::fmt INCLUDE_DIRECTORIES)
 target_include_directories(parac_executable PUBLIC ${FMT_INCLUDE_DIRS})
 
 target_include_directories(parac_executable PUBLIC ${Boost_INCLUDE_DIRS})
 
-set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
-add_dependencies(parac_executable distrac_paracooba)
+if(ENABLE_DISTRAC)
+    set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
+    add_dependencies(parac_executable distrac_paracooba)
+endif()

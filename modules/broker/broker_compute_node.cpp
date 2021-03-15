@@ -2,9 +2,6 @@
 #include "broker_compute_node_store.hpp"
 #include "broker_task_store.hpp"
 #include "cereal/details/helpers.hpp"
-#include "distrac/distrac.h"
-#include "distrac/types.h"
-#include "distrac_paracooba.h"
 #include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/file.h"
 #include "paracooba/common/message_kind.h"
@@ -14,6 +11,12 @@
 #include "paracooba/communicator/communicator.h"
 #include "paracooba/module.h"
 #include "paracooba/solver/solver.h"
+
+#ifdef ENABLE_DISTRAC
+#include <distrac/distrac.h>
+#include <distrac/types.h>
+#include <distrac_paracooba.h>
+#endif
 
 #include <cmath>
 #include <paracooba/common/compute_node.h>
@@ -546,6 +549,7 @@ ComputeNode::tryToOffloadTask() {
               task->path,
               m_node.id);
 
+#ifdef ENABLE_DISTRAC
     if(m_handle.distrac) {
       distrac_parac_path dp;
       dp.rep = task->path.rep;
@@ -558,6 +562,7 @@ ComputeNode::tryToOffloadTask() {
       };
       distrac_push(m_handle.distrac, &offload_task_ev, PARAC_EV_OFFLOAD_TASK);
     }
+#endif
 
     parac_message_wrapper msg;
     task->serialize(task, &msg);

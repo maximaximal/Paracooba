@@ -12,4 +12,6 @@ set_property(TARGET parac_broker_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES ce
 get_target_property(CEREAL_INCLUDE_DIRS cereal INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_broker_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
 
-add_dependencies(parac_broker_obj distrac_paracooba)
+if(ENABLE_DISTRAC)
+    add_dependencies(parac_broker_obj distrac_paracooba)
+endif()

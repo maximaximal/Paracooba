@@ -17,25 +17,17 @@ option(ENABLE_TRACING_SUPPORT "enable support for writing binary event traces to
 
 option(ENABLE_TESTS "enable building and integrating unit tests" ON)
 
-# Submodules
-# This is a nice solution from https://cliutils.gitlab.io/modern-cmake/chapters/projects/submodule.html
-find_package(Git QUIET)
-if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
-# Update submodules as needed
-    option(GIT_SUBMODULE "Check submodules during build" ON)
-    if(GIT_SUBMODULE)
-        message(STATUS "Submodule update")
-        execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
-                        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                        RESULT_VARIABLE GIT_SUBMOD_RESULT)
-        if(NOT GIT_SUBMOD_RESULT EQUAL "0")
-            message(FATAL_ERROR "git submodule update --init failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
-        endif()
-    endif()
+option(ENABLE_DISTRAC "enable distrac support" ON)
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/distrac/CMakeLists.txt")
+    message(STATUS "Distrac was not downloaded as submodule! Deactivating tracing support.")
+    set(ENABLE_DISTRAC OFF)
 endif()
 
-if(NOT EXISTS "${PROJECT_SOURCE_DIR}/extern/repo/CMakeLists.txt")
-    message(FATAL_ERROR "The submodules were not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
+if(ENABLE_DISTRAC)
+    set(CMAKE_C_FLAGS "-DENABLE_DISTRAC")
+    set(CMAKE_CXX_FLAGS "-DENABLE_DISTRAC")
+else()
+    file(WRITE ${CMAKE_BINARY_DIR}/distrac_paracooba.h "#pragma error 'DISTRAC NOT AVAILABLE!'")
 endif()
 
 # Libraries
@@ -178,14 +170,17 @@ macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
     get_target_property(PARAC_MODULES_INCLUDE_DIRS parac_modules INCLUDE_DIRECTORIES)
     target_include_directories(${NAME}_obj PUBLIC ${PARAC_MODULES_INCLUDE_DIRS})
 
-    get_target_property(DISTRAC_INCLUDE_DIRS distrac INCLUDE_DIRECTORIES)
-    target_include_directories(${NAME}_obj PUBLIC ${DISTRAC_INCLUDE_DIRS})
+    if(ENABLE_DISTRAC)
+        get_target_property(DISTRAC_INCLUDE_DIRS distrac INCLUDE_DIRECTORIES)
+        target_include_directories(${NAME}_obj PUBLIC ${DISTRAC_INCLUDE_DIRS})
+        target_link_libraries(${NAME} PUBLIC distrac)
+    endif()
 
     set_target_properties(${NAME}_obj PROPERTIES C_STANDARD 11)
     target_compile_features(${NAME}_obj PUBLIC cxx_std_17)
 
     set_property(TARGET ${NAME}_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac parac_common parac_modules)
-    target_link_libraries(${NAME} PUBLIC distrac parac_modules fmt::fmt)
+    target_link_libraries(${NAME} PUBLIC parac_modules fmt::fmt)
 
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_include_directories(${NAME}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -199,12 +194,14 @@ endmacro()
 
 set(test_libs  "" CACHE INTERNAL "Libraries for Tests")
 
-add_custom_command(
-    OUTPUT ${CMAKE_BINARY_DIR}/distrac_paracooba.h
-    COMMAND $<TARGET_FILE:distrac-codegen-bin> ${CMAKE_CURRENT_SOURCE_DIR}/Paracooba.distracdef -o ${CMAKE_CURRENT_BINARY_DIR}/distrac_paracooba.h
-    DEPENDS distrac-codegen-bin
-    MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/Paracooba.distracdef)
-add_custom_target(distrac_paracooba DEPENDS distrac_paracooba.h)
+if(ENABLE_DISTRAC)
+    add_custom_command(
+        OUTPUT ${CMAKE_BINARY_DIR}/distrac_paracooba.h
+        COMMAND $<TARGET_FILE:distrac-codegen-bin> ${CMAKE_CURRENT_SOURCE_DIR}/Paracooba.distracdef -o ${CMAKE_CURRENT_BINARY_DIR}/distrac_paracooba.h
+        DEPENDS distrac-codegen-bin
+        MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/Paracooba.distracdef)
+    add_custom_target(distrac_paracooba DEPENDS distrac_paracooba.h)
+endif()
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
@@ -212,7 +209,9 @@ add_subdirectory(loader)
 add_subdirectory(modules)
 add_subdirectory(executable)
 
-add_subdirectory(distracvis wd_distracvis)
+if(ENABLE_DISTRAC)
+    add_subdirectory(distracvis wd_distracvis)
+endif()
 
 set_source_files_properties(${CMAKE_BINARY_DIR}/distrac_paracooba.h PROPERTIES GENERATED 1)
 
