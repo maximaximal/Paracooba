@@ -43,6 +43,7 @@ SatHandler::handleSatisfyingAssignmentFound(
     m_mod.handle->assignment_highest_literal =
       &SolverAssignment::static_highestLiteral;
 
+    m_mod.handle->exit_status = PARAC_SAT;
     m_mod.handle->request_exit(m_mod.handle);
   } else {
     auto& o = m_assignmentOstream;

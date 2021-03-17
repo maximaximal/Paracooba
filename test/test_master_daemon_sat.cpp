@@ -23,8 +23,26 @@ p inccnf
 )";
 
 TEST_CASE(
+  "Connect one daemon and one master with two workers with a SAT formula",
+  "[integration][communicator][broker][solver][runner][sat]") {
+  setenv("PARAC_WORKER_COUNT", "2", 1);
+  ParacoobaMock master(1, test_dimacs_str);
+  setenv("PARAC_WORKER_COUNT", "2", 1);
+  ParacoobaMock daemon1(2, nullptr, &master);
+
+  setenv("PARAC_WORKER_COUNT",
+         std::to_string(std::thread::hardware_concurrency()).c_str(),
+         1);
+
+  master.getThreadRegistry().wait();
+
+  REQUIRE(master.exit_status == PARAC_SAT);
+  REQUIRE(master.assignment_data);
+}
+
+TEST_CASE(
   "Connect one daemon and one master without workers with a SAT formula",
-  "[integration,communicator,broker,solver,runner]") {
+  "[integration][communicator][broker][solver][runner][sat]") {
   setenv("PARAC_WORKER_COUNT", "0", 1);
   ParacoobaMock master(1, test_dimacs_str);
   setenv("PARAC_WORKER_COUNT", "1", 1);
@@ -41,7 +59,7 @@ TEST_CASE(
 }
 
 TEST_CASE("Single master without daemons with SAT formula",
-          "[integration,communicator,broker,solver,runner]") {
+          "[integration][communicator][broker][solver][runner][sat]") {
   setenv("PARAC_WORKER_COUNT", "1", 1);
   ParacoobaMock master(1, test_dimacs_str);
 
@@ -56,7 +74,7 @@ TEST_CASE("Single master without daemons with SAT formula",
 }
 
 TEST_CASE("Single master with two threads without daemons with SAT formula",
-          "[integration,communicator,broker,solver,runner]") {
+          "[integration][communicator][broker][solver][runner][sat]") {
   setenv("PARAC_WORKER_COUNT", "2", 1);
   ParacoobaMock master(1, test_dimacs_str);
 

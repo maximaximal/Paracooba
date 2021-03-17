@@ -525,10 +525,12 @@ TaskStore::assess_task(parac_task* task) {
     remove_from_tasksBeingWorkedOn(task);
 
     if(m_internal->handle.input_file && parac_path_is_root(task->path) &&
-       (task->result != PARAC_ABORTED && task->result != PARAC_UNDEFINED) &&
+       (task->result != PARAC_ABORTED && task->result != PARAC_UNDEFINED &&
+        m_internal->handle.exit_status != PARAC_SAT &&
+        m_internal->handle.exit_status != PARAC_UNSAT) &&
        m_internal->handle.exit_status == PARAC_UNDEFINED) {
-      m_internal->handle.request_exit(&m_internal->handle);
       m_internal->handle.exit_status = task->result;
+      m_internal->handle.request_exit(&m_internal->handle);
     }
 
     if((s & PARAC_TASK_SPLITS_DONE) == PARAC_TASK_SPLITS_DONE) {

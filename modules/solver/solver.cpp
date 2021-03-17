@@ -334,6 +334,7 @@ instance_handle_message(parac_module_solver_instance* instance,
 
       solverInstance->cadicalManager->handleSatisfyingAssignmentFound(
         std::move(assignment));
+      msg->cb(msg, PARAC_OK);
       break;
     }
     default:

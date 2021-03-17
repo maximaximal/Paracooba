@@ -31,16 +31,16 @@ struct TimeoutController::Internal {
     boost::asio::steady_timer timer;
 
     // Also deletes the current timeout!
-    void cancel() {
-      if(timeout.expired) {
-        timeout.expired(&timeout);
-      }
-      timer.cancel();
-    }
+    void cancel() { timer.cancel(); }
 
     Timeout(Service& service)
       : timer(service.ioContext()) {}
-    ~Timeout() {}
+    ~Timeout() {
+      if(timeout.expired) {
+        timeout.expired(&timeout);
+        timeout.expired = nullptr;
+      }
+    }
   };
 
   TimeoutList timeoutList;
@@ -53,10 +53,8 @@ TimeoutController::TimeoutController(Service& service)
 }
 TimeoutController::~TimeoutController() {
   parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Destroy TimeoutController");
-  while(!m_internal->timeoutList.empty()) {
-    m_internal->timeoutList.front().cancel();
-    m_internal->timeoutList.pop_front();
-  }
+  std::unique_lock lock(m_internal->timeoutMutex);
+  m_internal->timeoutList.clear();
 }
 
 parac_timeout*
