@@ -55,6 +55,8 @@ struct SolverInstance {
     instance.originator_id = originatorId;
   }
 
+  parac_module* mod;
+
   parac_module_solver_instance instance;
   std::unique_ptr<CaDiCaLManager> cadicalManager;
   std::unique_ptr<SatHandler> satHandler;
@@ -63,7 +65,6 @@ struct SolverInstance {
   SolverInstanceList::iterator it;
 
   bool configured = false;
-  parac_module* mod;
 
   std::unique_ptr<parac::NoncopyOStringstream> configStream;
 };

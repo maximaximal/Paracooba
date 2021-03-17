@@ -183,6 +183,10 @@ parac_timeout*
 Service::setTimeout(uint64_t ms,
                     void* userdata,
                     parac_timeout_expired expiery_cb) {
+  if(!m_internal)
+    return nullptr;
+  if(!m_internal->timeoutController)
+    return nullptr;
   return m_internal->timeoutController->setTimeout(ms, userdata, expiery_cb);
 }
 

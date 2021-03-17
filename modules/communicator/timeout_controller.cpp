@@ -30,14 +30,17 @@ struct TimeoutController::Internal {
     parac_timeout timeout;
     boost::asio::steady_timer timer;
 
-    Timeout(Service& service)
-      : timer(service.ioContext()) {}
-    ~Timeout() {
+    // Also deletes the current timeout!
+    void cancel() {
       if(timeout.expired) {
         timeout.expired(&timeout);
       }
       timer.cancel();
     }
+
+    Timeout(Service& service)
+      : timer(service.ioContext()) {}
+    ~Timeout() {}
   };
 
   TimeoutList timeoutList;
@@ -50,6 +53,10 @@ TimeoutController::TimeoutController(Service& service)
 }
 TimeoutController::~TimeoutController() {
   parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Destroy TimeoutController");
+  while(!m_internal->timeoutList.empty()) {
+    m_internal->timeoutList.front().cancel();
+    m_internal->timeoutList.pop_front();
+  }
 }
 
 parac_timeout*

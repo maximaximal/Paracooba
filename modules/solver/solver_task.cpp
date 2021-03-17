@@ -453,6 +453,9 @@ SolverTask::resplit(uint64_t durationMS) {
       self->m_interruptSolving = true;
     });
 
+  if(!m_timeout)
+    return { PARAC_ABORTED, {}, 0 };
+
   auto start = std::chrono::steady_clock::now();
   const int depth = m_fastSplit.split_depth();
 
