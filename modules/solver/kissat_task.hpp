@@ -7,14 +7,14 @@
 struct parac_handle;
 
 namespace parac::solver {
-class CaDiCaLManager;
+class SatHandler;
 
 class KissatTask {
   public:
   KissatTask(parac_handle& handle,
              const char* file,
              parac_task& task,
-             CaDiCaLManager& cadicalManager);
+             SatHandler& satHandler);
   ~KissatTask();
 
   private:

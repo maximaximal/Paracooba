@@ -7,6 +7,7 @@
 #include "cube_source.hpp"
 #include "paracooba/common/log.h"
 #include "paracooba/common/path.h"
+#include "sat_handler.hpp"
 #include "solver_config.hpp"
 
 using namespace parac::solver;
@@ -38,9 +39,12 @@ TEST_CASE("Test PathDefined Cube-Source", "[solver][cubesource]") {
   auto [s, outFile] = dummyHandle->prepareString(test_dimacs_str);
   dummyHandle->parseFile(outFile);
 
+  SatHandler dummySatHandler(mod, handle.id);
+
   REQUIRE(s == PARAC_OK);
 
-  CaDiCaLManager dummyManager(mod, std::move(dummyHandle), dummyConfig);
+  CaDiCaLManager dummyManager(
+    mod, std::move(dummyHandle), dummyConfig, dummySatHandler);
 
   const auto& f = dummyManager.parsedFormulaHandle();
   REQUIRE(f.getPregeneratedCubesCount() == 3);

@@ -1,7 +1,7 @@
 #include "kissat_task.hpp"
-#include "cadical_manager.hpp"
 #include "paracooba/common/status.h"
 #include "paracooba/common/task.h"
+#include "sat_handler.hpp"
 #include "solver_assignment.hpp"
 
 #include <cassert>
@@ -16,13 +16,13 @@ extern "C" {
 
 namespace parac::solver {
 struct KissatTask::Internal {
-  Internal(parac_handle& handle, CaDiCaLManager& cadicalManager)
+  Internal(parac_handle& handle, SatHandler& satHandler)
     : handle(handle)
-    , cadicalManager(cadicalManager)
+    , satHandler(satHandler)
     , solver(kissat_init(), kissat_release) {}
 
   parac_handle& handle;
-  CaDiCaLManager& cadicalManager;
+  SatHandler& satHandler;
 
   std::unique_ptr<kissat, void (*)(kissat*)> solver;
 };
@@ -30,8 +30,8 @@ struct KissatTask::Internal {
 KissatTask::KissatTask(parac_handle& handle,
                        const char* file,
                        parac_task& task,
-                       CaDiCaLManager& cadicalManager)
-  : m_internal(std::make_unique<Internal>(handle, cadicalManager))
+                       SatHandler& satHandler)
+  : m_internal(std::make_unique<Internal>(handle, satHandler))
   , m_file(file)
   , m_task(task) {
   task.state = PARAC_TASK_WORK_AVAILABLE;
@@ -95,7 +95,7 @@ KissatTask::work(parac_worker worker) {
       assignment->SerializeAssignmentFromKissatSolver(
         kissat_get_vars(m_internal->solver.get()), *m_internal->solver);
 
-      m_internal->cadicalManager.handleSatisfyingAssignmentFound(
+      m_internal->satHandler.handleSatisfyingAssignmentFound(
         std::move(assignment));
 
       return PARAC_SAT;

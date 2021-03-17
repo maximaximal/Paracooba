@@ -9,6 +9,7 @@
 #include "paracooba/common/noncopy_ostream.hpp"
 #include "paracooba/common/task_store.h"
 #include "parser_task.hpp"
+#include "sat_handler.hpp"
 #include "solver_assignment.hpp"
 #include "solver_config.hpp"
 #include "solver_task.hpp"
@@ -39,6 +40,7 @@
 using parac::solver::CaDiCaLManager;
 using parac::solver::KissatTask;
 using parac::solver::ParserTask;
+using parac::solver::SatHandler;
 using parac::solver::SolverAssignment;
 using parac::solver::SolverConfig;
 using parac::solver::SolverTask;
@@ -48,12 +50,14 @@ using SolverInstanceList = std::list<SolverInstance>;
 
 struct SolverInstance {
   explicit SolverInstance(parac_module* mod, parac_id originatorId)
-    : mod(mod) {
+    : mod(mod)
+    , satHandler(std::make_unique<SatHandler>(*mod, originatorId)) {
     instance.originator_id = originatorId;
   }
 
   parac_module_solver_instance instance;
   std::unique_ptr<CaDiCaLManager> cadicalManager;
+  std::unique_ptr<SatHandler> satHandler;
   SolverConfig config;
   parac_task_store* task_store = nullptr;
   SolverInstanceList::iterator it;
@@ -180,7 +184,7 @@ initiate_root_solver_on_file(parac_module& mod,
     SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
     i->task_store = &task_store;
     i->cadicalManager = std::make_unique<CaDiCaLManager>(
-      mod, std::move(parsedFormula), i->config);
+      mod, std::move(parsedFormula), i->config, *i->satHandler);
     i->config = solverUserdata->config;
     i->configured = true;
 
@@ -199,7 +203,7 @@ initiate_root_solver_on_file(parac_module& mod,
     parac_task* task = task_store.new_task(
       &task_store, nullptr, parac_path_root(), originatorId);
     assert(task);
-    new KissatTask(*mod.handle, file, *task, *i->cadicalManager);
+    new KissatTask(*mod.handle, file, *task, *i->satHandler);
     task_store.assess_task(&task_store, task);
   } else {
     parac_log(
@@ -248,7 +252,7 @@ initiate_peer_solver_on_file(
     SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
     i->task_store = &task_store;
     i->cadicalManager = std::make_unique<CaDiCaLManager>(
-      mod, std::move(parsedFormula), i->config);
+      mod, std::move(parsedFormula), i->config, *i->satHandler);
 
     cb(instance, cb_userdata, status);
   };

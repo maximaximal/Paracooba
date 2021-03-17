@@ -7,6 +7,7 @@ set(PARACOOBA_SOLVER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/cube_source.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/solver_config.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/kissat_task.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sat_handler.cpp
     )
 
 parac_module(parac_solver "${PARACOOBA_SOLVER_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)

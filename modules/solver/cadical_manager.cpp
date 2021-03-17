@@ -9,14 +9,11 @@
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
 #include "cube_source.hpp"
-#include "paracooba/common/message.h"
-#include "paracooba/common/noncopy_ostream.hpp"
+#include "sat_handler.hpp"
 #include "solver_assignment.hpp"
 #include "solver_config.hpp"
 #include "solver_task.hpp"
 
-#include <paracooba/broker/broker.h>
-#include <paracooba/common/compute_node_store.h>
 #include <paracooba/common/log.h>
 #include <paracooba/module.h>
 #include <paracooba/runner/runner.h>
@@ -27,8 +24,6 @@
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/pool/pool_alloc.hpp>
-
-#include <cereal/archives/binary.hpp>
 
 namespace parac::solver {
 struct CaDiCaLManager::Internal {
@@ -67,9 +62,6 @@ struct CaDiCaLManager::Internal {
     acc_averageSolvingTime;
 
   std::atomic_size_t waitingSolverTasks = 0;
-
-  std::mutex satAssignmentMutex;
-  std::unique_ptr<NoncopyOStringstream> satAssignmentOstream;
 };
 
 CaDiCaLManager::Internal::SolverTaskWrapperList
@@ -94,11 +86,13 @@ getAvailableWorkersFromMod(parac_module& mod) {
 
 CaDiCaLManager::CaDiCaLManager(parac_module& mod,
                                CaDiCaLHandlePtr parsedFormula,
-                               SolverConfig& solverConfig)
+                               SolverConfig& solverConfig,
+                               SatHandler& satHandler)
   : m_internal(std::make_unique<Internal>(getAvailableWorkersFromMod(mod)))
   , m_mod(mod)
   , m_parsedFormula(std::move(parsedFormula))
-  , m_solverConfig(solverConfig) {
+  , m_solverConfig(solverConfig)
+  , m_satHandler(satHandler) {
 
   uint32_t workers = 0;
 
@@ -225,72 +219,7 @@ CaDiCaLManager::getHandleForWorker(parac_worker worker) {
 void
 CaDiCaLManager::handleSatisfyingAssignmentFound(
   std::unique_ptr<SolverAssignment> assignment) {
-  std::unique_lock lock(m_internal->satAssignmentMutex, std::try_to_lock);
-  if(!lock.owns_lock() || m_solverAssignment) {
-    // A result was already found! Do nothing with the assignment.
-    return;
-  }
-
-  m_solverAssignment = std::move(assignment);
-
-  if(originatorId() == m_mod.handle->id) {
-    // Local solution found! Give solution to handle and exit paracooba, so that
-    // it can be printed in main().
-
-    mod().handle->assignment_data = m_solverAssignment.get();
-    mod().handle->assignment_is_set = &SolverAssignment::static_isSet;
-    mod().handle->assignment_highest_literal =
-      &SolverAssignment::static_highestLiteral;
-
-    mod().handle->request_exit(mod().handle);
-  } else {
-    auto& o = m_internal->satAssignmentOstream;
-    assert(!o);
-    o = std::make_unique<NoncopyOStringstream>();
-
-    parac_log(PARAC_SOLVER,
-              PARAC_DEBUG,
-              "SAT result destined for originator {} found in daemon compute "
-              "node! Encoding and sending.",
-              originatorId());
-
-    {
-      cereal::BinaryOutputArchive oa(*o);
-      oa(*m_solverAssignment);
-    }
-
-    parac_log(PARAC_SOLVER,
-              PARAC_DEBUG,
-              "SAT result destined for originator {} encoded into {}B.",
-              originatorId(),
-              o->tellp());
-
-    // Assignment found on some worker node! Send to master.
-    auto brokerMod = mod().handle->modules[PARAC_MOD_BROKER];
-    assert(brokerMod);
-    auto broker = brokerMod->broker;
-    assert(broker);
-    auto computeNodeStore = broker->compute_node_store;
-    assert(computeNodeStore);
-    assert(computeNodeStore->has(computeNodeStore, originatorId()));
-
-    auto originator = computeNodeStore->get(computeNodeStore, originatorId());
-    assert(originator);
-    assert(originator->available_to_send_to(originator));
-
-    parac_message_wrapper msg;
-    msg.kind = PARAC_MESSAGE_SOLVER_SAT_ASSIGNMENT;
-    msg.originator_id = originatorId();
-    msg.data = o->ptr();
-    msg.length = o->tellp();
-
-    parac_log(PARAC_SOLVER,
-              PARAC_DEBUG,
-              "Sending SAT result destined for originator {}.",
-              originatorId());
-
-    originator->send_message_to(originator, &msg);
-  }
+  m_satHandler.handleSatisfyingAssignmentFound(std::move(assignment));
 }
 
 CubeIteratorRange
