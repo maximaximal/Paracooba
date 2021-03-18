@@ -50,7 +50,7 @@ getTransformationFromPathAndNodeId(size_t nodeId, parac_path path) {
   } else if(parac_path_is_root(path)) {
     return Matrix4().translation(t).scaling(Vector3(2, 2, 2)).translation(t);
   } else {
-    for(size_t i = 0; i < path.length; ++i) {
+    for(size_t i = 0; i < parac_path_length(path); ++i) {
       if(parac_path_get_assignment(path, i + 1)) {
         t.x() -= offset;
       } else {
@@ -210,13 +210,23 @@ TreeVisWidget::updateShownTimespan() {
     }
 
     if(it.id() == start_processing_task) {
-      m_internal->tasks.emplace_back(
-        it.node().tracefile_location_index(),
-        it.property(start_processing_task_prop_path).as<parac_path>());
+      parac_path p =
+        it.property(start_processing_task_prop_path).as<parac_path>();
+
+      if(parac_path_is_overlength(p))
+        continue;
+
+      m_internal->tasks.emplace_back(it.node().tracefile_location_index(), p);
     } else if(it.id() == finish_processing_task) {
+      parac_path p =
+        it.property(finish_processing_task_prop_path).as<parac_path>();
+
+      if(parac_path_is_overlength(p))
+        continue;
+
       m_internal->tasks.emplace_back(
         it.node().tracefile_location_index(),
-        it.property(finish_processing_task_prop_path).as<parac_path>(),
+        p,
         static_cast<parac_status>(
           it.property(finish_processing_task_prop_result).as<uint16_t>()));
     }

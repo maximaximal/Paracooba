@@ -14,17 +14,23 @@ extern "C" {
 #define PARAC_PATH_MAX_LENGTH 58
 #define PARAC_PATH_EXPLICITLY_UNKNOWN 0b00111110u
 #define PARAC_PATH_PARSER 0b00111101u
+#define PARAC_PATH_OVERLENGTH 0b00111011u
 #define PARAC_PATH_BITS 58u
 #define PARAC_PATH_LENGTH_BITS 6u
 
 typedef uint64_t parac_path_type;
-typedef uint8_t parac_path_length_type;
+typedef uint64_t parac_path_length_type;
 
 typedef struct __attribute__((__packed__)) parac_path {
   union __attribute__((__packed__)) {
     struct __attribute__((__packed__)) {
-      parac_path_length_type length : 6;
-      parac_path_type path : 58;
+      parac_path_length_type length_ : 6;
+      parac_path_type path_ : 58;
+    };
+    struct __attribute__((__packed__)) {
+      parac_path_length_type overlength_tag_ : 6;
+      parac_path_type overlength_length_ : 57;
+      uint8_t overlength_left_right : 1;
     };
     parac_path_type rep;
   };
@@ -82,6 +88,12 @@ parac_path_unknown();
 parac_path
 parac_path_root();
 
+bool
+parac_path_is_overlength(parac_path p);
+
+parac_path_length_type
+parac_path_length(parac_path p);
+
 #ifdef __cplusplus
 }
 #include <iostream>
@@ -91,10 +103,11 @@ parac_path_root();
 template<typename T>
 parac_path
 parac_path_build(T p, parac_path_length_type l) {
+  assert(l <= PARAC_PATH_MAX_LENGTH);
   parac_path path;
   path.rep = p;
   path.rep <<= (((sizeof(parac_path)) - (sizeof(T))) * 8);
-  path.length = l;
+  path.length_ = l;
   path = parac_path_cleanup(path);
   return path;
 }
@@ -146,10 +159,11 @@ class Path : public parac_path {
     return parac_path_get_assignment(*this, pos);
   }
 
+  parac_path_length_type length() const { return parac_path_length(*this); }
   void operator=(parac_path p) { rep = p.rep; }
   bool operator==(const parac_path& p) const { return rep == p.rep; }
   operator uint64_t() const { return rep; }
-  bool operator<(const Path& o) const { return length < o.length; }
+  bool operator<(const Path& o) const { return length() < o.length(); }
 };
 
 inline std::string

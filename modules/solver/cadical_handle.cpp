@@ -188,7 +188,7 @@ CaDiCaLHandle::getCubeFromId(CubeId id) const {
 }
 CubeIteratorRange
 CaDiCaLHandle::getCubeFromPath(parac_path path) const {
-  if(path.length != m_internal->normalizedPathLength) {
+  if(parac_path_length(path) != m_internal->normalizedPathLength) {
     // The path needs to be at the end of the cube tree, or no predefined
     // cubes can be received, as the cube would be ambiguous!
     return CubeIteratorRange();

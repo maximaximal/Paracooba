@@ -352,7 +352,8 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
                          m_internal->tasksWaitingForWorkerQueue.end(),
                          task->path,
                          [](const Internal::TaskRef& t, parac_path p) {
-                           return t.get().path.length > p.length;
+                           return parac_path_length(t.get().path) >
+                                  parac_path_length(p);
                          }),
         *task);
     }

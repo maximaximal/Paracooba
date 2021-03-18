@@ -27,7 +27,8 @@ PathDefined::split(parac_path p,
                    bool& right) const {
   (void)mgr;
 
-  if(handle.getNormalizedPathLength() < static_cast<size_t>(p.length) + 1) {
+  if(handle.getNormalizedPathLength() <
+     static_cast<size_t>(parac_path_length(p)) + 1) {
     left = false;
     right = false;
     return false;
@@ -41,7 +42,14 @@ PathDefined::split(parac_path p,
 
   parac_path l = parac_path_get_next_left(p);
   parac_path r = parac_path_get_next_right(p);
-  size_t s = (handle.getNormalizedPathLength() - l.length);
+
+  if(parac_path_is_overlength(l) || parac_path_is_overlength(r)) {
+    left = false;
+    right = false;
+    return false;
+  }
+
+  size_t s = (handle.getNormalizedPathLength() - parac_path_length(l));
   parac_path_type depth_shifted_l = parac_path_get_depth_shifted(l) << s;
   parac_path_type depth_shifted_r = parac_path_get_depth_shifted(r) << s;
 

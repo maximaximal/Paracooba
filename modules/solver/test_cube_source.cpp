@@ -1,5 +1,7 @@
 #include <catch2/catch.hpp>
 
+#include <string>
+
 #include <paracooba/module.h>
 
 #include "cadical_handle.hpp"
@@ -12,6 +14,8 @@
 
 using namespace parac::solver;
 using namespace parac::solver::cubesource;
+
+using std::to_string;
 
 static const char* test_dimacs_str = R"(
 p inccnf
@@ -53,13 +57,14 @@ TEST_CASE("Test PathDefined Cube-Source", "[solver][cubesource]") {
   REQUIRE(f.getCubeFromId(2).size() == 1);
   REQUIRE(f.getCubeFromId(3).size() == 0);
 
-  [[maybe_unused]] auto pROOT = parac_path_build((uint8_t)0b00000000u, 0);
-  [[maybe_unused]] auto p0 = parac_path_build((uint8_t)0b00000000u, 1);
-  [[maybe_unused]] auto p1 = parac_path_build((uint8_t)0b10000000u, 1);
-  [[maybe_unused]] auto p00 = parac_path_build((uint8_t)0b00000000u, 2);
-  [[maybe_unused]] auto p01 = parac_path_build((uint8_t)0b01000000u, 2);
-  [[maybe_unused]] auto p10 = parac_path_build((uint8_t)0b10000000u, 2);
-  [[maybe_unused]] auto p11 = parac_path_build((uint8_t)0b11000000u, 2);
+  [[maybe_unused]] parac::Path pROOT =
+    parac_path_build((uint8_t)0b00000000u, 0);
+  [[maybe_unused]] parac::Path p0 = parac_path_build((uint8_t)0b00000000u, 1);
+  [[maybe_unused]] parac::Path p1 = parac_path_build((uint8_t)0b10000000u, 1);
+  [[maybe_unused]] parac::Path p00 = parac_path_build((uint8_t)0b00000000u, 2);
+  [[maybe_unused]] parac::Path p01 = parac_path_build((uint8_t)0b01000000u, 2);
+  [[maybe_unused]] parac::Path p10 = parac_path_build((uint8_t)0b10000000u, 2);
+  [[maybe_unused]] parac::Path p11 = parac_path_build((uint8_t)0b11000000u, 2);
 
   REQUIRE(f.getCubeFromPath(parac_path_build(0b00, 2)).size() == 2);
   REQUIRE(f.getCubeFromPath(parac_path_build(0b01, 2)).size() == 2);

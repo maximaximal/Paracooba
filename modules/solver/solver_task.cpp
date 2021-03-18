@@ -390,7 +390,7 @@ SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
   std::vector<CubeTreeElem> cubes{ expandLeftAndRightCube(
     m_manager, m_task, m_task->path, left_right_cube.value()) };
 
-  auto path_depth = 1 + path.length;
+  auto path_depth = 1 + parac_path_length(path);
   for(int i = path_depth;
       i < depth && i < PARAC_PATH_MAX_LENGTH && !m_interruptSolving;
       ++i) {
@@ -494,8 +494,7 @@ std::pair<parac_status, uint64_t>
 SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
                                       CaDiCaLHandle& handle,
                                       uint64_t duration) {
-  if((config.Resplit() || duration != 0) &&
-     m_task->path.length < PARAC_PATH_MAX_LENGTH - 1) {
+  if((config.Resplit() || duration != 0)) {
     m_interruptSolving = false;
     m_timeout =
       setTimeout(*m_manager, duration, this, [](parac_timeout* timeout) {
