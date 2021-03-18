@@ -1068,6 +1068,10 @@ TCPConnection::writeHandler(boost::system::error_code ec,
 #endif
 
       s->transmitMode = e->transmitMode;
+
+      if(s->service.stopped())
+        return;
+
       yield async_write(*s->socket, BUF(e->header), wh);
 
       if(ec == boost::system::errc::broken_pipe ||
