@@ -288,13 +288,16 @@ instance_handle_message(parac_module_solver_instance* instance,
 
       {
         cereal::BinaryInputArchive ia(data);
+        intptr_t remoteTask;
         ia(pathType);
+        ia(remoteTask);
         parac_path p;
         p.rep = pathType;
         task =
           task_store->new_task(task_store, nullptr, p, instance->originator_id);
         assert(task);
         task->received_from = msg->origin;
+        task->parent_task_ = reinterpret_cast<parac_task*>(remoteTask);
 
         solverTask =
           solverInstance->cadicalManager->createSolverTask(*task, nullptr);

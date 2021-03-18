@@ -7,6 +7,7 @@
 #include <mutex>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "broker_compute_node_store.hpp"
 #include "broker_task_store.hpp"
@@ -99,13 +100,11 @@ struct TaskStore::Internal {
   std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>> tasksBeingWorkedOn;
   std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>> tasksWaitingForChildren;
 
-  std::unordered_map<
-    parac_compute_node*,
-    std::unordered_map<const parac_path_type,
-                       TaskRef,
-                       std::hash<parac_path_type>,
-                       std::equal_to<parac_path_type>,
-                       Allocator<std::pair<const parac_path_type, TaskRef>>>>
+  std::unordered_map<parac_compute_node*,
+                     std::unordered_set<Task*,
+                                        std::hash<Task*>,
+                                        std::equal_to<Task*>,
+                                        Allocator<Task*>>>
     offloadedTasks;
 
   std::atomic_size_t tasksSize = 0;
@@ -262,14 +261,15 @@ TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
 
       t.offloaded_to = target;
 
+      Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+        reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
+
       auto rep = t.path.rep;
-      m_internal->offloadedTasks[target].insert({ rep, t });
+      m_internal->offloadedTasks[target].emplace(taskWrapper);
       t.state =
         static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
       t.state = t.state | PARAC_TASK_OFFLOADED;
 
-      Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
-        reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
       ++taskWrapper->refcount;
       --m_internal->tasksWaitingForWorkerQueueSize;
 
@@ -315,11 +315,26 @@ TaskStore::undo_offload(parac_task* t) {
 
     std::unique_lock lock(m_internal->containerMutex);
 
-    m_internal->offloadedTasks[t->offloaded_to].erase(t->path.rep);
-    t->state = static_cast<parac_task_state>(t->state & ~PARAC_TASK_OFFLOADED);
-
     Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
       reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
+
+    auto offloaded_to = m_internal->offloadedTasks[t->offloaded_to];
+
+    auto it = offloaded_to.find(taskWrapper);
+    if(it == offloaded_to.end()) {
+      parac_log(PARAC_BROKER,
+                PARAC_LOCALERROR,
+                "Tried to undo offload of task with wrapper address {} and "
+                "path {} that was not found in offloaded_to {}!",
+                t->path,
+                t->path,
+                t->offloaded_to->id);
+      return;
+    }
+    offloaded_to.erase(it);
+
+    t->state = static_cast<parac_task_state>(t->state & ~PARAC_TASK_OFFLOADED);
+
     --taskWrapper->refcount;
 
     t->offloaded_to = nullptr;
@@ -418,7 +433,7 @@ TaskStore::remove(parac_task* task) {
   if(task->right_child_)
     task->right_child_->parent_task_ = nullptr;
 
-  if(task->parent_task_) {
+  if(task->parent_task_ && !task->received_from) {
     Internal::Task* parentWrapper = reinterpret_cast<Internal::Task*>(
       reinterpret_cast<std::byte*>(task->parent_task_) -
       offsetof(Internal::Task, t));
@@ -543,6 +558,9 @@ TaskStore::assess_task(parac_task* task) {
     auto originator = task->originator;
     parac_task* parent = task->parent_task_;
 
+    if(task->received_from)
+      parent = nullptr;
+
     remove(task);
 
     parac_log(PARAC_BROKER,
@@ -596,7 +614,13 @@ TaskStore::store() {
 void
 TaskStore::receiveTaskResultFromPeer(parac_message& msg) {
   auto originId = msg.origin->id;
-  auto path = parac_task_result_packet_get_path(msg.data);
+  parac_task* t = parac_task_result_packet_get_task_ptr(msg.data);
+  Internal::Task* tWrapper = reinterpret_cast<Internal::Task*>(
+    reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
+
+  assert(t);
+  assert(tWrapper);
+
   parac_status result = parac_task_result_packet_get_result(msg.data);
 
   auto pathTaskMapIt = m_internal->offloadedTasks.find(msg.origin);
@@ -604,11 +628,11 @@ TaskStore::receiveTaskResultFromPeer(parac_message& msg) {
     parac_log(
       PARAC_BROKER,
       PARAC_GLOBALERROR,
-      "Task result {} on path {} with originator {} received from {}, but node "
+      "Task result {} with originator {} and ptr {} received from {}, but node "
       "not found in broker task store! Ignoring.",
       result,
-      path,
       msg.originator_id,
+      static_cast<void*>(t),
       originId);
     msg.cb(&msg, PARAC_COMPUTE_NODE_NOT_FOUND_ERROR);
     return;
@@ -616,27 +640,26 @@ TaskStore::receiveTaskResultFromPeer(parac_message& msg) {
 
   auto& pathTaskMap = pathTaskMapIt->second;
 
-  auto taskIt = pathTaskMap.find(path.rep);
+  auto taskIt = pathTaskMap.find(tWrapper);
   if(taskIt == pathTaskMap.end()) {
     parac_log(
       PARAC_BROKER,
       PARAC_GLOBALERROR,
-      "Task result {} on path {} with originator {} received from {}, but "
+      "Task result {} with originator {} and ptr {} received from {}, but "
       "task path "
       "not found in broker task store node map! Ignoring.",
       result,
-      path,
+      static_cast<void*>(t),
       msg.originator_id,
       originId);
     msg.cb(&msg, PARAC_PATH_NOT_FOUND_ERROR);
     return;
   }
 
-  auto& task = taskIt->second.get();
-  task.result = result;
-  task.state = task.state | PARAC_TASK_DONE;
+  t->result = result;
+  t->state = t->state | PARAC_TASK_DONE;
 
-  assess_task(&task);
+  assess_task(t);
 
   msg.cb(&msg, PARAC_OK);
 }

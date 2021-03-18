@@ -240,6 +240,7 @@ SolverTask::work(parac_worker worker) {
 parac_status
 SolverTask::serialize_to_msg(parac_message* tgt_msg) {
   assert(tgt_msg);
+  assert(m_task);
 
   if(!m_serializationOutStream) {
     m_serializationOutStream = std::make_unique<NoncopyOStringstream>();
@@ -248,6 +249,7 @@ SolverTask::serialize_to_msg(parac_message* tgt_msg) {
       cereal::BinaryOutputArchive oa(*m_serializationOutStream);
       parac_path_type p = m_task->path.rep;
       oa(p);
+      oa(reinterpret_cast<intptr_t>(m_task));
       oa(*this);
     }
   }

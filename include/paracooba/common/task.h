@@ -23,19 +23,19 @@ typedef enum parac_task_state {
   PARAC_TASK_ERROR = 1 << 7,
 } parac_task_state;
 
+struct parac_task;
+struct parac_message;
+struct parac_compute_node;
+
 parac_status
 parac_task_result_packet_get_result(void* result);
-struct parac_path
-parac_task_result_packet_get_path(void* result);
+struct parac_task*
+parac_task_result_packet_get_task_ptr(void* result);
 
 /** @brief Utility function to check if a task is done, irregarding splitted or
  * not. */
 bool
 parac_task_state_is_done(parac_task_state state);
-
-struct parac_task;
-struct parac_message;
-struct parac_compute_node;
 
 typedef parac_task_state (*parac_task_assess_func)(struct parac_task*);
 typedef parac_status (*parac_task_work_func)(struct parac_task*, parac_worker);
@@ -63,6 +63,8 @@ typedef struct parac_task {
   parac_task_serialize_func serialize;
   parac_task_free_userdata_func free_userdata;
 
+  /* Parent task when local, when received from remote it is the task ptr on
+     the remote system. */
   struct parac_task* parent_task_;
   struct parac_task* left_child_;
   struct parac_task* right_child_;
