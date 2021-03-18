@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <cassert>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -97,7 +99,7 @@ class SolverTask {
   parac_task* m_task = nullptr;
   FastSplit m_fastSplit;
   parac_timeout* m_timeout = nullptr;
-  CaDiCaLHandle* m_activeHandle = nullptr;
+  std::atomic<CaDiCaLHandle*> m_activeHandle = nullptr;
   bool m_interruptSolving = false;
 
   std::shared_ptr<cubesource::Source> m_cubeSource;

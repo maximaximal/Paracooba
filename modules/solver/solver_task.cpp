@@ -304,8 +304,8 @@ SolverTask::static_terminate(parac_task* task) {
   assert(task);
   assert(task->userdata);
   SolverTask* t = static_cast<SolverTask*>(task->userdata);
-  if(t->m_activeHandle) {
-    t->m_activeHandle->terminate();
+  if(auto activeHandle = t->m_activeHandle.load()) {
+    activeHandle->terminate();
   }
 }
 
@@ -377,9 +377,10 @@ SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
   parac_log(
     PARAC_CUBER, PARAC_TRACE, "Cubing path {} at depth {}.", path, depth);
 
-  m_activeHandle->applyCubeAsAssumption(literals);
+  auto activeHandle = m_activeHandle.load();
+  activeHandle->applyCubeAsAssumption(literals);
 
-  auto [status, left_right_cube] = m_activeHandle->resplitOnce(path, literals);
+  auto [status, left_right_cube] = activeHandle->resplitOnce(path, literals);
   if(status != PARAC_SPLITTED) {
     return { status, {} };
   }
@@ -398,7 +399,7 @@ SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
     cubes.clear();
     for(auto&& [task, cube] : cubes2) {
       auto [status, left_and_right_cube] =
-        m_activeHandle->resplitOnce(task->path, cube);
+        activeHandle->resplitOnce(task->path, cube);
       if(status == PARAC_NO_SPLITS_LEFT) {
         continue;
       }
@@ -448,7 +449,10 @@ SolverTask::resplit(uint64_t durationMS) {
                 "CNF lookahead for path {} will be interrupted!",
                 self->path());
 
-      self->m_activeHandle->terminate();
+      auto activeHandle = self->m_activeHandle.load();
+      if(activeHandle) {
+        activeHandle->terminate();
+      }
       self->m_interruptSolving = true;
       self->m_timeout = nullptr;
     });
