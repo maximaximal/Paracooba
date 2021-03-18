@@ -79,6 +79,19 @@ SolverConfig::SolverConfig(parac_config* config) {
     2;
 
   parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(Entry::ConcurrentCubeTreeCount)],
+    "concurrent-cube-tree-count",
+    "Number of cube-trees to concurrently build at the beginning. Uses "
+    "different initial splitting literals to create concurrent root entries "
+    "each trying to solve the same problem with different splits.");
+  m_config[static_cast<size_t>(Entry::ConcurrentCubeTreeCount)].registrar =
+    PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::ConcurrentCubeTreeCount)].type =
+    PARAC_TYPE_UINT16;
+  m_config[static_cast<size_t>(Entry::ConcurrentCubeTreeCount)]
+    .default_value.uint16 = 1;
+
+  parac_config_entry_set_str(
     &m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)],
     "cubing-fast-split-multiplication-factor",
     "The multiplication factor when in fast-split mode (when not enough work "
