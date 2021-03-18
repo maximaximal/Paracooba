@@ -264,11 +264,11 @@ TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
       Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
         reinterpret_cast<std::byte*>(&t) - offsetof(Internal::Task, t));
 
-      auto rep = t.path.rep;
-      m_internal->offloadedTasks[target].emplace(taskWrapper);
       t.state =
         static_cast<parac_task_state>(t.state & ~PARAC_TASK_WORK_AVAILABLE);
       t.state = t.state | PARAC_TASK_OFFLOADED;
+
+      m_internal->offloadedTasks[target].emplace(taskWrapper);
 
       ++taskWrapper->refcount;
       --m_internal->tasksWaitingForWorkerQueueSize;
