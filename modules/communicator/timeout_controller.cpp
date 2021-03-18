@@ -95,6 +95,7 @@ TimeoutController::setTimeout(uint64_t ms,
 void
 TimeoutController::cancel(parac_timeout* timeout) {
   assert(timeout);
+  assert(timeout->cancel_userdata);
 
   timeout->expired = nullptr;
 

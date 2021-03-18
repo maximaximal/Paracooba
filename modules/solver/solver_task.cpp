@@ -427,7 +427,6 @@ SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
               1 + i);
   }
 
-  m_timeout->cancel(m_timeout);
   return { cubes.size() > 0 ? PARAC_SPLITTED : PARAC_NO_SPLITS_LEFT, cubes };
 }
 
@@ -451,6 +450,7 @@ SolverTask::resplit(uint64_t durationMS) {
 
       self->m_activeHandle->terminate();
       self->m_interruptSolving = true;
+      self->m_timeout = nullptr;
     });
 
   if(!m_timeout)
@@ -464,6 +464,9 @@ SolverTask::resplit(uint64_t durationMS) {
 
   auto cubes = resplitDepth(path(), literals, depth);
   auto end = std::chrono::steady_clock::now();
+
+  if(m_timeout)
+    m_timeout->cancel(m_timeout);
 
   parac_log(
     PARAC_CUBER,
@@ -502,6 +505,7 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
         CaDiCaLHandle* handle = self->m_activeHandle;
         assert(handle);
         handle->terminate();
+        self->m_timeout = nullptr;
       });
   }
 
