@@ -3,6 +3,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/system/error_code.hpp>
 #include <map>
+#include <thread>
 
 #include "paracooba/common/timeout.h"
 #include "service.hpp"
@@ -34,6 +35,7 @@ struct Service::Internal {
     std::pair<boost::asio::steady_timer, TCPConnectionPayloadPtr>;
 
   io_context context;
+  std::thread::id contextThreadId;
   parac_thread_registry_handle threadHandle;
 
   std::unique_ptr<TCPAcceptor> tcpAcceptor;
@@ -120,6 +122,8 @@ parac_status
 Service::run() {
   parac_log(
     PARAC_COMMUNICATOR, PARAC_DEBUG, "Starting communicator io_context.");
+
+  m_internal->contextThreadId = std::this_thread::get_id();
 
   if(m_internal->tcpAcceptor)
     m_internal->tcpAcceptor->start(
@@ -273,6 +277,11 @@ Service::stopped() const {
     return m_internal->context.stopped();
   }
   return true;
+}
+
+const std::thread::id&
+Service::ioContextThreadId() const {
+  return m_internal->contextThreadId;
 }
 
 int

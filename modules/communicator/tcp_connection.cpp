@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/error.hpp>
+#include <thread>
 #if BOOST_VERSION >= 106600
 #include <boost/asio/io_context.hpp>
 #else
@@ -457,7 +458,17 @@ TCPConnection::send(SendQueueEntry&& e) {
     s->sendQueue.emplace(std::move(e));
   }
   if(!s->currentlySending.test_and_set()) {
-    writeHandler(boost::system::error_code(), 0);
+    if(s->service.ioContextThreadId() == std::this_thread::get_id()) {
+      writeHandler(boost::system::error_code(), 0);
+    } else {
+      // The Socket is not thread-safe, so when sending from some other thread,
+      // the send must be issued over the ioContext thread by posting work onto
+      // the context.
+      auto weakConn = TCPConnection(*this, WeakStatePtr(state()));
+      s->service.ioContext().post([weakConn]() mutable {
+        weakConn.writeHandler(boost::system::error_code(), 0);
+      });
+    }
   }
 }
 

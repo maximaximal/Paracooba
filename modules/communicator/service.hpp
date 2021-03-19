@@ -6,6 +6,7 @@
 #include <boost/version.hpp>
 #include <memory>
 #include <optional>
+#include <thread>
 
 namespace boost::asio {
 #if BOOST_VERSION >= 106600
@@ -60,6 +61,8 @@ class Service {
 
   boost::asio::io_context& ioContext();
   bool stopped() const;
+
+  const std::thread::id& ioContextThreadId() const;
 
   int connectionRetries() const;
   const char* temporaryDirectory() const;
