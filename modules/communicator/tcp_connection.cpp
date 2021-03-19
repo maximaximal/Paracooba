@@ -733,6 +733,8 @@ TCPConnection::compute_node_send_message_to_func(parac_compute_node* n,
     return;
   }
   TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
+  if(!conn)
+    return;
   auto s = conn->state();
   if(s) {
     conn->send(*msg);
