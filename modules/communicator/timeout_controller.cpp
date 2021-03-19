@@ -4,6 +4,8 @@
 #include "service.hpp"
 
 #include <boost/asio/steady_timer.hpp>
+#include <boost/pool/poolfwd.hpp>
+#include <boost/pool/singleton_pool.hpp>
 #include <chrono>
 #include <list>
 #include <mutex>
@@ -25,21 +27,28 @@ struct TimeoutController::Internal {
 
   using TimeoutList = std::list<Timeout, Allocator<Timeout>>;
 
+  using TimerPool = boost::singleton_pool<boost::asio::steady_timer,
+                                          sizeof(boost::asio::steady_timer)>;
+
   struct Timeout {
     TimeoutList::iterator it;
     parac_timeout timeout;
-    boost::asio::steady_timer timer;
+    boost::asio::steady_timer* timer;
+    boost::pool<>* pool;
 
     // Also deletes the current timeout!
-    void cancel() { timer.cancel(); }
+    void cancel() { timer->cancel(); }
 
-    Timeout(Service& service)
-      : timer(service.ioContext()) {}
+    Timeout(Service& service) {
+      void* mem = TimerPool::malloc();
+      timer = new(mem) boost::asio::steady_timer(service.ioContext());
+    }
     ~Timeout() {
       if(timeout.expired) {
         timeout.expired(&timeout);
         timeout.expired = nullptr;
       }
+      TimerPool::free(timer);
     }
   };
 
@@ -84,8 +93,8 @@ TimeoutController::setTimeout(uint64_t ms,
     TimeoutController* c = static_cast<TimeoutController*>(t->cancel_userdata);
     c->cancel(t);
   };
-  elem->timer.expires_from_now(std::chrono::milliseconds(ms));
-  elem->timer.async_wait([this, elem](const boost::system::error_code& errc) {
+  elem->timer->expires_from_now(std::chrono::milliseconds(ms));
+  elem->timer->async_wait([this, elem](const boost::system::error_code& errc) {
     if(!errc) {
       if(elem->timeout.expired) {
         elem->timeout.expired(&elem->timeout);
