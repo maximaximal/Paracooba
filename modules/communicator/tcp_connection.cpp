@@ -728,7 +728,8 @@ TCPConnection::compute_node_send_message_to_func(parac_compute_node* n,
   assert(n);
   assert(msg);
   if(!n->communicator_userdata) {
-    msg->cb(msg, PARAC_CONNECTION_CLOSED);
+    if(msg->cb)
+      msg->cb(msg, PARAC_CONNECTION_CLOSED);
     return;
   }
   TCPConnection* conn = static_cast<TCPConnection*>(n->communicator_userdata);
