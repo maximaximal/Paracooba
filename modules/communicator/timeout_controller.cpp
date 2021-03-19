@@ -50,6 +50,9 @@ TimeoutController::TimeoutController(Service& service)
   : m_internal(std::make_unique<Internal>())
   , m_service(service) {
   parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Create TimeoutController");
+
+  static_assert(
+    std::is_standard_layout_v<TimeoutController::Internal::Timeout>);
 }
 TimeoutController::~TimeoutController() {
   parac_log(PARAC_COMMUNICATOR, PARAC_DEBUG, "Destroy TimeoutController");
