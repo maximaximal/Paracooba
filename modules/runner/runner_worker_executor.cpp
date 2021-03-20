@@ -83,6 +83,7 @@ void
 WorkerExecutor::exit() {
   m_internal->stop.store(true);
   m_internal->notifier.notify_all();
+  m_internal->notifier.notify_all();
 }
 
 void

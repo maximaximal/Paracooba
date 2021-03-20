@@ -146,6 +146,8 @@ Worker::getNextTask() {
         }
 #endif
       }
+      if(m_stop)
+        return nullptr;
       m_notifier.wait(lock);
     }
     work = m_taskStore.pop_work(&m_taskStore);
