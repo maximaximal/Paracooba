@@ -230,7 +230,7 @@ struct TCPConnection::State {
                       timeout);
 
             TCPConnectionInitiator* initiator = new TCPConnectionInitiator(
-              service, cachedRemoteEndpoint, nullptr, ++connectionTry);
+              service, cachedRemoteEndpoint, nullptr, ++connectionTry, true);
             initiator->setTCPConnectionPayload(generatePayload());
 
             service.setTimeout(timeout, initiator, [](parac_timeout* t) {
