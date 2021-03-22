@@ -226,7 +226,7 @@ TCPConnectionInitiator::~TCPConnectionInitiator() {
      m_state->connectionTry < m_state->service.connectionRetries()) {
 
     m_state->retry = false;
-    std::default_random_engine generator;
+    std::mt19937 generator;
     auto timeout = m_state->service.retryTimeoutMS();
     std::normal_distribution<> distribution(timeout, timeout / 3);
     timeout = distribution(generator);

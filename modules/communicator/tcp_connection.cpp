@@ -216,7 +216,7 @@ struct TCPConnection::State {
             // Reconnects only happen if this side of the connection is the
             // original initiating side. The other side will end the connection.
 
-            std::default_random_engine generator;
+            std::mt19937 generator;
             std::normal_distribution<> distribution(1200, 200);
             size_t timeout = distribution(generator);
 
