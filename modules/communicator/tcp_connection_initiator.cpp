@@ -328,6 +328,7 @@ TCPConnectionInitiator::try_connecting_to_host(
           m_state->currentEndpoint(),
           m_state->service.tcpAcceptorAddress(),
           m_state->service.currentTCPListenPort());
+        m_state->retry = false;
         return;
       }
 
@@ -384,6 +385,7 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
                 m_state->endpoint(),
                 m_state->service.tcpAcceptorAddress(),
                 m_state->service.currentTCPListenPort());
+      m_state->retry = false;
       return;
     }
 
