@@ -839,6 +839,17 @@ ComputeNode::doNotifyOfNewRemotes() {
 
   *m_knownRemotesOstream = NoncopyOStringstream();
 
+  if(parac_log_enabled(PARAC_BROKER, PARAC_TRACE)) {
+    for(auto& connectionStringPair : m_newRemotesToNotifyAbout) {
+      parac_log(PARAC_BROKER,
+                PARAC_TRACE,
+                "Notify node {} of new remote {} with connection string {}",
+                m_node.id,
+                connectionStringPair.first,
+                connectionStringPair.second);
+    }
+  }
+
   {
     cereal::BinaryOutputArchive oa(*m_knownRemotesOstream);
     oa(knownRemotes);
@@ -869,7 +880,8 @@ ComputeNode::sendKnownRemotes() {
   for(const auto& node : m_store) {
     if(stepOverNode(node))
       continue;
-    m_newRemotesToNotifyAbout.emplace_back(node.getIDConnectionStringPair());
+    auto connectionStringPair = node.getIDConnectionStringPair();
+    m_newRemotesToNotifyAbout.emplace_back(connectionStringPair);
   }
 
   doNotifyOfNewRemotes();
