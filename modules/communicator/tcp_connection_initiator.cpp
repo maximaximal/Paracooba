@@ -181,21 +181,22 @@ TCPConnectionInitiator::TCPConnectionInitiator(Service& service,
               host,
               endpoint);
     m_state = std::make_shared<State>(service, endpoint, cb, connectionTry);
-    m_state->runFunc = [*this]() mutable {
-      try_connecting_to_endpoint(boost::system::error_code());
+    m_state->runFunc = [](TCPConnectionInitiator&& initiator) {
+      initiator.try_connecting_to_endpoint(boost::system::error_code());
     };
   } else {
     // Definitely no address, so try to resolve using DNS.
     m_state = std::make_shared<State>(
       service, connectionString, port, cb, connectionTry);
-    m_state->runFunc = [*this]() mutable {
-      try_connecting_to_host(boost::system::error_code(),
-                             boost::asio::ip::tcp::resolver::iterator());
+    m_state->runFunc = [](TCPConnectionInitiator&& initiator) {
+      initiator.try_connecting_to_host(
+        boost::system::error_code(),
+        boost::asio::ip::tcp::resolver::iterator());
     };
   }
 
   if(!delayed) {
-    m_state->runFunc();
+    m_state->runFunc(std::move(*this));
   }
 }
 TCPConnectionInitiator::TCPConnectionInitiator(
@@ -210,11 +211,11 @@ TCPConnectionInitiator::TCPConnectionInitiator(
             "Starting TCPConnectionInitiator to connect to endpoint {}.",
             endpoint);
 
-  m_state->runFunc = [*this]() mutable {
-    try_connecting_to_endpoint(boost::system::error_code());
+  m_state->runFunc = [](TCPConnectionInitiator&& initiator) {
+    initiator.try_connecting_to_endpoint(boost::system::error_code());
   };
   if(!delayed) {
-    m_state->runFunc();
+    m_state->runFunc(std::move(*this));
   }
 }
 TCPConnectionInitiator::TCPConnectionInitiator(
@@ -432,6 +433,6 @@ TCPConnectionInitiator::isEndpointSameAsLocalTCPAcceptor(
 
 void
 TCPConnectionInitiator::run() {
-  m_state->runFunc();
+  m_state->runFunc(std::move(*this));
 }
 }

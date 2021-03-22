@@ -49,7 +49,8 @@ class TCPConnectionInitiator {
   struct State;
   std::shared_ptr<State> m_state;
 
-  using DelayedRunFunc = std::function<void()>;
+  using DelayedRunFunc =
+    std::function<void(TCPConnectionInitiator&& initiator)>;
 
   void retryConnection();
 };
