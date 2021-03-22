@@ -603,13 +603,10 @@ ComputeNode::tryToOffloadTask() {
     m_node.send_message_to(&m_node, &msg);
     return true;
   } else {
-    auto [s, l] = status();
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
-              "Not offloading to {} because no fitting task was found (status "
-              "of this node: {}).",
-              m_node.id,
-              s);
+              "Not offloading to {} because no fitting task was found",
+              m_node.id);
   }
   return false;
 }
@@ -617,7 +614,6 @@ ComputeNode::tryToOffloadTask() {
 void
 ComputeNode::conditionallySendStatusTo(const Status& s) {
   if(!m_node.available_to_send_to(&m_node)) {
-    auto [s, l] = status();
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Cannot send status {} to {} because not available to send to.",
