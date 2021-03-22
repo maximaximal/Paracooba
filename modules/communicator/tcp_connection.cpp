@@ -241,6 +241,8 @@ struct TCPConnection::State {
                 delete initiator;
               });
             assert(timeout_handle);
+          } else if(remoteId() != 0) {
+            service.registerTCPConnectionPayload(remoteId(), generatePayload());
           }
           break;
         }
@@ -277,7 +279,7 @@ struct TCPConnection::State {
   std::atomic_int connectionTry = 0;
 
   std::atomic<TransmitMode> transmitMode = TransmitInit;
-  ResumeMode resumeMode = EndAfterShutdown;
+  ResumeMode resumeMode = RestartAfterShutdown;
 
   boost::asio::coroutine writeCoro;
   std::mutex sendQueueMutex;
@@ -843,7 +845,6 @@ TCPConnection::readHandler(boost::system::error_code ec,
 
     if(!handleInitiatorMessage(s->readInitiatorMessage)) {
       // This only means that the connection was already created.
-      s->resumeMode = EndAfterShutdown;
       return;
     }
 
@@ -1128,7 +1129,6 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       if(ec == boost::system::errc::broken_pipe ||
          ec == boost::system::errc::connection_reset) {
         // Connection can be closed silently.
-        s->resumeMode = EndAfterShutdown;
         return;
       }
 
