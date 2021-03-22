@@ -227,8 +227,7 @@ TCPConnectionInitiator::~TCPConnectionInitiator() {
     m_state->retry = false;
     std::default_random_engine generator;
     auto timeout = m_state->service.retryTimeoutMS();
-    std::uniform_int_distribution<size_t> distribution(timeout / 4,
-                                                       timeout * 2);
+    std::normal_distribution<size_t> distribution(timeout, timeout / 3);
     timeout = distribution(generator);
 
     parac_log(

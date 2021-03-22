@@ -215,7 +215,7 @@ struct TCPConnection::State {
             // original initiating side. The other side will end the connection.
 
             std::default_random_engine generator;
-            std::uniform_int_distribution<size_t> distribution(200, 1200);
+            std::normal_distribution<size_t> distribution(1200, 200);
             size_t timeout = distribution(generator);
 
             parac_log(PARAC_COMMUNICATOR,
