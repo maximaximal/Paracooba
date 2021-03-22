@@ -28,7 +28,7 @@ notify_result(parac_task* t) {
   }
   assert(t);
   assert(t->received_from);
-  assert(t->received_from->available_to_send_to(t->received_from));
+  assert(t->received_from->send_message_to);
   assert(t->parent_task_);
 
   parac_message msg;
