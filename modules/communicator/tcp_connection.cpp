@@ -596,6 +596,13 @@ TCPConnection::handleReceivedACK(const PacketHeader& ack) {
 
   {
     std::unique_lock lock(s->sendQueueMutex);
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_TRACE,
+              "Received ACK number {} from node {} acknowledging that a "
+              "message of kind {} successfully arrived.",
+              ack.number,
+              s->remoteId(),
+              it->second.header.kind);
     s->sentBuffer.erase(it);
   }
   return true;
@@ -1148,6 +1155,13 @@ TCPConnection::writeHandler(boost::system::error_code ec,
          e->header.kind == PARAC_MESSAGE_END ||
          e->header.kind == PARAC_MESSAGE_KEEPALIVE) {
         // Nothing has to be done, message already finished.
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_TRACE,
+                  "Send message of kind {} with id {} to remote {} without "
+                  "waiting for ACK ",
+                  e->header.kind,
+                  e->header.number,
+                  s->remoteId());
       } else if(e->header.kind == PARAC_MESSAGE_FILE) {
         assert(e);
 
