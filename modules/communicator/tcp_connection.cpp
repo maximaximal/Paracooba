@@ -45,7 +45,7 @@
 #include <sstream>
 
 #define REC_BUF_SIZE 4096u
-#define MAX_BUF_SIZE 10000000u
+#define MAX_BUF_SIZE 100'000'000u
 
 namespace parac::communicator {
 struct TCPConnection::EndTag {};
