@@ -393,7 +393,7 @@ TCPConnection::TCPConnection(
 
   // Set at beginning, only unset if write_handler yields. Set again at
   // send(SendQueueItem&).
-  state()->currentlySending.test_and_set();
+  // state()->currentlySending.test_and_set();
 
   auto weakConn = TCPConnection(*this, WeakStatePtr(state()));
   weakConn.writeHandler(boost::system::error_code(), 0);
@@ -486,13 +486,13 @@ TCPConnection::send(SendQueueEntry&& e) {
     s->sendQueue.emplace(std::move(e));
   }
   if(!s->currentlySending.test_and_set()) {
+    auto weakConn = TCPConnection(*this, WeakStatePtr(s));
     if(s->service.ioContextThreadId() == std::this_thread::get_id()) {
-      writeHandler(boost::system::error_code(), 0);
+      weakConn.writeHandler(boost::system::error_code(), 0);
     } else {
       // The Socket is not thread-safe, so when sending from some other thread,
       // the send must be issued over the ioContext thread by posting work onto
       // the context.
-      auto weakConn = TCPConnection(*this, WeakStatePtr(state()));
       s->service.ioContext().post([weakConn]() mutable {
         weakConn.writeHandler(boost::system::error_code(), 0);
       });
