@@ -334,10 +334,11 @@ TCPConnectionInitiator::try_connecting_to_host(
                   m_state->host(),
                   m_state->socket->remote_endpoint());
 
-        TCPConnection(m_state->service,
-                      std::move(m_state->socket),
-                      m_state->connectionTry,
-                      std::move(m_state->payload));
+        auto conn = TCPConnection(m_state->service,
+                                  std::move(m_state->socket),
+                                  m_state->connectionTry,
+                                  std::move(m_state->payload));
+        conn.setResumeMode(TCPConnection::RestartAfterShutdown);
         return;
       }
     }
@@ -389,10 +390,12 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
                 "Starting Paracooba connection.",
                 m_state->socket->remote_endpoint());
 
-      TCPConnection(m_state->service,
-                    std::move(m_state->socket),
-                    m_state->connectionTry,
-                    std::move(m_state->payload));
+      auto conn = TCPConnection(m_state->service,
+                                std::move(m_state->socket),
+                                m_state->connectionTry,
+                                std::move(m_state->payload));
+
+      conn.setResumeMode(TCPConnection::RestartAfterShutdown);
     }
   }
 }

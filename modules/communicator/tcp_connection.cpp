@@ -222,8 +222,6 @@ struct TCPConnection::State {
               service, cachedRemoteEndpoint, nullptr, ++connectionTry);
 
             initiator.setTCPConnectionPayload(generatePayload());
-          } else if(connectionTry == -1 && remoteId() != 0) {
-            service.registerTCPConnectionPayload(remoteId(), generatePayload());
           }
           break;
         }
@@ -300,7 +298,6 @@ struct TCPConnection::State {
       &TCPConnectionPayloadDestruct);
   }
 
-  Lifecycle lifecycle = Initializing;
   std::atomic_flag currentlySending = true;
   boost::asio::ip::tcp::endpoint cachedRemoteEndpoint;
 
@@ -407,6 +404,13 @@ TCPConnection::~TCPConnection() {
       }
     }
   }
+}
+
+void
+TCPConnection::setResumeMode(ResumeMode mode) {
+  auto s = state();
+  if(s)
+    s->resumeMode = mode;
 }
 
 void
@@ -806,6 +810,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
 
     if(!handleInitiatorMessage(s->readInitiatorMessage)) {
       // This only means that the connection was already created.
+      s->resumeMode = EndAfterShutdown;
       return;
     }
 

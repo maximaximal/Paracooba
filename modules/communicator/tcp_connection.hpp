@@ -37,7 +37,6 @@ class TCPConnection {
   using WeakStatePtr = std::weak_ptr<State>;
   using SharedStatePtr = std::shared_ptr<State>;
 
-  enum Lifecycle { Initializing, Active, Dead };
   enum TransmitMode {
     TransmitInit,
     TransmitMessage,
@@ -69,6 +68,8 @@ class TCPConnection {
   }
 
   ~TCPConnection();
+
+  void setResumeMode(ResumeMode mode);
 
   void send(parac_message&& message);
   void send(parac_file&& file);
