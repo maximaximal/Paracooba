@@ -235,6 +235,7 @@ struct TCPConnection::State {
               TCPConnectionInitiator* initiator =
                 static_cast<TCPConnectionInitiator*>(t->expired_userdata);
               initiator->run();
+              delete initiator;
             });
           }
           break;
