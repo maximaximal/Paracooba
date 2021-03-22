@@ -561,7 +561,6 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
             << ':' << init.tcp_port;
     s->connectionString = connStr.str();
     s->compute_node->connection_string = s->connectionString.c_str();
-    s->cachedRemoteEndpoint = s->socket->remote_endpoint();
   }
 
   return true;
@@ -823,6 +822,8 @@ TCPConnection::readHandler(boost::system::error_code ec,
   }
 
   reenter(&s->readCoro) {
+    s->cachedRemoteEndpoint = s->socket->remote_endpoint();
+
     yield async_read(
       *s->socket, BUF(s->readInitiatorMessage), rh, s->remoteId());
 
