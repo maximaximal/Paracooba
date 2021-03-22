@@ -445,12 +445,12 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
 
     msg.userdata = this;
     msg.cb = [](parac_message* msg, parac_status s) {
+      assert(msg->userdata);
+      auto self = static_cast<ComputeNode*>(msg->userdata);
+      parac_module_solver_instance* instance =
+        self->m_store.thisNode().m_node.solver_instance;
       if(s == PARAC_OK) {
-        assert(msg->userdata);
-        auto self = static_cast<ComputeNode*>(msg->userdata);
 
-        parac_module_solver_instance* instance =
-          self->m_store.thisNode().m_node.solver_instance;
         assert(instance);
 
         parac_log(PARAC_BROKER,
@@ -466,6 +466,14 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
         formula.path = self->m_handle.input_file;
         formula.originator = self->m_handle.id;
         self->m_node.send_file_to(&self->m_node, &formula);
+      } else if(s == PARAC_SOLVER_ALREADY_CONFIGURED_ERROR) {
+        parac_log(PARAC_BROKER,
+                  PARAC_GLOBALWARNING,
+                  "After sending solver config for originator {} to compute "
+                  "node {}, it returned a solver already configured warning. "
+                  "Something is wrong here!",
+                  instance->originator_id,
+                  self->m_node.id);
       }
     };
 

@@ -55,6 +55,8 @@ parac_status_to_str(parac_status status) {
       return "Connection already established Error";
     case PARAC_BIND_ERROR:
       return "Bind Error";
+    case PARAC_SOLVER_ALREADY_CONFIGURED_ERROR:
+      return "Solver already configured Error";
     case PARAC_GENERIC_ERROR:
       return "Generic Error";
   }

@@ -7,6 +7,7 @@
 #include "paracooba/common/compute_node_store.h"
 #include "paracooba/common/log.h"
 #include "paracooba/common/noncopy_ostream.hpp"
+#include "paracooba/common/status.h"
 #include "paracooba/common/task_store.h"
 #include "parser_task.hpp"
 #include "sat_handler.hpp"
@@ -309,7 +310,16 @@ instance_handle_message(parac_module_solver_instance* instance,
       break;
     }
     case PARAC_MESSAGE_SOLVER_DESCRIPTION: {
-      assert(!solverInstance->configured);
+      if(solverInstance->configured) {
+        parac_log(PARAC_SOLVER,
+                  PARAC_GLOBALWARNING,
+                  "Received solver config from {}, even though old config was "
+                  "already received: {}",
+                  msg->origin->id,
+                  solverInstance->config);
+        msg->cb(msg, PARAC_SOLVER_ALREADY_CONFIGURED_ERROR);
+        break;
+      }
       {
         cereal::BinaryInputArchive ia(data);
         ia(solverInstance->config);
