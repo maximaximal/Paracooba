@@ -451,8 +451,6 @@ TCPConnection::send(SendQueueEntry&& e) {
 
     if(e.header.kind != PARAC_MESSAGE_KEEPALIVE) {
       s->service.addOutgoingMessageToCounter();
-    } else {
-      assert(s->sendQueue.size() == 0);
     }
 
     s->sendQueue.emplace(std::move(e));
