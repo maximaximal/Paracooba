@@ -2,6 +2,7 @@
 #include <chrono>
 #include <limits>
 #include <memory>
+#include <random>
 #include <ratio>
 #include <variant>
 
@@ -224,13 +225,18 @@ TCPConnectionInitiator::~TCPConnectionInitiator() {
      m_state->connectionTry < m_state->service.connectionRetries()) {
 
     m_state->retry = false;
+    std::default_random_engine generator;
     auto timeout = m_state->service.retryTimeoutMS();
+    std::uniform_int_distribution<size_t> distribution(timeout / 4,
+                                                       timeout * 2);
+    timeout = distribution(generator);
 
     parac_log(
       PARAC_COMMUNICATOR,
       PARAC_TRACE,
       "As TCPConnectionInitiator is closing, a new connection is tried as a "
-      "retry, because this connection was not successful. Using timeout {}ms",
+      "retry, because this connection was not successful. Using randomized "
+      "timeout {}ms",
       timeout);
 
     m_state->timer.expires_from_now(std::chrono::milliseconds(timeout));
@@ -398,6 +404,7 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
                 "Could not connect to endpoint {}! Connection error: {}",
                 m_state->endpoint(),
                 ec.message());
+      m_state->retry = true;
     } else {
       assert(m_state->socket->is_open());
       parac_log(PARAC_COMMUNICATOR,
