@@ -268,6 +268,7 @@ mod_exit(parac_module* mod) {
     static_cast<CommunicatorUserdata*>(mod->userdata);
   if(userdata) {
     delete userdata;
+    mod->userdata = nullptr;
   }
 
   return PARAC_OK;

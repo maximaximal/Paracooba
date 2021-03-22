@@ -512,6 +512,7 @@ mod_exit(parac_module* mod) {
   if(mod->userdata) {
     SolverUserdata* userdata = static_cast<SolverUserdata*>(mod->userdata);
     delete userdata;
+    mod->userdata = nullptr;
   }
 
   return PARAC_OK;

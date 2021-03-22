@@ -100,6 +100,7 @@ mod_exit(parac_module* mod) {
     RunnerUserdata* runnerUserdata =
       static_cast<RunnerUserdata*>(mod->userdata);
     delete runnerUserdata;
+    mod->userdata = nullptr;
   }
 
   return PARAC_OK;

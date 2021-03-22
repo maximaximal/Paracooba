@@ -167,6 +167,7 @@ mod_exit(parac_module* mod) {
   if(mod->userdata) {
     BrokerUserdata* userdata = static_cast<BrokerUserdata*>(mod->userdata);
     delete userdata;
+    mod->userdata = nullptr;
   }
 
   return PARAC_OK;
