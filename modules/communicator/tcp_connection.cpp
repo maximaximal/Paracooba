@@ -523,11 +523,6 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
 
   if(!s->compute_node) {
     delete conn;
-    parac_log(PARAC_COMMUNICATOR,
-              PARAC_TRACE,
-              "Connection to {} already established previously, dropping new "
-              "connection.",
-              init.sender_id);
     return false;
   }
 
