@@ -479,19 +479,19 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
     msg.data, msg.length);
 
   {
-    cereal::BinaryInputArchive ia(data);
+    SpinLock lock(m_modifyingStatus);
     {
-      SpinLock lock(m_modifyingStatus);
+      cereal::BinaryInputArchive ia(data);
       ia(m_status);
     }
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Got status from {}: {}, message length: {}B",
+              msg.origin->id,
+              m_status,
+              msg.length);
     m_status.m_dirty = true;
   }
-  parac_log(PARAC_BROKER,
-            PARAC_TRACE,
-            "Got status from {}: {}, message length: {}B",
-            msg.origin->id,
-            m_status,
-            msg.length);
 
   // Check if the target needs some tasks according to offloading heuristic.
   float utilization = computeUtilization();
@@ -595,12 +595,13 @@ ComputeNode::tryToOffloadTask() {
     m_node.send_message_to(&m_node, &msg);
     return true;
   } else {
+    auto [s, l] = status();
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Not offloading to {} because no fitting task was found (status "
               "of this node: {}).",
               m_node.id,
-              m_status);
+              s);
   }
   return false;
 }
@@ -608,10 +609,11 @@ ComputeNode::tryToOffloadTask() {
 void
 ComputeNode::conditionallySendStatusTo(const Status& s) {
   if(!m_node.available_to_send_to(&m_node)) {
+    auto [s, l] = status();
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Cannot send status {} to {} because not available to send to.",
-              m_status,
+              s,
               m_node.id);
     return;
   }
