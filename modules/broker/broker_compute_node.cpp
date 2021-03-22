@@ -422,8 +422,10 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
     bn->notifyOfNewRemote(static_cast<parac_compute_node_wrapper&>(m_node));
   }
 
-  SpinLock lock(m_modifyingStatus);
-  m_status.insertWorkerCount(m_description->workers);
+  {
+    SpinLock lock(m_modifyingStatus);
+    m_status.insertWorkerCount(m_description->workers);
+  }
 
   if(m_handle.input_file &&
      !m_status.solverInstances[m_handle.id].formula_received) {
@@ -487,18 +489,23 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
     msg.data, msg.length);
 
   {
-    SpinLock lock(m_modifyingStatus);
+    Status s;
     {
       cereal::BinaryInputArchive ia(data);
-      ia(m_status);
+      ia(s);
     }
+    {
+      SpinLock lock(m_modifyingStatus);
+      m_status = s;
+      m_status.m_dirty = true;
+    }
+
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Got status from {}: {}, message length: {}B",
               msg.origin->id,
-              m_status,
+              s,
               msg.length);
-    m_status.m_dirty = true;
   }
 
   // Check if the target needs some tasks according to offloading heuristic.
@@ -659,10 +666,14 @@ ComputeNode::conditionallySendStatusTo(const Status& s) {
       ComputeNode& self = *static_cast<ComputeNode*>(msg->userdata);
       self.m_sendingStatusTo.clear();
 
-      auto [s, lock] = self.m_store.thisNode().status();
+      Status thisS;
+      {
+        auto [s, lock] = self.m_store.thisNode().status();
+        thisS = s;
+      }
       if(self.m_remotelyKnownLocalStatus.has_value() &&
-         Status::isDiffWorthwhile(*self.m_remotelyKnownLocalStatus, s)) {
-        self.conditionallySendStatusTo(s);
+         Status::isDiffWorthwhile(*self.m_remotelyKnownLocalStatus, thisS)) {
+        self.conditionallySendStatusTo(thisS);
       }
     }
   };
