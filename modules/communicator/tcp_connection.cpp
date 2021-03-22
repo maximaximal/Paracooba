@@ -337,13 +337,14 @@ TCPConnection::async_write(S& socket, B&& buffer, CB& cb) {
 
 template<typename S, typename B, typename CB>
 void
-TCPConnection::async_read(S& socket, B&& buffer, CB cb) {
-  auto timeout_handler = [cb](const boost::system::error_code& ec) {
+TCPConnection::async_read(S& socket, B&& buffer, CB cb, parac_id remoteId) {
+  auto timeout_handler = [cb, remoteId](const boost::system::error_code& ec) {
     if(!ec) {
       // The read timed out! Call the CB with a timeout error.
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_GLOBALWARNING,
-                "Connection run into timeout!");
+                "Connection to {} run into timeout!",
+                remoteId);
 
       std::function<void(boost::system::error_code, size_t)> timeout_func = cb;
       timeout_func(boost::system::error_code(boost::system::errc::timed_out,
@@ -822,7 +823,8 @@ TCPConnection::readHandler(boost::system::error_code ec,
   }
 
   reenter(&s->readCoro) {
-    yield async_read(*s->socket, BUF(s->readInitiatorMessage), rh);
+    yield async_read(
+      *s->socket, BUF(s->readInitiatorMessage), rh, s->remoteId());
 
     if(ec) {
       parac_log(
@@ -855,7 +857,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
         return;
       }
 
-      yield async_read(*s->socket, BUF(s->readHeader), rh);
+      yield async_read(*s->socket, BUF(s->readHeader), rh, s->remoteId());
 
       if(ec) {
         if(ec == boost::system::errc::connection_reset ||
@@ -906,7 +908,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
             s->readHeader.number);
         }
       } else if(s->readHeader.kind == PARAC_MESSAGE_FILE) {
-        yield async_read(*s->socket, BUF(s->readFileHeader), rh);
+        yield async_read(*s->socket, BUF(s->readFileHeader), rh, s->remoteId());
         if(ec) {
           parac_log(PARAC_COMMUNICATOR,
                     PARAC_LOCALERROR,
@@ -925,7 +927,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
         while(s->readHeader.size > 0) {
           s->recvBuf.resize(
             std::min((unsigned long)REC_BUF_SIZE, s->readHeader.size));
-          yield async_read(*s->socket, VBUF(s->recvBuf), rh);
+          yield async_read(*s->socket, VBUF(s->recvBuf), rh, s->remoteId());
 
           if(ec) {
             parac_log(
@@ -997,7 +999,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
           return;
         }
         s->recvBuf.resize(s->readHeader.size);
-        yield async_read(*s->socket, VBUF(s->recvBuf), rh);
+        yield async_read(*s->socket, VBUF(s->recvBuf), rh, s->remoteId());
 
         if(ec || bytes_received != s->readHeader.size ||
            bytes_received != s->recvBuf.size()) {

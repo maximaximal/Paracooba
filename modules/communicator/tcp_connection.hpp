@@ -9,6 +9,7 @@
 #include <boost/asio/ip/tcp.hpp>
 
 #include <paracooba/common/status.h>
+#include <paracooba/common/types.h>
 
 struct parac_message;
 struct parac_file;
@@ -130,7 +131,7 @@ class TCPConnection {
   inline void async_write(S& socket, B&& buffer, CB& cb);
 
   template<typename S, typename B, typename CB>
-  inline void async_read(S& socket, B&& buffer, CB cb);
+  inline void async_read(S& socket, B&& buffer, CB cb, parac_id remoteId);
 
   void close();
 
