@@ -233,12 +233,14 @@ struct TCPConnection::State {
               service, cachedRemoteEndpoint, nullptr, ++connectionTry, true);
             initiator->setTCPConnectionPayload(generatePayload());
 
-            service.setTimeout(timeout, initiator, [](parac_timeout* t) {
-              TCPConnectionInitiator* initiator =
-                static_cast<TCPConnectionInitiator*>(t->expired_userdata);
-              initiator->run();
-              delete initiator;
-            });
+            parac_timeout* timeout_handle =
+              service.setTimeout(timeout, initiator, [](parac_timeout* t) {
+                TCPConnectionInitiator* initiator =
+                  static_cast<TCPConnectionInitiator*>(t->expired_userdata);
+                initiator->run();
+                delete initiator;
+              });
+            assert(timeout_handle);
           }
           break;
         }
@@ -835,7 +837,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
         "reading initiator message: {}",
         s->remote_endpoint(),
         s->remoteId(),
-        ec);
+        ec.message());
       return;
     }
 
@@ -854,7 +856,7 @@ TCPConnection::readHandler(boost::system::error_code ec,
           "reading: {}",
           s->remote_endpoint(),
           s->remoteId(),
-          ec);
+          ec.message());
         return;
       }
 
@@ -866,8 +868,9 @@ TCPConnection::readHandler(boost::system::error_code ec,
           // No spamming about reset connections!
           parac_log(PARAC_COMMUNICATOR,
                     PARAC_TRACE,
-                    "Connection to {} reset. Ending connection.",
-                    s->remoteId());
+                    "Connection to {} reset. Error: {}. Ending connection.",
+                    s->remoteId(),
+                    ec.message());
           return;
         }
         parac_log(
