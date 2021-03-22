@@ -21,13 +21,17 @@ class TCPConnectionInitiator {
   TCPConnectionInitiator(Service& service,
                          const std::string& host,
                          Callback cb = nullptr,
-                         int connectionTry = 0);
+                         int connectionTry = 0,
+                         bool delayed = false);
   TCPConnectionInitiator(Service& service,
                          boost::asio::ip::tcp::endpoint endpoint,
                          Callback cb = nullptr,
-                         int connectionTry = 0);
+                         int connectionTry = 0,
+                         bool delayed = false);
   TCPConnectionInitiator(const TCPConnectionInitiator& initiator);
   ~TCPConnectionInitiator();
+
+  void run();
 
   void try_connecting_to_host(
     const ::boost::system::error_code& ec,
@@ -44,6 +48,8 @@ class TCPConnectionInitiator {
   private:
   struct State;
   std::shared_ptr<State> m_state;
+
+  using DelayedRunFunc = std::function<void()>;
 
   void retryConnection();
 };

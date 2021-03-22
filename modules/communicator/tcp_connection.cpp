@@ -26,6 +26,7 @@
 #include <cstdarg>
 #include <functional>
 #include <mutex>
+#include <random>
 
 #include <boost/asio.hpp>
 #include <boost/asio/coroutine.hpp>
@@ -209,19 +210,32 @@ struct TCPConnection::State {
         case RestartAfterShutdown: {
           if(connectionTry >= 0 &&
              connectionTry < service.connectionRetries()) {
+
             // Reconnects only happen if this side of the connection is the
             // original initiating side. The other side will end the connection.
 
+            std::default_random_engine generator;
+            std::uniform_int_distribution<size_t> distribution(200, 1200);
+            size_t timeout = distribution(generator);
+
             parac_log(PARAC_COMMUNICATOR,
                       PARAC_TRACE,
-                      "Reconnect to endpoint {} (remote id {}), try {}.",
+                      "Reconnect to endpoint {} (remote id {}), try {} after "
+                      "random timeout ({}ms)",
                       remote_endpoint(),
                       remoteId(),
-                      connectionTry);
-            TCPConnectionInitiator initiator(
-              service, cachedRemoteEndpoint, nullptr, ++connectionTry);
+                      connectionTry,
+                      timeout);
 
-            initiator.setTCPConnectionPayload(generatePayload());
+            TCPConnectionInitiator* initiator = new TCPConnectionInitiator(
+              service, cachedRemoteEndpoint, nullptr, ++connectionTry);
+            initiator->setTCPConnectionPayload(generatePayload());
+
+            service.setTimeout(timeout, initiator, [](parac_timeout* t) {
+              TCPConnectionInitiator* initiator =
+                static_cast<TCPConnectionInitiator*>(t->expired_userdata);
+              initiator->run();
+            });
           }
           break;
         }

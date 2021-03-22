@@ -117,6 +117,7 @@ struct TCPConnectionInitiator::State {
   using TCPConnectionPayloadPtr =
     std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>;
   TCPConnectionPayloadPtr payload = TCPConnectionPayloadPtr(nullptr, nullptr);
+  DelayedRunFunc runFunc;
 
   std::variant<HostConnection, EndpointConnection> conn;
 
@@ -149,7 +150,8 @@ struct TCPConnectionInitiator::State {
 TCPConnectionInitiator::TCPConnectionInitiator(Service& service,
                                                const std::string& host,
                                                Callback cb,
-                                               int connectionTry) {
+                                               int connectionTry,
+                                               bool delayed) {
   std::string connectionString = host;
   uint16_t port = ExtractPortFromConnectionString(
     connectionString, service.defaultTCPTargetPort());
@@ -157,7 +159,7 @@ TCPConnectionInitiator::TCPConnectionInitiator(Service& service,
   parac_log(
     PARAC_COMMUNICATOR,
     PARAC_TRACE,
-    "Starting TCPConnectionInitiator to connect to host {} with port {}.",
+    "Creating TCPConnectionInitiator to connect to host {} with port {}.",
     host,
     port);
 
@@ -169,8 +171,8 @@ TCPConnectionInitiator::TCPConnectionInitiator(Service& service,
 #endif
 
   if(!ec) {
-    // The address could be parsed! This means we have a defined endpoint that
-    // does not have to be resolved.
+    // The address could be parsed! This means we have a defined endpoint
+    // that does not have to be resolved.
     auto endpoint = boost::asio::ip::tcp::endpoint(address, port);
     parac_log(PARAC_COMMUNICATOR,
               PARAC_TRACE,
@@ -178,27 +180,41 @@ TCPConnectionInitiator::TCPConnectionInitiator(Service& service,
               host,
               endpoint);
     m_state = std::make_shared<State>(service, endpoint, cb, connectionTry);
-    try_connecting_to_endpoint(boost::system::error_code());
+    m_state->runFunc = [*this]() mutable {
+      try_connecting_to_endpoint(boost::system::error_code());
+    };
   } else {
     // Definitely no address, so try to resolve using DNS.
     m_state = std::make_shared<State>(
       service, connectionString, port, cb, connectionTry);
-    try_connecting_to_host(boost::system::error_code(),
-                           boost::asio::ip::tcp::resolver::iterator());
+    m_state->runFunc = [*this]() mutable {
+      try_connecting_to_host(boost::system::error_code(),
+                             boost::asio::ip::tcp::resolver::iterator());
+    };
+  }
+
+  if(!delayed) {
+    m_state->runFunc();
   }
 }
 TCPConnectionInitiator::TCPConnectionInitiator(
   Service& service,
   boost::asio::ip::tcp::endpoint endpoint,
   Callback cb,
-  int connectionTry)
+  int connectionTry,
+  bool delayed)
   : m_state(std::make_shared<State>(service, endpoint, cb, connectionTry)) {
   parac_log(PARAC_COMMUNICATOR,
             PARAC_TRACE,
             "Starting TCPConnectionInitiator to connect to endpoint {}.",
             endpoint);
 
-  try_connecting_to_endpoint(boost::system::error_code());
+  m_state->runFunc = [*this]() mutable {
+    try_connecting_to_endpoint(boost::system::error_code());
+  };
+  if(!delayed) {
+    m_state->runFunc();
+  }
 }
 TCPConnectionInitiator::TCPConnectionInitiator(
   const TCPConnectionInitiator& initiator)
@@ -406,5 +422,10 @@ TCPConnectionInitiator::isEndpointSameAsLocalTCPAcceptor(
   const boost::asio::ip::tcp::endpoint& e) const {
   return e.port() == m_state->service.currentTCPListenPort() &&
          e.address() == m_state->service.tcpAcceptorAddress();
+}
+
+void
+TCPConnectionInitiator::run() {
+  m_state->runFunc();
 }
 }
