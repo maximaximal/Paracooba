@@ -9,6 +9,7 @@
 #include "tcp_connection_initiator.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/error.hpp>
 #include <thread>
@@ -187,7 +188,8 @@ struct TCPConnection::State {
     , sentBuffer(std::move(ptr->map))
     , readTimer(service.ioContext())
     , keepaliveTimer(service.ioContext()) {
-    service.addOutgoingMessageToCounter(sendQueue.size());
+    sendQueueTrackedSize += sendQueue.size();
+    service.addOutgoingMessageToCounter(sendQueueTrackedSize);
   }
 
   ~State() {
@@ -204,7 +206,7 @@ struct TCPConnection::State {
       compute_node->connection_string = nullptr;
       compute_node = nullptr;
     }
-    service.removeOutgoingMessageFromCounter(sendQueue.size());
+    service.removeOutgoingMessageFromCounter(sendQueueTrackedSize);
     if(!service.stopped()) {
       switch(resumeMode) {
         case RestartAfterShutdown: {
@@ -215,7 +217,7 @@ struct TCPConnection::State {
             // original initiating side. The other side will end the connection.
 
             std::default_random_engine generator;
-            std::normal_distribution<size_t> distribution(1200, 200);
+            std::normal_distribution<> distribution(1200, 200);
             size_t timeout = distribution(generator);
 
             parac_log(PARAC_COMMUNICATOR,
@@ -317,6 +319,9 @@ struct TCPConnection::State {
   boost::asio::ip::tcp::endpoint cachedRemoteEndpoint;
 
   std::queue<SendQueueEntry> sendQueue;
+  std::atomic_size_t sendQueueTrackedSize =
+    0;/// The tracked size of outgoing messages does not count some internal
+      /// messages (keep alives), as keepalives do not send ACKs.
   using SentBuffer = std::map<decltype(PacketHeader::number), SendQueueEntry>;
   SentBuffer sentBuffer;
 
@@ -469,6 +474,7 @@ TCPConnection::send(SendQueueEntry&& e) {
     }
 
     if(e.header.kind != PARAC_MESSAGE_KEEPALIVE) {
+      ++s->sendQueueTrackedSize;
       s->service.addOutgoingMessageToCounter();
     }
 
@@ -1176,6 +1182,7 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       }
 
       if(e->header.kind != PARAC_MESSAGE_KEEPALIVE) {
+        --s->sendQueueTrackedSize;
         s->service.removeOutgoingMessageFromCounter();
       }
 
