@@ -39,7 +39,9 @@ struct CaDiCaLHandle::Internal {
     , terminator(stop)
     , originatorId(originatorId)
     , pregeneratedCubes(pregeneratedCubes)
-    , pregeneratedCubesJumplist(pregeneratedCubesJumplist) {}
+    , pregeneratedCubesJumplist(pregeneratedCubesJumplist) {
+    solver.connect_terminator(&terminator);
+  }
   parac_handle& handle;
   CaDiCaL::Solver solver;
   size_t pregeneratedCubesCount = 0;
