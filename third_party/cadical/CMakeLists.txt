@@ -9,8 +9,8 @@ endif()
 
 ExternalProject_Add(cadical
     PREFIX cadical
-    URL ${CMAKE_CURRENT_SOURCE_DIR}/cadical-3b18d05.tar.gz
-    URL_HASH SHA256=3651f3e28f404f38df754b747923b5332e02dfdd843f216c05d40534fae36d44
+    URL ${CMAKE_CURRENT_SOURCE_DIR}/cadical-34661ad.tar.gz
+    URL_HASH SHA256=c079b3951d2a98c60ae61311f2fc5225519986edc1724c90b257f36839aa8b15
     BUILD_IN_SOURCE 1
     BUILD_COMMAND bash -c "./configure -q CXX=${CMAKE_CXX_COMPILER} CXXFLAGS=\"-fPIC ${CADICAL_SANITIZER_OPTIONS} -fvisibility=hidden\" && ${MAKE_COMMAND} -C build libcadical.a"
     UPDATE_COMMAND ""
