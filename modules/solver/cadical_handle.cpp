@@ -298,12 +298,12 @@ std::pair<parac_status, std::optional<std::pair<Cube, Cube>>>
 CaDiCaLHandle::resplitOnce(parac_path path, Cube literals) {
   parac_log(
     PARAC_CUBER, PARAC_TRACE, "CNF formula for path {} splitted.", path);
+  parac_log(
+    PARAC_CUBER, PARAC_TRACE, "Cube lit: {}", fmt::join(literals, ", "));
 
   Cube literals2(literals);
-  for(auto lit : literals) {
-    parac_log(PARAC_CUBER, PARAC_TRACE, "Cube lit: {}", lit);
-    m_internal->solver.assume(lit);
-  }
+
+  applyCubeAsAssumption(literals);
 
   Literal lit_to_split = m_internal->solver.lookahead();
   m_internal->solver.reset_assumptions();
