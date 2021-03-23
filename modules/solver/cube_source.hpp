@@ -3,11 +3,12 @@
 #include <boost/utility/base_from_member.hpp>
 
 #include <cereal/archives/binary.hpp>
+#include <cereal/types/optional.hpp>
 #include <cereal/types/polymorphic.hpp>
 #include <cereal/types/vector.hpp>
 
-#include <paracooba/solver/types.hpp>
 #include <paracooba/solver/cube_iterator.hpp>
+#include <paracooba/solver/types.hpp>
 
 #include <memory>
 #include <variant>
@@ -55,7 +56,7 @@ class PathDefined : public Source {
   virtual std::unique_ptr<Source> copy() const;
 
   template<class Archive>
-  void serialize(Archive &ar) {
+  void serialize(Archive& ar) {
     ar(0);
   }
 };
@@ -78,7 +79,7 @@ class Supplied : public Source {
   virtual std::unique_ptr<Source> copy() const;
 
   template<class Archive>
-  void serialize(Archive &ar) {
+  void serialize(Archive& ar) {
     ar(m_cube);
   }
 
@@ -102,9 +103,42 @@ class Unspecified : public Source {
   virtual std::unique_ptr<Source> copy() const;
 
   template<class Archive>
-  void serialize(Archive &ar) {
+  void serialize(Archive& ar) {
     ar(0);
   }
+};
+
+/** @brief CaDiCaL is used to compute cubes on first split call. */
+class CaDiCaLCubes : public Source {
+  public:
+  explicit CaDiCaLCubes();
+  virtual ~CaDiCaLCubes();
+
+  /** @brief Set a start point for the CaDiCaL cubing mechanism. Cubes will
+   * start with +lit and -lit.
+   */
+  void setStartLiteral(Literal lit) { m_startingLiteral = lit; }
+
+  /** @brief First call to cube runs CaDiCaL's splitting algorithm with
+   * optionally applied starting lit. */
+  virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
+  virtual bool split(parac_path p,
+                     CaDiCaLManager& mgr,
+                     const CaDiCaLHandle& handle,
+                     bool& left,
+                     bool& right) const;
+  virtual const char* name() const { return "CaDiCaLCubes"; }
+  virtual std::unique_ptr<Source> copy() const;
+
+  template<class Archive>
+  void serialize(Archive& ar) {
+    ar(m_startingLiteral, m_pregeneratedCubes, m_pregeneratedJumplist);
+  }
+
+  private:
+  Literal m_startingLiteral = 0;
+  std::optional<Cube> m_pregeneratedCubes;
+  std::optional<Cube> m_pregeneratedJumplist;
 };
 
 using Variant = std::variant<cubesource::PathDefined,

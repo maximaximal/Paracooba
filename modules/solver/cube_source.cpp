@@ -115,14 +115,45 @@ std::unique_ptr<Source>
 Unspecified::copy() const {
   return std::make_unique<Unspecified>(*this);
 }
+
+CaDiCaLCubes::CaDiCaLCubes() = default;
+CaDiCaLCubes::~CaDiCaLCubes() = default;
+
+CubeIteratorRange
+CaDiCaLCubes::cube(parac_path p, CaDiCaLManager& mgr) {
+  (void)p;
+  (void)mgr;
+  return CubeIteratorRange();
+}
+
+bool
+CaDiCaLCubes::split(parac_path p,
+                    CaDiCaLManager& mgr,
+                    const CaDiCaLHandle& handle,
+                    bool& left,
+                    bool& right) const {
+  (void)p;
+  (void)mgr;
+  (void)handle;
+  left = false;
+  right = false;
+  return false;
+}
+std::unique_ptr<Source>
+CaDiCaLCubes::copy() const {
+  return std::make_unique<CaDiCaLCubes>(*this);
+}
 }
 
 CEREAL_REGISTER_TYPE(parac::solver::cubesource::PathDefined)
 CEREAL_REGISTER_TYPE(parac::solver::cubesource::Supplied)
 CEREAL_REGISTER_TYPE(parac::solver::cubesource::Unspecified)
+CEREAL_REGISTER_TYPE(parac::solver::cubesource::CaDiCaLCubes)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(parac::solver::cubesource::Source,
                                      parac::solver::cubesource::PathDefined)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(parac::solver::cubesource::Source,
                                      parac::solver::cubesource::Supplied)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(parac::solver::cubesource::Source,
                                      parac::solver::cubesource::Unspecified)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(parac::solver::cubesource::Source,
+                                     parac::solver::cubesource::CaDiCaLCubes)
