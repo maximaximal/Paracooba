@@ -11,6 +11,7 @@
 #include <mutex>
 
 #include <boost/pool/pool_alloc.hpp>
+#include <thread>
 
 namespace parac::communicator {
 struct TimeoutController::Internal {
@@ -27,28 +28,33 @@ struct TimeoutController::Internal {
 
   using TimeoutList = std::list<Timeout, Allocator<Timeout>>;
 
-  using TimerPool = boost::singleton_pool<boost::asio::steady_timer,
-                                          sizeof(boost::asio::steady_timer)>;
-
   struct Timeout {
     TimeoutList::iterator it;
     parac_timeout timeout;
-    boost::asio::steady_timer* timer;
-    boost::pool<>* pool;
 
-    // Also deletes the current timeout!
-    void cancel() { timer->cancel(); }
+    /// Memory for steady_timer that is aligned for all possible internal
+    /// use-cases.
+    std::uint64_t
+      timerMem[sizeof(boost::asio::steady_timer) / sizeof(std::uint64_t)];
+
+    boost::asio::steady_timer& timer() {
+      return *reinterpret_cast<boost::asio::steady_timer*>(timerMem);
+    }
+
+    /// Also deletes the current timeout!
+    void cancel() { timer().cancel(); }
 
     Timeout(Service& service) {
-      void* mem = TimerPool::malloc();
-      timer = new(mem) boost::asio::steady_timer(service.ioContext());
+      // Creates a new timer in the available space.
+      new(&timer()) boost::asio::steady_timer(service.ioContext());
     }
     ~Timeout() {
       if(timeout.expired) {
         timeout.expired(&timeout);
         timeout.expired = nullptr;
       }
-      TimerPool::free(timer);
+      using boost::asio::steady_timer;
+      timer().~steady_timer();
     }
   };
 
@@ -93,8 +99,8 @@ TimeoutController::setTimeout(uint64_t ms,
     TimeoutController* c = static_cast<TimeoutController*>(t->cancel_userdata);
     c->cancel(t);
   };
-  elem->timer->expires_from_now(std::chrono::milliseconds(ms));
-  elem->timer->async_wait([this, elem](const boost::system::error_code& errc) {
+  elem->timer().expires_from_now(std::chrono::milliseconds(ms));
+  elem->timer().async_wait([this, elem](const boost::system::error_code& errc) {
     if(!errc) {
       if(elem->timeout.expired) {
         elem->timeout.expired(&elem->timeout);
@@ -104,8 +110,17 @@ TimeoutController::setTimeout(uint64_t ms,
   });
   return &elem->timeout;
 }
+
 void
 TimeoutController::cancel(parac_timeout* timeout) {
+  if(std::this_thread::get_id() == m_service.ioContextThreadId()) {
+    cancelIOThread(timeout);
+  } else {
+    m_service.ioContext().post([this, timeout]() { cancelIOThread(timeout); });
+  }
+}
+void
+TimeoutController::cancelIOThread(parac_timeout* timeout) {
   assert(timeout);
   assert(timeout->cancel_userdata);
 

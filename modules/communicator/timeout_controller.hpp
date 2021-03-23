@@ -21,5 +21,7 @@ class TimeoutController {
   struct Internal;
   std::unique_ptr<Internal> m_internal;
   Service& m_service;
+
+  void cancelIOThread(parac_timeout* timeout);
 };
 }
