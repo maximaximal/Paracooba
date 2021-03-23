@@ -628,6 +628,9 @@ ComputeNode::conditionallySendStatusTo(const Status& s) {
               m_node.id);
     return;
   }
+  if(m_sendingStatusTo.test_and_set()) {
+    return;
+  }
   if(m_remotelyKnownLocalStatus.has_value() &&
      !Status::isDiffWorthwhile(*m_remotelyKnownLocalStatus, s)) {
     parac_log(PARAC_BROKER,
@@ -637,9 +640,7 @@ ComputeNode::conditionallySendStatusTo(const Status& s) {
               s,
               m_node.id,
               *m_remotelyKnownLocalStatus);
-    return;
-  }
-  if(m_sendingStatusTo.test_and_set()) {
+    m_sendingStatusTo.clear();
     return;
   }
 
@@ -664,7 +665,6 @@ ComputeNode::conditionallySendStatusTo(const Status& s) {
       assert(msg);
       assert(msg->userdata);
       ComputeNode& self = *static_cast<ComputeNode*>(msg->userdata);
-      self.m_sendingStatusTo.clear();
 
       Status thisS;
       {
@@ -673,7 +673,10 @@ ComputeNode::conditionallySendStatusTo(const Status& s) {
       }
       if(self.m_remotelyKnownLocalStatus.has_value() &&
          Status::isDiffWorthwhile(*self.m_remotelyKnownLocalStatus, thisS)) {
+        self.m_sendingStatusTo.clear();
         self.conditionallySendStatusTo(thisS);
+      } else {
+        self.m_sendingStatusTo.clear();
       }
     }
   };
