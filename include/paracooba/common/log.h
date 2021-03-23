@@ -114,7 +114,7 @@ parac_log(parac_log_channel channel,
           const Args&... args) {
   if(!parac_log_enabled(channel, severity))
     return;
-  parac_log(channel, severity, fmt, args...);
+  parac_log(channel, severity, fmt, std::forward<const Args>(args)...);
 }
 template<typename FormatString, typename... Args>
 void
@@ -126,7 +126,7 @@ parac_log(parac_log_channel channel,
     return;
   try {
     fmt::memory_buffer buf;
-    fmt::format_to(buf, fmt, args...);
+    fmt::format_to(buf, fmt, std::forward<const Args>(args)...);
     parac_log(channel, severity, std::string_view(buf.data(), buf.size()));
   } catch(...) {
   }
