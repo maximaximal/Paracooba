@@ -41,6 +41,8 @@ class Source {
     return self;
   };
 
+  virtual uint32_t prePathSortingCritereon() { return 0; }
+
   // Also include serialize functions!
 };
 
@@ -72,8 +74,9 @@ class PathDefined : public Source {
 class Supplied : public Source {
   public:
   Supplied();
-  explicit Supplied(const Cube& cube)
-    : m_cube(cube) {}
+  explicit Supplied(const Cube& cube, uint32_t prePathSortingCritereon)
+    : m_cube(cube)
+    , m_prePathSortingCritereon(prePathSortingCritereon) {}
   virtual ~Supplied();
 
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
@@ -87,11 +90,16 @@ class Supplied : public Source {
 
   template<class Archive>
   void serialize(Archive& ar) {
-    ar(m_cube);
+    ar(m_cube, m_prePathSortingCritereon);
+  }
+
+  virtual uint32_t prePathSortingCritereon() {
+    return m_prePathSortingCritereon;
   }
 
   private:
   Cube m_cube;
+  uint32_t m_prePathSortingCritereon;
 };
 
 /** @brief Cube is supplied by parent. */
@@ -145,8 +153,12 @@ class CaDiCaLCubes : public Source {
   virtual std::shared_ptr<Source> leftChild(std::shared_ptr<Source> self);
   virtual std::shared_ptr<Source> rightChild(std::shared_ptr<Source> self);
 
-  uint32_t concurrentCubeTreeNumber() const {
+  inline uint32_t concurrentCubeTreeNumber() const {
     return m_concurrentCubeTreeNumber;
+  }
+
+  virtual uint32_t prePathSortingCritereon() {
+    return concurrentCubeTreeNumber();
   }
 
   private:

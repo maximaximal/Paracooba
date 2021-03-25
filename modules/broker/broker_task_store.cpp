@@ -519,10 +519,13 @@ TaskStore::assess_task(parac_task* task) {
 
   parac_log(PARAC_BROKER,
             PARAC_TRACE,
-            "Assessing task on path {} to state {}. Current result {}. Work "
+            "Assessing task on path {} (pre-psc: {}, post-psc: {}) to state "
+            "{}. Current result {}. Work "
             "available in store: "
             "{}, tasks in store: {}",
             task->path,
+            task->pre_path_sorting_critereon,
+            task->post_path_sorting_critereon,
             task->state,
             task->result,
             m_internal->tasksWaitingForWorkerQueueSize,

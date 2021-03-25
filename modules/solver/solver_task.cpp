@@ -279,10 +279,7 @@ SolverTask::create(parac_task& task,
                    std::shared_ptr<cubesource::Source> source) {
   assert(source);
 
-  if(auto cadicalcubes =
-       std::dynamic_pointer_cast<cubesource::CaDiCaLCubes>(source)) {
-    task.pre_path_sorting_critereon = cadicalcubes->concurrentCubeTreeNumber();
-  }
+  task.pre_path_sorting_critereon = source->prePathSortingCritereon();
 
   auto self = manager.createSolverTask(task, source);
   assert(self);
@@ -339,7 +336,8 @@ static parac_task*
 makeTaskFromCube(CaDiCaLManager* manager,
                  parac_task* parent,
                  parac_path path,
-                 const Cube& cube) {
+                 const Cube& cube,
+                 cubesource::Source& parentSource) {
   assert(
     std::none_of(cube.begin(), cube.end(), [](Literal l) { return l == 0; }));
 
@@ -349,8 +347,10 @@ makeTaskFromCube(CaDiCaLManager* manager,
   parac_task* new_task = parent->task_store->new_task(
     parent->task_store, parent, path, parent->originator);
   assert(new_task);
-  SolverTask::create(
-    *new_task, *manager, std::make_shared<cubesource::Supplied>(cube));
+  SolverTask::create(*new_task,
+                     *manager,
+                     std::make_shared<cubesource::Supplied>(
+                       cube, parentSource.prePathSortingCritereon()));
 
   if(parac_path_get_next_left(parent->path) == path) {
     parent->left_result = PARAC_PENDING;
@@ -369,17 +369,21 @@ static std::vector<SolverTask::CubeTreeElem>
 expandLeftAndRightCube(CaDiCaLManager* manager,
                        parac_task* t,
                        parac_path p,
-                       const std::pair<Cube, Cube>& c) {
+                       const std::pair<Cube, Cube>& c,
+                       cubesource::Source& parentCubeSource) {
   assert(std::none_of(
     c.first.begin(), c.first.end(), [](Literal l) { return l == 0; }));
   assert(std::none_of(
     c.second.begin(), c.second.end(), [](Literal l) { return l == 0; }));
 
-  return { { makeTaskFromCube(manager, t, parac_path_get_next_left(p), c.first),
-             c.first },
-           { makeTaskFromCube(
-               manager, t, parac_path_get_next_right(p), c.second),
-             c.second } };
+  return {
+    { makeTaskFromCube(
+        manager, t, parac_path_get_next_left(p), c.first, parentCubeSource),
+      c.first },
+    { makeTaskFromCube(
+        manager, t, parac_path_get_next_right(p), c.second, parentCubeSource),
+      c.second }
+  };
 }
 
 std::pair<parac_status, std::vector<SolverTask::CubeTreeElem>>
@@ -399,7 +403,7 @@ SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
   assert(left_right_cube.has_value());
 
   std::vector<CubeTreeElem> cubes{ expandLeftAndRightCube(
-    m_manager, m_task, m_task->path, left_right_cube.value()) };
+    m_manager, m_task, m_task->path, left_right_cube.value(), *m_cubeSource) };
 
   auto path_depth = 1 + parac_path_length(path);
   for(int i = path_depth;
@@ -428,8 +432,11 @@ SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
         continue;
       }
       assert(left_and_right_cube.has_value());
-      auto pcubes = expandLeftAndRightCube(
-        m_manager, task, task->path, left_and_right_cube.value());
+      auto pcubes = expandLeftAndRightCube(m_manager,
+                                           task,
+                                           task->path,
+                                           left_and_right_cube.value(),
+                                           *m_cubeSource);
       std::copy(pcubes.begin(), pcubes.end(), std::back_inserter(cubes));
     }
     parac_log(PARAC_CUBER,
