@@ -51,6 +51,8 @@ typedef struct parac_task {
   parac_status left_result;
   parac_status right_result;
   bool stop;
+  uint32_t pre_path_sorting_critereon;
+  uint32_t post_path_sorting_critereon;
   parac_path path;
   parac_worker worker;
   struct parac_compute_node* received_from;
@@ -79,6 +81,14 @@ parac_task_init(parac_task* t);
  */
 parac_task_state
 parac_task_default_assess(struct parac_task* task);
+
+/** @brief Specifies the default order between tasks.
+ *
+ * Based on pre_path_sorting_critereon, path length and
+ * post_path_sorting_critereon.
+ */
+bool
+parac_task_compare(const parac_task* l, const parac_task* r);
 
 #ifdef __cplusplus
 }

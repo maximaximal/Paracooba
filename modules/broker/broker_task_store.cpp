@@ -365,10 +365,9 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
       m_internal->tasksWaitingForWorkerQueue.insert(
         std::lower_bound(m_internal->tasksWaitingForWorkerQueue.begin(),
                          m_internal->tasksWaitingForWorkerQueue.end(),
-                         task->path,
-                         [](const Internal::TaskRef& t, parac_path p) {
-                           return parac_path_length(t.get().path) >
-                                  parac_path_length(p);
+                         task,
+                         [](const Internal::TaskRef& l, parac_task* r) {
+                           return parac_task_compare(&l.get(), r);
                          }),
         *task);
     }

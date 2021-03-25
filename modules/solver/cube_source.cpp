@@ -119,10 +119,10 @@ Unspecified::copy() const {
 
 CaDiCaLCubes::CaDiCaLCubes() = default;
 CaDiCaLCubes::CaDiCaLCubes(Literal splittingLiteral,
-                           size_t concurrentCubeTreeNumber)
+                           uint32_t concurrentCubeTreeNumber)
   : m_splittingLiteral(splittingLiteral)
   , m_concurrentCubeTreeNumber(concurrentCubeTreeNumber) {}
-CaDiCaLCubes::CaDiCaLCubes(Cube currentCube, size_t concurrentCubeTreeNumber)
+CaDiCaLCubes::CaDiCaLCubes(Cube currentCube, uint32_t concurrentCubeTreeNumber)
   : m_currentCube(currentCube)
   , m_concurrentCubeTreeNumber(concurrentCubeTreeNumber) {}
 CaDiCaLCubes::~CaDiCaLCubes() = default;

@@ -119,6 +119,9 @@ parac_task_init(parac_task* t) {
   t->serialize = NULL;
   t->stop = false;
   t->terminate = NULL;
+  t->worker = 0;
+  t->pre_path_sorting_critereon = 0;
+  t->post_path_sorting_critereon = 0;
 }
 
 PARAC_COMMON_EXPORT
@@ -127,4 +130,20 @@ parac_task_state_is_done(parac_task_state s) {
   return !(s & PARAC_TASK_WORK_AVAILABLE) && !(s & PARAC_TASK_WORKING) &&
          ((!(s & PARAC_TASK_SPLITTED) && s & PARAC_TASK_DONE) ||
           ((s & PARAC_TASK_SPLITTED) && (s & PARAC_TASK_SPLITS_DONE)));
+}
+
+PARAC_COMMON_EXPORT bool
+parac_task_compare(const parac_task* l, const parac_task* r) {
+  assert(l);
+  assert(r);
+  bool res = false;
+  if(l->pre_path_sorting_critereon != r->pre_path_sorting_critereon) {
+    return l->pre_path_sorting_critereon < r->pre_path_sorting_critereon;
+  }
+  size_t l_path_length = parac_path_length(l->path);
+  size_t r_path_length = parac_path_length(r->path);
+  if(l_path_length != r_path_length) {
+    return l_path_length > r_path_length;
+  }
+  return l->post_path_sorting_critereon < r->post_path_sorting_critereon;
 }

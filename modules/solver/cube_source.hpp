@@ -120,8 +120,8 @@ class CaDiCaLCubes : public Source {
   public:
   explicit CaDiCaLCubes();
   explicit CaDiCaLCubes(Literal splittingLiteral,
-                        size_t concurrentCubeTreeNumber);
-  explicit CaDiCaLCubes(Cube currentCube, size_t concurrentCubeTreeNumber);
+                        uint32_t concurrentCubeTreeNumber);
+  explicit CaDiCaLCubes(Cube currentCube, uint32_t concurrentCubeTreeNumber);
   explicit CaDiCaLCubes(const CaDiCaLCubes& o) = default;
   virtual ~CaDiCaLCubes();
 
@@ -145,10 +145,14 @@ class CaDiCaLCubes : public Source {
   virtual std::shared_ptr<Source> leftChild(std::shared_ptr<Source> self);
   virtual std::shared_ptr<Source> rightChild(std::shared_ptr<Source> self);
 
+  uint32_t concurrentCubeTreeNumber() const {
+    return m_concurrentCubeTreeNumber;
+  }
+
   private:
   Cube m_currentCube;
   Literal m_splittingLiteral = 0;
-  size_t m_concurrentCubeTreeNumber;
+  uint32_t m_concurrentCubeTreeNumber;
 };
 
 using Variant = std::variant<cubesource::PathDefined,

@@ -17,6 +17,7 @@
 #include "solver_config.hpp"
 #include "solver_task.hpp"
 
+#include <memory>
 #include <paracooba/communicator/communicator.h>
 #include <paracooba/runner/runner.h>
 
@@ -277,6 +278,11 @@ SolverTask::create(parac_task& task,
                    CaDiCaLManager& manager,
                    std::shared_ptr<cubesource::Source> source) {
   assert(source);
+
+  if(auto cadicalcubes =
+       std::dynamic_pointer_cast<cubesource::CaDiCaLCubes>(source)) {
+    task.pre_path_sorting_critereon = cadicalcubes->concurrentCubeTreeNumber();
+  }
 
   auto self = manager.createSolverTask(task, source);
   assert(self);

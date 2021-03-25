@@ -167,7 +167,7 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
                 "parallel cube tree is possible.");
     }
 
-    size_t concurrentCubeTreeNumber = 0;
+    uint32_t concurrentCubeTreeNumber = 0;
     std::transform(startLiterals.begin(),
                    startLiterals.end(),
                    std::back_inserter(m_internal->rootCubeSources),
