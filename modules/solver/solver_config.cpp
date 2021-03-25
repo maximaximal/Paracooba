@@ -6,7 +6,7 @@
 #include <thread>
 
 namespace parac::solver {
-SolverConfig::SolverConfig(parac_config* config) {
+SolverConfig::SolverConfig(parac_config* config, parac_id localId) {
   m_config = parac_config_reserve(config, static_cast<size_t>(Entry::_COUNT));
 
   parac_config_entry_set_str(
@@ -79,6 +79,18 @@ SolverConfig::SolverConfig(parac_config* config) {
     2;
 
   parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(Entry::InitialSplitTimeoutMS)],
+    "initial-split-timeout-ms",
+    "Initial CaDiCaL cubes split timeout at splitting phase (using "
+    "lookahead).");
+  m_config[static_cast<size_t>(Entry::InitialSplitTimeoutMS)].registrar =
+    PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::InitialSplitTimeoutMS)].type =
+    PARAC_TYPE_UINT32;
+  m_config[static_cast<size_t>(Entry::InitialSplitTimeoutMS)]
+    .default_value.uint16 = 30000;
+
+  parac_config_entry_set_str(
     &m_config[static_cast<size_t>(Entry::ConcurrentCubeTreeCount)],
     "concurrent-cube-tree-count",
     "Number of cube-trees to concurrently build at the beginning. Uses "
@@ -113,6 +125,8 @@ SolverConfig::SolverConfig(parac_config* config) {
     PARAC_TYPE_FLOAT;
   m_config[static_cast<size_t>(Entry::SplitMultiplicationFactor)]
     .default_value.f = m_splitMultiplicationFactor;
+
+  m_originatorId = localId;
 }
 
 void
@@ -131,10 +145,14 @@ SolverConfig::extractFromConfigEntries() {
     m_config[static_cast<size_t>(Entry::InitialCubeDepth)].value.uint16;
   m_initialMinimalCubeDepth =
     m_config[static_cast<size_t>(Entry::InitialMinimalCubeDepth)].value.uint16;
+  m_initialSplitTimeoutMS =
+    m_config[static_cast<size_t>(Entry::InitialSplitTimeoutMS)].value.uint32;
   m_fastSplitMultiplicationFactor =
     m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)].value.f;
   m_splitMultiplicationFactor =
     m_config[static_cast<size_t>(Entry::SplitMultiplicationFactor)].value.f;
+  m_concurrentCubeTreeCount =
+    m_config[static_cast<size_t>(Entry::ConcurrentCubeTreeCount)].value.uint16;
 }
 std::ostream&
 operator<<(std::ostream& o, const SolverConfig& config) {

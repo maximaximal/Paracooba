@@ -61,7 +61,7 @@ class CaDiCaLManager {
 
   const SolverConfig& config() const { return m_solverConfig; }
 
-  std::unique_ptr<cubesource::Source> createRootCubeSource();
+  const std::vector<std::shared_ptr<cubesource::Source>>& getRootCubeSources();
 
   const CaDiCaLHandle& parsedFormulaHandle() const;
 
@@ -71,6 +71,7 @@ class CaDiCaLManager {
   void addWaitingSolverTask();
   void removeWaitingSolverTask();
   size_t waitingSolverTasks() const;
+  parac_id getOriginatorId() const;
 
   private:
   struct Internal;

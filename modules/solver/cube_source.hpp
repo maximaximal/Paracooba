@@ -28,11 +28,18 @@ class Source {
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr) = 0;
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
-                     const CaDiCaLHandle& handle,
+                     CaDiCaLHandle& handle,
                      bool& left,
-                     bool& right) const = 0;
+                     bool& right) = 0;
   virtual const char* name() const = 0;
   virtual std::unique_ptr<Source> copy() const = 0;
+
+  virtual std::shared_ptr<Source> leftChild(std::shared_ptr<Source> self) {
+    return self;
+  };
+  virtual std::shared_ptr<Source> rightChild(std::shared_ptr<Source> self) {
+    return self;
+  };
 
   // Also include serialize functions!
 };
@@ -49,9 +56,9 @@ class PathDefined : public Source {
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
-                     const CaDiCaLHandle& handle,
+                     CaDiCaLHandle& handle,
                      bool& left,
-                     bool& right) const;
+                     bool& right);
   virtual const char* name() const { return "PathDefined"; }
   virtual std::unique_ptr<Source> copy() const;
 
@@ -72,9 +79,9 @@ class Supplied : public Source {
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
-                     const CaDiCaLHandle& handle,
+                     CaDiCaLHandle& handle,
                      bool& left,
-                     bool& right) const;
+                     bool& right);
   virtual const char* name() const { return "Supplied"; }
   virtual std::unique_ptr<Source> copy() const;
 
@@ -96,9 +103,9 @@ class Unspecified : public Source {
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
-                     const CaDiCaLHandle& handle,
+                     CaDiCaLHandle& handle,
                      bool& left,
-                     bool& right) const;
+                     bool& right);
   virtual const char* name() const { return "Unspecified"; }
   virtual std::unique_ptr<Source> copy() const;
 
@@ -112,37 +119,41 @@ class Unspecified : public Source {
 class CaDiCaLCubes : public Source {
   public:
   explicit CaDiCaLCubes();
+  explicit CaDiCaLCubes(Literal splittingLiteral,
+                        size_t concurrentCubeTreeNumber);
+  explicit CaDiCaLCubes(Cube currentCube, size_t concurrentCubeTreeNumber);
+  explicit CaDiCaLCubes(const CaDiCaLCubes& o) = default;
   virtual ~CaDiCaLCubes();
 
-  /** @brief Set a start point for the CaDiCaL cubing mechanism. Cubes will
-   * start with +lit and -lit.
-   */
-  void setStartLiteral(Literal lit) { m_startingLiteral = lit; }
-
-  /** @brief First call to cube runs CaDiCaL's splitting algorithm with
-   * optionally applied starting lit. */
   virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
+
+  /** @brief First call to split runs CaDiCaL's splitting algorithm with
+   * optionally applied starting lit. */
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
-                     const CaDiCaLHandle& handle,
+                     CaDiCaLHandle& handle,
                      bool& left,
-                     bool& right) const;
+                     bool& right);
   virtual const char* name() const { return "CaDiCaLCubes"; }
   virtual std::unique_ptr<Source> copy() const;
 
   template<class Archive>
   void serialize(Archive& ar) {
-    ar(m_startingLiteral, m_pregeneratedCubes, m_pregeneratedJumplist);
+    ar(m_currentCube, m_splittingLiteral, m_concurrentCubeTreeNumber);
   }
 
+  virtual std::shared_ptr<Source> leftChild(std::shared_ptr<Source> self);
+  virtual std::shared_ptr<Source> rightChild(std::shared_ptr<Source> self);
+
   private:
-  Literal m_startingLiteral = 0;
-  std::optional<Cube> m_pregeneratedCubes;
-  std::optional<Cube> m_pregeneratedJumplist;
+  Cube m_currentCube;
+  Literal m_splittingLiteral = 0;
+  size_t m_concurrentCubeTreeNumber;
 };
 
 using Variant = std::variant<cubesource::PathDefined,
                              cubesource::Supplied,
+                             cubesource::CaDiCaLCubes,
                              cubesource::Unspecified>;
 }
 }

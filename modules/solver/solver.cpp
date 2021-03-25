@@ -190,11 +190,14 @@ initiate_root_solver_on_file(parac_module& mod,
     i->config = solverUserdata->config;
     i->configured = true;
 
-    parac_task* task = task_store.new_task(
-      &task_store, nullptr, parac_path_unknown(), originatorId);
-    assert(task);
-    SolverTask::createRoot(*task, *i->cadicalManager);
-    task_store.assess_task(&task_store, task);
+    for(auto& rootCubeSource : i->cadicalManager->getRootCubeSources()) {
+      parac_task* task = task_store.new_task(
+        &task_store, nullptr, parac_path_unknown(), originatorId);
+      assert(task);
+      task->path = parac_path_root();
+      SolverTask::create(*task, *i->cadicalManager, rootCubeSource);
+      task_store.assess_task(&task_store, task);
+    }
   };
 
   parac_status status = parse_formula_file(mod, file, originatorId, parserDone);
@@ -549,7 +552,7 @@ parac_module_discover_solver(parac_handle* handle) {
   SolverUserdata* userdata = new SolverUserdata();
   mod->userdata = userdata;
 
-  userdata->config = SolverConfig(handle->config);
+  userdata->config = SolverConfig(handle->config, handle->id);
 
   return PARAC_OK;
 }

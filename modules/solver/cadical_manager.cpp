@@ -62,6 +62,8 @@ struct CaDiCaLManager::Internal {
     acc_averageSolvingTime;
 
   std::atomic_size_t waitingSolverTasks = 0;
+
+  std::vector<std::shared_ptr<cubesource::Source>> rootCubeSources;
 };
 
 CaDiCaLManager::Internal::SolverTaskWrapperList
@@ -82,6 +84,25 @@ getAvailableWorkersFromMod(parac_module& mod) {
   }
   assert(runner);
   return runner->available_worker_count;
+}
+
+static std::vector<Literal>
+MakeStartLiteralVector(CaDiCaLHandle& handle, SolverConfig& solverConfig) {
+  std::vector<Literal> startLiterals;
+  assert(solverConfig.ConcurrentCubeTreeCount() >= 1);
+  if(solverConfig.ConcurrentCubeTreeCount() == 1) {
+    startLiterals.emplace_back(0);
+  } else if(solverConfig.ConcurrentCubeTreeCount() > 1) {
+    CaDiCaLHandle::FastLookaheadResult r =
+      handle.fastLookahead(solverConfig.ConcurrentCubeTreeCount());
+    assert(r.status == PARAC_SPLITTED);
+    assert(r.cubes.size() >= 1);
+    startLiterals = r.cubes[0];
+    for(Literal& l : startLiterals) {
+      l = std::abs(l);
+    }
+  }
+  return startLiterals;
 }
 
 CaDiCaLManager::CaDiCaLManager(parac_module& mod,
@@ -116,22 +137,48 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
     m_internal->solvers.resize(workers);
     m_internal->borrowed.resize(workers);
 
-    // Generate cubes if required.
-    if(solverConfig.CaDiCaLCubes()) {
-      parac_log(PARAC_SOLVER,
-                PARAC_TRACE,
-                "Because --cadical-cubes is active, pregenerate cubes as part "
-                "of formula parsing step of {} from {}.",
-                m_parsedFormula->path(),
-                m_parsedFormula->originatorId());
-      m_parsedFormula->lookahead(solverConfig.InitialCubeDepth(),
-                                 solverConfig.InitialMinimalCubeDepth());
-    }
   } else {
     parac_log(PARAC_SOLVER,
               PARAC_TRACE,
               "Generate dummy CaDiCaLManager for formula that was not parsed "
               "locally, as there are 0 workers.");
+  }
+
+  if(mod.handle->input_file && solverConfig.CaDiCaLCubes()) {
+
+    std::vector<Literal> startLiterals{ 0 };
+
+    if(m_parsedFormula) {
+      startLiterals = MakeStartLiteralVector(*m_parsedFormula, solverConfig);
+      assert(startLiterals.size() >= 1);
+      parac_log(
+        PARAC_SOLVER,
+        PARAC_TRACE,
+        "Because --cadical-cubes is active, produced start literal "
+        "vector containing {} literals to start ({}). Literals are expanded "
+        "in worker thread.",
+        startLiterals.size(),
+        fmt::join(startLiterals, ", "));
+    } else {
+      parac_log(PARAC_SOLVER,
+                PARAC_LOCALWARNING,
+                "The client has no local workers but --cadical-cubes is "
+                "active! Cubes will be expanded on peers, but only one "
+                "parallel cube tree is possible.");
+    }
+
+    size_t concurrentCubeTreeNumber = 0;
+    std::transform(startLiterals.begin(),
+                   startLiterals.end(),
+                   std::back_inserter(m_internal->rootCubeSources),
+                   [&concurrentCubeTreeNumber](Literal lit) {
+                     return std::make_shared<cubesource::CaDiCaLCubes>(
+                       lit, concurrentCubeTreeNumber++);
+                   });
+  } else {
+    m_internal->rootCubeSources = {
+      std::make_shared<cubesource::PathDefined>()
+    };
   }
 }
 CaDiCaLManager::~CaDiCaLManager() {
@@ -232,14 +279,12 @@ CaDiCaLManager::originatorId() const {
   return m_parsedFormula->originatorId();
 }
 
-std::unique_ptr<cubesource::Source>
-CaDiCaLManager::createRootCubeSource() {
-  if(m_solverConfig.PredefinedCubes()) {
-    return std::make_unique<cubesource::PathDefined>();
-  } else {
-    return std::make_unique<cubesource::Unspecified>();
-  }
+const std::vector<std::shared_ptr<cubesource::Source>>&
+CaDiCaLManager::getRootCubeSources() {
+  assert(m_internal->rootCubeSources.size() > 0);
+  return m_internal->rootCubeSources;
 }
+
 const CaDiCaLHandle&
 CaDiCaLManager::parsedFormulaHandle() const {
   return *m_parsedFormula;
@@ -271,5 +316,9 @@ CaDiCaLManager::removeWaitingSolverTask() {
 size_t
 CaDiCaLManager::waitingSolverTasks() const {
   return m_internal->waitingSolverTasks;
+}
+parac_id
+CaDiCaLManager::getOriginatorId() const {
+  return m_solverConfig.OriginatorId();
 }
 }

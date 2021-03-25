@@ -40,6 +40,7 @@ TEST_CASE("Test PathDefined Cube-Source", "[solver][cubesource]") {
   SolverConfig dummyConfig;
   std::unique_ptr<CaDiCaLHandle> dummyHandle =
     std::make_unique<CaDiCaLHandle>(handle, stop, 1);
+  auto& f = *dummyHandle;
   auto [s, outFile] = dummyHandle->prepareString(test_dimacs_str);
   dummyHandle->parseFile(outFile);
 
@@ -50,7 +51,6 @@ TEST_CASE("Test PathDefined Cube-Source", "[solver][cubesource]") {
   CaDiCaLManager dummyManager(
     mod, std::move(dummyHandle), dummyConfig, dummySatHandler);
 
-  const auto& f = dummyManager.parsedFormulaHandle();
   REQUIRE(f.getPregeneratedCubesCount() == 3);
   REQUIRE(f.getCubeFromId(0).size() == 2);
   REQUIRE(f.getCubeFromId(1).size() == 2);

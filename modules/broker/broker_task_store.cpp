@@ -495,6 +495,9 @@ TaskStore::manageAutoShutdownTimer() {
 void
 TaskStore::terminateAllTasks() {
   std::unique_lock lock(m_internal->containerMutex);
+  for(auto& t : m_internal->tasks) {
+    t.t.stop = true;
+  }
   for(auto t : m_internal->tasksBeingWorkedOn) {
     auto& task = t.get();
     if(task.terminate) {

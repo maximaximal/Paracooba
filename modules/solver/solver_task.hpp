@@ -42,7 +42,6 @@ class SolverTask {
   parac_status work(parac_worker worker);
   parac_status serialize_to_msg(parac_message* tgt_msg);
 
-  static SolverTask& createRoot(parac_task& task, CaDiCaLManager& manager);
   static SolverTask& create(parac_task& task,
                             CaDiCaLManager& manager,
                             std::shared_ptr<cubesource::Source> source);

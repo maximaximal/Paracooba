@@ -58,6 +58,8 @@ Worker::run() {
     assert(m_currentTask);
     m_idle = false;
 
+    m_currentTask->worker = m_workerId;
+
     assert(!(m_currentTask->state & PARAC_TASK_WORK_AVAILABLE));
 
     parac_log(PARAC_RUNNER,

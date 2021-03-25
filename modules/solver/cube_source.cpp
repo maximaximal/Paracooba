@@ -1,6 +1,7 @@
 #include "cube_source.hpp"
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
+#include "solver_config.hpp"
 
 #include <paracooba/common/log.h>
 #include <paracooba/common/path.h>
@@ -22,9 +23,9 @@ PathDefined::~PathDefined() {}
 bool
 PathDefined::split(parac_path p,
                    CaDiCaLManager& mgr,
-                   const CaDiCaLHandle& handle,
+                   CaDiCaLHandle& handle,
                    bool& left,
-                   bool& right) const {
+                   bool& right) {
   (void)mgr;
 
   if(handle.getNormalizedPathLength() <
@@ -76,9 +77,9 @@ PathDefined::copy() const {
 bool
 Supplied::split(parac_path p,
                 CaDiCaLManager& mgr,
-                const CaDiCaLHandle& handle,
+                CaDiCaLHandle& handle,
                 bool& left,
-                bool& right) const {
+                bool& right) {
   (void)p;
   (void)mgr;
   (void)handle;
@@ -101,9 +102,9 @@ Unspecified::cube(parac_path p, CaDiCaLManager& mgr) {
 bool
 Unspecified::split(parac_path p,
                    CaDiCaLManager& mgr,
-                   const CaDiCaLHandle& handle,
+                   CaDiCaLHandle& handle,
                    bool& left,
-                   bool& right) const {
+                   bool& right) {
   (void)p;
   (void)mgr;
   (void)handle;
@@ -117,24 +118,64 @@ Unspecified::copy() const {
 }
 
 CaDiCaLCubes::CaDiCaLCubes() = default;
+CaDiCaLCubes::CaDiCaLCubes(Literal splittingLiteral,
+                           size_t concurrentCubeTreeNumber)
+  : m_splittingLiteral(splittingLiteral)
+  , m_concurrentCubeTreeNumber(concurrentCubeTreeNumber) {}
+CaDiCaLCubes::CaDiCaLCubes(Cube currentCube, size_t concurrentCubeTreeNumber)
+  : m_currentCube(currentCube)
+  , m_concurrentCubeTreeNumber(concurrentCubeTreeNumber) {}
 CaDiCaLCubes::~CaDiCaLCubes() = default;
 
 CubeIteratorRange
 CaDiCaLCubes::cube(parac_path p, CaDiCaLManager& mgr) {
   (void)p;
   (void)mgr;
-  return CubeIteratorRange();
+  return CubeIteratorRange(m_currentCube.begin(), m_currentCube.end());
 }
 
 bool
 CaDiCaLCubes::split(parac_path p,
                     CaDiCaLManager& mgr,
-                    const CaDiCaLHandle& handle,
+                    CaDiCaLHandle& handle,
                     bool& left,
-                    bool& right) const {
-  (void)p;
-  (void)mgr;
-  (void)handle;
+                    bool& right) {
+  parac_log(PARAC_CUBER,
+            PARAC_TRACE,
+            "Splitting formula with originator {} from path {} in CaDiCaLCuber "
+            "with splitting lit {} and current cube {} in cube tree number {}",
+            mgr.config().OriginatorId(),
+            p,
+            m_splittingLiteral,
+            fmt::join(m_currentCube, ", "),
+            m_concurrentCubeTreeNumber);
+
+  if(m_splittingLiteral != 0) {
+    // Split was already decided previously! No other split has to be computed
+    // locally.
+    left = true;
+    right = true;
+    return true;
+  } else {
+    // Maybe a splitting literal has to be computed! This depends on the depth
+    // of the current cube and the solver config.
+    if(m_currentCube.size() < mgr.config().InitialMinimalCubeDepth()) {
+      // Split again using resplit!
+      auto r = handle.resplitCube(p, m_currentCube, mgr.config());
+      assert(r.first);
+      assert(r.second != 0);
+      m_splittingLiteral = r.second;
+      left = true;
+      right = true;
+      return true;
+    } else {
+      // Desired depth reached! Now, solving (with potential resplitting)
+      // starts.
+      left = false;
+      right = false;
+      return false;
+    }
+  }
   left = false;
   right = false;
   return false;
@@ -142,6 +183,25 @@ CaDiCaLCubes::split(parac_path p,
 std::unique_ptr<Source>
 CaDiCaLCubes::copy() const {
   return std::make_unique<CaDiCaLCubes>(*this);
+}
+
+std::shared_ptr<Source>
+CaDiCaLCubes::leftChild(std::shared_ptr<Source> selfSource) {
+  auto self = std::dynamic_pointer_cast<CaDiCaLCubes>(selfSource);
+  assert(self);
+  std::shared_ptr<CaDiCaLCubes> copy = std::make_shared<CaDiCaLCubes>(*self);
+  copy->m_currentCube.emplace_back(-copy->m_splittingLiteral);
+  copy->m_splittingLiteral = 0;
+  return copy;
+}
+std::shared_ptr<Source>
+CaDiCaLCubes::rightChild(std::shared_ptr<Source> selfSource) {
+  auto self = std::dynamic_pointer_cast<CaDiCaLCubes>(selfSource);
+  assert(self);
+  std::shared_ptr<CaDiCaLCubes> copy = std::make_shared<CaDiCaLCubes>(*self);
+  copy->m_currentCube.emplace_back(copy->m_splittingLiteral);
+  copy->m_splittingLiteral = 0;
+  return copy;
 }
 }
 

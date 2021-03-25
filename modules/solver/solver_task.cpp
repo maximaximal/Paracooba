@@ -118,7 +118,7 @@ SolverTask::work(parac_worker worker) {
                                      m_task,
                                      parac_path_get_next_left(m_task->path),
                                      m_task->originator);
-      create(*l, *m_manager, m_cubeSource);
+      create(*l, *m_manager, m_cubeSource->leftChild(m_cubeSource));
       assert(m_task->task_store);
       m_task->left_result = PARAC_PENDING;
       m_task->task_store->assess_task(m_task->task_store, l);
@@ -137,7 +137,7 @@ SolverTask::work(parac_worker worker) {
                                      m_task,
                                      parac_path_get_next_right(m_task->path),
                                      m_task->originator);
-      create(*r, *m_manager, m_cubeSource);
+      create(*r, *m_manager, m_cubeSource->rightChild(m_cubeSource));
       m_task->right_result = PARAC_PENDING;
       m_task->task_store->assess_task(m_task->task_store, r);
     } else {
@@ -165,10 +165,12 @@ SolverTask::work(parac_worker worker) {
       parac_log(PARAC_CUBER,
                 PARAC_TRACE,
                 "Start solving CNF formula on path {} using CaDiCaL CNF solver "
+                "with cube {} as assumption "
                 "for roughly "
                 "{}ms before aborting it (fastSplit = {}, "
                 "averageSolvingTimeMS: {}, waitingSolverTasks: {})",
                 path(),
+                cube,
                 duration,
                 m_fastSplit,
                 averageSolvingTime,
@@ -180,9 +182,13 @@ SolverTask::work(parac_worker worker) {
     } else {
       parac_log(PARAC_CUBER,
                 PARAC_TRACE,
-                "Start solving CNF formula on path {} using CaDiCaL CNF "
+                "Start solving CNF formula on path {} and originator id {} "
+                "with cube {} as "
+                "assumption using CaDiCaL CNF "
                 "solver. No resplitting is carried out here.",
-                path());
+                path(),
+                handle.originatorId(),
+                cube);
       splitting_status = PARAC_PENDING;
       auto r = solveOrConditionallyAbort(config, handle, 0);
       s = r.first;
@@ -225,7 +231,8 @@ SolverTask::work(parac_worker worker) {
       }
     }
 
-    if(s == PARAC_SAT || s == PARAC_UNSAT) {
+    if(s == PARAC_SAT || s == PARAC_UNSAT || s == PARAC_ABORTED ||
+       s == PARAC_UNKNOWN) {
       m_task->state = PARAC_TASK_DONE;
     }
 
@@ -266,14 +273,6 @@ SolverTask::serialize_to_msg(parac_message* tgt_msg) {
 }
 
 SolverTask&
-SolverTask::createRoot(parac_task& task, CaDiCaLManager& manager) {
-  auto self = manager.createSolverTask(task, manager.createRootCubeSource());
-  assert(self);
-  task.path = Path::build(0, 0);
-  return *self;
-}
-
-SolverTask&
 SolverTask::create(parac_task& task,
                    CaDiCaLManager& manager,
                    std::shared_ptr<cubesource::Source> source) {
@@ -309,6 +308,10 @@ SolverTask::static_terminate(parac_task* task) {
   if(auto activeHandle = t->m_activeHandle.load()) {
     activeHandle->terminate();
   }
+  parac_log(PARAC_SOLVER,
+            PARAC_DEBUG,
+            "SolverTask in worker {} terminated!",
+            task->worker);
 }
 
 const parac_path&
@@ -459,8 +462,9 @@ SolverTask::resplit(uint64_t durationMS) {
       self->m_timeout = nullptr;
     });
 
-  if(!m_timeout)
+  if(!m_timeout) {
     return { PARAC_ABORTED, {}, 0 };
+  }
 
   auto start = std::chrono::steady_clock::now();
   const int depth = m_fastSplit.split_depth();
@@ -498,6 +502,7 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
                                       uint64_t duration) {
   if((config.Resplit() || duration != 0)) {
     m_interruptSolving = false;
+    assert(!m_timeout);
     m_timeout =
       setTimeout(*m_manager, duration, this, [](parac_timeout* timeout) {
         SolverTask* self = static_cast<SolverTask*>(timeout->expired_userdata);
@@ -514,12 +519,18 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
       });
   }
 
+  if(m_task->stop) {
+    return { PARAC_ABORTED, 0 };
+  }
+
+  m_interruptSolving = false;
   auto start = std::chrono::steady_clock::now();
   parac_status s = handle.solve();
   auto end = std::chrono::steady_clock::now();
 
   if(m_timeout && !m_interruptSolving) {
     m_timeout->cancel(m_timeout);
+    m_timeout = nullptr;
   }
 
   uint64_t solverRuntimeMS =
@@ -528,9 +539,10 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
 
   parac_log(PARAC_CUBER,
             PARAC_TRACE,
-            "Stopped solving after roughly {}ms. Interrupted: {}",
+            "Stopped solving after roughly {}ms. Interrupted: {}. Status: {}",
             solverRuntimeMS,
-            m_interruptSolving);
+            m_interruptSolving,
+            s);
 
   return { s, solverRuntimeMS };
 }

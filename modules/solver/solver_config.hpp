@@ -5,6 +5,8 @@
 #include <cereal/access.hpp>
 #include <cereal/types/vector.hpp>
 
+#include <paracooba/common/types.h>
+
 struct parac_config_entry;
 struct parac_config;
 
@@ -12,7 +14,7 @@ namespace parac::solver {
 class SolverConfig {
   public:
   SolverConfig() = default;
-  explicit SolverConfig(parac_config* config);
+  explicit SolverConfig(parac_config* config, parac_id localId);
   ~SolverConfig() = default;
 
   void extractFromConfigEntries();
@@ -23,6 +25,7 @@ class SolverConfig {
     Resplit,
     InitialCubeDepth,
     InitialMinimalCubeDepth,
+    InitialSplitTimeoutMS,
     FastSplitMultiplicationFactor,
     SplitMultiplicationFactor,
     DisableLocalKissat,
@@ -43,6 +46,8 @@ class SolverConfig {
     return m_splitMultiplicationFactor;
   }
   bool DisableLocalKissat() const { return m_disableLocalKissat; }
+  parac_id OriginatorId() const { return m_originatorId; }
+  uint32_t InitialSplitTimeoutMS() const { return m_initialSplitTimeoutMS; }
 
   private:
   parac_config_entry* m_config = nullptr;
@@ -53,9 +58,11 @@ class SolverConfig {
   bool m_disableLocalKissat = false;
   uint16_t m_initialCubeDepth = 0;
   uint16_t m_initialMinimalCubeDepth = 0;
-  uint16_t m_concurrentCubeTreeCount = 0;
+  uint16_t m_concurrentCubeTreeCount = 1;
   float m_fastSplitMultiplicationFactor = 0.5;
   float m_splitMultiplicationFactor = 2;
+  parac_id m_originatorId = 0;
+  uint32_t m_initialSplitTimeoutMS = 30000;
 
   friend class cereal::access;
   template<class Archive>
@@ -70,7 +77,9 @@ class SolverConfig {
                         m_fastSplitMultiplicationFactor),
        cereal::make_nvp("concurrentCubeTreeCount", m_concurrentCubeTreeCount),
        cereal::make_nvp("splitMultiplicationFactor",
-                        m_splitMultiplicationFactor));
+                        m_splitMultiplicationFactor),
+       cereal::make_nvp("initialSplitTimeoutMS", m_initialSplitTimeoutMS),
+       cereal::make_nvp("originatorId", m_originatorId));
   }
 };
 std::ostream&

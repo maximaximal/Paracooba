@@ -5,6 +5,7 @@
 #include "paracooba/common/status.h"
 #include "paracooba/module.h"
 #include "solver_assignment.hpp"
+#include "solver_config.hpp"
 
 #include "paracooba/common/timeout.h"
 #include "paracooba/communicator/communicator.h"
@@ -261,6 +262,12 @@ CaDiCaLHandle::applyCubeAsAssumption(Cube cube) {
 
 parac_status
 CaDiCaLHandle::solve() {
+  if(m_internal->terminator.stopRef()) {
+    return PARAC_ABORTED;
+  }
+
+  m_internal->terminator.terminateLocally(false);
+
   int r = m_internal->solver.solve();
   switch(r) {
     case 0:
@@ -348,6 +355,66 @@ setTimeout(parac_handle& paracHandle,
   return paracComm->set_timeout(paracCommMod, ms, userdata, expired_cb);
 }
 
+std::pair<parac_status, Literal>
+CaDiCaLHandle::resplitCube(parac_path p,
+                           Cube currentCube,
+                           const SolverConfig& solverConfig) {
+  applyCubeAsAssumption(currentCube);
+
+  assert(!m_lookaheadTimeout);
+
+  m_lookaheadTimeout =
+    setTimeout(m_internal->handle,
+               solverConfig.InitialSplitTimeoutMS(),
+               this,
+               [](parac_timeout* t) {
+                 CaDiCaLHandle* handle =
+                   static_cast<CaDiCaLHandle*>(t->expired_userdata);
+                 handle->m_lookaheadTimeout = nullptr;
+                 handle->m_interruptedLookahead = true;
+                 handle->terminate();
+               });
+
+  Literal lit_to_split = std::abs(m_internal->solver.lookahead());
+
+  if(m_lookaheadTimeout) {
+    m_lookaheadTimeout->cancel(m_lookaheadTimeout);
+    m_lookaheadTimeout = nullptr;
+  }
+
+  m_internal->solver.reset_assumptions();
+
+  if(lit_to_split == 0) {
+    if(m_internal->solver.state() == CaDiCaL::SATISFIED) {
+      return { PARAC_SAT, {} };
+    } else if(m_internal->solver.state() == CaDiCaL::UNSATISFIED) {
+      return { PARAC_UNSAT, {} };
+    } else {
+      parac_log(
+        PARAC_CUBER,
+        PARAC_TRACE,
+        "Cannot split formula with originator id {} on path {} (current cube: "
+        "{}) again! CaDiCaL Lookahead returned 0.",
+        originatorId(),
+        p,
+        fmt::join(currentCube, ", "));
+      return { PARAC_NO_SPLITS_LEFT, {} };
+    }
+  }
+
+  parac_log(PARAC_CUBER,
+            PARAC_TRACE,
+            "Successfully split formula with originator id {} on path {} "
+            "(current cube: "
+            "{}). Next literal: {}",
+            originatorId(),
+            p,
+            fmt::join(currentCube, ", "),
+            lit_to_split);
+
+  return { PARAC_SPLITTED, lit_to_split };
+}
+
 parac_status
 CaDiCaLHandle::lookahead(size_t depth, size_t min_depth) {
   parac_log(PARAC_CUBER, PARAC_TRACE, "Generating cubes of length {}", depth);
@@ -385,7 +452,6 @@ CaDiCaLHandle::lookahead(size_t depth, size_t min_depth) {
     return PARAC_UNSAT;
   else if(cubes.status == 10)
     return PARAC_SAT;
-  std::vector<int> flatCubes;
   size_t max_depth = 0;
 
   for(const auto& cube : cubes.cubes) {
@@ -413,5 +479,40 @@ CaDiCaLHandle::lookahead(size_t depth, size_t min_depth) {
             m_internal->normalizedPathLength);
 
   return PARAC_SPLITTED;
+}
+
+CaDiCaLHandle::FastLookaheadResult
+CaDiCaLHandle::fastLookahead(size_t depth) {
+  parac_log(
+    PARAC_CUBER, PARAC_TRACE, "Generating fast cubes of length {}", depth);
+
+  m_lookaheadTimeout =
+    setTimeout(m_internal->handle, 30000, this, [](parac_timeout* t) {
+      CaDiCaLHandle* handle = static_cast<CaDiCaLHandle*>(t->expired_userdata);
+      handle->m_lookaheadTimeout = nullptr;
+      handle->m_interruptedLookahead = true;
+      handle->terminate();
+    });
+
+  m_internal->terminator.terminateLocally();
+  auto cubes{ m_internal->solver.generate_cubes(depth, depth) };
+  m_internal->terminator.terminateLocally(false);
+
+  if(m_lookaheadTimeout) {
+    m_lookaheadTimeout->cancel(m_lookaheadTimeout);
+  }
+
+  if(cubes.status == 20)
+    return { PARAC_UNSAT, {} };
+  else if(cubes.status == 10)
+    return { PARAC_SAT, {} };
+
+  parac_log(PARAC_CUBER,
+            PARAC_TRACE,
+            "Generated {} fast cubes. Depth = {}",
+            cubes.cubes.size(),
+            depth);
+
+  return { PARAC_SPLITTED, std::move(cubes.cubes) };
 }
 }

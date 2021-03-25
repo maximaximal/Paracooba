@@ -1,6 +1,8 @@
 #ifndef PARACOOBA_SOLVER_CUBEITERATOR_HPP
 #define PARACOOBA_SOLVER_CUBEITERATOR_HPP
 
+#include <ostream>
+
 #include "types.hpp"
 
 namespace parac::solver {
@@ -55,6 +57,7 @@ class CubeIterator {
   private:
   pointer m_pos = nullptr;
 };
+
 struct CubeIteratorRange {
   CubeIteratorRange() = default;
   CubeIteratorRange(const CubeIterator& begin, const CubeIterator& end)
@@ -81,6 +84,20 @@ struct CubeIteratorRange {
     return false;
   }
 };
+
+inline std::ostream&
+operator<<(std::ostream& o, const CubeIteratorRange& it) {
+  bool first = true;
+  for(auto& l : it) {
+    if(first) {
+      first = !first;
+    } else {
+      o << ", ";
+    }
+    o << l;
+  }
+  return o;
+}
 }
 
 #endif

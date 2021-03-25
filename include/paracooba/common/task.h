@@ -52,6 +52,7 @@ typedef struct parac_task {
   parac_status right_result;
   bool stop;
   parac_path path;
+  parac_worker worker;
   struct parac_compute_node* received_from;
   struct parac_compute_node* offloaded_to;
   parac_id originator;

@@ -17,6 +17,7 @@ class Solver;
 namespace parac::solver {
 class CubeIteratorRange;
 class SolverAssignment;
+class SolverConfig;
 
 class CaDiCaLHandle {
   public:
@@ -58,7 +59,22 @@ class CaDiCaLHandle {
     parac_path path,
     Cube literals);
 
+  /** @brief Resplit a provided cube and return the literal to split on.
+   *
+   * The split must then be -lit and +lit.
+   */
+  std::pair<parac_status, Literal> resplitCube(parac_path p,
+                                               Cube currentCube,
+                                               const SolverConfig& solverConfig);
+
   parac_status lookahead(size_t depth, size_t min_depth);
+
+  struct FastLookaheadResult {
+    parac_status status;
+    std::vector<Cube> cubes;
+  };
+
+  FastLookaheadResult fastLookahead(size_t depth);
 
   std::unique_ptr<SolverAssignment> takeSolverAssignment();
 
