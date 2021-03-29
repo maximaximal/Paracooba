@@ -3,6 +3,7 @@
 #include "packet.hpp"
 #include "paracooba/broker/broker.h"
 #include "paracooba/common/message_kind.h"
+#include "paracooba/common/random.h"
 #include "paracooba/common/status.h"
 #include "paracooba/communicator/communicator.h"
 #include "service.hpp"
@@ -216,9 +217,7 @@ struct TCPConnection::State {
             // Reconnects only happen if this side of the connection is the
             // original initiating side. The other side will end the connection.
 
-            std::mt19937 generator;
-            std::normal_distribution<> distribution(1200, 200);
-            size_t timeout = distribution(generator);
+            size_t timeout = parac_size_normal_distribution(1200, 200);
 
             parac_log(PARAC_COMMUNICATOR,
                       PARAC_TRACE,

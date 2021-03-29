@@ -9,6 +9,7 @@ set(PARAC_COMMON_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/thread_registry.c
 
     ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/random.cpp
     )
 
 parac_module_def(parac_common "${PARAC_COMMON_SRCS}")

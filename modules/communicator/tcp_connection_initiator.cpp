@@ -7,6 +7,7 @@
 #include <variant>
 
 #include "paracooba/common/log.h"
+#include "paracooba/common/random.h"
 #include "service.hpp"
 #include "tcp_connection.hpp"
 #include "tcp_connection_initiator.hpp"
@@ -226,10 +227,8 @@ TCPConnectionInitiator::~TCPConnectionInitiator() {
      m_state->connectionTry < m_state->service.connectionRetries()) {
 
     m_state->retry = false;
-    std::mt19937 generator;
     auto timeout = m_state->service.retryTimeoutMS();
-    std::normal_distribution<> distribution(timeout, timeout / 3);
-    timeout = distribution(generator);
+    timeout = parac_uint32_normal_distribution(timeout, timeout / 3);
 
     parac_log(
       PARAC_COMMUNICATOR,

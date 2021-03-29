@@ -4,6 +4,7 @@
 #include <boost/program_options/variables_map.hpp>
 #include <cstdlib>
 #include <paracooba/common/config.h>
+#include <paracooba/common/random.h>
 #include <paracooba/module.h>
 
 #include <random>
@@ -358,12 +359,8 @@ CLI::generateId() {
     return std::atoi(std::getenv("PARAC_ID"));
   }
 
-  std::random_device dev;
-  std::mt19937_64 rng(dev());
-  std::uniform_int_distribution<std::mt19937_64::result_type> dist_mac(
+  int64_t uniqueNumber = parac_int64_uniform_distribution(
     -((int64_t)1 << 47), ((int64_t)1 << 47) - 1);
-
-  int64_t uniqueNumber = dist_mac(rng);
 
   int16_t pid = std::abs(static_cast<int16_t>(::getpid()));
   return ((int64_t)pid << 48) | uniqueNumber;
