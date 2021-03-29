@@ -7,10 +7,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 id=$(($AWS_BATCH_JOB_NODE_INDEX + 1))
 
-echo "IP ADDRESSES:";
-echo $(ip addr show)
-
-ip=$(/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1)
+ip=$(/sbin/ip -o -4 addr list eth1 | awk '{print $4}' | cut -d/ -f1)
 
 if [ "$AWS_BATCH_JOB_MAIN_NODE_INDEX" = "$AWS_BATCH_JOB_NODE_INDEX" ]; then
     # Main node detected!
