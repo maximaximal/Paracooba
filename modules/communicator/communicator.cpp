@@ -81,7 +81,7 @@ init_config(CommunicatorUserdata* u) {
   e[Config::TCP_LISTEN_ADDRESS].registrar = PARAC_MOD_COMMUNICATOR;
   e[Config::TCP_LISTEN_ADDRESS].type = PARAC_TYPE_STR;
 
-  u->default_tcp_listen_address = "";
+  u->default_tcp_listen_address = "0.0.0.0";
   e[Config::TCP_LISTEN_ADDRESS].default_value.string =
     u->default_tcp_listen_address.c_str();
 
