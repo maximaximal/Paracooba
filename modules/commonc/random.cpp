@@ -22,16 +22,24 @@ random_mt() {
 
 template<typename T>
 static inline T
-rand_normal_distribution(T mean, double s) {
-  std::normal_distribution<> distr(mean, s);
-  return distr(random_mt());
+rand_normal_distribution(T mean, double s) noexcept {
+  try {
+    std::normal_distribution<> distr(mean, s);
+    return distr(random_mt());
+  } catch(...) {
+    return 0;
+  }
 }
 
 template<typename T>
 static inline T
-rand_uniform_distribution(T min, T max) {
-  std::uniform_int_distribution<T> distr(min, max);
-  return distr(random_mt());
+rand_uniform_distribution(T min, T max) noexcept {
+  try {
+    std::uniform_int_distribution<T> distr(min, max);
+    return distr(random_mt());
+  } catch(...) {
+    return 0;
+  }
 }
 
 PARAC_COMMON_EXPORT uint32_t
