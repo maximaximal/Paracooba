@@ -144,41 +144,42 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
               "locally, as there are 0 workers.");
   }
 
-  if(mod.handle->input_file && solverConfig.CaDiCaLCubes()) {
+  if(mod.handle->input_file) {
+    if(solverConfig.CaDiCaLCubes()) {
+      std::vector<Literal> startLiterals{ 0 };
 
-    std::vector<Literal> startLiterals{ 0 };
+      if(m_parsedFormula) {
+        startLiterals = MakeStartLiteralVector(*m_parsedFormula, solverConfig);
+        assert(startLiterals.size() >= 1);
+        parac_log(
+          PARAC_SOLVER,
+          PARAC_TRACE,
+          "Because --cadical-cubes is active, produced start literal "
+          "vector containing {} literals to start ({}). Literals are expanded "
+          "in worker thread.",
+          startLiterals.size(),
+          fmt::join(startLiterals, ", "));
+      } else {
+        parac_log(PARAC_SOLVER,
+                  PARAC_LOCALWARNING,
+                  "The client has no local workers but --cadical-cubes is "
+                  "active! Cubes will be expanded on peers, but only one "
+                  "parallel cube tree is possible.");
+      }
 
-    if(m_parsedFormula) {
-      startLiterals = MakeStartLiteralVector(*m_parsedFormula, solverConfig);
-      assert(startLiterals.size() >= 1);
-      parac_log(
-        PARAC_SOLVER,
-        PARAC_TRACE,
-        "Because --cadical-cubes is active, produced start literal "
-        "vector containing {} literals to start ({}). Literals are expanded "
-        "in worker thread.",
-        startLiterals.size(),
-        fmt::join(startLiterals, ", "));
+      uint32_t concurrentCubeTreeNumber = 0;
+      std::transform(startLiterals.begin(),
+                     startLiterals.end(),
+                     std::back_inserter(m_internal->rootCubeSources),
+                     [&concurrentCubeTreeNumber](Literal lit) {
+                       return std::make_shared<cubesource::CaDiCaLCubes>(
+                         lit, concurrentCubeTreeNumber++);
+                     });
     } else {
-      parac_log(PARAC_SOLVER,
-                PARAC_LOCALWARNING,
-                "The client has no local workers but --cadical-cubes is "
-                "active! Cubes will be expanded on peers, but only one "
-                "parallel cube tree is possible.");
+      m_internal->rootCubeSources = {
+        std::make_shared<cubesource::PathDefined>()
+      };
     }
-
-    uint32_t concurrentCubeTreeNumber = 0;
-    std::transform(startLiterals.begin(),
-                   startLiterals.end(),
-                   std::back_inserter(m_internal->rootCubeSources),
-                   [&concurrentCubeTreeNumber](Literal lit) {
-                     return std::make_shared<cubesource::CaDiCaLCubes>(
-                       lit, concurrentCubeTreeNumber++);
-                   });
-  } else {
-    m_internal->rootCubeSources = {
-      std::make_shared<cubesource::PathDefined>()
-    };
   }
 }
 CaDiCaLManager::~CaDiCaLManager() {

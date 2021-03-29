@@ -77,6 +77,7 @@ echo "c Running job $name!";
 $runlim \"$binary\" \"$problem\" \\
 	--worker-count $cpus_per_task \\
 	--id 1 \\
+    --tcp-listen-address 0.0.0.0 \\
 	$paracooba_args;
 END
 
@@ -113,6 +114,8 @@ $runlim \"$binary\" \\
 	--worker-count $cpus_per_task \\
 	--id \$SLURM_ARRAY_TASK_ID \\
 	--known-remote \"$client_node\" \\
+    --tcp-listen-address 0.0.0.0 \\
+    --auto-shutdown-after-finished-client \\
 	$paracooba_args;
 END
 
