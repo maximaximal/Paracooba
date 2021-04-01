@@ -36,6 +36,12 @@ parac_message_kind_to_str(parac_message_kind kind);
 bool
 parac_message_kind_is_for_solver(parac_message_kind kind);
 
+bool
+parac_message_kind_is_count_tracked(parac_message_kind kind);
+
+bool
+parac_message_kind_is_waiting_for_ack(parac_message_kind kind);
+
 #ifdef __cplusplus
 }
 

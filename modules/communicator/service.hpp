@@ -25,9 +25,7 @@ struct parac_config_entry;
 struct parac_timeout;
 
 namespace parac::communicator {
-struct TCPConnectionPayload;
-using TCPConnectionPayloadPtr =
-  std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>;
+class MessageSendQueue;
 
 enum Config {
   TEMPORARY_DIRECTORY,
@@ -40,6 +38,7 @@ enum Config {
   TCP_TARGET_PORT,
   NETWORK_TIMEOUT,
   RETRY_TIMEOUT,
+  MESSAGE_TIMEOUT,
   KEEPALIVE_INTERVAL,
   CONNECTION_RETRIES,
   KNOWN_REMOTES,
@@ -73,6 +72,7 @@ class Service {
   uint16_t udpTargetPort() const;
   uint32_t networkTimeoutMS() const;
   uint32_t retryTimeoutMS() const;
+  uint16_t messageTimeoutMS() const;
   uint32_t keepaliveIntervalMS() const;
   bool automaticListenPortAssignment() const;
 
@@ -90,9 +90,7 @@ class Service {
                             void* userdata,
                             parac_timeout_expired expiery_cb);
 
-  void registerTCPConnectionPayload(parac_id id,
-                                    TCPConnectionPayloadPtr payload);
-  TCPConnectionPayloadPtr retrieveTCPConnectionPayload(parac_id id);
+  std::shared_ptr<MessageSendQueue> getMessageSendQueueForRemoteId(parac_id id);
 
   void setTCPAcceptorActive();
   bool isTCPAcceptorActive();

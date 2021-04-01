@@ -11,6 +11,7 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
 #define PARAC_MESSAGE_INLINE_DATA_SIZE 16
 
@@ -27,6 +28,7 @@ typedef struct parac_message {
   };
   bool data_to_be_freed : 1;
   bool data_is_inline : 1;
+  uint16_t age_ms;
   size_t length;
   void* userdata;
   parac_message_cb cb;
@@ -49,6 +51,7 @@ class parac_message_wrapper : public parac_message {
     cb = nullptr;
     origin = 0;
     originator_id = 0;
+    age_ms = 0;
   };
   parac_message_wrapper(const parac_message& msg) {
     kind = msg.kind;

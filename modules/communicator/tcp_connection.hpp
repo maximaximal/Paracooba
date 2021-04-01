@@ -11,6 +11,8 @@
 #include <paracooba/common/status.h>
 #include <paracooba/common/types.h>
 
+#include "message_send_queue.hpp"
+
 struct parac_message;
 struct parac_file;
 struct parac_compute_node;
@@ -22,9 +24,6 @@ class error_code;
 namespace parac::communicator {
 class Service;
 class PacketHeader;
-struct TCPConnectionPayload;
-using TCPConnectionPayloadPtr =
-  std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>;
 
 /** @brief Class representing a connection between two compute nodes.
  *
@@ -38,16 +37,7 @@ class TCPConnection {
   using WeakStatePtr = std::weak_ptr<State>;
   using SharedStatePtr = std::shared_ptr<State>;
 
-  enum TransmitMode {
-    TransmitInit,
-    TransmitMessage,
-    TransmitFile,
-    TransmitACK,
-    TransmitEnd
-  };
   enum ResumeMode { EndAfterShutdown, RestartAfterShutdown };
-  struct EndTag;
-  struct ACKTag;
 
   /** @brief Initialize a paracooba connection on an opened socket.
    * @param service The Service to use.
@@ -56,11 +46,9 @@ class TCPConnection {
    * @param connectionTry Number of retries to establish connection (>0) when
    * used from TCPConnectionInitiator, -1 when initialized from TCPAcceptor.
    */
-  explicit TCPConnection(
-    Service& service,
-    std::unique_ptr<boost::asio::ip::tcp::socket> socket,
-    int connectionTry = 0,
-    TCPConnectionPayloadPtr ptr = TCPConnectionPayloadPtr(nullptr, nullptr));
+  explicit TCPConnection(Service& service,
+                         std::unique_ptr<boost::asio::ip::tcp::socket> socket,
+                         int connectionTry = 0);
 
   explicit TCPConnection(const TCPConnection& o, WeakStatePtr weakPtr)
     : TCPConnection(o) {
@@ -74,13 +62,13 @@ class TCPConnection {
 
   void send(parac_message&& message);
   void send(parac_file&& file);
-  void send(EndTag&& end);
+  void send(MessageSendQueue::EndTag&& end);
   void send(parac_message& message);
   void send(parac_file& file);
-  void send(EndTag& end);
+  void send(MessageSendQueue::EndTag& end);
   void sendACK(uint32_t id, parac_status status);
 
-  struct SendQueueEntry;
+  void conditionallyTriggerWriteHandler();
 
   private:
   struct InitiatorMessage;
@@ -105,8 +93,6 @@ class TCPConnection {
       return weak.lock();
     }
   }
-
-  void send(SendQueueEntry&& e);
 
   void readHandler(boost::system::error_code ec, size_t bytes_received);
   void writeHandler(boost::system::error_code ec, size_t bytes_sent);

@@ -53,3 +53,26 @@ parac_message_kind_is_for_solver(parac_message_kind kind) {
       return false;
   }
 }
+
+PARAC_COMMON_EXPORT bool
+parac_message_kind_is_count_tracked(parac_message_kind kind) {
+  switch(kind) {
+    case PARAC_MESSAGE_KEEPALIVE:
+    case PARAC_MESSAGE_ACK:
+      return false;
+    default:
+      return true;
+  }
+}
+
+PARAC_COMMON_EXPORT bool
+parac_message_kind_is_waiting_for_ack(parac_message_kind kind) {
+  switch(kind) {
+    case PARAC_MESSAGE_KEEPALIVE:
+    case PARAC_MESSAGE_ACK:
+    case PARAC_MESSAGE_END:
+      return false;
+    default:
+      return true;
+  }
+}

@@ -56,6 +56,9 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   REQUIRE(n1->send_message_to);
   REQUIRE(n2->send_message_to);
 
+  REQUIRE(n1->communicator_userdata);
+  REQUIRE(n2->communicator_userdata);
+
   bool message_cb_called[3] = { false, false, false };
 
   parac_message_wrapper msg;
@@ -67,6 +70,7 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   msg.userdata = message_cb_called;
   msg.cb = [](parac_message* msg, parac_status status) {
     bool* cb_called = static_cast<bool*>(msg->userdata);
+    parac_log(PARAC_GENERAL, PARAC_TRACE, "Status in CB: {}", status);
     if(!cb_called[0]) {
       cb_called[1] = status == PARAC_OK;
     } else {

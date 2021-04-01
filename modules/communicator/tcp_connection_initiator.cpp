@@ -116,9 +116,6 @@ struct TCPConnectionInitiator::State {
   boost::asio::steady_timer timer;
   int connectionTry;
   bool retry = false;
-  using TCPConnectionPayloadPtr =
-    std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>;
-  TCPConnectionPayloadPtr payload = TCPConnectionPayloadPtr(nullptr, nullptr);
   DelayedRunFunc runFunc;
 
   std::variant<HostConnection, EndpointConnection> conn;
@@ -245,12 +242,6 @@ TCPConnectionInitiator::~TCPConnectionInitiator() {
 }
 
 void
-TCPConnectionInitiator::setTCPConnectionPayload(
-  State::TCPConnectionPayloadPtr payload) {
-  m_state->payload = std::move(payload);
-}
-
-void
 TCPConnectionInitiator::retryConnection() {
   ++m_state->connectionTry;
 
@@ -356,10 +347,8 @@ TCPConnectionInitiator::try_connecting_to_host(
                   m_state->host(),
                   m_state->socket->remote_endpoint());
 
-        auto conn = TCPConnection(m_state->service,
-                                  std::move(m_state->socket),
-                                  m_state->connectionTry,
-                                  std::move(m_state->payload));
+        auto conn = TCPConnection(
+          m_state->service, std::move(m_state->socket), m_state->connectionTry);
         conn.setResumeMode(TCPConnection::RestartAfterShutdown);
         return;
       }
@@ -414,10 +403,8 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
                 "Starting Paracooba connection.",
                 m_state->socket->remote_endpoint());
 
-      auto conn = TCPConnection(m_state->service,
-                                std::move(m_state->socket),
-                                m_state->connectionTry,
-                                std::move(m_state->payload));
+      auto conn = TCPConnection(
+        m_state->service, std::move(m_state->socket), m_state->connectionTry);
 
       conn.setResumeMode(TCPConnection::RestartAfterShutdown);
     }

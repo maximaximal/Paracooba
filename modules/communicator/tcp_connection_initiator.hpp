@@ -12,7 +12,6 @@ class error_code;
 namespace parac::communicator {
 class Service;
 class TCPConnection;
-struct TCPConnectionPayload;
 
 class TCPConnectionInitiator {
   public:
@@ -40,10 +39,6 @@ class TCPConnectionInitiator {
 
   bool isEndpointSameAsLocalTCPAcceptor(
     const boost::asio::ip::tcp::endpoint& e) const;
-
-  void setTCPConnectionPayload(
-    std::unique_ptr<TCPConnectionPayload, void (*)(TCPConnectionPayload*)>
-      payload);
 
   private:
   struct State;

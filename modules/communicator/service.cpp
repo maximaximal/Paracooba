@@ -3,8 +3,10 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/system/error_code.hpp>
 #include <map>
+#include <memory>
 #include <thread>
 
+#include "message_send_queue.hpp"
 #include "paracooba/common/timeout.h"
 #include "service.hpp"
 #include "tcp_acceptor.hpp"
@@ -31,9 +33,6 @@ using boost::asio::io_context;
 
 namespace parac::communicator {
 struct Service::Internal {
-  using TCPConnectionPayloadPair =
-    std::pair<boost::asio::steady_timer, TCPConnectionPayloadPtr>;
-
   io_context context;
   std::thread::id contextThreadId;
   parac_thread_registry_handle threadHandle;
@@ -42,7 +41,8 @@ struct Service::Internal {
   std::unique_ptr<UDPAcceptor> udpAcceptor;
   std::unique_ptr<TimeoutController> timeoutController;
 
-  std::map<parac_id, TCPConnectionPayloadPair> connectionPayloads;
+  std::unordered_map<parac_id, std::shared_ptr<MessageSendQueue>>
+    messageSendQueues;
 
   std::atomic_bool tcpAcceptorActive, stopRequested = false;
   std::atomic_size_t outgoingMessageCounter = 0;
@@ -195,41 +195,15 @@ Service::setTimeout(uint64_t ms,
   return m_internal->timeoutController->setTimeout(ms, userdata, expiery_cb);
 }
 
-void
-Service::registerTCPConnectionPayload(parac_id id,
-                                      TCPConnectionPayloadPtr payload) {
-  assert(id != 0);
-
-  auto [it, inserted] = m_internal->connectionPayloads.try_emplace(
-    id, ioContext(), std::move(payload));
-  assert(inserted);
-
-  auto& entry = it->second;
-
-  entry.first.expires_from_now(std::chrono::milliseconds(retryTimeoutMS() * 4));
-  entry.first.async_wait([this, id](const boost::system::error_code& error) {
-    if(!error) {
-      auto ptr = retrieveTCPConnectionPayload(id);
-      if(ptr) {
-        parac_log(PARAC_COMMUNICATOR,
-                  PARAC_TRACE,
-                  "TCPConnectionPayload for connection to {} expired and was "
-                  "invalidated.",
-                  id);
-      }
-    }
-  });
-}
-
-TCPConnectionPayloadPtr
-Service::retrieveTCPConnectionPayload(parac_id id) {
-  auto it = m_internal->connectionPayloads.find(id);
-  TCPConnectionPayloadPtr ptr(nullptr, nullptr);
-  if(it->second.second) {
-    ptr = std::move(it->second.second);
-    m_internal->connectionPayloads.erase(id);
+std::shared_ptr<MessageSendQueue>
+Service::getMessageSendQueueForRemoteId(parac_id id) {
+  auto it = m_internal->messageSendQueues.find(id);
+  if(it == m_internal->messageSendQueues.end()) {
+    it = m_internal->messageSendQueues
+           .try_emplace(id, std::make_shared<MessageSendQueue>(*this, id))
+           .first;
   }
-  return ptr;
+  return it->second;
 }
 
 void
@@ -329,6 +303,12 @@ uint32_t
 Service::retryTimeoutMS() const {
   assert(m_config);
   return m_config[RETRY_TIMEOUT].value.uint32;
+}
+
+uint16_t
+Service::messageTimeoutMS() const {
+  assert(m_config);
+  return m_config[MESSAGE_TIMEOUT].value.uint16;
 }
 
 uint32_t

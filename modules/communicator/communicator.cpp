@@ -148,6 +148,15 @@ init_config(CommunicatorUserdata* u) {
   e[Config::RETRY_TIMEOUT].type = PARAC_TYPE_UINT32;
   e[Config::RETRY_TIMEOUT].default_value.uint32 = 1000;
 
+  parac_config_entry_set_str(
+    &e[Config::MESSAGE_TIMEOUT],
+    "message-timeout",
+    "Timeout (in ms) for messages sent over the network. After this time, they "
+    "are marked as failed. Messages can survive connection drops.");
+  e[Config::MESSAGE_TIMEOUT].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::MESSAGE_TIMEOUT].type = PARAC_TYPE_UINT16;
+  e[Config::MESSAGE_TIMEOUT].default_value.uint16 = 10000u;
+
   parac_config_entry_set_str(&e[Config::KEEPALIVE_INTERVAL],
                              "keepalive-interval",
                              "Interval how often keepalive-packets should be "

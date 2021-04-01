@@ -10,6 +10,7 @@ set(PARACOOBA_COMMUNICATOR_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/tcp_connection_initiator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/communicator_util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/timeout_controller.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/message_send_queue.cpp
 )
 
 parac_module(parac_communicator "${PARACOOBA_COMMUNICATOR_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
