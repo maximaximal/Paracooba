@@ -173,14 +173,6 @@ class ComputeNode {
 
   void conditionallySendStatusTo(const Status& s);
 
-  parac_status applyCommunicatorConnection(
-    parac_compute_node_free_func communicator_free,
-    void* communicator_userdata,
-    parac_compute_node_message_func send_message_func,
-    parac_compute_node_file_func send_file_func);
-
-  void removeCommunicatorConnection();
-
   void notifyOfNewRemote(const parac_compute_node_wrapper &node);
 
   private:
@@ -212,12 +204,6 @@ class ComputeNode {
 
   std::atomic_flag m_sendingKnownRemotes = ATOMIC_FLAG_INIT;
   std::vector<parac_compute_node_wrapper::IDConnectionStringPair> m_newRemotesToNotifyAbout;
-
-  std::mutex m_commConnectionMutex;
-  std::atomic<parac_compute_node_message_func> m_commMessageFunc = nullptr;
-  std::atomic<parac_compute_node_file_func> m_commFileFunc = nullptr;
-  std::queue<std::variant<parac_message, parac_file>> m_commQueue;
-  void emptyCommQueue();
 };
 
 std::ostream&

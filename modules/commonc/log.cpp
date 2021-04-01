@@ -29,7 +29,7 @@ static boost::shared_ptr<boost::log::sinks::synchronous_sink<
 
 static LoggerMT global_logger(boost::log::keywords::channel = PARAC_GENERAL);
 
-static parac_log_severity global_severity = PARAC_INFO;
+static std::atomic<parac_log_severity> global_severity = PARAC_INFO;
 static std::array<bool, PARAC_CHANNEL_COUNT> global_channels;
 
 static std::string local_name = "Unnamed";

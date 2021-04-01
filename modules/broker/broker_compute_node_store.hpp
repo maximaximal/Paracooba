@@ -30,12 +30,13 @@ class ComputeNodeStore {
    * run-time after it once was valid.
    */
   parac_compute_node* get(parac_id id);
-  parac_compute_node* get_with_connection(
+  parac_compute_node* create_with_connection(
     parac_id id,
     parac_compute_node_free_func communicator_free,
     void* communicator_userdata,
     parac_compute_node_message_func send_message_func,
-    parac_compute_node_file_func send_file_func);
+    parac_compute_node_file_func send_file_func,
+    parac_compute_node_available_to_send_to_func available_to_send_to);
   ComputeNode* get_broker_compute_node(parac_id id);
   bool has(parac_id) const;
 
@@ -58,13 +59,14 @@ class ComputeNodeStore {
   private:
   static parac_compute_node* static_get(parac_compute_node_store* store,
                                         parac_id id);
-  static parac_compute_node* static_get_with_connection(
+  static parac_compute_node* static_create_with_connection(
     struct parac_compute_node_store*,
     parac_id id,
     parac_compute_node_free_func communicator_free,
     void* communicator_userdata,
     parac_compute_node_message_func send_message_func,
-    parac_compute_node_file_func send_file_func);
+    parac_compute_node_file_func send_file_func,
+    parac_compute_node_available_to_send_to_func available_to_send_to);
 
   static bool static_has(parac_compute_node_store* store, parac_id id);
 

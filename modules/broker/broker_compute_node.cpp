@@ -101,11 +101,6 @@ ComputeNode::ComputeNode(parac_compute_node& node,
     ComputeNode* self = static_cast<ComputeNode*>(n->broker_userdata);
     self->receiveFileFrom(*file);
   };
-
-  node.send_message_to = ComputeNode::static_sendMessageTo;
-  node.send_file_to = ComputeNode::static_sendFileTo;
-  node.connection_dropped = ComputeNode::static_connectionDropped;
-  node.available_to_send_to = ComputeNode::static_availableToSendTo;
 }
 ComputeNode::~ComputeNode() {}
 
@@ -544,7 +539,7 @@ ComputeNode::tryToOffloadTask() {
               m_node.id);
     return false;
   }
-  if(!m_commMessageFunc) {
+  if(!m_node.send_message_to) {
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
               "Not offloading to {} because it has no send message func.",
@@ -683,37 +678,6 @@ ComputeNode::conditionallySendStatusTo(const Status& s) {
   msg.userdata = static_cast<void*>(this);
 
   m_node.send_message_to(&m_node, &msg);
-}
-
-parac_status
-ComputeNode::applyCommunicatorConnection(
-  parac_compute_node_free_func communicator_free,
-  void* communicator_userdata,
-  parac_compute_node_message_func send_message_func,
-  parac_compute_node_file_func send_file_func) {
-  if(m_commFileFunc.load() || m_commMessageFunc.load()) {
-    return PARAC_CONNECTION_ALREADY_ESTABLISHED_ERROR;
-  }
-
-  m_node.communicator_free = communicator_free;
-  m_node.communicator_userdata = communicator_userdata;
-  m_commMessageFunc = send_message_func;
-  m_commFileFunc = send_file_func;
-
-  emptyCommQueue();
-
-  return PARAC_OK;
-}
-
-void
-ComputeNode::removeCommunicatorConnection() {
-  parac_log(PARAC_BROKER,
-            PARAC_DEBUG,
-            "Connection to {} dropped and is deactivated. Messages sent to "
-            "this connection are cached.",
-            m_node.id);
-  m_commFileFunc.store(nullptr);
-  m_commMessageFunc.store(nullptr);
 }
 
 void
@@ -929,61 +893,16 @@ ComputeNode::static_connectionDropped(parac_compute_node* node) {
   assert(node);
   assert(node->broker_userdata);
   ComputeNode& self = *static_cast<ComputeNode*>(node->broker_userdata);
-  self.removeCommunicatorConnection();
-}
-bool
-ComputeNode::static_availableToSendTo(parac_compute_node* node) {
-  assert(node);
-  assert(node->broker_userdata);
-  ComputeNode& self = *static_cast<ComputeNode*>(node->broker_userdata);
-  return self.m_commFileFunc && self.m_commMessageFunc;
+  (void)self;
 }
 
 void
 ComputeNode::sendMessageTo(parac_message& msg) {
-  parac_compute_node_message_func f = m_commMessageFunc.load();
-  if(f) {
-    f(&m_node, &msg);
-  } else {
-    std::unique_lock lock(m_commConnectionMutex);
-    m_commQueue.emplace(msg);
-  }
+  m_node.send_message_to(&m_node, &msg);
 }
 void
 ComputeNode::sendFileTo(parac_file& file) {
-  parac_compute_node_file_func f = m_commFileFunc.load();
-  if(f) {
-    f(&m_node, &file);
-  } else {
-    std::unique_lock lock(m_commConnectionMutex);
-    m_commQueue.emplace(file);
-  }
-}
-
-void
-ComputeNode::emptyCommQueue() {
-  parac_compute_node_message_func messageFunc = m_commMessageFunc.load();
-  parac_compute_node_file_func fileFunc = m_commFileFunc.load();
-  assert(messageFunc);
-  assert(fileFunc);
-
-  std::unique_lock lock(m_commConnectionMutex);
-  while(!m_commQueue.empty()) {
-    auto& e = m_commQueue.front();
-    switch(e.index()) {
-      case 0: {// parac_message
-        parac_message& msg = std::get<0>(e);
-        messageFunc(&m_node, &msg);
-        break;
-      }
-      case 1: {// parac_file
-        parac_file& file = std::get<1>(e);
-        fileFunc(&m_node, &file);
-        break;
-      }
-    }
-    m_commQueue.pop();
-  }
+  m_node.send_file_to(&m_node, &file);
 }
 
 std::ostream&

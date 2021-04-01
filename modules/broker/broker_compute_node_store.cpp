@@ -56,7 +56,8 @@ ComputeNodeStore::ComputeNodeStore(parac_handle& handle,
 
   store.userdata = this;
   store.get = &ComputeNodeStore::static_get;
-  store.get_with_connection = &ComputeNodeStore::static_get_with_connection;
+  store.create_with_connection =
+    &ComputeNodeStore::static_create_with_connection;
   store.has = &ComputeNodeStore::static_has;
 
   parac_compute_node* thisNode = get(handle.id);
@@ -111,33 +112,26 @@ ComputeNodeStore::get(parac_id id) {
 }
 
 parac_compute_node*
-ComputeNodeStore::get_with_connection(
+ComputeNodeStore::create_with_connection(
   parac_id id,
   parac_compute_node_free_func communicator_free,
   void* communicator_userdata,
   parac_compute_node_message_func send_message_func,
-  parac_compute_node_file_func send_file_func) {
+  parac_compute_node_file_func send_file_func,
+  parac_compute_node_available_to_send_to_func available_to_send_to) {
 
   std::unique_lock lock(m_internal->nodesMutex);
+
+  assert(!has(id));
 
   parac_compute_node* n = get(id);
   assert(n);
 
-  ComputeNode& computeNode = *static_cast<ComputeNode*>(n->broker_userdata);
-
-  parac_status s =
-    computeNode.applyCommunicatorConnection(communicator_free,
-                                            communicator_userdata,
-                                            send_message_func,
-                                            send_file_func);
-  if(s != PARAC_OK) {
-    parac_log(PARAC_BROKER,
-              PARAC_DEBUG,
-              "Connection to {} not linked to compute node because of {}",
-              id,
-              s);
-    return nullptr;
-  }
+  n->send_message_to = send_message_func;
+  n->send_file_to = send_file_func;
+  n->communicator_free = communicator_free;
+  n->communicator_userdata = communicator_userdata;
+  n->available_to_send_to = available_to_send_to;
 
   parac_message_wrapper msg;
   assert(thisNode().description());
@@ -333,23 +327,25 @@ ComputeNodeStore::static_get(parac_compute_node_store* store, parac_id id) {
 }
 
 parac_compute_node*
-ComputeNodeStore::static_get_with_connection(
+ComputeNodeStore::static_create_with_connection(
   struct parac_compute_node_store* store,
   parac_id id,
   parac_compute_node_free_func communicator_free,
   void* communicator_userdata,
   parac_compute_node_message_func send_message_func,
-  parac_compute_node_file_func send_file_func) {
+  parac_compute_node_file_func send_file_func,
+  parac_compute_node_available_to_send_to_func available_to_send_to) {
   assert(store);
   assert(store->userdata);
 
   ComputeNodeStore* self = static_cast<ComputeNodeStore*>(store->userdata);
   return static_cast<parac_compute_node*>(
-    self->get_with_connection(id,
-                              communicator_free,
-                              communicator_userdata,
-                              send_message_func,
-                              send_file_func));
+    self->create_with_connection(id,
+                                 communicator_free,
+                                 communicator_userdata,
+                                 send_message_func,
+                                 send_file_func,
+                                 available_to_send_to));
 }
 
 bool

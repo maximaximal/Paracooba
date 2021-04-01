@@ -19,20 +19,21 @@ typedef struct parac_compute_node* (*parac_compute_node_store_get_or_create)(
   parac_id id);
 
 typedef struct parac_compute_node* (
-  *parac_compute_node_store_get_or_create_with_connection)(
+  *parac_compute_node_store_create_with_connection)(
   struct parac_compute_node_store*,
   parac_id id,
   parac_compute_node_free_func communicator_free,
   void* communicator_userdata,
   parac_compute_node_message_func send_message_func,
-  parac_compute_node_file_func send_file_func);
+  parac_compute_node_file_func send_file_func,
+  parac_compute_node_available_to_send_to_func available_to_send_to_func);
 
 typedef bool (*parac_compute_node_store_has)(struct parac_compute_node_store*,
                                              parac_id id);
 
 typedef struct parac_compute_node_store {
   parac_compute_node_store_get_or_create get;
-  parac_compute_node_store_get_or_create_with_connection get_with_connection;
+  parac_compute_node_store_create_with_connection create_with_connection;
   parac_compute_node_store_has has;
   struct parac_compute_node* this_node;
 

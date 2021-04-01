@@ -239,7 +239,7 @@ TCPConnection::TCPConnection(
 
   // Set at beginning, only unset if write_handler yields. Set again at
   // send(SendQueueItem&).
-  state()->currentlySending.test_and_set();
+  // state()->currentlySending.test_and_set();
 
   auto weakConn = TCPConnection(*this, WeakStatePtr(state()));
   weakConn.writeHandler(boost::system::error_code(), 0);
@@ -288,7 +288,9 @@ template<typename S, typename T>
 inline static void
 SendToMessageSendQueue(S s, T&& v) {
   assert(s);
-  assert(s->sendQueue);
+  if(!s->sendQueue)
+    return;
+
   if constexpr(std::is_rvalue_reference<T>())
     s->sendQueue->send(std::forward(v));
   else
@@ -323,15 +325,16 @@ void
 TCPConnection::sendACK(uint32_t id, parac_status status) {
   auto s = state();
   assert(s);
-  assert(s->sendQueue);
+  if(!s->sendQueue)
+    return;
   s->sendQueue->sendACK(id, status);
 }
 
-void
+bool
 TCPConnection::conditionallyTriggerWriteHandler() {
   auto s = state();
   if(!s)
-    return;
+    return false;
   if(!s->currentlySending.test_and_set()) {
     auto weakConn = TCPConnection(*this, WeakStatePtr(s));
     if(s->service.ioContextThreadId() == std::this_thread::get_id()) {
@@ -345,6 +348,15 @@ TCPConnection::conditionallyTriggerWriteHandler() {
       });
     }
   }
+  return true;
+}
+
+void
+TCPConnection::injectMessageSendQueue(
+  std::shared_ptr<MessageSendQueue> sendQueue) {
+  auto s = state();
+  assert(s);
+  s->sendQueue = sendQueue;
 }
 
 bool
@@ -384,7 +396,7 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
     return false;
   }
 
-  s->sendQueue = s->service.getMessageSendQueueForRemoteId(init.sender_id);
+  auto sendQueue = s->service.getMessageSendQueueForRemoteId(init.sender_id);
   TCPConnection weakConn(*this, WeakStatePtr(state()));
 
   std::stringstream connStr;
@@ -392,7 +404,7 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
   connStr << (a.is_v6() ? "[" : "") << a.to_string() << (a.is_v6() ? "]" : "")
           << ':' << init.tcp_port;
 
-  s->compute_node = s->sendQueue->registerTCPConnection(
+  s->compute_node = sendQueue->registerTCPConnection(
     weakConn, connStr.str(), s->connectionTry >= 0);
 
   if(!s->compute_node) {
@@ -876,8 +888,11 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       if(s->service.stopped())
         return;
 
+      assert(s->sendQueue);
+      assert(!s->sendQueue->empty());
+      assert(e.header);
+
       yield async_write(*s->socket, BUF((*e.header)), wh);
-      e = s->sendQueue->front();
 
       if(ec == boost::system::errc::broken_pipe ||
          ec == boost::system::errc::connection_reset) {
@@ -893,6 +908,10 @@ TCPConnection::writeHandler(boost::system::error_code ec,
                   ec.message());
         return;
       }
+
+      assert(s->sendQueue);
+      assert(!s->sendQueue->empty());
+      assert(e.header);
 
       if(e.header->kind == PARAC_MESSAGE_ACK ||
          e.header->kind == PARAC_MESSAGE_END ||

@@ -25,6 +25,10 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
   REQUIRE(master_cns->has(master_cns, 1));
   REQUIRE(!master_cns->has(master_cns, 2));
 
+  ParacoobaMock daemon(2, nullptr, &master);
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
   auto n2 = master_cns->get(master_cns, 2);
 
   n2->receive_message_from = [](parac_compute_node* remote,
@@ -40,13 +44,10 @@ TEST_CASE("Connect two daemons.", "[integration,communicator,broker]") {
     msg->cb(msg, PARAC_OK);
   };
 
-  ParacoobaMock daemon(2, nullptr, &master);
   auto daemon_cns = daemon.getBroker().compute_node_store;
   auto n1 = daemon_cns->get(daemon_cns, 1);
   n1->receive_message_from = n2->receive_message_from;
   REQUIRE(daemon_cns->has(daemon_cns, 2));
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
   REQUIRE(master_cns->has(master_cns, 1));
   REQUIRE(master_cns->has(master_cns, 2));

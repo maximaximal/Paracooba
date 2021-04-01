@@ -68,7 +68,9 @@ class TCPConnection {
   void send(MessageSendQueue::EndTag& end);
   void sendACK(uint32_t id, parac_status status);
 
-  void conditionallyTriggerWriteHandler();
+  bool conditionallyTriggerWriteHandler();
+
+  void injectMessageSendQueue(std::shared_ptr<MessageSendQueue> sendQueue);
 
   private:
   struct InitiatorMessage;

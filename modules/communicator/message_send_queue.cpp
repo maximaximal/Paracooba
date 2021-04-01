@@ -209,6 +209,14 @@ MessageSendQueue::static_compute_node_free_func(
   if(self)
     self->computeNodeFreeFunc(*compute_node);
 }
+bool
+MessageSendQueue::static_available_to_send_to(
+  parac_compute_node* compute_node) {
+  MessageSendQueue* self = MessageSendQueueFromComputeNode(compute_node);
+  if(self)
+    return self->availableToSendTo(*compute_node);
+  return false;
+}
 
 void
 MessageSendQueue::sendMessageTo(parac_compute_node& compute_node,
@@ -229,9 +237,21 @@ MessageSendQueue::computeNodeFreeFunc(parac_compute_node& compute_node) {
   // way, messages can be recovered if connections drop momentarily.
   compute_node.communicator_userdata = nullptr;
 }
+bool
+MessageSendQueue::availableToSendTo(parac_compute_node& compute_node) {
+  (void)compute_node;
+  return m_availableToSendTo;
+}
 
 void
 MessageSendQueue::send(Entry&& e) {
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_TRACE,
+            "Queuing message of kind {} with id {} to remote {} ",
+            e.header.kind,
+            e.header.number,
+            m_remoteId);
+
   {
     std::unique_lock lock(m_queuedMutex);
 
@@ -248,7 +268,21 @@ MessageSendQueue::send(Entry&& e) {
   }
 
   if(m_weakActiveTCPConnection) {
-    m_weakActiveTCPConnection->conditionallyTriggerWriteHandler();
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_TRACE,
+              "Calling conditionallyTriggerWriteHandler on TCPConnection "
+              "for remote {}.",
+              m_remoteId);
+    if(!m_weakActiveTCPConnection->conditionallyTriggerWriteHandler()) {
+      m_availableToSendTo = false;
+    }
+  } else {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_TRACE,
+              "Cannot call conditionallyTriggerWriteHandler on TCPConnection "
+              "for remote {} as none is known!",
+              m_remoteId);
+    m_availableToSendTo = false;
   }
 }
 
@@ -302,7 +336,10 @@ MessageSendQueue::EntryRef
 MessageSendQueue::front() {
   std::unique_lock lock(m_queuedMutex);
   if(m_queued.empty()) {
-    parac_log(PARAC_COMMUNICATOR, PARAC_LOCALERROR, "QUEUED EMPTY!");
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_LOCALERROR,
+              "QUEUED EMPTY! Remote: {}",
+              m_remoteId);
   }
   assert(!m_queued.empty());
 
@@ -311,39 +348,56 @@ MessageSendQueue::front() {
   r.header = &front.header;
   front.applyToRefValue(r.body);
   r.transmitMode = front.transmitMode;
+
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_TRACE,
+            "Getting reference to message of kind {} with id {} to remote {} "
+            "(front of message queue)",
+            r.header->kind,
+            r.header->number,
+            m_remoteId);
+
   return r;
 }
 
 void
 MessageSendQueue::popFromQueued() {
-  std::unique_lock lock(m_queuedMutex);
-  auto& r = m_queued.front();
+  auto r = [this]() {
+    std::unique_lock lock(m_queuedMutex);
+    auto r = m_queued.front();
+    m_queued.pop();
+    return r;
+  }();
+
+  auto kind = r.header.kind;
+  auto number = r.header.number;
+
   r.sent = std::chrono::steady_clock::now();
 
-  if(parac_message_kind_is_waiting_for_ack(r.header.kind)) {
+  if(parac_message_kind_is_waiting_for_ack(kind)) {
     std::unique_lock lock(m_waitingForACKMutex);
-    m_waitingForACK.try_emplace(r.header.number, r);
+    m_waitingForACK.try_emplace(number, std::move(r));
 
     parac_log(PARAC_COMMUNICATOR,
               PARAC_TRACE,
               "Sent message of kind {} with id {} to remote {} and waiting "
               "for ACK.",
-              r.header.kind,
-              r.header.number,
+              kind,
+              number,
               m_remoteId);
   } else {
     parac_log(PARAC_COMMUNICATOR,
               PARAC_TRACE,
               "Send message of kind {} with id {} to remote {} without "
               "waiting for ACK ",
-              r.header.kind,
-              r.header.number,
+              kind,
+              number,
               m_remoteId);
   }
-  if(parac_message_kind_is_count_tracked(r.header.kind)) {
+
+  if(parac_message_kind_is_count_tracked(kind)) {
     --m_trackedQueueSize;
   }
-  m_queued.pop();
 }
 
 bool
@@ -359,22 +413,36 @@ MessageSendQueue::registerTCPConnection(TCPConnection& conn,
   m_weakActiveTCPConnection = std::make_unique<TCPConnection>(conn);
   (void)isConnectionInitiator;
 
+  m_availableToSendTo = true;
+
   m_connectionString = connectionString;
 
   if(m_remoteComputeNode) {
+    conn.injectMessageSendQueue(nullptr);
     return m_remoteComputeNode;
   }
+
+  conn.injectMessageSendQueue(shared_from_this());
 
   auto compute_node_store =
     m_service.handle().modules[PARAC_MOD_BROKER]->broker->compute_node_store;
 
-  parac_compute_node* compute_node = compute_node_store->get_with_connection(
+  if(compute_node_store->has(compute_node_store, m_remoteId)) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_LOCALERROR,
+              "Already has {} compute node in store!",
+              m_remoteId);
+  }
+  assert(!compute_node_store->has(compute_node_store, m_remoteId));
+
+  parac_compute_node* compute_node = compute_node_store->create_with_connection(
     compute_node_store,
     m_remoteId,
     &MessageSendQueue::static_compute_node_free_func,
     this,
     &MessageSendQueue::static_send_message_to,
-    &MessageSendQueue::static_send_file_to);
+    &MessageSendQueue::static_send_file_to,
+    &MessageSendQueue::static_available_to_send_to);
 
   m_remoteComputeNode = compute_node;
   m_remoteComputeNode->connection_string = m_connectionString.c_str();

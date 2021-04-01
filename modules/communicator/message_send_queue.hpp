@@ -29,7 +29,7 @@ class TCPConnection;
  * This class is also the one that is embedded into compute nodes and that is
  * called from all other threads.
  */
-class MessageSendQueue {
+class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
   public:
   struct EndTag {};
   struct ACKTag {};
@@ -50,10 +50,12 @@ class MessageSendQueue {
   static void static_send_file_to(parac_compute_node* compute_node,
                                   parac_file* msg);
   static void static_compute_node_free_func(parac_compute_node* n);
+  static bool static_available_to_send_to(parac_compute_node* n);
 
   void sendMessageTo(parac_compute_node& compute_node, parac_message& message);
   void sendFileTo(parac_compute_node& compute_node, parac_file& file);
   void computeNodeFreeFunc(parac_compute_node& compute_node);
+  bool availableToSendTo(parac_compute_node& compute_node);
 
   bool handleACK(const PacketHeader& ack);
 
@@ -130,6 +132,8 @@ class MessageSendQueue {
 
   std::unique_ptr<TCPConnection> m_weakActiveTCPConnection;
   std::string m_connectionString;
+
+  std::atomic_bool m_availableToSendTo = false;
 
   void send(Entry&& e);
 };
