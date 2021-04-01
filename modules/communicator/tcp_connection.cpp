@@ -141,6 +141,7 @@ struct TCPConnection::State {
 
   std::vector<char> recvBuf;
   std::atomic_int connectionTry = 0;
+  std::atomic_bool killed = false;
 
   std::atomic<TransmitMode> transmitMode = TransmitMode::Init;
   ResumeMode resumeMode = RestartAfterShutdown;
@@ -349,6 +350,31 @@ TCPConnection::conditionallyTriggerWriteHandler() {
     }
   }
   return true;
+}
+
+void
+TCPConnection::kill() {
+  auto s = state();
+  if(!s) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_TRACE,
+              "Cannot kill connection to because it is already dead!");
+    return;
+  }
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_TRACE,
+            "Connection to {} scheduled for kill!",
+            s->remoteId());
+  send(MessageSendQueue::EndTag());
+  s->killed = true;
+  s->socket->close();
+}
+
+bool
+TCPConnection::wasInitiator() {
+  auto s = state();
+  assert(s);
+  return s->connectionTry >= 0;
 }
 
 void
@@ -595,6 +621,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
       *s->socket, BUF(s->readInitiatorMessage), rh, s->remoteId());
 
     if(ec) {
+      if(ec == boost::system::errc::connection_reset ||
+         ec == boost::system::errc::operation_canceled) {
+        return;
+      }
       parac_log(
         PARAC_COMMUNICATOR,
         PARAC_LOCALERROR,
@@ -795,6 +825,14 @@ TCPConnection::readHandler(boost::system::error_code ec,
                     s->remoteId());
           return;
         }
+      }
+
+      if(s->killed) {
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_TRACE,
+                  "Connection to {} killed!",
+                  s->remoteId());
+        return;
       }
     }
   }

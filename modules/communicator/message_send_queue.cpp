@@ -145,15 +145,15 @@ MessageSendQueue::~MessageSendQueue() {
 
 void
 MessageSendQueue::send(parac_message&& message) {
-  send(Entry(message));
+  send(Entry(std::move(message)));
 }
 void
 MessageSendQueue::send(parac_file&& file) {
-  send(Entry(file));
+  send(Entry(std::move(file)));
 }
 void
 MessageSendQueue::send(EndTag&& end) {
-  send(Entry(end));
+  send(Entry(std::move(end)));
 }
 void
 MessageSendQueue::send(parac_message& message) {
@@ -267,18 +267,13 @@ MessageSendQueue::send(Entry&& e) {
     m_queued.emplace(std::move(e));
   }
 
-  if(m_weakActiveTCPConnection) {
-    parac_log(PARAC_COMMUNICATOR,
-              PARAC_TRACE,
-              "Calling conditionallyTriggerWriteHandler on TCPConnection "
-              "for remote {}.",
-              m_remoteId);
+  if(m_availableToSendTo && m_weakActiveTCPConnection) {
     if(!m_weakActiveTCPConnection->conditionallyTriggerWriteHandler()) {
       m_availableToSendTo = false;
     }
   } else {
     parac_log(PARAC_COMMUNICATOR,
-              PARAC_TRACE,
+              PARAC_LOCALWARNING,
               "Cannot call conditionallyTriggerWriteHandler on TCPConnection "
               "for remote {} as none is known!",
               m_remoteId);
@@ -335,12 +330,6 @@ MessageSendQueue::handleACK(const PacketHeader& ack) {
 MessageSendQueue::EntryRef
 MessageSendQueue::front() {
   std::unique_lock lock(m_queuedMutex);
-  if(m_queued.empty()) {
-    parac_log(PARAC_COMMUNICATOR,
-              PARAC_LOCALERROR,
-              "QUEUED EMPTY! Remote: {}",
-              m_remoteId);
-  }
   assert(!m_queued.empty());
 
   auto& front = m_queued.front();
@@ -348,14 +337,6 @@ MessageSendQueue::front() {
   r.header = &front.header;
   front.applyToRefValue(r.body);
   r.transmitMode = front.transmitMode;
-
-  parac_log(PARAC_COMMUNICATOR,
-            PARAC_TRACE,
-            "Getting reference to message of kind {} with id {} to remote {} "
-            "(front of message queue)",
-            r.header->kind,
-            r.header->number,
-            m_remoteId);
 
   return r;
 }
@@ -410,19 +391,42 @@ parac_compute_node*
 MessageSendQueue::registerTCPConnection(TCPConnection& conn,
                                         const std::string& connectionString,
                                         bool isConnectionInitiator) {
+  if(m_weakActiveTCPConnection) {
+    // The connection was already established previously! It must now be decided
+    // if the new connection should be used or the old one should be kept.
+
+    bool idGreaterThanRemote = m_remoteId > m_service.handle().id;
+
+    if(isConnectionInitiator && idGreaterThanRemote) {
+      // Then it should be replaced.
+      m_weakActiveTCPConnection->kill();
+    } else if(!isConnectionInitiator && idGreaterThanRemote) {
+      // The other connection should remain active.
+      return nullptr;
+    } else if(!isConnectionInitiator && !idGreaterThanRemote) {
+      // I'm the receiver of a more important connection. The other one should
+      // be dropped. The same would happen on the other side.
+      m_weakActiveTCPConnection->kill();
+    } else if(isConnectionInitiator && !idGreaterThanRemote) {
+      // Again, the other already existing connection takes prevalence.
+      return nullptr;
+    }
+  }
+
   m_weakActiveTCPConnection = std::make_unique<TCPConnection>(conn);
-  (void)isConnectionInitiator;
+
+  assert(m_weakActiveTCPConnection);
 
   m_availableToSendTo = true;
 
   m_connectionString = connectionString;
 
+  conn.injectMessageSendQueue(shared_from_this());
+
   if(m_remoteComputeNode) {
-    conn.injectMessageSendQueue(nullptr);
+    m_remoteComputeNode->connection_string = m_connectionString.c_str();
     return m_remoteComputeNode;
   }
-
-  conn.injectMessageSendQueue(shared_from_this());
 
   auto compute_node_store =
     m_service.handle().modules[PARAC_MOD_BROKER]->broker->compute_node_store;
