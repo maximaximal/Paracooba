@@ -1,3 +1,4 @@
+#include "paracooba/common/message_kind.h"
 #include <paracooba/common/status.h>
 
 #include <parac_common_export.h>
@@ -33,6 +34,8 @@ parac_status_to_str(parac_status status) {
       return "Abort Connection";
     case PARAC_CONNECTION_CLOSED:
       return "Connection Closed";
+    case PARAC_MESSAGE_TIMEOUT_ERROR:
+      return "Message Timeout";
     case PARAC_OUT_OF_MEMORY:
       return "Out of Memory";
     case PARAC_INVALID_CHAR_ENCOUNTERED:

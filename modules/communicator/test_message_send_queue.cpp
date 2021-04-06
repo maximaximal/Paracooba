@@ -74,7 +74,6 @@ setup_environment(environment& e, parac_id id) {
   memset(&e.brokerMod, 0, sizeof(e.brokerMod));
   memset(&e.broker, 0, sizeof(e.broker));
   memset(&e.pstore, 0, sizeof(e.pstore));
-  memset(&e.stor, 0, sizeof(e.stor));
 
   e.handle.id = id;
 

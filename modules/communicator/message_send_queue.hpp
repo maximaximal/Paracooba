@@ -121,6 +121,10 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
                          const std::string& connectionString,
                          bool isConnectionInitiator);
 
+  /** @brief Check contained messages for eventual resends.
+   */
+  void tick();
+
   private:
   struct Entry;
   using SentMap = std::map<uint32_t, Entry>;
@@ -131,8 +135,8 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
   SentMap m_waitingForACK;
   SendQueue m_queued;
 
-  std::mutex m_queuedMutex;
-  std::mutex m_waitingForACKMutex;
+  std::recursive_mutex m_queuedMutex;
+  std::recursive_mutex m_waitingForACKMutex;
 
   parac_id m_remoteId = 0;
   uint32_t m_messageNumber = 0;
@@ -146,6 +150,6 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
 
   std::atomic_bool m_availableToSendTo = false;
 
-  void send(Entry&& e);
+  void send(Entry&& e, bool resend = false);
 };
 }

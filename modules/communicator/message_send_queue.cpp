@@ -244,23 +244,36 @@ MessageSendQueue::availableToSendTo(parac_compute_node& compute_node) {
 }
 
 void
-MessageSendQueue::send(Entry&& e) {
+MessageSendQueue::send(Entry&& e, bool resend) {
   {
     std::unique_lock lock(m_queuedMutex);
 
     // ACKs already have a correct message number.
-    if(e.header.kind != PARAC_MESSAGE_ACK) {
+    if(e.header.kind != PARAC_MESSAGE_ACK && !resend) {
       e.header.number = m_messageNumber++;
     }
 
     parac_log(PARAC_COMMUNICATOR,
               PARAC_TRACE,
-              "Queuing message of kind {} with id {} to remote {} ",
+              "Queuing message of kind {} with id {} to remote {}",
               e.header.kind,
               e.header.number,
               m_remoteId);
 
-    if(parac_message_kind_is_count_tracked(e.header.kind)) {
+    if(resend) {
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_TRACE,
+                "The message of kind {} with id {} to remote {} is a resend! "
+                "Last sent {}ms ago.",
+                e.header.kind,
+                e.header.number,
+                m_remoteId,
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::steady_clock::now() - e.sent)
+                  .count());
+    }
+
+    if(parac_message_kind_is_count_tracked(e.header.kind) && !resend) {
       ++m_trackedQueueSize;
     }
 
@@ -495,6 +508,36 @@ MessageSendQueue::registerNotificationCB(const NotificationFunc& f,
   m_remoteComputeNode->connection_string = m_connectionString.c_str();
 
   return { compute_node, shared_from_this() };
+}
+
+void
+MessageSendQueue::tick() {
+  auto now = std::chrono::steady_clock::now();
+
+  std::unique_lock l1(m_queuedMutex), l2(m_waitingForACKMutex);
+
+  for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end(); ++it) {
+    auto& e = it->second;
+
+    if(std::chrono::duration_cast<std::chrono::milliseconds>(e.sent - now)
+         .count() > m_service.messageTimeoutMS() / 2) {
+      // Re-send the message in hope of it yet arriving on the other side.
+      send(std::move(it->second), true);
+      it = m_waitingForACK.erase(it);
+    } else if(std::chrono::duration_cast<std::chrono::milliseconds>(e.sent -
+                                                                    now)
+                .count() > m_service.messageTimeoutMS()) {
+      // The message ran into a timeout! Cancel that message and mark as never
+      // received.
+      if(parac_message_kind_is_count_tracked(it->second.header.kind)) {
+        --m_trackedQueueSize;
+      }
+      it->second(PARAC_MESSAGE_TIMEOUT_ERROR);
+      it->second(PARAC_TO_BE_DELETED);
+      it = m_waitingForACK.erase(it);
+      --m_trackedQueueSize;
+    }
+  }
 }
 
 }

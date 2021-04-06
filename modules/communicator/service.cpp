@@ -2,6 +2,7 @@
 #include <boost/exception/exception.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/system/error_code.hpp>
+#include <chrono>
 #include <map>
 #include <memory>
 #include <thread>
@@ -46,6 +47,7 @@ struct Service::Internal {
 
   std::atomic_bool tcpAcceptorActive, stopRequested = false;
   std::atomic_size_t outgoingMessageCounter = 0;
+  boost::asio::steady_timer messageSendQueueTimer{ context };
 };
 
 Service::Service(parac_handle& handle)
@@ -140,6 +142,8 @@ Service::run() {
 
   connectToKnownRemotes();
 
+  startMessageSendQueueTimer();
+
   while(!m_internal->context.stopped()) {
     try {
       m_internal->context.run();
@@ -181,6 +185,25 @@ Service::connectToRemote(const std::string& remote) {
               "Exception while trying to connect to remote {}: {}",
               remote,
               e.what());
+  }
+}
+
+void
+Service::startMessageSendQueueTimer() {
+  m_internal->messageSendQueueTimer.expires_from_now(std::chrono::seconds(1));
+  m_internal->messageSendQueueTimer.async_wait(
+    [this](const boost::system::error_code& ec) {
+      if(!ec)
+        handleMessageSendTimerTick();
+      startMessageSendQueueTimer();
+    });
+}
+
+void
+Service::handleMessageSendTimerTick() {
+  for(auto& e : m_internal->messageSendQueues) {
+    auto& sendQueue = e.second;
+    sendQueue->tick();
   }
 }
 

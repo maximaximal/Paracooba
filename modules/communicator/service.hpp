@@ -108,6 +108,8 @@ class Service {
   void stop();
 
   void connectToKnownRemotes();
+  void startMessageSendQueueTimer();
+  void handleMessageSendTimerTick();
 
   struct Internal;
   const std::unique_ptr<Internal> m_internal;
