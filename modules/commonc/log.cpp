@@ -14,6 +14,7 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/console.hpp>
 
+#include <atomic>
 #include <cassert>
 #include <iostream>
 #include <parac_common_export.h>
