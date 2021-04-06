@@ -15,6 +15,7 @@
 #include <atomic>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/error.hpp>
+#include <limits>
 #include <thread>
 #include <type_traits>
 #if BOOST_VERSION >= 106600
@@ -77,11 +78,13 @@ struct TCPConnection::State {
 
   ~State() {
     if(!service.stopped()) {
-      parac_log(PARAC_COMMUNICATOR,
-                PARAC_TRACE,
-                "Connection to remote {} ended with resume mode {}.",
-                remoteId(),
-                resumeMode);
+      parac_log(
+        PARAC_COMMUNICATOR,
+        PARAC_TRACE,
+        "Connection to remote {} ended with resume mode {}. Was initiator: {}",
+        remoteId(),
+        resumeMode,
+        connectionTry >= 0);
     }
 
     if(!service.stopped()) {
@@ -336,6 +339,7 @@ TCPConnection::conditionallyTriggerWriteHandler() {
   auto s = state();
   if(!s)
     return false;
+
   if(!s->currentlySending.test_and_set()) {
     auto weakConn = TCPConnection(*this, WeakStatePtr(s));
     if(s->service.ioContextThreadId() == std::this_thread::get_id()) {
@@ -352,22 +356,22 @@ TCPConnection::conditionallyTriggerWriteHandler() {
   return true;
 }
 
-void
+bool
 TCPConnection::kill() {
   auto s = state();
   if(!s) {
     parac_log(PARAC_COMMUNICATOR,
               PARAC_TRACE,
               "Cannot kill connection to because it is already dead!");
-    return;
+    return false;
   }
   parac_log(PARAC_COMMUNICATOR,
             PARAC_TRACE,
             "Connection to {} scheduled for kill!",
             s->remoteId());
-  send(MessageSendQueue::EndTag());
   s->killed = true;
-  s->socket->close();
+  conditionallyTriggerWriteHandler();
+  return true;
 }
 
 bool
@@ -408,6 +412,8 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
   auto s = state();
   assert(s);
 
+  s->remoteIdCache = init.sender_id;
+
   parac_log(PARAC_COMMUNICATOR,
             PARAC_TRACE,
             "Handle initiator message on node {} from node {}.",
@@ -430,14 +436,32 @@ TCPConnection::handleInitiatorMessage(const InitiatorMessage& init) {
   connStr << (a.is_v6() ? "[" : "") << a.to_string() << (a.is_v6() ? "]" : "")
           << ':' << init.tcp_port;
 
-  s->compute_node = sendQueue->registerTCPConnection(
-    weakConn, connStr.str(), s->connectionTry >= 0);
+  auto [compute_node, send_queue] = sendQueue->registerNotificationCB(
+    [weakConn](MessageSendQueue::Event e) mutable -> bool {
+      switch(e) {
+        case MessageSendQueue::MessagesAvailable:
+          return weakConn.conditionallyTriggerWriteHandler();
+        case MessageSendQueue::KillConnection:
+          return weakConn.kill();
+      }
+      return true;
+    },
+    connStr.str(),
+    s->connectionTry >= 0);
 
-  if(!s->compute_node) {
+  if(!compute_node) {
+    s->resumeMode = EndAfterShutdown;
     return false;
   }
 
-  s->remoteIdCache = s->compute_node->id;
+  s->compute_node = compute_node;
+  s->sendQueue = send_queue;
+
+  // Send queue was now set! Maybe there are already messages from other
+  // modules. Send these.
+  if(!send_queue->empty()) {
+    conditionallyTriggerWriteHandler();
+  }
 
   return true;
 }
@@ -895,12 +919,29 @@ TCPConnection::writeHandler(boost::system::error_code ec,
     }
 
     while(true) {
-      while(!s->sendQueue || s->sendQueue->empty()) {
+      while((!s->sendQueue || s->sendQueue->empty()) && !s->killed) {
         s->currentlySending.clear();
         setKeepaliveTimer();
         yield;
       }
-      assert(!s->sendQueue->empty());
+
+      if(s->killed) {
+        // Killed means that the normal way of using the send queue is not valid
+        // anymore! Some other connection is using that queue. Directly send the
+        // end message and quit the write handler for good.
+
+        PacketHeader endHeader;
+        endHeader.kind = PARAC_MESSAGE_END;
+        endHeader.size = 0;
+        endHeader.originator = s->service.id();
+        endHeader.number =
+          std::numeric_limits<decltype(endHeader.number)>::max();
+        boost::asio::write(*s->socket, BUF(endHeader));
+
+        while(s->killed) {
+          yield;
+        }
+      }
       setKeepaliveTimer();
       e = s->sendQueue->front();
 
@@ -931,6 +972,9 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       assert(e.header);
 
       yield async_write(*s->socket, BUF((*e.header)), wh);
+
+      if(s->killed)
+        continue;
 
       if(ec == boost::system::errc::broken_pipe ||
          ec == boost::system::errc::connection_reset) {
@@ -966,14 +1010,23 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         // function when it's done. If there is some error, the connection is
         // dropped and re-established.
         yield fileSender.send();
+
+        if(s->killed)
+          continue;
       } else {
         if(e.message().data_is_inline) {
           assert(e.header->size <= PARAC_MESSAGE_INLINE_DATA_SIZE);
           yield async_write(
             *s->socket, buffer(e.message().inline_data, e.header->size), wh);
+
+          if(s->killed)
+            continue;
         } else {
           yield async_write(
             *s->socket, buffer(e.message().data, e.header->size), wh);
+
+          if(s->killed)
+            continue;
         }
 
         if(ec) {
@@ -986,6 +1039,8 @@ TCPConnection::writeHandler(boost::system::error_code ec,
         }
       }
 
+      if(s->killed)
+        continue;
       s->sendQueue->popFromQueued();
     }
   }

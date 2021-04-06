@@ -95,14 +95,14 @@ class parac_compute_node_wrapper : public parac_compute_node {
   public:
   using IDConnectionStringPair = std::pair<parac_id, std::string>;
 
-  parac_compute_node_wrapper() {
+  parac_compute_node_wrapper(parac_id id = 0) {
     send_message_to = nullptr;
     receive_message_from = nullptr;
     send_file_to = nullptr;
     receive_file_from = nullptr;
     broker_free = nullptr;
     communicator_free = nullptr;
-    id = 0;
+    this->id = id;
     broker_userdata = nullptr;
     communicator_userdata = nullptr;
     state = PARAC_COMPUTE_NODE_NEW;

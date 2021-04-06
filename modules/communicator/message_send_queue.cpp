@@ -245,13 +245,6 @@ MessageSendQueue::availableToSendTo(parac_compute_node& compute_node) {
 
 void
 MessageSendQueue::send(Entry&& e) {
-  parac_log(PARAC_COMMUNICATOR,
-            PARAC_TRACE,
-            "Queuing message of kind {} with id {} to remote {} ",
-            e.header.kind,
-            e.header.number,
-            m_remoteId);
-
   {
     std::unique_lock lock(m_queuedMutex);
 
@@ -260,6 +253,13 @@ MessageSendQueue::send(Entry&& e) {
       e.header.number = m_messageNumber++;
     }
 
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_TRACE,
+              "Queuing message of kind {} with id {} to remote {} ",
+              e.header.kind,
+              e.header.number,
+              m_remoteId);
+
     if(parac_message_kind_is_count_tracked(e.header.kind)) {
       ++m_trackedQueueSize;
     }
@@ -267,8 +267,8 @@ MessageSendQueue::send(Entry&& e) {
     m_queued.emplace(std::move(e));
   }
 
-  if(m_availableToSendTo && m_weakActiveTCPConnection) {
-    if(!m_weakActiveTCPConnection->conditionallyTriggerWriteHandler()) {
+  if(m_availableToSendTo && m_notificationFunc) {
+    if(!m_notificationFunc(MessagesAvailable)) {
       m_availableToSendTo = false;
     }
   } else {
@@ -304,6 +304,8 @@ MessageSendQueue::handleACK(const PacketHeader& ack) {
               m_remoteId,
               it->second.header.kind);
   }
+
+  ++m_ACKdMessageCount;
 
 #ifdef ENABLE_DISTRAC
   auto distrac = m_service.handle().distrac;
@@ -387,49 +389,90 @@ MessageSendQueue::empty() {
   return m_queued.empty();
 }
 
-parac_compute_node*
-MessageSendQueue::registerTCPConnection(TCPConnection& conn,
-                                        const std::string& connectionString,
-                                        bool isConnectionInitiator) {
-  if(m_weakActiveTCPConnection) {
+std::pair<parac_compute_node*, std::shared_ptr<MessageSendQueue>>
+MessageSendQueue::registerNotificationCB(const NotificationFunc& f,
+                                         const std::string& connectionString,
+                                         bool isConnectionInitiator) {
+  if(m_notificationFunc) {
     // The connection was already established previously! It must now be decided
     // if the new connection should be used or the old one should be kept.
 
-    bool idGreaterThanRemote = m_remoteId > m_service.handle().id;
+    bool idGreaterThanRemote = m_remoteId < m_service.handle().id;
 
     if(isConnectionInitiator && idGreaterThanRemote) {
-      // Then it should be replaced.
-      m_weakActiveTCPConnection->kill();
+      // Then it should be replaced if the queue was not already used.
+      if(m_ACKdMessageCount >= 1) {
+        parac_log(
+          PARAC_COMMUNICATOR,
+          PARAC_TRACE,
+          "Cancel a connection to {} (connection string {}) even though it "
+          "would have caused the other one to be killed, because "
+          " the other active connection was already used and does not "
+          "have to be canceled.",
+          m_remoteId,
+          connectionString);
+        return { nullptr, nullptr };
+      } else
+        m_notificationFunc(KillConnection);
     } else if(!isConnectionInitiator && idGreaterThanRemote) {
       // The other connection should remain active.
-      return nullptr;
+      parac_log(
+        PARAC_COMMUNICATOR,
+        PARAC_TRACE,
+        "Cancel a connection to {} (connection string {}) because "
+        "local id {} > remote id {} and this is NOT the initiating side.",
+        m_remoteId,
+        connectionString,
+        m_service.handle().id,
+        m_remoteId);
+      return { nullptr, nullptr };
     } else if(!isConnectionInitiator && !idGreaterThanRemote) {
-      // I'm the receiver of a more important connection. The other one should
-      // be dropped. The same would happen on the other side.
-      m_weakActiveTCPConnection->kill();
+      if(m_ACKdMessageCount >= 1) {
+        // I'm the receiver of a more important connection. The other one should
+        // be dropped. The same would happen on the other side.
+        parac_log(
+          PARAC_COMMUNICATOR,
+          PARAC_TRACE,
+          "Cancel a connection to {} (connection string {}) even though it "
+          "would have caused the other one to be killed, because "
+          " the other active connection was already used and does not "
+          "have to be canceled.",
+          m_remoteId,
+          connectionString);
+        return { nullptr, nullptr };
+      } else
+        m_notificationFunc(KillConnection);
     } else if(isConnectionInitiator && !idGreaterThanRemote) {
       // Again, the other already existing connection takes prevalence.
-      return nullptr;
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_TRACE,
+                "Cancel a connection to {} (connection string {}) because "
+                "local id {} < remote id {} and this is the initiating side.",
+                m_remoteId,
+                connectionString,
+                m_service.handle().id,
+                m_remoteId);
+      return { nullptr, nullptr };
     }
   }
 
-  m_weakActiveTCPConnection = std::make_unique<TCPConnection>(conn);
-
-  assert(m_weakActiveTCPConnection);
+  m_notificationFunc = f;
 
   m_availableToSendTo = true;
 
   m_connectionString = connectionString;
 
-  conn.injectMessageSendQueue(shared_from_this());
-
   if(m_remoteComputeNode) {
     m_remoteComputeNode->connection_string = m_connectionString.c_str();
-    return m_remoteComputeNode;
+    return { m_remoteComputeNode, shared_from_this() };
   }
 
-  auto compute_node_store =
-    m_service.handle().modules[PARAC_MOD_BROKER]->broker->compute_node_store;
+  auto brokerMod = m_service.handle().modules[PARAC_MOD_BROKER];
+  assert(brokerMod);
+  auto broker = brokerMod->broker;
+  assert(broker);
+  auto compute_node_store = broker->compute_node_store;
+  assert(compute_node_store);
 
   if(compute_node_store->has(compute_node_store, m_remoteId)) {
     parac_log(PARAC_COMMUNICATOR,
@@ -451,7 +494,7 @@ MessageSendQueue::registerTCPConnection(TCPConnection& conn,
   m_remoteComputeNode = compute_node;
   m_remoteComputeNode->connection_string = m_connectionString.c_str();
 
-  return compute_node;
+  return { compute_node, shared_from_this() };
 }
 
 }

@@ -70,7 +70,7 @@ class TCPConnection {
 
   bool conditionallyTriggerWriteHandler();
 
-  void kill();
+  bool kill();
   bool wasInitiator();
 
   void injectMessageSendQueue(std::shared_ptr<MessageSendQueue> sendQueue);

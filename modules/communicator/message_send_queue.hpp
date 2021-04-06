@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -31,6 +32,16 @@ class TCPConnection;
  */
 class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
   public:
+  enum Event { MessagesAvailable, KillConnection };
+
+  /** @brief Notifies the message consumer of new messages available in this
+   * queue.
+   *
+   * @return True if consumer still exists, false if the callback should be
+   * de-registered.
+   */
+  using NotificationFunc = std::function<bool(Event)>;
+
   struct EndTag {};
   struct ACKTag {};
 
@@ -102,14 +113,13 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
    */
   bool empty();
 
-  /** @brief Registers a TCPConnection that is connected to the target node.
-   *
-   * This connection is called when new messages should be sent. It is
-   * copied into a weak TCPConnection handle.
+  /** @brief Registers a CB to be called when new messages should be sent or a
+   * connection be killed.
    */
-  parac_compute_node* registerTCPConnection(TCPConnection& conn,
-                                            const std::string& connectionString,
-                                            bool isConnectionInitiator);
+  std::pair<parac_compute_node*, std::shared_ptr<MessageSendQueue>>
+  registerNotificationCB(const NotificationFunc& f,
+                         const std::string& connectionString,
+                         bool isConnectionInitiator);
 
   private:
   struct Entry;
@@ -126,11 +136,12 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
 
   parac_id m_remoteId = 0;
   uint32_t m_messageNumber = 0;
+  uint32_t m_ACKdMessageCount = 0;
   parac_compute_node* m_remoteComputeNode = nullptr;
 
   std::atomic_size_t m_trackedQueueSize = 0;
 
-  std::unique_ptr<TCPConnection> m_weakActiveTCPConnection;
+  NotificationFunc m_notificationFunc;
   std::string m_connectionString;
 
   std::atomic_bool m_availableToSendTo = false;
