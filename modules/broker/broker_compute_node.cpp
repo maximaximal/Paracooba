@@ -404,19 +404,6 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
   // Send all known other nodes to the peer.
   sendKnownRemotes();
 
-  // Notify other nodes on newly created node.
-  for(const auto& n : m_store) {
-    if(n.id == m_handle.id || n.id == m_node.id)
-      continue;
-
-    ComputeNode* bn = static_cast<ComputeNode*>(n.broker_userdata);
-    assert(bn);
-
-    // This static cast is okay, since all nodes in the task store are stored as
-    // wrappers. This is the same module, so no breakage should occur.
-    bn->notifyOfNewRemote(static_cast<parac_compute_node_wrapper&>(m_node));
-  }
-
   {
     SpinLock lock(m_modifyingStatus);
     m_status.insertWorkerCount(m_description->workers);
