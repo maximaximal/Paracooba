@@ -471,8 +471,8 @@ SolverTask::resplit(uint64_t durationMS) {
       if(activeHandle) {
         activeHandle->terminate();
         self->m_interruptSolving = true;
-        self->m_timeout = nullptr;
       }
+      self->m_timeout = nullptr;
     });
 
   if(!m_timeout) {
@@ -488,8 +488,10 @@ SolverTask::resplit(uint64_t durationMS) {
   auto cubes = resplitDepth(path(), literals, depth);
   auto end = std::chrono::steady_clock::now();
 
-  if(m_timeout)
+  if(m_timeout) {
     m_timeout->cancel(m_timeout);
+    m_timeout = nullptr;
+  }
 
   parac_log(
     PARAC_CUBER,
@@ -528,8 +530,8 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
         auto activeHandle = self->m_activeHandle.load();
         if(activeHandle) {
           activeHandle->terminate();
-          self->m_timeout = nullptr;
         }
+        self->m_timeout = nullptr;
       });
   }
 
