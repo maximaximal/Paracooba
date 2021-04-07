@@ -366,6 +366,7 @@ ComputeNode::receiveMessageFrom(parac_message& msg) {
               m_node.id,
               msg.originator_id,
               e.what());
+    msg.cb(&msg, PARAC_ABORT_CONNECTION);
   } catch(...) {
     assert(false);
   }
