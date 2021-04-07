@@ -335,6 +335,12 @@ Service::messageTimeoutMS() const {
 }
 
 uint32_t
+Service::connectionTimeoutMS() const {
+  assert(m_config);
+  return m_config[CONNECTION_TIMEOUT].value.uint32;
+}
+
+uint32_t
 Service::keepaliveIntervalMS() const {
   assert(m_config);
   return m_config[KEEPALIVE_INTERVAL].value.uint32;

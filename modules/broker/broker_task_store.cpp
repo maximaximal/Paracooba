@@ -55,7 +55,7 @@ struct TaskStore::Internal {
     , store(store) {}
 
   std::recursive_mutex assessMutex;
-  std::mutex containerMutex;
+  std::recursive_mutex containerMutex;
   parac_handle& handle;
   parac_task_store& store;
 
@@ -208,6 +208,7 @@ TaskStore::newTask(parac_task* parent_task,
   task->task_store = &m_internal->store;
   task->path = new_path;
   task->originator = originator;
+  task->handle = &m_internal->handle;
 
   if(parent_task) {
     Internal::Task* parentWrapper = reinterpret_cast<Internal::Task*>(
@@ -341,6 +342,35 @@ TaskStore::undo_offload(parac_task* t) {
   }
 
   insert_into_tasksWaitingForWorkerQueue(t);
+}
+
+void
+TaskStore::undoAllOffloadsTo(parac_compute_node* remote) {
+  assert(remote);
+  parac_log(
+    PARAC_BROKER, PARAC_TRACE, "Undo all offloads to remote {}.", remote->id);
+
+  std::unique_lock lock(m_internal->containerMutex);
+
+  auto offloaded_to = m_internal->offloadedTasks[remote];
+  for(auto it = offloaded_to.begin(); it != offloaded_to.end(); ++it) {
+    Internal::Task* taskWrapper = *it;
+    parac_task* t = &taskWrapper->t;
+
+    parac_log(PARAC_BROKER,
+              PARAC_TRACE,
+              "Undo all offloads to remote {}, so undoing offload of task {}",
+              remote->id,
+              t->path);
+
+    it = offloaded_to.erase(it);
+
+    t->state = static_cast<parac_task_state>(t->state & ~PARAC_TASK_OFFLOADED);
+
+    --taskWrapper->refcount;
+
+    insert_into_tasksWaitingForWorkerQueue(t);
+  }
 }
 
 void
@@ -654,8 +684,8 @@ TaskStore::receiveTaskResultFromPeer(parac_message& msg) {
       "task path "
       "not found in broker task store node map! Ignoring.",
       result,
-      static_cast<void*>(t),
       msg.originator_id,
+      static_cast<void*>(t),
       originId);
     msg.cb(&msg, PARAC_PATH_NOT_FOUND_ERROR);
     return;

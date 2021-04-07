@@ -39,6 +39,7 @@ enum Config {
   NETWORK_TIMEOUT,
   RETRY_TIMEOUT,
   MESSAGE_TIMEOUT,
+  CONNECTION_TIMEOUT,
   KEEPALIVE_INTERVAL,
   CONNECTION_RETRIES,
   KNOWN_REMOTES,
@@ -73,6 +74,7 @@ class Service {
   uint32_t networkTimeoutMS() const;
   uint32_t retryTimeoutMS() const;
   uint16_t messageTimeoutMS() const;
+  uint32_t connectionTimeoutMS() const;
   uint32_t keepaliveIntervalMS() const;
   bool automaticListenPortAssignment() const;
 

@@ -538,6 +538,41 @@ MessageSendQueue::tick() {
       --m_trackedQueueSize;
     }
   }
+
+  if(m_availableToSendTo && m_notificationFunc &&
+     std::chrono::duration_cast<std::chrono::milliseconds>(now -
+                                                           m_lastHeardOfRemote)
+         .count() > m_service.connectionTimeoutMS()) {
+    // The connection has timed out! Cancel all messages, kill connection.
+    m_notificationFunc(KillConnection);
+    m_notificationFunc = nullptr;
+    m_availableToSendTo = false;
+    clear();
+    assert(m_remoteComputeNode);
+    assert(m_remoteComputeNode->connection_dropped);
+    m_remoteComputeNode->connection_dropped(m_remoteComputeNode);
+  }
+}
+
+void
+MessageSendQueue::clear() {
+  // Mutexes must already be locked!
+  assert(!m_queuedMutex.try_lock());
+  assert(!m_waitingForACKMutex.try_lock());
+
+  while(!m_queued.empty()) {
+    auto& f = m_queued.front();
+    f(PARAC_MESSAGE_TIMEOUT_ERROR);
+    f(PARAC_TO_BE_DELETED);
+    m_queued.pop();
+  }
+
+  for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end(); ++it) {
+    auto& f = it->second;
+    f(PARAC_MESSAGE_TIMEOUT_ERROR);
+    f(PARAC_TO_BE_DELETED);
+    it = m_waitingForACK.erase(it);
+  }
 }
 
 }

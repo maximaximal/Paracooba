@@ -1,10 +1,12 @@
 #include <assert.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "paracooba/common/message.h"
 #include "paracooba/common/status.h"
 #include <paracooba/common/path.h>
 #include <paracooba/common/task.h>
+#include <paracooba/module.h>
 
 #include <paracooba/common/log.h>
 
@@ -20,6 +22,35 @@ static_assert(sizeof(char) * PARAC_MESSAGE_INLINE_DATA_SIZE >=
               "Inline data must be able to fit parac_task_result_packet!");
 
 static void
+notify_result_cb(parac_message* msg, parac_status status) {
+  assert(msg);
+  assert(msg->userdata);
+  parac_task* t = msg->userdata;
+  assert(t->handle);
+
+  if(status == PARAC_PATH_NOT_FOUND_ERROR ||
+     status == PARAC_COMPUTE_NODE_NOT_FOUND_ERROR) {
+    char pathbuffer[PARAC_PATH_MAX_LENGTH];
+    parac_path_to_str(t->path, pathbuffer);
+    char buf[512];
+    snprintf(buf,
+             512,
+             "Received a PATH NOT FOUND error or a compute node not found "
+             "error when notifying remote %lu of "
+             "update of path %s with originator %lu! Try to recover by killing "
+             "the local node, so "
+             "that order may be restored.",
+             t->received_from->id,
+             pathbuffer,
+             t->originator);
+    parac_log(PARAC_GENERAL, PARAC_FATAL, buf);
+
+    t->handle->exit_status = PARAC_GENERIC_ERROR;
+    t->handle->request_exit(t->handle);
+  }
+}
+
+static void
 notify_result(parac_task* t) {
   if(!t || !t->received_from || !t->received_from->send_message_to) {
     parac_log(PARAC_GENERAL,
@@ -30,6 +61,7 @@ notify_result(parac_task* t) {
   assert(t->received_from);
   assert(t->received_from->send_message_to);
   assert(t->parent_task_);
+  assert(t->handle);
 
   parac_message msg;
   msg.kind = PARAC_MESSAGE_TASK_RESULT;
@@ -42,8 +74,8 @@ notify_result(parac_task* t) {
 
   msg.data_to_be_freed = false;
   msg.data_is_inline = true;
-  msg.userdata = NULL;
-  msg.cb = NULL;
+  msg.userdata = t;
+  msg.cb = notify_result_cb;
   msg.originator_id = t->originator;
   msg.length = sizeof(parac_task_result_packet);
   t->received_from->send_message_to(t->received_from, &msg);
@@ -63,6 +95,7 @@ parac_task_result_packet_get_task_ptr(void* result) {
 PARAC_COMMON_EXPORT parac_task_state
 parac_task_default_assess(parac_task* t) {
   assert(t);
+  assert(t->task_store);
 
   if(t->state & PARAC_TASK_SPLITTED) {
     if(t->left_result != PARAC_PENDING && t->right_result != PARAC_PENDING) {
@@ -116,6 +149,7 @@ parac_task_init(parac_task* t) {
   t->left_child_ = NULL;
   t->right_child_ = NULL;
   t->task_store = NULL;
+  t->handle = NULL;
   t->serialize = NULL;
   t->stop = false;
   t->terminate = NULL;

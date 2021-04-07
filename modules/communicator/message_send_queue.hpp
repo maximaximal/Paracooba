@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -125,6 +126,15 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
    */
   void tick();
 
+  /** @brief Called when any kind of communication happened on a connection
+   * associated with this queue.
+   *
+   * This keeps the logical connection to the remote compute node alive.
+   */
+  void notifyOfRead() {
+    m_lastHeardOfRemote = std::chrono::steady_clock::now();
+  }
+
   private:
   struct Entry;
   using SentMap = std::map<uint32_t, Entry>;
@@ -150,6 +160,11 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
 
   std::atomic_bool m_availableToSendTo = false;
 
+  std::chrono::steady_clock::time_point m_lastHeardOfRemote =
+    std::chrono::steady_clock::now();
+
   void send(Entry&& e, bool resend = false);
+
+  void clear();
 };
 }

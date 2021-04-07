@@ -101,6 +101,7 @@ ComputeNode::ComputeNode(parac_compute_node& node,
     ComputeNode* self = static_cast<ComputeNode*>(n->broker_userdata);
     self->receiveFileFrom(*file);
   };
+  node.connection_dropped = &static_connectionDropped;
 }
 ComputeNode::~ComputeNode() {}
 
@@ -880,7 +881,11 @@ ComputeNode::static_connectionDropped(parac_compute_node* node) {
   assert(node);
   assert(node->broker_userdata);
   ComputeNode& self = *static_cast<ComputeNode*>(node->broker_userdata);
-  (void)self;
+  parac_log(PARAC_COMMUNICATOR,
+            PARAC_GLOBALWARNING,
+            "Connection to remote {} dropped! Undoing all offloads.",
+            node->id);
+  self.m_taskStore.undoAllOffloadsTo(node);
 }
 
 void

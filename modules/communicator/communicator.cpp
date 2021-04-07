@@ -157,6 +157,15 @@ init_config(CommunicatorUserdata* u) {
   e[Config::MESSAGE_TIMEOUT].type = PARAC_TYPE_UINT16;
   e[Config::MESSAGE_TIMEOUT].default_value.uint16 = 10000u;
 
+  parac_config_entry_set_str(
+    &e[Config::CONNECTION_TIMEOUT],
+    "connection-timeout",
+    "Timeout (in ms) for connections to remote. After expiry, all offloaded "
+    "tasks are returned to their queues and the work is re-scheduled.");
+  e[Config::CONNECTION_TIMEOUT].registrar = PARAC_MOD_COMMUNICATOR;
+  e[Config::CONNECTION_TIMEOUT].type = PARAC_TYPE_UINT32;
+  e[Config::CONNECTION_TIMEOUT].default_value.uint32 = 30000u;
+
   parac_config_entry_set_str(&e[Config::KEEPALIVE_INTERVAL],
                              "keepalive-interval",
                              "Interval how often keepalive-packets should be "

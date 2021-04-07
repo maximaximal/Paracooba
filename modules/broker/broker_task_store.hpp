@@ -35,6 +35,7 @@ class TaskStore {
   parac_task* pop_work();
 
   void undo_offload(parac_task* t);
+  void undoAllOffloadsTo(parac_compute_node* remote);
 
   void assess_task(parac_task* task);
 

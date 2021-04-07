@@ -665,6 +665,9 @@ TCPConnection::readHandler(boost::system::error_code ec,
       return;
     }
 
+    if(s->sendQueue)
+      s->sendQueue->notifyOfRead();
+
     while(true) {
       if(ec) {
         parac_log(
@@ -702,6 +705,9 @@ TCPConnection::readHandler(boost::system::error_code ec,
           bytes_received);
         return;
       }
+
+      if(s->sendQueue)
+        s->sendQueue->notifyOfRead();
 
 #ifdef ENABLE_DISTRAC
       {
@@ -766,6 +772,10 @@ TCPConnection::readHandler(boost::system::error_code ec,
               ec.message());
             return;
           }
+
+          if(s->sendQueue)
+            s->sendQueue->notifyOfRead();
+
           s->readHeader.size -= bytes_received;
           handleReceivedFileChunk();
         }
@@ -849,6 +859,9 @@ TCPConnection::readHandler(boost::system::error_code ec,
                     s->remoteId());
           return;
         }
+
+        if(s->sendQueue)
+          s->sendQueue->notifyOfRead();
       }
 
       if(s->killed) {

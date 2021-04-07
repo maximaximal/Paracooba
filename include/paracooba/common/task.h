@@ -26,6 +26,7 @@ typedef enum parac_task_state {
 struct parac_task;
 struct parac_message;
 struct parac_compute_node;
+struct parac_handle;
 
 parac_status
 parac_task_result_packet_get_result(void* result);
@@ -72,6 +73,9 @@ typedef struct parac_task {
   struct parac_task* left_child_;
   struct parac_task* right_child_;
   struct parac_task_store* task_store;
+
+  /* Used in utility functions where only a pointer to task is available */
+  struct parac_handle* handle;
 } parac_task;
 
 void
