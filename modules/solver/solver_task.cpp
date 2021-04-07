@@ -470,9 +470,9 @@ SolverTask::resplit(uint64_t durationMS) {
       auto activeHandle = self->m_activeHandle.load();
       if(activeHandle) {
         activeHandle->terminate();
+        self->m_interruptSolving = true;
+        self->m_timeout = nullptr;
       }
-      self->m_interruptSolving = true;
-      self->m_timeout = nullptr;
     });
 
   if(!m_timeout) {
@@ -525,10 +525,11 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
                   "CNF formula for path {} will be interrupted.",
                   self->path());
         self->m_interruptSolving = true;
-        CaDiCaLHandle* handle = self->m_activeHandle;
-        assert(handle);
-        handle->terminate();
-        self->m_timeout = nullptr;
+        auto activeHandle = self->m_activeHandle.load();
+        if(activeHandle) {
+          activeHandle->terminate();
+          self->m_timeout = nullptr;
+        }
       });
   }
 
