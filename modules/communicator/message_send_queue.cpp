@@ -406,6 +406,16 @@ std::pair<parac_compute_node*, std::shared_ptr<MessageSendQueue>>
 MessageSendQueue::registerNotificationCB(const NotificationFunc& f,
                                          const std::string& connectionString,
                                          bool isConnectionInitiator) {
+  if(m_dropped) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_GLOBALWARNING,
+              "Connection from previously dropped remote {} coming in again "
+              "with connection string {}! Blocking.",
+              m_remoteId,
+              connectionString);
+    return { nullptr, nullptr };
+  }
+
   if(m_notificationFunc) {
     // The connection was already established previously! It must now be decided
     // if the new connection should be used or the old one should be kept.
@@ -516,17 +526,27 @@ MessageSendQueue::tick() {
 
   std::unique_lock l1(m_queuedMutex), l2(m_waitingForACKMutex);
 
-  for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end(); ++it) {
+  for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end();) {
     auto& e = it->second;
 
-    if(std::chrono::duration_cast<std::chrono::milliseconds>(e.sent - now)
-         .count() > m_service.messageTimeoutMS() / 2) {
+    auto dur =
+      std::chrono::duration_cast<std::chrono::milliseconds>(e.sent - now)
+        .count();
+
+    if(dur > m_service.messageTimeoutMS() / 2) {
       // Re-send the message in hope of it yet arriving on the other side.
       send(std::move(it->second), true);
       it = m_waitingForACK.erase(it);
-    } else if(std::chrono::duration_cast<std::chrono::milliseconds>(e.sent -
-                                                                    now)
-                .count() > m_service.messageTimeoutMS()) {
+
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_GLOBALWARNING,
+                "Message of kind {} with id {} to remote {} is at halftime to "
+                "timeout at send duration of {}ms! Re-queuing to send again.",
+                it->second.header.kind,
+                it->second.header.number,
+                m_remoteId,
+                dur);
+    } else if(dur > m_service.messageTimeoutMS()) {
       // The message ran into a timeout! Cancel that message and mark as never
       // received.
       if(parac_message_kind_is_count_tracked(it->second.header.kind)) {
@@ -536,29 +556,48 @@ MessageSendQueue::tick() {
       it->second(PARAC_TO_BE_DELETED);
       it = m_waitingForACK.erase(it);
       --m_trackedQueueSize;
+
+      parac_log(
+        PARAC_COMMUNICATOR,
+        PARAC_GLOBALWARNING,
+        "Message of kind {} with id {} to remote {} timed out after {}ms!",
+        it->second.header.kind,
+        it->second.header.number,
+        m_remoteId,
+        dur);
+    } else {
+      ++it;
     }
   }
 
-  if(m_availableToSendTo && m_notificationFunc &&
-     std::chrono::duration_cast<std::chrono::milliseconds>(now -
-                                                           m_lastHeardOfRemote)
-         .count() > m_service.connectionTimeoutMS()) {
+  auto lastReadDur = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       now - m_lastHeardOfRemote)
+                       .count();
+
+  if(!m_dropped && lastReadDur > m_service.connectionTimeoutMS()) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_GLOBALWARNING,
+              "Connection to {} dropped after not having any successful reads "
+              "for {}ms!",
+              m_remoteId,
+              lastReadDur);
     // The connection has timed out! Cancel all messages, kill connection.
-    m_notificationFunc(KillConnection);
-    m_notificationFunc = nullptr;
+    if(m_notificationFunc) {
+      m_notificationFunc(KillConnection);
+      m_notificationFunc = nullptr;
+    }
     m_availableToSendTo = false;
     clear();
     assert(m_remoteComputeNode);
     assert(m_remoteComputeNode->connection_dropped);
     m_remoteComputeNode->connection_dropped(m_remoteComputeNode);
+    m_dropped = true;
   }
 }
 
 void
 MessageSendQueue::clear() {
-  // Mutexes must already be locked!
-  assert(!m_queuedMutex.try_lock());
-  assert(!m_waitingForACKMutex.try_lock());
+  std::unique_lock l1(m_queuedMutex), l2(m_waitingForACKMutex);
 
   while(!m_queued.empty()) {
     auto& f = m_queued.front();
@@ -567,7 +606,7 @@ MessageSendQueue::clear() {
     m_queued.pop();
   }
 
-  for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end(); ++it) {
+  for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end();) {
     auto& f = it->second;
     f(PARAC_MESSAGE_TIMEOUT_ERROR);
     f(PARAC_TO_BE_DELETED);

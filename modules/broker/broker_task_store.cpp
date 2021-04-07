@@ -353,7 +353,7 @@ TaskStore::undoAllOffloadsTo(parac_compute_node* remote) {
   std::unique_lock lock(m_internal->containerMutex);
 
   auto offloaded_to = m_internal->offloadedTasks[remote];
-  for(auto it = offloaded_to.begin(); it != offloaded_to.end(); ++it) {
+  for(auto it = offloaded_to.begin(); it != offloaded_to.end();) {
     Internal::Task* taskWrapper = *it;
     parac_task* t = &taskWrapper->t;
 
@@ -366,6 +366,7 @@ TaskStore::undoAllOffloadsTo(parac_compute_node* remote) {
     it = offloaded_to.erase(it);
 
     t->state = static_cast<parac_task_state>(t->state & ~PARAC_TASK_OFFLOADED);
+    t->offloaded_to = nullptr;
 
     --taskWrapper->refcount;
 
@@ -693,6 +694,10 @@ TaskStore::receiveTaskResultFromPeer(parac_message& msg) {
 
   t->result = result;
   t->state = t->state | PARAC_TASK_DONE;
+
+  // No longer offloaded!
+  --tWrapper->refcount;
+  pathTaskMap.erase(taskIt);
 
   assess_task(t);
 

@@ -193,9 +193,10 @@ Service::startMessageSendQueueTimer() {
   m_internal->messageSendQueueTimer.expires_from_now(std::chrono::seconds(1));
   m_internal->messageSendQueueTimer.async_wait(
     [this](const boost::system::error_code& ec) {
-      if(!ec)
+      if(!ec) {
         handleMessageSendTimerTick();
-      startMessageSendQueueTimer();
+        startMessageSendQueueTimer();
+      }
     });
 }
 

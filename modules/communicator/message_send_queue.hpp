@@ -159,6 +159,7 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
   std::string m_connectionString;
 
   std::atomic_bool m_availableToSendTo = false;
+  std::atomic_bool m_dropped = false;
 
   std::chrono::steady_clock::time_point m_lastHeardOfRemote =
     std::chrono::steady_clock::now();

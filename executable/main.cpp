@@ -253,32 +253,35 @@ main(int argc, char* argv[]) {
   }
 #endif
 
-  switch(loader.handle().exit_status) {
-    case PARAC_SAT:
-      std::cout << "s SATISFIABLE";
-      for(auto i = 1; i <= loader.handle().assignment_highest_literal(
-                             loader.handle().assignment_data);
-          ++i) {
-        if(i % 10 == 1) {
-          std::cout << "\nv";
+  // Only client nodes give a status at the end.
+  if(loader.handle().input_file) {
+    switch(loader.handle().exit_status) {
+      case PARAC_SAT:
+        std::cout << "s SATISFIABLE";
+        for(auto i = 1; i <= loader.handle().assignment_highest_literal(
+                               loader.handle().assignment_data);
+            ++i) {
+          if(i % 10 == 1) {
+            std::cout << "\nv";
+          }
+          std::cout << " "
+                    << (loader.handle().assignment_is_set(
+                          loader.handle().assignment_data, i)
+                          ? "-"
+                          : "")
+                    << i;
         }
-        std::cout << " "
-                  << (loader.handle().assignment_is_set(
-                        loader.handle().assignment_data, i)
-                        ? "-"
-                        : "")
-                  << i;
-      }
-      std ::cout << " 0" << std::endl;
-      break;
-    case PARAC_UNSAT:
-      std::cout << "s UNSATISFIABLE" << std::endl;
-      break;
-    case PARAC_UNKNOWN:
-    case PARAC_ABORTED:
-    default:
-      std::cout << "s UNKNOWN" << std::endl;
-      break;
+        std ::cout << " 0" << std::endl;
+        break;
+      case PARAC_UNSAT:
+        std::cout << "s UNSATISFIABLE" << std::endl;
+        break;
+      case PARAC_UNKNOWN:
+      case PARAC_ABORTED:
+      default:
+        std::cout << "s UNKNOWN" << std::endl;
+        break;
+    }
   }
 
   return EXIT_SUCCESS;
