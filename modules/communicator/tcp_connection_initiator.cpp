@@ -6,12 +6,7 @@
 #include <ratio>
 #include <variant>
 
-#include "paracooba/common/log.h"
-#include "paracooba/common/random.h"
-#include "service.hpp"
-#include "tcp_connection.hpp"
-#include "tcp_connection_initiator.hpp"
-
+#include <boost/algorithm/string.hpp>
 #include <boost/asio/coroutine.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/placeholders.hpp>
@@ -19,7 +14,11 @@
 #include <boost/bind.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <boost/algorithm/string.hpp>
+#include "paracooba/common/log.h"
+#include "paracooba/common/random.h"
+#include "service.hpp"
+#include "tcp_connection.hpp"
+#include "tcp_connection_initiator.hpp"
 
 namespace parac::communicator {
 static uint16_t
