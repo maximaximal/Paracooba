@@ -245,6 +245,12 @@ MessageSendQueue::availableToSendTo(parac_compute_node& compute_node) {
 
 void
 MessageSendQueue::send(Entry&& e, bool resend) {
+  if(m_dropped) {
+    // No logging required. This is just an artifact of some late running
+    // messages to be sent.
+    return;
+  }
+
   {
     std::unique_lock lock(m_queuedMutex);
 
