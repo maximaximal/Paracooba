@@ -431,10 +431,10 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
     msg.userdata = this;
     msg.cb = [](parac_message* msg, parac_status s) {
       assert(msg->userdata);
-      auto self = static_cast<ComputeNode*>(msg->userdata);
-      parac_module_solver_instance* instance =
-        self->m_store.thisNode().m_node.solver_instance;
       if(s == PARAC_OK) {
+        auto self = static_cast<ComputeNode*>(msg->userdata);
+        parac_module_solver_instance* instance =
+          self->m_store.thisNode().m_node.solver_instance;
 
         assert(instance);
 
@@ -452,6 +452,9 @@ ComputeNode::receiveMessageDescriptionFrom(parac_message& msg) {
         formula.originator = self->m_handle.id;
         self->m_node.send_file_to(&self->m_node, &formula);
       } else if(s == PARAC_SOLVER_ALREADY_CONFIGURED_ERROR) {
+        auto self = static_cast<ComputeNode*>(msg->userdata);
+        parac_module_solver_instance* instance =
+          self->m_store.thisNode().m_node.solver_instance;
         parac_log(PARAC_BROKER,
                   PARAC_GLOBALWARNING,
                   "After sending solver config for originator {} to compute "
@@ -566,7 +569,8 @@ ComputeNode::tryToOffloadTask() {
     task->serialize(task, &msg);
     msg.userdata = task;
     msg.cb = [](parac_message* msg, parac_status s) {
-      if(s != PARAC_OK && s != PARAC_TO_BE_DELETED) {
+      if(s != PARAC_OK && s != PARAC_TO_BE_DELETED &&
+         s != PARAC_CONNECTION_CLOSED) {
         // Message has been lost! Undo offload operation.
         parac_task* t = static_cast<parac_task*>(msg->userdata);
         parac_log(PARAC_BROKER,

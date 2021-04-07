@@ -85,6 +85,10 @@ struct TCPConnection::State {
         remoteId(),
         resumeMode,
         connectionTry >= 0);
+
+      if(sendQueue) {
+        sendQueue->deregisterNotificationCB();
+      }
     }
 
     if(!service.stopped()) {
@@ -729,11 +733,11 @@ TCPConnection::readHandler(boost::system::error_code ec,
             PARAC_COMMUNICATOR,
             PARAC_LOCALWARNING,
             "Error in TCPConnection to endpoint {} (ID {}) readHandler when "
-            "reading ACK for message id {}! This could have been a wrongly "
-            "sent ACK, ignoring this mishap.",
+            "reading ACK for message id {}!",
             s->remote_endpoint(),
             s->remoteId(),
             s->readHeader.number);
+          return;
         }
       } else if(s->readHeader.kind == PARAC_MESSAGE_FILE) {
         yield async_read(*s->socket, BUF(s->readFileHeader), rh, s->remoteId());

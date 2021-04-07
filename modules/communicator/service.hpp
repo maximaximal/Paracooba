@@ -97,8 +97,8 @@ class Service {
   void setTCPAcceptorActive();
   bool isTCPAcceptorActive();
 
-  void addOutgoingMessageToCounter(size_t count = 1);
-  void removeOutgoingMessageFromCounter(size_t count = 1);
+  void addOutgoingMessageToCounter(int64_t count = 1);
+  void removeOutgoingMessageFromCounter(int64_t count = 1);
 
   parac_id id() const;
   const char* broadcastAddress() const;

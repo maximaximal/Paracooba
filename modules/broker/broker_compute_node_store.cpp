@@ -222,7 +222,7 @@ ComputeNodeStore::sendOfflineAnnouncementToPeers() {
   msg.length = 0;
   msg.kind = PARAC_MESSAGE_OFFLINE_ANNOUNCEMENT;
   for(auto& e : m_internal->nodesList) {
-    if(e.id != m_handle.id) {
+    if(e.id != m_handle.id && e.available_to_send_to(&e)) {
       e.send_message_to(&e, &msg);
     }
   }

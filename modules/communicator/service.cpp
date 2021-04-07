@@ -1,6 +1,7 @@
 #include <atomic>
 #include <boost/exception/exception.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/move/core.hpp>
 #include <boost/system/error_code.hpp>
 #include <chrono>
 #include <map>
@@ -48,7 +49,7 @@ struct Service::Internal {
     messageSendQueues;
 
   std::atomic_bool tcpAcceptorActive, stopRequested = false;
-  std::atomic_size_t outgoingMessageCounter = 0;
+  std::atomic_int64_t outgoingMessageCounter = 0;
   boost::asio::steady_timer messageSendQueueTimer{ context };
 
   std::mutex connectionInitiationAttemptsMutex;
@@ -261,20 +262,19 @@ Service::getMessageSendQueueForRemoteId(parac_id id) {
 }
 
 void
-Service::addOutgoingMessageToCounter(size_t count) {
+Service::addOutgoingMessageToCounter(int64_t count) {
   if(!m_internal)
     return;
   m_internal->outgoingMessageCounter += count;
 }
 void
-Service::removeOutgoingMessageFromCounter(size_t count) {
+Service::removeOutgoingMessageFromCounter(int64_t count) {
   if(!m_internal)
     return;
-  assert(m_internal->outgoingMessageCounter >= count);
 
-  m_internal->outgoingMessageCounter -= count;
+  auto c = m_internal->outgoingMessageCounter.fetch_sub(count);
 
-  if(m_internal->stopRequested && m_internal->outgoingMessageCounter == 0) {
+  if(m_internal->stopRequested && c - count == 0) {
     stop();
   }
 }

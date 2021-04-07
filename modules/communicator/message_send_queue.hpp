@@ -121,6 +121,9 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
   registerNotificationCB(const NotificationFunc& f,
                          const std::string& connectionString,
                          bool isConnectionInitiator);
+  /** @brief Deregister the CB and make message counter in service go to 0 for
+   * faster shutdown. */
+  void deregisterNotificationCB();
 
   /** @brief Check contained messages for eventual resends.
    */
@@ -160,6 +163,8 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
 
   std::atomic_bool m_availableToSendTo = false;
   std::atomic_bool m_dropped = false;
+
+  std::atomic_bool m_serviceKnowsAboutWrites = false;
 
   std::chrono::steady_clock::time_point m_lastHeardOfRemote =
     std::chrono::steady_clock::now();

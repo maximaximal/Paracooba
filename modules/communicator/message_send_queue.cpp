@@ -251,12 +251,16 @@ MessageSendQueue::send(Entry&& e, bool resend) {
     return;
   }
 
+  parac_message_kind kind = e.header.kind;
+  auto id = e.header.number;
+
   {
     std::unique_lock lock(m_queuedMutex);
 
     // ACKs already have a correct message number.
     if(e.header.kind != PARAC_MESSAGE_ACK && !resend) {
       e.header.number = m_messageNumber++;
+      id = e.header.number;
     }
 
     parac_log(PARAC_COMMUNICATOR,
@@ -279,23 +283,31 @@ MessageSendQueue::send(Entry&& e, bool resend) {
                   .count());
     }
 
-    if(parac_message_kind_is_count_tracked(e.header.kind) && !resend) {
-      ++m_trackedQueueSize;
-    }
-
     m_queued.emplace(std::move(e));
   }
 
   if(m_availableToSendTo && m_notificationFunc) {
     if(!m_notificationFunc(MessagesAvailable)) {
-      m_availableToSendTo = false;
+      deregisterNotificationCB();
+    } else {
+      // Successfully submitted to writer! Now it can be added to the service
+      // message counter until it is popped or something else happens.
+      if(parac_message_kind_is_count_tracked(e.header.kind) && !resend) {
+        ++m_trackedQueueSize;
+        if(m_serviceKnowsAboutWrites) {
+          m_service.addOutgoingMessageToCounter();
+        }
+      }
     }
   } else {
-    parac_log(PARAC_COMMUNICATOR,
-              PARAC_LOCALWARNING,
-              "Cannot call conditionallyTriggerWriteHandler on TCPConnection "
-              "for remote {} as none is known!",
-              m_remoteId);
+    parac_log(
+      PARAC_COMMUNICATOR,
+      PARAC_LOCALWARNING,
+      "Cannot call conditionallyTriggerWriteHandler on TCPConnection "
+      "for remote {} for sending message id {} of kind {} as none is known!",
+      m_remoteId,
+      id,
+      kind);
     m_availableToSendTo = false;
   }
 }
@@ -399,6 +411,10 @@ MessageSendQueue::popFromQueued() {
 
   if(parac_message_kind_is_count_tracked(kind)) {
     --m_trackedQueueSize;
+
+    if(m_serviceKnowsAboutWrites) {
+      m_service.removeOutgoingMessageFromCounter();
+    }
   }
 }
 
@@ -422,6 +438,8 @@ MessageSendQueue::registerNotificationCB(const NotificationFunc& f,
     return { nullptr, nullptr };
   }
 
+  bool overtake = false;
+
   if(m_notificationFunc) {
     // The connection was already established previously! It must now be decided
     // if the new connection should be used or the old one should be kept.
@@ -441,8 +459,10 @@ MessageSendQueue::registerNotificationCB(const NotificationFunc& f,
           m_remoteId,
           connectionString);
         return { nullptr, nullptr };
-      } else
+      } else {
         m_notificationFunc(KillConnection);
+        overtake = true;
+      }
     } else if(!isConnectionInitiator && idGreaterThanRemote) {
       // The other connection should remain active.
       parac_log(
@@ -469,8 +489,10 @@ MessageSendQueue::registerNotificationCB(const NotificationFunc& f,
           m_remoteId,
           connectionString);
         return { nullptr, nullptr };
-      } else
+      } else {
         m_notificationFunc(KillConnection);
+        overtake = true;
+      }
     } else if(isConnectionInitiator && !idGreaterThanRemote) {
       // Again, the other already existing connection takes prevalence.
       parac_log(PARAC_COMMUNICATOR,
@@ -490,6 +512,11 @@ MessageSendQueue::registerNotificationCB(const NotificationFunc& f,
   m_availableToSendTo = true;
 
   m_connectionString = connectionString;
+
+  if(m_trackedQueueSize > 0 && !overtake &&
+     !m_serviceKnowsAboutWrites.exchange(true)) {
+    m_service.addOutgoingMessageToCounter(m_trackedQueueSize);
+  }
 
   if(m_remoteComputeNode) {
     m_remoteComputeNode->connection_string = m_connectionString.c_str();
@@ -527,6 +554,19 @@ MessageSendQueue::registerNotificationCB(const NotificationFunc& f,
 }
 
 void
+MessageSendQueue::deregisterNotificationCB() {
+  if(m_availableToSendTo.exchange(false)) {
+    m_notificationFunc = nullptr;
+  }
+
+  if(m_serviceKnowsAboutWrites.exchange(false)) {
+    if(m_trackedQueueSize > 0) {
+      m_service.removeOutgoingMessageFromCounter(m_trackedQueueSize);
+    }
+  }
+}
+
+void
 MessageSendQueue::tick() {
   auto now = std::chrono::steady_clock::now();
 
@@ -557,11 +597,13 @@ MessageSendQueue::tick() {
       // received.
       if(parac_message_kind_is_count_tracked(it->second.header.kind)) {
         --m_trackedQueueSize;
+        if(m_serviceKnowsAboutWrites) {
+          m_service.removeOutgoingMessageFromCounter();
+        }
       }
       it->second(PARAC_MESSAGE_TIMEOUT_ERROR);
       it->second(PARAC_TO_BE_DELETED);
       it = m_waitingForACK.erase(it);
-      --m_trackedQueueSize;
 
       parac_log(
         PARAC_COMMUNICATOR,
@@ -590,9 +632,8 @@ MessageSendQueue::tick() {
     // The connection has timed out! Cancel all messages, kill connection.
     if(m_notificationFunc) {
       m_notificationFunc(KillConnection);
-      m_notificationFunc = nullptr;
+      deregisterNotificationCB();
     }
-    m_availableToSendTo = false;
     clear();
     assert(m_remoteComputeNode);
     assert(m_remoteComputeNode->connection_dropped);
@@ -609,6 +650,11 @@ MessageSendQueue::clear() {
     auto& f = m_queued.front();
     f(PARAC_MESSAGE_TIMEOUT_ERROR);
     f(PARAC_TO_BE_DELETED);
+
+    if(parac_message_kind_is_count_tracked(f.header.kind)) {
+      --m_trackedQueueSize;
+    }
+
     m_queued.pop();
   }
 
