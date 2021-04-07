@@ -25,28 +25,18 @@ static void
 notify_result_cb(parac_message* msg, parac_status status) {
   assert(msg);
   assert(msg->userdata);
-  parac_task* t = msg->userdata;
-  assert(t->handle);
+  parac_handle* handle = msg->userdata;
+  assert(handle);
 
   if(status == PARAC_PATH_NOT_FOUND_ERROR ||
      status == PARAC_COMPUTE_NODE_NOT_FOUND_ERROR) {
-    char pathbuffer[PARAC_PATH_MAX_LENGTH];
-    parac_path_to_str(t->path, pathbuffer);
-    char buf[512];
-    snprintf(buf,
-             512,
-             "Received a PATH NOT FOUND error or a compute node not found "
-             "error when notifying remote %lu of "
-             "update of path %s with originator %lu! Try to recover by killing "
-             "the local node, so "
-             "that order may be restored.",
-             t->received_from->id,
-             pathbuffer,
-             t->originator);
-    parac_log(PARAC_GENERAL, PARAC_FATAL, buf);
+    parac_log(PARAC_GENERAL,
+              PARAC_FATAL,
+              "Received a Path Not Found or Node Not Found error in notify "
+              "result cb! Killing local node is the only resort.");
 
-    t->handle->exit_status = PARAC_GENERIC_ERROR;
-    t->handle->request_exit(t->handle);
+    handle->exit_status = PARAC_GENERIC_ERROR;
+    handle->request_exit(handle);
   }
 }
 
@@ -74,7 +64,7 @@ notify_result(parac_task* t) {
 
   msg.data_to_be_freed = false;
   msg.data_is_inline = true;
-  msg.userdata = t;
+  msg.userdata = t->handle;
   msg.cb = notify_result_cb;
   msg.originator_id = t->originator;
   msg.length = sizeof(parac_task_result_packet);
