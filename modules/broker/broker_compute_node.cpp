@@ -886,6 +886,17 @@ ComputeNode::static_connectionDropped(parac_compute_node* node) {
             "Connection to remote {} dropped! Undoing all offloads.",
             node->id);
   self.m_taskStore.undoAllOffloadsTo(node);
+
+  if(self.m_store.autoShutdownAfterFirstFinishedClient() &&
+     self.description() && !self.description()->daemon) {
+    parac_log(PARAC_BROKER,
+              PARAC_DEBUG,
+              "Automatic shutdown on first connected client node active! This "
+              "ends the current node.",
+              self.m_node.id);
+    self.m_handle.exit_status = PARAC_UNKNOWN;
+    self.m_handle.request_exit(&self.m_handle);
+  }
 }
 
 void
