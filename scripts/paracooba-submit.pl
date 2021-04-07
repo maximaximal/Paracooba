@@ -116,6 +116,7 @@ $runlim \"$binary\" \\
 	--known-remote \"$client_node\" \\
     --tcp-listen-address 0.0.0.0 \\
     --auto-shutdown-after-finished-client \\
+    ----connection-timeout 2000 \\
 	$paracooba_args;
 END
 
