@@ -1009,6 +1009,16 @@ TCPConnection::writeHandler(boost::system::error_code ec,
       }
 
       assert(s->sendQueue);
+
+      if(s->sendQueue->empty()) {
+        parac_log(PARAC_COMMUNICATOR,
+                  PARAC_LOCALERROR,
+                  "Send queue to remote id {} empty even though coroutine says "
+                  "it should be empty! Ending connection!",
+                  s->remoteId());
+        yield return;
+      }
+
       assert(!s->sendQueue->empty());
       assert(e.header);
 
