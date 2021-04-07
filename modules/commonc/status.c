@@ -34,6 +34,8 @@ parac_status_to_str(parac_status status) {
       return "Abort Connection";
     case PARAC_CONNECTION_CLOSED:
       return "Connection Closed";
+    case PARAC_NO_CONNECTION_ESTABLISHED_ERROR:
+      return "No Connection Established";
     case PARAC_MESSAGE_TIMEOUT_ERROR:
       return "Message Timeout";
     case PARAC_OUT_OF_MEMORY:

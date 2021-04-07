@@ -15,7 +15,8 @@ class TCPConnection;
 
 class TCPConnectionInitiator {
   public:
-  using Callback = std::function<void(TCPConnection, parac_status)>;
+  using Callback =
+    std::function<void(std::optional<TCPConnection>, parac_status)>;
 
   TCPConnectionInitiator(Service& service,
                          const std::string& host,

@@ -6,11 +6,13 @@
 #include <map>
 #include <memory>
 #include <thread>
+#include <unordered_set>
 
 #include "message_send_queue.hpp"
 #include "paracooba/common/timeout.h"
 #include "service.hpp"
 #include "tcp_acceptor.hpp"
+#include "tcp_connection.hpp"
 #include "tcp_connection_initiator.hpp"
 #include "timeout_controller.hpp"
 #include "udp_acceptor.hpp"
@@ -48,10 +50,13 @@ struct Service::Internal {
   std::atomic_bool tcpAcceptorActive, stopRequested = false;
   std::atomic_size_t outgoingMessageCounter = 0;
   boost::asio::steady_timer messageSendQueueTimer{ context };
+
+  std::mutex connectionInitiationAttemptsMutex;
+  std::unordered_set<std::string> connectionInitiationAttempts;
 };
 
 Service::Service(parac_handle& handle)
-  : m_internal(std::make_unique<Internal>())
+  : m_internal(std::make_shared<Internal>())
   , m_handle(handle) {
   m_internal->threadHandle.userdata = this;
 
@@ -177,8 +182,33 @@ Service::connectToKnownRemotes() {
 
 void
 Service::connectToRemote(const std::string& remote) {
+  {
+    std::unique_lock lock(m_internal->connectionInitiationAttemptsMutex);
+
+    auto [it, inserted] =
+      m_internal->connectionInitiationAttempts.emplace(remote);
+    (void)it;
+    if(!inserted) {
+      parac_log(PARAC_COMMUNICATOR,
+                PARAC_TRACE,
+                "Not doing another connection to remote {} as prior connection "
+                "attempt has not finished yet.",
+                remote);
+      return;
+    }
+  }
+
   try {
-    TCPConnectionInitiator initiator(*this, remote);
+    auto ptr = m_internal;
+    TCPConnectionInitiator initiator(
+      *this,
+      remote,
+      [ptr, remote](std::optional<TCPConnection> conn, parac_status status) {
+        (void)conn;
+        (void)status;
+        std::unique_lock lock(ptr->connectionInitiationAttemptsMutex);
+        ptr->connectionInitiationAttempts.erase(remote);
+      });
   } catch(std::exception& e) {
     parac_log(PARAC_COMMUNICATOR,
               PARAC_LOCALERROR,

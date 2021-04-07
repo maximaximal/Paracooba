@@ -114,7 +114,7 @@ class Service {
   void handleMessageSendTimerTick();
 
   struct Internal;
-  const std::unique_ptr<Internal> m_internal;
+  std::shared_ptr<Internal> m_internal;
   parac_handle& m_handle;
   parac_config_entry* m_config = nullptr;
 };

@@ -16,6 +16,7 @@
 
 #include "paracooba/common/log.h"
 #include "paracooba/common/random.h"
+#include "paracooba/common/status.h"
 #include "service.hpp"
 #include "tcp_connection.hpp"
 #include "tcp_connection_initiator.hpp"
@@ -107,6 +108,12 @@ struct TCPConnectionInitiator::State {
     , timer(service.ioContext())
     , connectionTry(connectionTry)
     , conn(EndpointConnection{ endpoint }) {}
+
+  ~State() {
+    if(connectionCB) {
+      connectionCB(std::nullopt, PARAC_NO_CONNECTION_ESTABLISHED_ERROR);
+    }
+  }
 
   Service& service;
   Callback connectionCB;
@@ -349,6 +356,11 @@ TCPConnectionInitiator::try_connecting_to_host(
         auto conn = TCPConnection(
           m_state->service, std::move(m_state->socket), m_state->connectionTry);
         conn.setResumeMode(TCPConnection::RestartAfterShutdown);
+
+        if(m_state->connectionCB) {
+          m_state->connectionCB(conn, PARAC_OK);
+          m_state->connectionCB = nullptr;
+        }
         return;
       }
     }
@@ -406,6 +418,11 @@ TCPConnectionInitiator::try_connecting_to_endpoint(
         m_state->service, std::move(m_state->socket), m_state->connectionTry);
 
       conn.setResumeMode(TCPConnection::RestartAfterShutdown);
+
+      if(m_state->connectionCB) {
+        m_state->connectionCB(conn, PARAC_OK);
+        m_state->connectionCB = nullptr;
+      }
     }
   }
 }
