@@ -576,20 +576,24 @@ ComputeNode::tryToOffloadTask() {
          s != PARAC_CONNECTION_CLOSED) {
         // Message has been lost! Undo offload operation.
         parac_task* t = static_cast<parac_task*>(msg->userdata);
-        parac_log(PARAC_BROKER,
-                  PARAC_LOCALERROR,
-                  "Offload operation of task on path {} to remote node {} "
-                  "failed! Undoing offload.",
-                  t->path,
-                  t->offloaded_to->id);
 
-        parac_compute_node* n = t->offloaded_to;
-        assert(n);
-        ComputeNode* cn = static_cast<ComputeNode*>(n->broker_userdata);
-        assert(cn);
-        cn->decrementWorkQueueSize(t->originator);
+        // Only do this once, as the offloaded_to will be set to nullptr.
+        if(t->offloaded_to) {
+          parac_log(PARAC_BROKER,
+                    PARAC_LOCALERROR,
+                    "Offload operation of task on path {} to remote node {} "
+                    "failed! Undoing offload.",
+                    t->path,
+                    t->offloaded_to->id);
 
-        t->task_store->undo_offload(t->task_store, t);
+          parac_compute_node* n = t->offloaded_to;
+          assert(n);
+          ComputeNode* cn = static_cast<ComputeNode*>(n->broker_userdata);
+          assert(cn);
+          cn->decrementWorkQueueSize(t->originator);
+
+          t->task_store->undo_offload(t->task_store, t);
+        }
       }
     };
     assert(m_node.send_message_to);

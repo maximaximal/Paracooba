@@ -307,6 +307,7 @@ TaskStore::pop_work() {
 }
 void
 TaskStore::undo_offload(parac_task* t) {
+  assert(t->offloaded_to);
   {
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
@@ -335,10 +336,9 @@ TaskStore::undo_offload(parac_task* t) {
     offloaded_to.erase(it);
 
     t->state = static_cast<parac_task_state>(t->state & ~PARAC_TASK_OFFLOADED);
+    t->offloaded_to = nullptr;
 
     --taskWrapper->refcount;
-
-    t->offloaded_to = nullptr;
   }
 
   insert_into_tasksWaitingForWorkerQueue(t);
@@ -356,6 +356,8 @@ TaskStore::undoAllOffloadsTo(parac_compute_node* remote) {
   for(auto it = offloaded_to.begin(); it != offloaded_to.end();) {
     Internal::Task* taskWrapper = *it;
     parac_task* t = &taskWrapper->t;
+
+    assert(t->offloaded_to);
 
     parac_log(PARAC_BROKER,
               PARAC_TRACE,

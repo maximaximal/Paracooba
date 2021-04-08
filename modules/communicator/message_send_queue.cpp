@@ -193,8 +193,10 @@ MessageSendQueue::static_send_message_to(parac_compute_node* compute_node,
   MessageSendQueue* self = MessageSendQueueFromComputeNode(compute_node);
   if(self)
     self->sendMessageTo(*compute_node, *msg);
-  else
+  else {
     msg->cb(msg, PARAC_CONNECTION_CLOSED);
+    msg->cb(msg, PARAC_TO_BE_DELETED);
+  }
 }
 void
 MessageSendQueue::static_send_file_to(parac_compute_node* compute_node,
@@ -203,8 +205,10 @@ MessageSendQueue::static_send_file_to(parac_compute_node* compute_node,
   MessageSendQueue* self = MessageSendQueueFromComputeNode(compute_node);
   if(self)
     self->sendFileTo(*compute_node, *file);
-  else
+  else {
     file->cb(file, PARAC_CONNECTION_CLOSED);
+    file->cb(file, PARAC_TO_BE_DELETED);
+  }
 }
 void
 MessageSendQueue::static_compute_node_free_func(
