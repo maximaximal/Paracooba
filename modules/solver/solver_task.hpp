@@ -101,6 +101,10 @@ class SolverTask {
   std::atomic<CaDiCaLHandle*> m_activeHandle = nullptr;
   bool m_interruptSolving = false;
 
+#ifndef NDEBUG
+  std::atomic_bool m_working = false;
+#endif
+
   std::shared_ptr<cubesource::Source> m_cubeSource;
 
   std::pair<parac_status, std::vector<CubeTreeElem>>

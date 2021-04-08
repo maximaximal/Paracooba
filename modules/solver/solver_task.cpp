@@ -83,6 +83,11 @@ setTimeout(CaDiCaLManager& manager,
 
 parac_status
 SolverTask::work(parac_worker worker) {
+#ifndef NDEBUG
+  // Ensure that this is only called once!
+  assert(!m_working.exchange(true));
+#endif
+
   auto handlePtr = m_manager->getHandleForWorker(worker);
   auto& handle = *handlePtr.ptr;
 
