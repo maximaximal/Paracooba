@@ -1,6 +1,7 @@
 #include <chrono>
 #include <type_traits>
 #include <variant>
+#include <vector>
 
 #include <paracooba/broker/broker.h>
 #include <paracooba/common/compute_node.h>
@@ -652,25 +653,33 @@ MessageSendQueue::tick() {
 
 void
 MessageSendQueue::clear() {
-  std::unique_lock l1(m_queuedMutex), l2(m_waitingForACKMutex);
+  std::vector<Entry> entriesToBeDeleted;
 
-  while(!m_queued.empty()) {
-    auto& f = m_queued.front();
-    f(PARAC_MESSAGE_TIMEOUT_ERROR);
-    f(PARAC_TO_BE_DELETED);
+  {
+    std::unique_lock l1(m_queuedMutex), l2(m_waitingForACKMutex);
 
-    if(parac_message_kind_is_count_tracked(f.header.kind)) {
-      --m_trackedQueueSize;
+    entriesToBeDeleted.reserve(m_queued.size() + m_waitingForACK.size());
+
+    while(!m_queued.empty()) {
+      entriesToBeDeleted.emplace_back(std::move(m_queued.front()));
+
+      if(parac_message_kind_is_count_tracked(
+           entriesToBeDeleted.back().header.kind)) {
+        --m_trackedQueueSize;
+      }
+
+      m_queued.pop();
     }
 
-    m_queued.pop();
+    for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end();) {
+      entriesToBeDeleted.emplace_back(std::move(it->second));
+      it = m_waitingForACK.erase(it);
+    }
   }
 
-  for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end();) {
-    auto& f = it->second;
-    f(PARAC_MESSAGE_TIMEOUT_ERROR);
-    f(PARAC_TO_BE_DELETED);
-    it = m_waitingForACK.erase(it);
+  for(auto& e : entriesToBeDeleted) {
+    e(PARAC_MESSAGE_TIMEOUT_ERROR);
+    e(PARAC_TO_BE_DELETED);
   }
 }
 
