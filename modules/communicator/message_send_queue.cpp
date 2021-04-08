@@ -26,6 +26,7 @@
 
 namespace parac::communicator {
 struct MessageSendQueue::Entry {
+  Entry() = delete;
   Entry(const Entry& e) = default;
   Entry(Entry&& e) = default;
 
@@ -88,7 +89,7 @@ struct MessageSendQueue::Entry {
     std::chrono::steady_clock::now();
   std::chrono::time_point<std::chrono::steady_clock> sent;
 
-  void applyToRefValue(RefValueType& v) {
+  bool applyToRefValue(RefValueType& v) {
     switch(value.index()) {
       case 0:
         v = &std::get<parac_message_wrapper>(value);
@@ -103,9 +104,9 @@ struct MessageSendQueue::Entry {
         v = &std::get<ACKTag>(value);
         break;
       default:
-        assert(false);
-        break;
+        return false;
     }
+    return true;
   }
 
   parac_message_wrapper& message() {
