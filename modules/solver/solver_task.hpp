@@ -99,7 +99,7 @@ class SolverTask {
   FastSplit m_fastSplit;
   parac_timeout* m_timeout = nullptr;
   std::atomic<CaDiCaLHandle*> m_activeHandle = nullptr;
-  bool m_interruptSolving = false;
+  std::atomic_bool m_interruptSolving = false;
 
 #ifndef NDEBUG
   std::atomic_bool m_working = false;

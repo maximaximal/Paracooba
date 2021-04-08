@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include <cadical/cadical.hpp>
 
 namespace parac::solver {
@@ -18,6 +20,6 @@ class CaDiCaLTerminator : public CaDiCaL::Terminator {
 
   private:
   bool& m_terminated;
-  bool m_locallyTerminated = false;
+  std::atomic_bool m_locallyTerminated = false;
 };
 }

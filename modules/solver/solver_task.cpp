@@ -469,6 +469,7 @@ SolverTask::resplit(uint64_t durationMS) {
   m_timeout =
     setTimeout(*m_manager, durationMS, this, [](parac_timeout* timeout) {
       SolverTask* self = static_cast<SolverTask*>(timeout->expired_userdata);
+      self->m_timeout = nullptr;
       parac_log(PARAC_CUBER,
                 PARAC_TRACE,
                 "CNF lookahead for path {} will be interrupted!",
@@ -479,7 +480,6 @@ SolverTask::resplit(uint64_t durationMS) {
         activeHandle->terminate();
         self->m_interruptSolving = true;
       }
-      self->m_timeout = nullptr;
     });
 
   if(!m_timeout) {
@@ -529,6 +529,7 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
       setTimeout(*m_manager, duration, this, [](parac_timeout* timeout) {
         SolverTask* self = static_cast<SolverTask*>(timeout->expired_userdata);
         assert(self);
+        self->m_timeout = nullptr;
         parac_log(PARAC_CUBER,
                   PARAC_TRACE,
                   "CNF formula for path {} will be interrupted.",
@@ -538,7 +539,6 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
         if(activeHandle) {
           activeHandle->terminate();
         }
-        self->m_timeout = nullptr;
       });
   }
 
