@@ -317,15 +317,21 @@ MessageSendQueue::send(Entry&& e, bool resend) {
 
 bool
 MessageSendQueue::handleACK(const PacketHeader& ack) {
-  std::unique_lock lock(m_waitingForACKMutex);
+  std::optional<Entry> entry{ [this, &ack]() {
+    std::unique_lock lock(m_waitingForACKMutex);
 
-  SentMap::iterator it;
-  it = m_waitingForACK.find(ack.number);
-  if(it == m_waitingForACK.end()) {
-    return false;
-  }
+    SentMap::iterator it;
+    it = m_waitingForACK.find(ack.number);
+    if(it == m_waitingForACK.end()) {
+      return std::optional<Entry>(std::nullopt);
+    }
+    Entry entry = std::move(it->second);
+    m_waitingForACK.erase(it);
+    return std::optional<Entry>(std::move(entry));
+  }() };
 
-  auto& sentItem = it->second;
+  auto& sentItem = *entry;
+
   try {
     sentItem(ack.ack_status);
     sentItem(PARAC_TO_BE_DELETED);
@@ -336,7 +342,7 @@ MessageSendQueue::handleACK(const PacketHeader& ack) {
               "message kind {}!",
               ack.number,
               m_remoteId,
-              it->second.header.kind);
+              sentItem.header.kind);
   }
 
   ++m_ACKdMessageCount;
@@ -357,9 +363,8 @@ MessageSendQueue::handleACK(const PacketHeader& ack) {
             "message of kind {} successfully arrived.",
             ack.number,
             m_remoteId,
-            it->second.header.kind);
+            sentItem.header.kind);
 
-  m_waitingForACK.erase(it);
   return true;
 }
 
