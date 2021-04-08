@@ -101,6 +101,9 @@ struct MessageSendQueue::Entry {
       case 3:
         v = &std::get<ACKTag>(value);
         break;
+      default:
+        assert(false);
+        break;
     }
   }
 
@@ -376,12 +379,12 @@ MessageSendQueue::front() {
 
 void
 MessageSendQueue::popFromQueued() {
-  auto r = [this]() {
+  Entry r{ [this]() {
     std::unique_lock lock(m_queuedMutex);
-    auto r = m_queued.front();
+    Entry r = std::move(m_queued.front());
     m_queued.pop();
     return r;
-  }();
+  }() };
 
   auto kind = r.header.kind;
   auto number = r.header.number;
