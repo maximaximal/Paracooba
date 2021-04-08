@@ -120,20 +120,25 @@ ComputeNodeStore::create_with_connection(
   parac_compute_node_file_func send_file_func,
   parac_compute_node_available_to_send_to_func available_to_send_to) {
 
-  assert(!has(id));
-
-  parac_compute_node* n = get(id);
-  assert(n);
-
-  n->send_message_to = send_message_func;
-  n->send_file_to = send_file_func;
-  n->communicator_free = communicator_free;
-  n->communicator_userdata = communicator_userdata;
-  n->available_to_send_to = available_to_send_to;
-
+  parac_compute_node* n = nullptr;
   parac_message_wrapper msg;
-  assert(thisNode().description());
-  thisNode().description()->serializeToMessage(msg);
+  {
+    std::unique_lock lock(m_internal->nodesMutex);
+    assert(!has(id));
+
+    n = get(id);
+    assert(n);
+
+    n->send_message_to = send_message_func;
+    n->send_file_to = send_file_func;
+    n->communicator_free = communicator_free;
+    n->communicator_userdata = communicator_userdata;
+    n->available_to_send_to = available_to_send_to;
+
+    assert(thisNode().description());
+    thisNode().description()->serializeToMessage(msg);
+  }
+
   send_message_func(n, &msg);
 
   assert(n);
