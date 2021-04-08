@@ -320,7 +320,7 @@ TaskStore::undo_offload(parac_task* t) {
     Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
       reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
 
-    auto offloaded_to = m_internal->offloadedTasks[t->offloaded_to];
+    auto& offloaded_to = m_internal->offloadedTasks[t->offloaded_to];
 
     auto it = offloaded_to.find(taskWrapper);
     if(it == offloaded_to.end()) {
@@ -352,7 +352,7 @@ TaskStore::undoAllOffloadsTo(parac_compute_node* remote) {
 
   std::unique_lock lock(m_internal->containerMutex);
 
-  auto offloaded_to = m_internal->offloadedTasks[remote];
+  auto& offloaded_to = m_internal->offloadedTasks[remote];
   for(auto it = offloaded_to.begin(); it != offloaded_to.end();) {
     Internal::Task* taskWrapper = *it;
     parac_task* t = &taskWrapper->t;
