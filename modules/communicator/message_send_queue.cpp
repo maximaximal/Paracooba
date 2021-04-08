@@ -644,9 +644,9 @@ MessageSendQueue::tick() {
       deregisterNotificationCB();
     }
     clear();
-    assert(m_remoteComputeNode);
-    assert(m_remoteComputeNode->connection_dropped);
-    m_remoteComputeNode->connection_dropped(m_remoteComputeNode);
+    if(m_remoteComputeNode && m_remoteComputeNode->connection_dropped) {
+      m_remoteComputeNode->connection_dropped(m_remoteComputeNode);
+    }
     m_dropped = true;
   }
 }

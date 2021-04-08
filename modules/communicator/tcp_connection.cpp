@@ -293,25 +293,40 @@ TCPConnection::setResumeMode(ResumeMode mode) {
 }
 
 template<typename S, typename T>
-inline static void
+inline static bool
 SendToMessageSendQueue(S s, T&& v) {
-  assert(s);
+  if(!s)
+    return false;
   if(!s->sendQueue)
-    return;
+    return false;
 
   if constexpr(std::is_rvalue_reference<T>())
     s->sendQueue->send(std::forward(v));
   else
     s->sendQueue->send(v);
+
+  return true;
 }
 
 void
 TCPConnection::send(parac_message&& message) {
-  SendToMessageSendQueue(state(), std::move(message));
+  parac_message m(message);
+  if(!SendToMessageSendQueue(state(), std::move(message))) {
+    if(m.cb) {
+      m.cb(&m, PARAC_CONNECTION_CLOSED);
+      m.cb(&m, PARAC_TO_BE_DELETED);
+    }
+  }
 }
 void
 TCPConnection::send(parac_file&& file) {
-  SendToMessageSendQueue(state(), std::move(file));
+  parac_file f(file);
+  if(!SendToMessageSendQueue(state(), std::move(file))) {
+    if(f.cb) {
+      f.cb(&f, PARAC_CONNECTION_CLOSED);
+      f.cb(&f, PARAC_TO_BE_DELETED);
+    }
+  }
 }
 void
 TCPConnection::send(MessageSendQueue::EndTag&& end) {
@@ -319,11 +334,21 @@ TCPConnection::send(MessageSendQueue::EndTag&& end) {
 }
 void
 TCPConnection::send(parac_message& message) {
-  SendToMessageSendQueue(state(), message);
+  if(!SendToMessageSendQueue(state(), message)) {
+    if(message.cb) {
+      message.cb(&message, PARAC_CONNECTION_CLOSED);
+      message.cb(&message, PARAC_TO_BE_DELETED);
+    }
+  }
 }
 void
 TCPConnection::send(parac_file& file) {
-  SendToMessageSendQueue(state(), file);
+  if(!SendToMessageSendQueue(state(), file)) {
+    if(file.cb) {
+      file.cb(&file, PARAC_CONNECTION_CLOSED);
+      file.cb(&file, PARAC_TO_BE_DELETED);
+    }
+  }
 }
 void
 TCPConnection::send(MessageSendQueue::EndTag& end) {
