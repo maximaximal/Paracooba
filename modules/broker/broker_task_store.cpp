@@ -539,11 +539,12 @@ TaskStore::terminateAllTasks() {
 void
 TaskStore::assess_task(parac_task* task) {
   assert(task);
-  assert(task->assess);
-  assert(task->path.rep != PARAC_PATH_EXPLICITLY_UNKNOWN);
 
   // Required so that no concurrent assessments of the same tasks are happening.
   std::unique_lock lock(m_internal->assessMutex);
+
+  assert(task->assess);
+  assert(task->path.rep != PARAC_PATH_EXPLICITLY_UNKNOWN);
 
   parac_task_state s = task->assess(task);
   task->state = s;
