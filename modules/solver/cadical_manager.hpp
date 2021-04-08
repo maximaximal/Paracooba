@@ -44,6 +44,10 @@ class CaDiCaLManager {
                                      CaDiCaLManager& mgr,
                                      parac_worker worker);
 
+    CaDiCaLHandlePtrWrapper(CaDiCaLHandlePtrWrapper&& o) = default;
+    CaDiCaLHandlePtrWrapper(const CaDiCaLHandlePtrWrapper& o) = delete;
+    CaDiCaLHandlePtrWrapper(CaDiCaLHandlePtrWrapper& o) = delete;
+
     ~CaDiCaLHandlePtrWrapper();
   };
 

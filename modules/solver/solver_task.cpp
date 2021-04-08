@@ -88,10 +88,9 @@ SolverTask::work(parac_worker worker) {
   assert(!m_working.exchange(true));
 #endif
 
-  auto handlePtr = m_manager->getHandleForWorker(worker);
+  auto handlePtr(m_manager->getHandleForWorker(worker));
   auto& handle = *handlePtr.ptr;
-
-  m_activeHandle = &handle;
+  m_activeHandle = handlePtr.ptr.get();
 
   assert(m_manager);
   assert(m_task);
@@ -252,6 +251,9 @@ SolverTask::work(parac_worker worker) {
 }
 parac_status
 SolverTask::serialize_to_msg(parac_message* tgt_msg) {
+#ifndef NDEBUG
+  assert(!m_working);
+#endif
   assert(tgt_msg);
   assert(m_task);
 

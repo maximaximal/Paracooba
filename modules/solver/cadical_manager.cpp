@@ -261,7 +261,8 @@ CaDiCaLManager::CaDiCaLHandlePtrWrapper::~CaDiCaLHandlePtrWrapper() {
 
 CaDiCaLManager::CaDiCaLHandlePtrWrapper
 CaDiCaLManager::getHandleForWorker(parac_worker worker) {
-  return CaDiCaLHandlePtrWrapper(takeHandleForWorker(worker), *this, worker);
+  CaDiCaLHandlePtrWrapper wrapper(takeHandleForWorker(worker), *this, worker);
+  return wrapper;
 }
 
 void
