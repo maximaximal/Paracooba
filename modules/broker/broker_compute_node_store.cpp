@@ -120,8 +120,6 @@ ComputeNodeStore::create_with_connection(
   parac_compute_node_file_func send_file_func,
   parac_compute_node_available_to_send_to_func available_to_send_to) {
 
-  std::unique_lock lock(m_internal->nodesMutex);
-
   assert(!has(id));
 
   parac_compute_node* n = get(id);
