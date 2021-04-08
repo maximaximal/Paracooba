@@ -179,7 +179,7 @@ ComputeNodeStore::decrementThisNodeWorkQueueSize(parac_id originator) {
 void
 ComputeNodeStore::formulaParsed(parac_id originator) {
   thisNode().formulaParsed(originator);
-  sendStatusToPeers();
+  sendStatusToPeers(true);
 }
 
 parac_compute_node*
@@ -205,8 +205,17 @@ ComputeNodeStore::create(parac_id id) {
 }
 
 void
-ComputeNodeStore::sendStatusToPeers() {
-  std::unique_lock lock(m_internal->nodesMutex);
+ComputeNodeStore::sendStatusToPeers(bool important) {
+  std::unique_lock lock{ [this, important]() {
+    if(important)
+      return std::unique_lock(m_internal->nodesMutex);
+    else
+      return std::unique_lock(m_internal->nodesMutex, std::try_to_lock);
+  }() };
+
+  if(!lock.owns_lock())
+    return;
+
   for(auto& e : m_internal->nodesList) {
     if(e.id != m_handle.id && e.available_to_send_to(&e)) {
       ComputeNode& computeNode = *static_cast<ComputeNode*>(e.broker_userdata);

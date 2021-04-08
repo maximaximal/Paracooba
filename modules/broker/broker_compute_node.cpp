@@ -296,6 +296,7 @@ ComputeNode::initDescription(const std::string& name,
                              uint16_t tcpListenPort,
                              bool demon,
                              bool local) {
+  std::unique_lock lock(m_descriptionMutex);
   m_description = Description(
     name, host, workers, udpListenPort, tcpListenPort, demon, local);
   m_status.insertWorkerCount(workers);
@@ -500,11 +501,12 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
   if(utilization < 1.5 && m_store.thisNode().computeUtilization() >= 0.5) {
     tryToOffloadTask();
   } else {
-    if(m_store.thisNode().computeUtilization() < 1) {
+    float u = m_store.thisNode().computeUtilization();
+    if(u < 1) {
       // The current node doesn't have enough work! Try to get more by sending
       // status to all other known nodes. This saves waiting time for answers of
       // previously sent status updates.
-      m_store.sendStatusToPeers();
+      m_store.sendStatusToPeers(u < 0.5);
     }
   }
 

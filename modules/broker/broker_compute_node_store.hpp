@@ -49,7 +49,7 @@ class ComputeNodeStore {
   const std::list<parac_compute_node_wrapper>::iterator begin();
   const std::list<parac_compute_node_wrapper>::iterator end();
 
-  void sendStatusToPeers();
+  void sendStatusToPeers(bool important = false);
   void sendOfflineAnnouncementToPeers();
 
   bool autoShutdownAfterFirstFinishedClient() const noexcept {
