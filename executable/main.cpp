@@ -156,6 +156,10 @@ main(int argc, char* argv[]) {
   GlobalModuleLoader = &loader;
   signal(SIGINT, InterruptHandler);
 
+  // Sigpipe would exit the whole application! Don't do that. Errors are handled
+  // in modules directly.
+  signal(SIGPIPE, SIG_IGN);
+
 #ifdef ENABLE_DISTRAC
   distrac_wrapper distracWrapper;
   if(cli.distracEnabled()) {
