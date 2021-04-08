@@ -502,7 +502,9 @@ TCPConnection::handleReceivedMessage() {
     d->status = status;
     d->returned = true;
   };
-  assert(msg.data);
+
+  // Data can be zero in very specific error scenarios.
+  assert(msg.length == 0 || (msg.length > 0 && msg.data));
 
   assert(s->compute_node->receive_message_from);
   s->compute_node->receive_message_from(s->compute_node, &msg);
