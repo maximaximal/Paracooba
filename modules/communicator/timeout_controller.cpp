@@ -80,21 +80,15 @@ TimeoutController::setTimeout(uint64_t ms,
                               void* userdata,
                               parac_timeout_expired expiery_cb) {
   Internal::Timeout* elem = nullptr;
-  {
-    std::unique_lock lock(m_internal->timeoutMutex);
-    elem = &m_internal->timeoutList.emplace_front(m_service);
-    elem->it = m_internal->timeoutList.begin();
-  }
+  std::unique_lock lock(m_internal->timeoutMutex);
+  elem = &m_internal->timeoutList.emplace_front(m_service);
+  elem->it = m_internal->timeoutList.begin();
   elem->timeout.cancel_userdata = this;
   elem->timeout.expired_userdata = userdata;
   elem->timeout.expired = expiery_cb;
   elem->timeout.cancel = [](parac_timeout* t) {
     assert(t);
     assert(t->cancel_userdata);
-
-    // Timer can no longer expire when it is canceled.
-    t->expired_userdata = nullptr;
-    t->expired = nullptr;
 
     TimeoutController* c = static_cast<TimeoutController*>(t->cancel_userdata);
     c->cancel(t);
@@ -124,14 +118,18 @@ TimeoutController::cancelIOThread(parac_timeout* timeout) {
   assert(timeout);
   assert(timeout->cancel_userdata);
 
-  timeout->expired = nullptr;
+  std::unique_lock lock(m_internal->timeoutMutex);
 
   Internal::Timeout* t =
     reinterpret_cast<Internal::Timeout*>(reinterpret_cast<std::byte*>(timeout) -
                                          offsetof(Internal::Timeout, timeout));
+
+  // Timer can no longer expire when it is canceled.
+  timeout->expired_userdata = nullptr;
+  timeout->expired = nullptr;
+
   assert(t);
 
-  std::unique_lock lock(m_internal->timeoutMutex);
   m_internal->timeoutList.erase(t->it);
 }
 }
