@@ -165,10 +165,11 @@ parac_path_to_str(parac_path p, char* out_str) {
     out_str[i++] = '\0';
     return;
   } else if(parac_path_is_overlength(p)) {
+    parac_path_length_type length = p.overlength_length_;
     size_t i = snprintf(out_str,
                         PARAC_PATH_MAX_LENGTH,
                         "(overlength | %lu | l/r %u)",
-                        p.overlength_length_,
+                        length,
                         p.overlength_left_right);
     out_str[i] = '\0';
     return;
@@ -189,7 +190,7 @@ parac_path_to_str(parac_path p, char* out_str) {
     out_str[i++] = 'h';
     out_str[i++] = ')';
     out_str[i++] = '\0';
-    return ;
+    return;
   }
 
   for(size_t i = 0; i < PARAC_PATH_MAX_LENGTH; ++i) {
