@@ -5,6 +5,9 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 #DAEMON_THREADS=$(grep -c ^processor /proc/cpuinfo)
 #let DAEMON_THREADS=DAEMON_THREADS/2
 
+# Show IP Information
+/sbin/ip addr
+
 id=$(($AWS_BATCH_JOB_NODE_INDEX + 1))
 
 ip=$(/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1)
