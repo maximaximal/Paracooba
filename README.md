@@ -58,10 +58,10 @@ Building
     git clone https://github.com/maximaximal/Paracooba.git
     git submodule update --init --recursive
 
-	# Build directory
+    # Build directory
     mkdir build
-	cd build
+    cd build
 
-	# Building
-	cmake ..
-	make -j
+    # Building
+    cmake ..
+    make -j
