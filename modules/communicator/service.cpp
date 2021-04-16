@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "message_send_queue.hpp"

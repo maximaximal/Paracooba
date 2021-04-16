@@ -139,14 +139,13 @@ class MessageSendQueue : public std::enable_shared_from_this<MessageSendQueue> {
   }
 
   private:
+  struct Internal;
   struct Entry;
   using SentMap = std::map<uint32_t, Entry>;
   using SendQueue = std::queue<Entry>;
 
   Service& m_service;
-
-  SentMap m_waitingForACK;
-  SendQueue m_queued;
+  std::unique_ptr<Internal> m_internal;
 
   std::recursive_mutex m_queuedMutex;
   std::recursive_mutex m_waitingForACKMutex;

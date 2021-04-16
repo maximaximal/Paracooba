@@ -130,8 +130,14 @@ struct MessageSendQueue::Entry {
   ~Entry() {}
 };
 
+struct MessageSendQueue::Internal {
+  SentMap waitingForACK;
+  SendQueue queued;
+};
+
 MessageSendQueue::MessageSendQueue(Service& service, parac_id remoteId)
   : m_service(service)
+  , m_internal(std::make_unique<Internal>())
   , m_remoteId(remoteId) {
   static_assert(
     std::is_same_v<SentMap::key_type, decltype(PacketHeader::number)>);
@@ -139,11 +145,11 @@ MessageSendQueue::MessageSendQueue(Service& service, parac_id remoteId)
 
 MessageSendQueue::~MessageSendQueue() {
   // Notify all items that the message queue is no more
-  while(!m_queued.empty()) {
-    m_queued.front()(PARAC_CONNECTION_CLOSED);
-    m_queued.pop();
+  while(!m_internal->queued.empty()) {
+    m_internal->queued.front()(PARAC_CONNECTION_CLOSED);
+    m_internal->queued.pop();
   }
-  for(auto& e : m_waitingForACK) {
+  for(auto& e : m_internal->waitingForACK) {
     e.second(PARAC_CONNECTION_CLOSED);
   }
 }
@@ -292,7 +298,7 @@ MessageSendQueue::send(Entry&& e, bool resend) {
                   .count());
     }
 
-    m_queued.emplace(std::move(e));
+    m_internal->queued.emplace(std::move(e));
   }
 
   if(m_availableToSendTo && m_notificationFunc) {
@@ -327,12 +333,12 @@ MessageSendQueue::handleACK(const PacketHeader& ack) {
     std::unique_lock lock(m_waitingForACKMutex);
 
     SentMap::iterator it;
-    it = m_waitingForACK.find(ack.number);
-    if(it == m_waitingForACK.end()) {
+    it = m_internal->waitingForACK.find(ack.number);
+    if(it == m_internal->waitingForACK.end()) {
       return std::optional<Entry>(std::nullopt);
     }
     Entry entry = std::move(it->second);
-    m_waitingForACK.erase(it);
+    m_internal->waitingForACK.erase(it);
     return std::optional<Entry>(std::move(entry));
   }() };
 
@@ -377,9 +383,9 @@ MessageSendQueue::handleACK(const PacketHeader& ack) {
 MessageSendQueue::EntryRef
 MessageSendQueue::front() {
   std::unique_lock lock(m_queuedMutex);
-  assert(!m_queued.empty());
+  assert(!m_internal->queued.empty());
 
-  auto& front = m_queued.front();
+  auto& front = m_internal->queued.front();
   EntryRef r;
   r.header = &front.header;
   front.applyToRefValue(r.body);
@@ -392,8 +398,8 @@ void
 MessageSendQueue::popFromQueued() {
   Entry r{ [this]() {
     std::unique_lock lock(m_queuedMutex);
-    Entry r = std::move(m_queued.front());
-    m_queued.pop();
+    Entry r = std::move(m_internal->queued.front());
+    m_internal->queued.pop();
     return r;
   }() };
 
@@ -404,7 +410,7 @@ MessageSendQueue::popFromQueued() {
 
   if(parac_message_kind_is_waiting_for_ack(kind)) {
     std::unique_lock lock(m_waitingForACKMutex);
-    m_waitingForACK.try_emplace(number, std::move(r));
+    m_internal->waitingForACK.try_emplace(number, std::move(r));
 
     parac_log(PARAC_COMMUNICATOR,
               PARAC_TRACE,
@@ -435,7 +441,7 @@ MessageSendQueue::popFromQueued() {
 bool
 MessageSendQueue::empty() {
   std::unique_lock lock(m_queuedMutex);
-  return m_queued.empty();
+  return m_internal->queued.empty();
 }
 
 std::pair<parac_compute_node*, std::shared_ptr<MessageSendQueue>>
@@ -586,7 +592,8 @@ MessageSendQueue::tick() {
 
   std::unique_lock l1(m_queuedMutex), l2(m_waitingForACKMutex);
 
-  for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end();) {
+  for(auto it = m_internal->waitingForACK.begin();
+      it != m_internal->waitingForACK.end();) {
     auto& e = it->second;
 
     auto dur =
@@ -596,7 +603,7 @@ MessageSendQueue::tick() {
     if(dur > m_service.messageTimeoutMS() / 2) {
       // Re-send the message in hope of it yet arriving on the other side.
       send(std::move(it->second), true);
-      it = m_waitingForACK.erase(it);
+      it = m_internal->waitingForACK.erase(it);
 
       parac_log(PARAC_COMMUNICATOR,
                 PARAC_GLOBALWARNING,
@@ -617,7 +624,7 @@ MessageSendQueue::tick() {
       }
       it->second(PARAC_MESSAGE_TIMEOUT_ERROR);
       it->second(PARAC_TO_BE_DELETED);
-      it = m_waitingForACK.erase(it);
+      it = m_internal->waitingForACK.erase(it);
 
       parac_log(
         PARAC_COMMUNICATOR,
@@ -663,22 +670,24 @@ MessageSendQueue::clear() {
   {
     std::unique_lock l1(m_queuedMutex), l2(m_waitingForACKMutex);
 
-    entriesToBeDeleted.reserve(m_queued.size() + m_waitingForACK.size());
+    entriesToBeDeleted.reserve(m_internal->queued.size() +
+                               m_internal->waitingForACK.size());
 
-    while(!m_queued.empty()) {
-      entriesToBeDeleted.emplace_back(std::move(m_queued.front()));
+    while(!m_internal->queued.empty()) {
+      entriesToBeDeleted.emplace_back(std::move(m_internal->queued.front()));
 
       if(parac_message_kind_is_count_tracked(
            entriesToBeDeleted.back().header.kind)) {
         --m_trackedQueueSize;
       }
 
-      m_queued.pop();
+      m_internal->queued.pop();
     }
 
-    for(auto it = m_waitingForACK.begin(); it != m_waitingForACK.end();) {
+    for(auto it = m_internal->waitingForACK.begin();
+        it != m_internal->waitingForACK.end();) {
       entriesToBeDeleted.emplace_back(std::move(it->second));
-      it = m_waitingForACK.erase(it);
+      it = m_internal->waitingForACK.erase(it);
     }
   }
 

@@ -573,6 +573,17 @@ TCPConnection::handleReceivedFileStart() {
                         p.string(),
                         s->readFileHeader.name });
 
+  if(!s->readFileOstream->o) {
+    parac_log(PARAC_COMMUNICATOR,
+              PARAC_FATAL,
+              "Could not open file ostream for file {} to path {} for "
+              "receiving file from remote {}! Error: {}",
+              name,
+              p,
+              s->remoteId(),
+              strerror(errno));
+  }
+
   assert(s->readFileOstream->o);
   assert(s->readFileOstream->o.is_open());
 }
