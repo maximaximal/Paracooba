@@ -133,10 +133,6 @@ MakeStartLiteralVector(CaDiCaLHandle& handle, SolverConfig& solverConfig) {
     for(Literal& l : startLiterals) {
       l = std::abs(l);
     }
-    parac_log(PARAC_SOLVER,
-              PARAC_LOCALERROR,
-              "Start literals size {}!",
-              startLiterals.size());
   }
   return startLiterals;
 }
