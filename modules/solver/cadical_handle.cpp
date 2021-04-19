@@ -266,6 +266,10 @@ CaDiCaLHandle::applyLearnedClause(const Clause& clause) {
     m_internal->solver.add(l);
   m_internal->solver.add(0);
 }
+bool
+CaDiCaLHandle::stoppedGlobally() const {
+  return m_internal->terminator.stopRef();
+}
 
 parac_status
 CaDiCaLHandle::solve() {
@@ -370,6 +374,10 @@ CaDiCaLHandle::resplitCube(parac_path p,
 
   assert(!m_lookaheadTimeout);
 
+  if(stoppedGlobally()) {
+    return { PARAC_ABORTED, {} };
+  }
+
   m_lookaheadTimeout =
     setTimeout(m_internal->handle,
                solverConfig.InitialSplitTimeoutMS(),
@@ -383,6 +391,11 @@ CaDiCaLHandle::resplitCube(parac_path p,
                });
 
   Literal lit_to_split = std::abs(m_internal->solver.lookahead());
+
+  if(m_internal->terminator.stopRef()) {
+    m_lookaheadTimeout = nullptr;
+    return { PARAC_ABORTED, {} };
+  }
 
   if(m_lookaheadTimeout) {
     m_lookaheadTimeout->cancel(m_lookaheadTimeout);

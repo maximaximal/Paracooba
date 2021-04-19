@@ -152,6 +152,10 @@ SolverTask::work(parac_worker worker) {
 
     s = PARAC_PENDING;
   } else {
+    if(handle.stoppedGlobally()) {
+      return PARAC_ABORTED;
+    }
+
     auto& config = m_manager->config();
     uint64_t averageSolvingTime = m_manager->averageSolvingTimeMS();
     m_fastSplit.tick(m_manager->waitingSolverTasks() <= 1);
@@ -159,6 +163,9 @@ SolverTask::work(parac_worker worker) {
     uint64_t duration = multiplicationFactor * averageSolvingTime;
 
     auto cube = m_cubeSource->cube(m_task->path, *m_manager);
+    if(handle.stoppedGlobally()) {
+      return PARAC_ABORTED;
+    }
     handle.applyCubeAsAssumption(cube);
 
     s = PARAC_UNKNOWN;
@@ -205,7 +212,8 @@ SolverTask::work(parac_worker worker) {
       switch(s) {
         case PARAC_ABORTED: {
           if(splitting_status == PARAC_PENDING) {
-            auto [resplit_status, cubes, resplit_duration] = resplit(duration);
+            auto [resplit_status, cubes, resplit_duration] =
+              resplit(duration, handle);
             splitting_cubes = std::move(cubes);
             splitting_status = resplit_status;
             splitting_duration = resplit_duration;
@@ -503,7 +511,7 @@ SolverTask::resplitDepth(parac_path path, Cube literals, int depth) {
 }
 
 std::tuple<parac_status, std::vector<SolverTask::CubeTreeElem>, uint64_t>
-SolverTask::resplit(uint64_t durationMS) {
+SolverTask::resplit(uint64_t durationMS, CaDiCaLHandle& handle) {
   m_interruptSolving = false;
 
   parac_log(PARAC_CUBER,
@@ -540,6 +548,10 @@ SolverTask::resplit(uint64_t durationMS) {
 
   auto cubes = resplitDepth(path(), literals, depth);
   auto end = std::chrono::steady_clock::now();
+
+  if(handle.stoppedGlobally()) {
+    return { PARAC_ABORTED, {}, 0 };
+  }
 
   if(m_timeout) {
     m_timeout->cancel(m_timeout);
@@ -596,6 +608,10 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
   auto start = std::chrono::steady_clock::now();
   parac_status s = handle.solve();
   auto end = std::chrono::steady_clock::now();
+
+  if(handle.stoppedGlobally()) {
+    return { PARAC_ABORTED, 0 };
+  }
 
   if(m_timeout && !m_interruptSolving) {
     m_timeout->cancel(m_timeout);

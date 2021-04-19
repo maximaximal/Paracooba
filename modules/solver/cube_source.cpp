@@ -166,7 +166,6 @@ CaDiCaLCubes::split(parac_path p,
     if(m_currentCube.size() < mgr.config().InitialMinimalCubeDepth()) {
       // Split again using resplit!
       auto r = handle.resplitCube(p, m_currentCube, mgr.config());
-      assert(r.first);
       if(r.first != PARAC_SPLITTED) {
         left = false;
         right = false;

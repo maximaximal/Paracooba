@@ -44,6 +44,7 @@ class CaDiCaLHandle {
   void applyCubeAsAssumption(const Cube &cube);
 
   void applyLearnedClause(const Clause &clause);
+  bool stoppedGlobally() const;
 
   /** @brief Calls solve on the internal CaDiCaL Solver instance.
    *

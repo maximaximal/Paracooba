@@ -112,7 +112,8 @@ class SolverTask {
   resplitDepth(parac_path path, Cube literals, int depth);
 
   std::tuple<parac_status, std::vector<CubeTreeElem>, uint64_t> resplit(
-    uint64_t durationMS);
+    uint64_t durationMS,
+    CaDiCaLHandle& handle);
 
   std::pair<parac_status, uint64_t> solveOrConditionallyAbort(
     const SolverConfig& config,

@@ -56,6 +56,24 @@ set_timeout(parac_module* mod,
 }
 
 static void
+connect_to_remote_inactive(parac_module* mod, const char* remote) {
+  (void)mod;
+  (void)remote;
+}
+
+static parac_timeout*
+set_timeout_inactive(parac_module* mod,
+                     uint64_t ms,
+                     void* userdata,
+                     parac_timeout_expired expiery_cb) {
+  (void)mod;
+  (void)ms;
+  (void)userdata;
+  (void)expiery_cb;
+  return nullptr;
+}
+
+static void
 init_config(CommunicatorUserdata* u) {
   using parac::communicator::Config;
   parac_config_entry* e = u->config_entries;
@@ -268,6 +286,9 @@ mod_request_exit(parac_module* mod) {
   assert(mod->communicator);
   assert(mod->handle);
   assert(mod->userdata);
+
+  mod->communicator->set_timeout = &set_timeout_inactive;
+  mod->communicator->connect_to_remote = &connect_to_remote_inactive;
 
   CommunicatorUserdata* userdata =
     static_cast<CommunicatorUserdata*>(mod->userdata);
