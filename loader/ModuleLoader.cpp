@@ -75,10 +75,10 @@ struct ModuleLoader::Internal {
     boost::dll::detail::import_type<decltype(parac_module_discover)>::type>
     imports;
 
+  parac_module_communicator communicator;
   parac_module_broker broker;
   parac_module_runner runner;
   parac_module_solver solver;
-  parac_module_communicator communicator;
   bool exitRequested = false;
 
   std::variant<parac_handle, parac_handle*> storedHandle;
@@ -181,19 +181,18 @@ ModuleLoader::load(parac_module_type type) {
 
         auto& mod = *m_modules[type];
 
-        parac_log(
-          PARAC_LOADER,
-          PARAC_DEBUG,
-          "{} named '{}' version {}.{}.{}:{} loaded with from (generic) "
-          "SO-path {} with status {}",
-          parac_module_type_to_str(type),
-          mod.name,
-          mod.version.major,
-          mod.version.minor,
-          mod.version.patch,
-          mod.version.tweak,
-          (path / name).string(),
-          status);
+        parac_log(PARAC_LOADER,
+                  PARAC_DEBUG,
+                  "{} named '{}' version {}.{}.{}:{} loaded from (generic) "
+                  "SO-path {} with status {}",
+                  parac_module_type_to_str(type),
+                  mod.name,
+                  mod.version.major,
+                  mod.version.minor,
+                  mod.version.patch,
+                  mod.version.tweak,
+                  (path / name).string(),
+                  status);
       }
 
       return true;
@@ -217,18 +216,22 @@ ModuleLoader::load(parac_module_type type) {
 
 PARAC_LOADER_EXPORT struct parac_module_solver*
 ModuleLoader::solver() {
+  assert(hasSolver());
   return &m_internal->solver;
 }
 PARAC_LOADER_EXPORT struct parac_module_runner*
 ModuleLoader::runner() {
+  assert(hasRunner());
   return &m_internal->runner;
 }
 PARAC_LOADER_EXPORT struct parac_module_communicator*
 ModuleLoader::communicator() {
+  assert(hasCommunicator());
   return &m_internal->communicator;
 }
 PARAC_LOADER_EXPORT struct parac_module_broker*
 ModuleLoader::broker() {
+  assert(hasBroker());
   return &m_internal->broker;
 }
 PARAC_LOADER_EXPORT struct parac_module*
@@ -250,6 +253,10 @@ ModuleLoader::load(std::set<parac_module_type> modulesToLoad) {
   for(auto& mod : m_modules) {
     if(mod) {
       switch(mod->type) {
+        case PARAC_MOD_COMMUNICATOR:
+          mod->communicator = communicator();
+          handle().modules[PARAC_MOD_COMMUNICATOR] = mod.get();
+          break;
         case PARAC_MOD_BROKER:
           mod->broker = broker();
           handle().modules[PARAC_MOD_BROKER] = mod.get();
@@ -261,10 +268,6 @@ ModuleLoader::load(std::set<parac_module_type> modulesToLoad) {
         case PARAC_MOD_SOLVER:
           mod->solver = solver();
           handle().modules[PARAC_MOD_SOLVER] = mod.get();
-          break;
-        case PARAC_MOD_COMMUNICATOR:
-          mod->communicator = communicator();
-          handle().modules[PARAC_MOD_COMMUNICATOR] = mod.get();
           break;
         case PARAC_MOD__COUNT:
           assert(false);
@@ -297,7 +300,7 @@ RunFuncInAllModules(ModuleLoader::ModuleArray& modules,
 
     // If the module is not loaded at this stage, it is explicitly deactivated.
     if(!ptr)
-      return true;
+      continue;
 
     if(!ptr || !getFunc(ptr)) {
       parac_log(PARAC_LOADER,

@@ -31,10 +31,6 @@ init_config(RunnerUserdata* u) {
   parac_config_entry* e = u->config_entries;
 
   uint32_t worker_count = std::thread::hardware_concurrency();
-  const char* workerCount = "PARAC_WORKER_COUNT";
-  if(std::getenv(workerCount)) {
-    worker_count = std::atoi(std::getenv(workerCount));
-  }
 
   parac_config_entry_set_str(
     &e[WorkerExecutor::WORKER_COUNT],

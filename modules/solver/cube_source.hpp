@@ -41,7 +41,7 @@ class Source {
     return self;
   };
 
-  virtual uint32_t prePathSortingCritereon() { return 0; }
+  virtual uint32_t prePathSortingCritereon() const { return 0; }
 
   // Also include serialize functions!
 };
@@ -55,14 +55,14 @@ class PathDefined : public Source {
   PathDefined();
   virtual ~PathDefined();
 
-  virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
+  virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr) override;
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
                      CaDiCaLHandle& handle,
                      bool& left,
-                     bool& right);
-  virtual const char* name() const { return "PathDefined"; }
-  virtual std::unique_ptr<Source> copy() const;
+                     bool& right) override;
+  virtual const char* name() const override { return "PathDefined"; }
+  virtual std::unique_ptr<Source> copy() const override;
 
   template<class Archive>
   void serialize(Archive& ar) {
@@ -79,21 +79,21 @@ class Supplied : public Source {
     , m_prePathSortingCritereon(prePathSortingCritereon) {}
   virtual ~Supplied();
 
-  virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
+  virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr) override;
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
                      CaDiCaLHandle& handle,
                      bool& left,
-                     bool& right);
-  virtual const char* name() const { return "Supplied"; }
-  virtual std::unique_ptr<Source> copy() const;
+                     bool& right) override;
+  virtual const char* name() const override { return "Supplied"; }
+  virtual std::unique_ptr<Source> copy() const override;
 
   template<class Archive>
   void serialize(Archive& ar) {
     ar(m_cube, m_prePathSortingCritereon);
   }
 
-  virtual uint32_t prePathSortingCritereon() {
+  virtual uint32_t prePathSortingCritereon() const override {
     return m_prePathSortingCritereon;
   }
 
@@ -108,14 +108,14 @@ class Unspecified : public Source {
   explicit Unspecified() = default;
   virtual ~Unspecified() = default;
 
-  virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
+  virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr) override;
   virtual bool split(parac_path p,
                      CaDiCaLManager& mgr,
                      CaDiCaLHandle& handle,
                      bool& left,
-                     bool& right);
-  virtual const char* name() const { return "Unspecified"; }
-  virtual std::unique_ptr<Source> copy() const;
+                     bool& right) override;
+  virtual const char* name() const override { return "Unspecified"; }
+  virtual std::unique_ptr<Source> copy() const override;
 
   template<class Archive>
   void serialize(Archive& ar) {
@@ -133,7 +133,7 @@ class CaDiCaLCubes : public Source {
   explicit CaDiCaLCubes(const CaDiCaLCubes& o) = default;
   virtual ~CaDiCaLCubes();
 
-  virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr);
+  virtual CubeIteratorRange cube(parac_path p, CaDiCaLManager& mgr) override;
 
   /** @brief First call to split runs CaDiCaL's splitting algorithm with
    * optionally applied starting lit. */
@@ -141,23 +141,25 @@ class CaDiCaLCubes : public Source {
                      CaDiCaLManager& mgr,
                      CaDiCaLHandle& handle,
                      bool& left,
-                     bool& right);
-  virtual const char* name() const { return "CaDiCaLCubes"; }
-  virtual std::unique_ptr<Source> copy() const;
+                     bool& right) override;
+  virtual const char* name() const override { return "CaDiCaLCubes"; }
+  virtual std::unique_ptr<Source> copy() const override;
 
   template<class Archive>
   void serialize(Archive& ar) {
     ar(m_currentCube, m_splittingLiteral, m_concurrentCubeTreeNumber);
   }
 
-  virtual std::shared_ptr<Source> leftChild(std::shared_ptr<Source> self);
-  virtual std::shared_ptr<Source> rightChild(std::shared_ptr<Source> self);
+  virtual std::shared_ptr<Source> leftChild(
+    std::shared_ptr<Source> self) override;
+  virtual std::shared_ptr<Source> rightChild(
+    std::shared_ptr<Source> self) override;
 
   inline uint32_t concurrentCubeTreeNumber() const {
     return m_concurrentCubeTreeNumber;
   }
 
-  virtual uint32_t prePathSortingCritereon() {
+  virtual uint32_t prePathSortingCritereon() const override {
     return concurrentCubeTreeNumber();
   }
 

@@ -8,6 +8,7 @@
 struct parac_module;
 struct parac_task;
 struct parac_path;
+struct parac_compute_node;
 
 namespace parac::solver {
 class CaDiCaLHandle;
@@ -76,6 +77,9 @@ class CaDiCaLManager {
   void removeWaitingSolverTask();
   size_t waitingSolverTasks() const;
   parac_id getOriginatorId() const;
+
+  void addPossiblyNewNodePeer(parac_compute_node& peer);
+  void applyAndDistributeNewLearnedClause(Clause c, parac_id source = 0);
 
   private:
   struct Internal;

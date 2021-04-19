@@ -1,11 +1,16 @@
+#include "paracooba/common/log.h"
 #include "paracooba/common/status.h"
+#include "paracooba/common/types.h"
 #include <paracooba/common/config.h>
 
 #include <parac_common_export.h>
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <stdio.h>
 
 PARAC_COMMON_EXPORT
 void
@@ -94,7 +99,75 @@ parac_config_apply_default_values(parac_config* config) {
 
     for(size_t i = 0; i < size; ++i) {
       parac_config_entry* e = &entries[i];
-      e->value = e->default_value;
+
+      switch(e->type) {
+        case PARAC_TYPE_STR:
+          e->value.string = strdup(e->default_value.string);
+          break;
+        case PARAC_TYPE_VECTOR_STR:
+          e->value.string_vector.size = e->default_value.string_vector.size;
+          e->value.string_vector.strings =
+            malloc(sizeof(const char*) * e->default_value.string_vector.size);
+          for(size_t i = 0; i < e->default_value.string_vector.size; ++i)
+            e->value.string_vector.strings[i] =
+              strdup(e->default_value.string_vector.strings[i]);
+          break;
+        default:
+          e->value = e->default_value;
+          break;
+      }
+    }
+  }
+}
+
+PARAC_COMMON_EXPORT void
+parac_config_parse_env(parac_config* config) {
+  assert(config);
+
+  parac_config_entry_node** node = &config->first_node;
+
+  while(*node) {
+    parac_config_entry* entries = (*node)->entries;
+    size_t size = (*node)->size;
+    node = &(*node)->next;
+
+    for(size_t i = 0; i < size; ++i) {
+      parac_config_entry* e = &entries[i];
+
+      size_t uppercase_name_len = strlen(e->name) + 6 + 1;
+      char uppercase_name[uppercase_name_len];
+      uppercase_name[uppercase_name_len - 1] = '\0';
+      uppercase_name[0] = 'P';
+      uppercase_name[1] = 'A';
+      uppercase_name[2] = 'R';
+      uppercase_name[3] = 'A';
+      uppercase_name[4] = 'C';
+      uppercase_name[5] = '_';
+      for(size_t i = 6; i < uppercase_name_len - 1; ++i) {
+        if(e->name[i - 6] == '-') {
+          uppercase_name[i] = '_';
+        } else {
+          uppercase_name[i] = toupper(e->name[i - 6]);
+        }
+      }
+      if(getenv(uppercase_name)) {
+        bool success =
+          parac_type_from_str(getenv(uppercase_name), e->type, &e->value);
+        if(!success) {
+          printf("c !! Could not parse environment variable %s (value \"%s\") "
+                 "into config "
+                 "variable %s!\n",
+                 uppercase_name,
+                 getenv(uppercase_name),
+                 e->name);
+        } else {
+          // Useful for debugging, but deactivated by default.
+          // printf("c Applied %s over %s to %s\n",
+          //       getenv(uppercase_name),
+          //       uppercase_name,
+          //       e->name);
+        }
+      }
     }
   }
 }

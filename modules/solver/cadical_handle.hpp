@@ -40,8 +40,10 @@ class CaDiCaLHandle {
   size_t getPregeneratedCubesCount() const;
   size_t getNormalizedPathLength() const;
 
-  void applyCubeAsAssumption(CubeIteratorRange cube);
-  void applyCubeAsAssumption(Cube cube);
+  void applyCubeAsAssumption(const CubeIteratorRange &cube);
+  void applyCubeAsAssumption(const Cube &cube);
+
+  void applyLearnedClause(const Clause &clause);
 
   /** @brief Calls solve on the internal CaDiCaL Solver instance.
    *

@@ -12,12 +12,12 @@
 
 #include <paracooba/common/path.h>
 #include <paracooba/common/status.h>
+#include <paracooba/common/task.h>
 #include <paracooba/common/types.h>
 #include <paracooba/solver/types.hpp>
 
 #include "cube_source.hpp"
 
-struct parac_task;
 struct parac_message;
 struct parac_handle;
 struct parac_timeout;
@@ -49,6 +49,7 @@ class SolverTask {
   static parac_status static_serialize(parac_task* task,
                                        parac_message* tgt_msg);
   static void static_terminate(parac_task* task);
+  static parac_task_state static_assess(parac_task* t);
 
   parac_path& path();
   const parac_path& path() const;

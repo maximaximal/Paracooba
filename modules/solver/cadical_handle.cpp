@@ -243,7 +243,7 @@ CaDiCaLHandle::generateJumplist() {
 
 template<typename T>
 static void
-applyCubeAsAssumptionToSolver(T cube, CaDiCaL::Solver& s) {
+applyCubeAsAssumptionToSolver(const T& cube, CaDiCaL::Solver& s) {
   for(auto lit : cube) {
     assert(lit != 0);
     s.assume(lit);
@@ -251,13 +251,20 @@ applyCubeAsAssumptionToSolver(T cube, CaDiCaL::Solver& s) {
 }
 
 void
-CaDiCaLHandle::applyCubeAsAssumption(CubeIteratorRange cube) {
+CaDiCaLHandle::applyCubeAsAssumption(const CubeIteratorRange& cube) {
   applyCubeAsAssumptionToSolver(cube, m_internal->solver);
 }
 
 void
-CaDiCaLHandle::applyCubeAsAssumption(Cube cube) {
+CaDiCaLHandle::applyCubeAsAssumption(const Cube& cube) {
   applyCubeAsAssumptionToSolver(cube, m_internal->solver);
+}
+
+void
+CaDiCaLHandle::applyLearnedClause(const Clause& clause) {
+  for(Literal l : clause)
+    m_internal->solver.add(l);
+  m_internal->solver.add(0);
 }
 
 parac_status

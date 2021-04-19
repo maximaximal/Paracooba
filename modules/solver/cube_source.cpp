@@ -1,6 +1,7 @@
 #include "cube_source.hpp"
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
+#include "paracooba/solver/cube_iterator.hpp"
 #include "solver_config.hpp"
 
 #include <paracooba/common/log.h>
@@ -131,6 +132,9 @@ CubeIteratorRange
 CaDiCaLCubes::cube(parac_path p, CaDiCaLManager& mgr) {
   (void)p;
   (void)mgr;
+  if(m_currentCube.size() == 0) {
+    return CubeIteratorRange();
+  }
   return CubeIteratorRange(m_currentCube.begin(), m_currentCube.end());
 }
 
@@ -163,6 +167,11 @@ CaDiCaLCubes::split(parac_path p,
       // Split again using resplit!
       auto r = handle.resplitCube(p, m_currentCube, mgr.config());
       assert(r.first);
+      if(r.first != PARAC_SPLITTED) {
+        left = false;
+        right = false;
+        return false;
+      }
       assert(r.second != 0);
       m_splittingLiteral = r.second;
       left = true;

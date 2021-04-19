@@ -147,10 +147,12 @@ MessageSendQueue::~MessageSendQueue() {
   // Notify all items that the message queue is no more
   while(!m_internal->queued.empty()) {
     m_internal->queued.front()(PARAC_CONNECTION_CLOSED);
+    m_internal->queued.front()(PARAC_TO_BE_DELETED);
     m_internal->queued.pop();
   }
   for(auto& e : m_internal->waitingForACK) {
     e.second(PARAC_CONNECTION_CLOSED);
+    e.second(PARAC_TO_BE_DELETED);
   }
 }
 

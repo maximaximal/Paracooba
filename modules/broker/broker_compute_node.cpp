@@ -283,9 +283,20 @@ ComputeNode::decrementWorkQueueSize(parac_id originator) {
 }
 void
 ComputeNode::formulaParsed(parac_id originator) {
-  SpinLock lock(m_status.m_writeFlag);
-  m_status.solverInstances[originator].formula_parsed = true;
-  m_status.m_dirty = true;
+  {
+    SpinLock lock(m_status.m_writeFlag);
+    m_status.solverInstances[originator].formula_parsed = true;
+    m_status.m_dirty = true;
+  }
+  {
+    std::unique_lock lock(m_cbAfterParsingIsDoneMutex);
+    if(m_cbAfterParsingIsDone.count(originator)) {
+      for(auto& cb : m_cbAfterParsingIsDone[originator]) {
+        cb();
+      }
+      m_cbAfterParsingIsDone.erase(originator);
+    }
+  }
 }
 
 void
@@ -310,9 +321,11 @@ ComputeNode::applyStatus(const Status& s) {
 void
 ComputeNode::receiveMessageFrom(parac_message& msg) {
   if(parac_message_kind_is_for_solver(msg.kind)) {
+    assert(msg.originator_id != 0);
     ComputeNode* n = m_store.get_broker_compute_node(msg.originator_id);
     assert(n);
     parac_module_solver_instance* i = n->getSolverInstance();
+    assert(i);
     i->handle_message(i, &msg);
     return;
   }
@@ -477,13 +490,14 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
     msg.data, msg.length);
 
   {
-    Status s;
+    Status s, oldStatus;
     {
       cereal::BinaryInputArchive ia(data);
       ia(s);
     }
     {
       SpinLock lock(m_modifyingStatus);
+      oldStatus = m_status;
       m_status = s;
       m_status.m_dirty = true;
     }
@@ -494,6 +508,33 @@ ComputeNode::receiveMessageStatusFrom(parac_message& msg) {
               msg.origin->id,
               s,
               msg.length);
+
+    // Before offloading, send already known clauses, so solving gets faster.
+    for(const auto& instanceIt : oldStatus.solverInstances) {
+      parac_id instanceId = instanceIt.first;
+      const SolverInstance& instance = instanceIt.second;
+
+      if(!instance.formula_parsed && s.isParsed(instanceId)) {
+        // One instance just jumped from parsing to parsed. This can be applied
+        // to the local solver instance as a new known peer.
+
+        // Be careful to only do this after the local solver instance has
+        // finished parsing too!
+        parac_compute_node* origin = msg.origin;
+        auto cb = [this, instanceId, origin]() {
+          parac_message_wrapper newRemotesMsg;
+          newRemotesMsg.kind = PARAC_MESSAGE_SOLVER_NEW_REMOTE_AVAILABLE;
+          newRemotesMsg.origin = origin;
+
+          ComputeNode* n = m_store.get_broker_compute_node(instanceId);
+          assert(n);
+          parac_module_solver_instance* i = n->getSolverInstance();
+          assert(i);
+          i->handle_message(i, &newRemotesMsg);
+        };
+        m_store.thisNode().runCBAfterParsingOfFormulaIsDone(cb, instanceId);
+      }
+    }
   }
 
   // Check if the target needs some tasks according to offloading heuristic.
@@ -765,6 +806,25 @@ ComputeNode::receiveMessageOfflineAnnouncement(parac_message& m) {
   }
 
   m.cb(&m, PARAC_OK);
+}
+
+void
+ComputeNode::runCBAfterParsingOfFormulaIsDone(std::function<void()> cb,
+                                              parac_id id) {
+  if(isParsed(id)) {
+    cb();
+  } else {
+    {
+      std::unique_lock lock(m_cbAfterParsingIsDoneMutex);
+      m_cbAfterParsingIsDone[id].emplace_back(cb);
+    }
+
+    // The parser could finish alongside this network read. Be sure to execute
+    // the CB at all costs.
+    if(isParsed(id)) {
+      cb();
+    }
+  }
 }
 
 float

@@ -53,6 +53,12 @@ parac_config_entry_set_str(parac_config_entry* e,
 void
 parac_config_apply_default_values(parac_config* config);
 
+/** @brief Try to extract configuration variables from environment and apply to
+ * values if something was found.
+ */
+void
+parac_config_parse_env(parac_config* config);
+
 #ifdef __cplusplus
 }
 namespace paracooba {

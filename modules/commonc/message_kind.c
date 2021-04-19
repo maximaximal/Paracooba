@@ -28,6 +28,10 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "Solver-Task";
     case PARAC_MESSAGE_SOLVER_SAT_ASSIGNMENT:
       return "Solver-SAT-Assignment";
+    case PARAC_MESSAGE_SOLVER_NEW_LEARNED_CLAUSE:
+      return "Solver-New-Learned-Clause";
+    case PARAC_MESSAGE_SOLVER_NEW_REMOTE_AVAILABLE:
+      return "Solver-New-Remote-Available";
     case PARAC_MESSAGE_TASK_RESULT:
       return "Task-Result";
     case PARAC_MESSAGE_FILE:
@@ -48,6 +52,7 @@ parac_message_kind_is_for_solver(parac_message_kind kind) {
     case PARAC_MESSAGE_SOLVER_TASK:
     case PARAC_MESSAGE_SOLVER_DESCRIPTION:
     case PARAC_MESSAGE_SOLVER_SAT_ASSIGNMENT:
+    case PARAC_MESSAGE_SOLVER_NEW_LEARNED_CLAUSE:
       return true;
     default:
       return false;

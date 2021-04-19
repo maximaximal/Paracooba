@@ -21,6 +21,13 @@ typedef enum parac_message_kind {
   PARAC_MESSAGE_SOLVER_DESCRIPTION,
   PARAC_MESSAGE_SOLVER_TASK,
   PARAC_MESSAGE_SOLVER_SAT_ASSIGNMENT,
+  PARAC_MESSAGE_SOLVER_NEW_LEARNED_CLAUSE,
+
+  /// Internal message only. Provided to the solver module once a remote has
+  /// parsed a formula, received a config and reported success. Can be used if
+  /// the solver keeps track of available remotes too for exchanging
+  /// information.
+  PARAC_MESSAGE_SOLVER_NEW_REMOTE_AVAILABLE,
 
   PARAC_MESSAGE_FILE,
   PARAC_MESSAGE_ACK,

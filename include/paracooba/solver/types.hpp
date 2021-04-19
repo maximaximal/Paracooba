@@ -8,6 +8,7 @@
 namespace parac::solver {
 using Literal = int;
 using Cube = std::vector<Literal>;
+using Clause = Cube;
 using CubeId = std::uint64_t;
 }
 

@@ -30,6 +30,7 @@ class SolverConfig {
     SplitMultiplicationFactor,
     DisableLocalKissat,
     ConcurrentCubeTreeCount,
+    DistributeCubeTreeLearntClausesMaxLevel,
     _COUNT
   };
 
@@ -39,6 +40,9 @@ class SolverConfig {
   uint16_t InitialCubeDepth() const { return m_initialCubeDepth; }
   uint16_t InitialMinimalCubeDepth() const { return m_initialMinimalCubeDepth; }
   uint16_t ConcurrentCubeTreeCount() const { return m_concurrentCubeTreeCount; }
+  uint16_t DistributeCubeTreeLearntClausesMaxLevel() const {
+    return m_distributeCubeTreeLearntClausesMaxLevel;
+  }
   float FastSplitMultiplicationFactor() const {
     return m_fastSplitMultiplicationFactor;
   }
@@ -59,6 +63,7 @@ class SolverConfig {
   uint16_t m_initialCubeDepth = 0;
   uint16_t m_initialMinimalCubeDepth = 0;
   uint16_t m_concurrentCubeTreeCount = 1;
+  uint16_t m_distributeCubeTreeLearntClausesMaxLevel = 1;
   float m_fastSplitMultiplicationFactor = 0.5;
   float m_splitMultiplicationFactor = 2;
   parac_id m_originatorId = 0;
@@ -76,6 +81,8 @@ class SolverConfig {
        cereal::make_nvp("fastSplitMultiplicationFactor",
                         m_fastSplitMultiplicationFactor),
        cereal::make_nvp("concurrentCubeTreeCount", m_concurrentCubeTreeCount),
+       cereal::make_nvp("distributeCubeTreeLearntClausesMaxLevel",
+                        m_distributeCubeTreeLearntClausesMaxLevel),
        cereal::make_nvp("splitMultiplicationFactor",
                         m_splitMultiplicationFactor),
        cereal::make_nvp("initialSplitTimeoutMS", m_initialSplitTimeoutMS),

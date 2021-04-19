@@ -22,6 +22,7 @@
 #include <paracooba/module.h>
 #include <paracooba/runner/runner.h>
 #include <paracooba/solver/solver.h>
+#include <paracooba/solver/types.hpp>
 
 #include <cassert>
 #include <list>
@@ -39,6 +40,7 @@
 #define SOLVER_VERSION_TWEAK 0
 
 using parac::solver::CaDiCaLManager;
+using parac::solver::Clause;
 using parac::solver::KissatTask;
 using parac::solver::ParserTask;
 using parac::solver::SatHandler;
@@ -353,6 +355,51 @@ instance_handle_message(parac_module_solver_instance* instance,
       msg->cb(msg, PARAC_OK);
       break;
     }
+    case PARAC_MESSAGE_SOLVER_NEW_LEARNED_CLAUSE: {
+      assert(solverInstance->cadicalManager);
+      std::vector<Clause> learnedClauses;
+      {
+        cereal::BinaryInputArchive ia(data);
+        ia(learnedClauses);
+      }
+      assert(solverInstance);
+
+      if(parac_log_enabled(PARAC_SOLVER, PARAC_TRACE)) {
+        std::vector<std::string> clausesString;
+        std::transform(learnedClauses.begin(),
+                       learnedClauses.end(),
+                       std::back_inserter(clausesString),
+                       [](const Clause& c) {
+                         return fmt::format("({})", fmt::join(c, "|"));
+                       });
+
+        parac_log(
+          PARAC_SOLVER,
+          PARAC_TRACE,
+          "Received new learned clauses {} for originator ID {} from {}.",
+          fmt::join(clausesString, ","),
+          msg->originator_id,
+          msg->origin->id);
+      }
+
+      for(auto& clause : learnedClauses) {
+        solverInstance->cadicalManager->applyAndDistributeNewLearnedClause(
+          clause, msg->origin->id);
+      }
+      msg->cb(msg, PARAC_OK);
+      break;
+    }
+    case PARAC_MESSAGE_SOLVER_NEW_REMOTE_AVAILABLE:
+      assert(solverInstance->cadicalManager);
+      assert(msg->origin);
+      parac_log(PARAC_SOLVER,
+                PARAC_TRACE,
+                "Registered (possibly) new peer with ID {} in solver with "
+                "originator id {}.",
+                msg->origin->id,
+                solverInstance->cadicalManager->originatorId());
+      solverInstance->cadicalManager->addPossiblyNewNodePeer(*msg->origin);
+      break;
     default:
       assert(false);
   }

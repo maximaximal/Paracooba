@@ -9,6 +9,9 @@
 #include "cadical_handle.hpp"
 #include "cadical_manager.hpp"
 #include "cube_source.hpp"
+#include "paracooba/common/compute_node.h"
+#include "paracooba/common/noncopy_ostream.hpp"
+#include "paracooba/common/status.h"
 #include "sat_handler.hpp"
 #include "solver_assignment.hpp"
 #include "solver_config.hpp"
@@ -19,11 +22,17 @@
 #include <paracooba/runner/runner.h>
 #include <paracooba/solver/cube_iterator.hpp>
 
+#include <paracooba/common/message.h>
+#include <paracooba/common/message_kind.h>
+
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/rolling_mean.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/pool/pool_alloc.hpp>
+
+#include <cereal/archives/binary.hpp>
+#include <cereal/types/vector.hpp>
 
 namespace parac::solver {
 struct CaDiCaLManager::Internal {
@@ -64,6 +73,16 @@ struct CaDiCaLManager::Internal {
   std::atomic_size_t waitingSolverTasks = 0;
 
   std::vector<std::shared_ptr<cubesource::Source>> rootCubeSources;
+
+  std::mutex knownPeersMutex;
+  std::set<parac_compute_node*> knownPeers;
+
+  std::mutex learnedClausesMutex;
+  std::vector<Clause> learnedClauses;
+  std::atomic_size_t learnedClausesCount = 0;
+  parac_id learnedClausesInitiallyFrom = 0;
+
+  std::vector<size_t> learnedClausesApplicationStack;
 };
 
 CaDiCaLManager::Internal::SolverTaskWrapperList
@@ -98,9 +117,26 @@ MakeStartLiteralVector(CaDiCaLHandle& handle, SolverConfig& solverConfig) {
     assert(r.status == PARAC_SPLITTED);
     assert(r.cubes.size() >= 1);
     startLiterals = r.cubes[0];
+    if(startLiterals.size() != solverConfig.ConcurrentCubeTreeCount()) {
+      parac_log(
+        PARAC_SOLVER,
+        PARAC_LOCALERROR,
+        "Cannot generate {} cubing roots from formula {} with originator id "
+        "{}! Only generated {} ({}). Returning with 0 as root!",
+        solverConfig.ConcurrentCubeTreeCount(),
+        handle.path(),
+        handle.originatorId(),
+        fmt::join(startLiterals, ", "),
+        startLiterals.size());
+      return { 0 };
+    }
     for(Literal& l : startLiterals) {
       l = std::abs(l);
     }
+    parac_log(PARAC_SOLVER,
+              PARAC_LOCALERROR,
+              "Start literals size {}!",
+              startLiterals.size());
   }
   return startLiterals;
 }
@@ -126,7 +162,7 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
     assert(m_parsedFormula);
     parac_log(
       PARAC_SOLVER,
-      PARAC_TRACE,
+      PARAC_DEBUG,
       "Generate CaDiCaLManager for formula in file \"{}\" from compute node {} "
       "for {} "
       "workers. Copy operation is deferred to when a solver is requested.",
@@ -137,9 +173,13 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
     m_internal->solvers.resize(workers);
     m_internal->borrowed.resize(workers);
 
+    m_internal->learnedClausesApplicationStack.resize(workers);
+    std::fill(m_internal->learnedClausesApplicationStack.begin(),
+              m_internal->learnedClausesApplicationStack.end(),
+              0);
   } else {
     parac_log(PARAC_SOLVER,
-              PARAC_TRACE,
+              PARAC_DEBUG,
               "Generate dummy CaDiCaLManager for formula that was not parsed "
               "locally, as there are 0 workers.");
   }
@@ -203,13 +243,48 @@ CaDiCaLManager::takeHandleForWorker(parac_worker worker) {
   if(!s[worker]) {
     parac_log(PARAC_SOLVER,
               PARAC_DEBUG,
-              "Creating copy of root formula in file \"{}\" from {} because a "
+              "Creating copy of root formula in file \"{}\" from {} for worker "
+              "{} because a "
               "solver object was requested from CaDiCaLManager.",
               m_parsedFormula->path(),
-              m_parsedFormula->originatorId());
+              m_parsedFormula->originatorId(),
+              worker);
     s[worker] = std::make_unique<CaDiCaLHandle>(*m_parsedFormula);
   }
-  return std::move(s[worker]);
+
+  auto handle = std::move(s[worker]);
+
+  // Check if there are new clauses to apply.
+  if(m_internal->learnedClausesCount >
+     m_internal->learnedClausesApplicationStack[worker]) {
+    std::vector<Clause> clausesToLearn;
+    {
+      std::unique_lock lock(m_internal->learnedClausesMutex);
+      std::copy(m_internal->learnedClauses.begin() +
+                  m_internal->learnedClausesApplicationStack[worker],
+                m_internal->learnedClauses.end(),
+                std::back_inserter(clausesToLearn));
+      m_internal->learnedClausesApplicationStack[worker] =
+        m_internal->learnedClauses.size();
+    }
+
+    for(Clause& clause : clausesToLearn) {
+      parac_log(
+        PARAC_SOLVER,
+        PARAC_TRACE,
+        "Apply learned clause ({}) to solver worker {} from file \"{}\" "
+        "with originator id {}.",
+        fmt::join(clause, " | "),
+        worker,
+        m_parsedFormula->path(),
+        m_parsedFormula->originatorId());
+      assert(clause.size() > 0);
+
+      handle->applyLearnedClause(clause);
+    }
+  }
+
+  return handle;
 }
 void
 CaDiCaLManager::returnHandleFromWorker(CaDiCaLHandlePtr handle,
@@ -322,5 +397,129 @@ CaDiCaLManager::waitingSolverTasks() const {
 parac_id
 CaDiCaLManager::getOriginatorId() const {
   return m_solverConfig.OriginatorId();
+}
+
+template<typename T>
+void
+DistributeLearnedClausesToTargets(const std::vector<Clause>& clauses,
+                                  const T& targets,
+                                  parac_id originatorId) {
+  assert(clauses.size() >= 1);
+
+  for(auto& c : clauses) {
+    assert(c.size() > 0);
+  }
+
+  parac_message_wrapper msg;
+  msg.kind = PARAC_MESSAGE_SOLVER_NEW_LEARNED_CLAUSE;
+  msg.userdata = new int;
+
+  // Count the references to the data of this message.
+  int* count = static_cast<int*>(msg.userdata);
+  *count = 1;
+
+  {
+    NoncopyOStringstream os;
+    {
+      cereal::BinaryOutputArchive oa(os);
+      oa(clauses);
+    }
+    msg.data = new char[os.tellp()];
+    msg.length = os.tellp();
+    msg.originator_id = originatorId;
+    std::copy(os.ptr(), os.ptr() + os.tellp(), msg.data);
+  }
+
+  msg.cb = [](parac_message* msg, parac_status s) {
+    if(s == PARAC_TO_BE_DELETED) {
+      int* count = static_cast<int*>(msg->userdata);
+      if(--(*count) == 0) {
+        delete[] msg->data;
+        msg->data = nullptr;
+        delete count;
+      }
+    }
+  };
+
+  {
+    for(parac_compute_node* peer : targets) {
+      assert(peer);
+      if(peer->available_to_send_to(peer)) {
+        ++(*count);
+        peer->send_message_to(peer, &msg);
+
+        if(parac_log_enabled(PARAC_SOLVER, PARAC_TRACE)) {
+          std::vector<std::string> clausesString;
+          std::transform(clauses.begin(),
+                         clauses.end(),
+                         std::back_inserter(clausesString),
+                         [](const Clause& c) {
+                           return fmt::format("({})", fmt::join(c, "|"));
+                         });
+
+          parac_log(PARAC_SOLVER,
+                    PARAC_TRACE,
+                    "Distributing learned clauses {} with originator {} to "
+                    "peer with id {}.",
+                    fmt::join(clausesString, ", "),
+                    originatorId,
+                    peer->id);
+        }
+      }
+    }
+  }
+
+  msg.cb(&msg, PARAC_TO_BE_DELETED);
+}
+
+void
+CaDiCaLManager::addPossiblyNewNodePeer(parac_compute_node& peer) {
+  bool inserted = false;
+  {
+    std::unique_lock lock(m_internal->knownPeersMutex);
+    inserted = m_internal->knownPeers.insert(&peer).second;
+  }
+
+  if(inserted && peer.id != m_internal->learnedClausesInitiallyFrom) {
+    // Distribute all previously known clauses to the peer too!
+    std::vector<Clause> learnedClauses;
+
+    {
+      std::unique_lock lock(m_internal->knownPeersMutex);
+      learnedClauses = m_internal->learnedClauses;
+    }
+
+    if(learnedClauses.size() == 0)
+      return;
+
+    DistributeLearnedClausesToTargets(
+      learnedClauses, std::set<parac_compute_node*>{ &peer }, originatorId());
+  }
+}
+
+void
+CaDiCaLManager::applyAndDistributeNewLearnedClause(Clause c, parac_id source) {
+  assert(c.size() > 0);
+
+  // Add to internal solver queue.
+  {
+    std::unique_lock lock(m_internal->learnedClausesMutex);
+    m_internal->learnedClauses.emplace_back(c);
+    m_internal->learnedClausesCount = m_internal->learnedClauses.size();
+  }
+
+  // Send to known peers.
+  if(source == 0) {
+    std::set<parac_compute_node*> peers;
+    {
+      std::unique_lock lock(m_internal->knownPeersMutex);
+      peers = m_internal->knownPeers;
+    }
+    DistributeLearnedClausesToTargets({ c }, peers, originatorId());
+  } else {
+    if(m_internal->learnedClausesInitiallyFrom == 0) {
+      m_internal->learnedClausesInitiallyFrom = source;
+    }
+  }
 }
 }

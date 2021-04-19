@@ -15,11 +15,13 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
           "[integration,broker,taskstore]") {
   ParacoobaMock master(1, nullptr, nullptr, { PARAC_MOD_BROKER });
 
-  parac_compute_node* this_node =
-    master.getBroker().compute_node_store->this_node;
+  auto& broker = master.getBroker();
+  auto compNodeStore = broker.compute_node_store;
+  REQUIRE(compNodeStore);
+
+  parac_compute_node* this_node = compNodeStore->this_node;
   REQUIRE(this_node);
 
-  auto& broker = master.getBroker();
   auto store = broker.task_store;
 
   REQUIRE(store->empty);

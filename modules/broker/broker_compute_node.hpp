@@ -11,6 +11,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <functional>
 
 #include <cereal/types/map.hpp>
 #include <cereal/types/string.hpp>
@@ -160,6 +161,8 @@ class ComputeNode {
 
   void receiveFileFrom(parac_file& file);
 
+  void runCBAfterParsingOfFormulaIsDone(std::function<void()> cb, parac_id id);
+
   float computeUtilization() const;
 
   parac_module_solver_instance* getSolverInstance();
@@ -173,7 +176,7 @@ class ComputeNode {
 
   void conditionallySendStatusTo(const Status& s);
 
-  void notifyOfNewRemote(const parac_compute_node_wrapper &node);
+  void notifyOfNewRemote(const parac_compute_node_wrapper& node);
 
   private:
   void sendKnownRemotes();
@@ -203,7 +206,11 @@ class ComputeNode {
   std::unique_ptr<NoncopyOStringstream> m_knownRemotesOstream;
 
   std::atomic_flag m_sendingKnownRemotes = ATOMIC_FLAG_INIT;
-  std::vector<parac_compute_node_wrapper::IDConnectionStringPair> m_newRemotesToNotifyAbout;
+  std::vector<parac_compute_node_wrapper::IDConnectionStringPair>
+    m_newRemotesToNotifyAbout;
+
+  std::mutex m_cbAfterParsingIsDoneMutex;
+  std::map<parac_id, std::vector<std::function<void()>>> m_cbAfterParsingIsDone;
 };
 
 std::ostream&

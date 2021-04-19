@@ -27,30 +27,31 @@ class ModuleLoader {
   ~ModuleLoader();
 
   bool load(std::set<parac_module_type> modulesToLoad = {
+              PARAC_MOD_COMMUNICATOR,
               PARAC_MOD_BROKER,
               PARAC_MOD_RUNNER,
               PARAC_MOD_SOLVER,
-              PARAC_MOD_COMMUNICATOR });
+            });
   bool pre_init();
   bool init();
   bool request_exit();
   bool exit();
 
   bool isComplete(std::set<parac_module_type> modulesToLoad = {
+                    PARAC_MOD_COMMUNICATOR,
                     PARAC_MOD_BROKER,
                     PARAC_MOD_RUNNER,
-                    PARAC_MOD_SOLVER,
-                    PARAC_MOD_COMMUNICATOR });
+                    PARAC_MOD_SOLVER });
 
   bool hasSolver();
   bool hasRunner();
   bool hasCommunicator();
   bool hasBroker();
 
-  struct parac_module_solver* solver();
-  struct parac_module_runner* runner();
   struct parac_module_communicator* communicator();
   struct parac_module_broker* broker();
+  struct parac_module_runner* runner();
+  struct parac_module_solver* solver();
   struct parac_module* mod(size_t mod);
 
   parac_handle& handle();

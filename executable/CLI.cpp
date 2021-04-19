@@ -50,6 +50,26 @@ CLI::CLI(struct parac_config& config)
     ;
   // clang-format on
 }
+
+static void
+free_entry(parac_config_entry& entry) {
+  if(entry.type == PARAC_TYPE_STR) {
+    if(entry.value.string) {
+      // Was initiated in CLI and must be back-casted in order to be freed.
+      free(const_cast<char*>(entry.value.string));
+    }
+  }
+  if(entry.type == PARAC_TYPE_VECTOR_STR) {
+    if(entry.value.string_vector.strings) {
+      // Was initiated in CLI and must be back-casted in order to be freed.
+      for(size_t i = 0; i < entry.value.string_vector.size; ++i) {
+        free(const_cast<char*>(entry.value.string_vector.strings[i]));
+      }
+      std::free(entry.value.string_vector.strings);
+    }
+  }
+}
+
 CLI::~CLI() {
   parac_config_entry_node** node = &m_config.first_node;
 
@@ -60,17 +80,7 @@ CLI::~CLI() {
 
     for(size_t i = 0; i < size; ++i) {
       parac_config_entry& entry = entries[i];
-      if(entry.type == PARAC_TYPE_STR) {
-        // Was initiated in CLI and must be back-casted in order to be freed.
-        free(const_cast<char*>(entry.value.string));
-      }
-      if(entry.type == PARAC_TYPE_VECTOR_STR) {
-        // Was initiated in CLI and must be back-casted in order to be freed.
-        for(size_t i = 0; i < entry.value.string_vector.size; ++i) {
-          free(const_cast<char*>(entry.value.string_vector.strings[i]));
-        }
-        delete[] entry.value.string_vector.strings;
-      }
+      free_entry(entry);
     }
   }
 }
@@ -249,6 +259,12 @@ TryParsingCLIArgToConfigEntry(parac_config_entry& e,
   if(!vm.count(e.name))
     return;
 
+  if(vm[e.name].defaulted())
+    return;
+
+  // Something could have been set from the environment. That has to be freed.
+  free_entry(e);
+
   const auto val = vm[e.name];
 
   switch(e.type) {
@@ -292,7 +308,8 @@ TryParsingCLIArgToConfigEntry(parac_config_entry& e,
       // References the strings in the m_vm member of CLI, so strings stay
       // valid.
       const auto& src = val.as<std::vector<std::string>>();
-      const char** tgt = new const char*[src.size()];
+      const char** tgt = static_cast<const char**>(
+        std::malloc(sizeof(const char*) * src.size()));
       std::transform(src.begin(), src.end(), tgt, ConvertStringToConstChar);
 
       e.value.string_vector.strings = tgt;
@@ -335,8 +352,19 @@ CLI::parseModuleArgs(int argc, char* argv[]) {
               << m_moduleOptions[PARAC_MOD_RUNNER]
               << m_moduleOptions[PARAC_MOD_SOLVER]
               << m_moduleOptions[PARAC_MOD_COMMUNICATOR] << std::endl;
+    std::cout << "All options may also be given using environment variables."
+              << std::endl;
+    std::cout
+      << "Environment variables have the format PARAC_<OPTION_IN_UPPERCASE>"
+      << std::endl;
     return false;
   }
+
+  // Default values should be applied correctly.
+  parac_config_apply_default_values(&m_config);
+
+  // Parse environment first, then go to directly supplied variables.
+  parac_config_parse_env(&m_config);
 
   parac_config_entry_node** node = &m_config.first_node;
   while(*node) {

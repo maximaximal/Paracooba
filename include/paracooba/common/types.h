@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 typedef uint64_t parac_id;
 typedef uint32_t parac_worker;
@@ -76,6 +76,11 @@ typedef union parac_type_union {
 
 #define PARAC_TYPE_ASSERT(UNION, TYPE, MEMBER) \
   _PARAC_TYPE_GET_ASSERT_##MEMBER(UNION, TYPE)
+
+bool
+parac_type_from_str(const char* str,
+                    parac_type expected_type,
+                    parac_type_union* tgt);
 
 #ifdef __cplusplus
 }

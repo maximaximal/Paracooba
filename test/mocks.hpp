@@ -28,10 +28,10 @@ class ParacoobaMock : public parac_handle {
     parac_id id,
     const char* input_file = nullptr,
     ParacoobaMock* knownRemote = nullptr,
-    std::set<parac_module_type> modulesToLoad = { PARAC_MOD_BROKER,
+    std::set<parac_module_type> modulesToLoad = { PARAC_MOD_COMMUNICATOR,
+                                                  PARAC_MOD_BROKER,
                                                   PARAC_MOD_RUNNER,
-                                                  PARAC_MOD_SOLVER,
-                                                  PARAC_MOD_COMMUNICATOR })
+                                                  PARAC_MOD_SOLVER })
     : m_threadRegistry(id) {
     version.major = 0;
     version.minor = 0;
@@ -48,8 +48,8 @@ class ParacoobaMock : public parac_handle {
     distrac = nullptr;
     offsetNS = 0;
 
-    modules[PARAC_MOD_BROKER] = nullptr;
     modules[PARAC_MOD_COMMUNICATOR] = nullptr;
+    modules[PARAC_MOD_BROKER] = nullptr;
     modules[PARAC_MOD_SOLVER] = nullptr;
     modules[PARAC_MOD_RUNNER] = nullptr;
 
@@ -63,6 +63,7 @@ class ParacoobaMock : public parac_handle {
     m_moduleLoader->load(modulesToLoad);
 
     parac_config_apply_default_values(config);
+    parac_config_parse_env(config);
 
     m_moduleLoader->pre_init();
     m_moduleLoader->init();
@@ -86,12 +87,22 @@ class ParacoobaMock : public parac_handle {
     return "localhost:" + std::to_string(getCommunicator().tcp_listen_port);
   }
 
-  parac_module_runner& getRunner() { return *m_moduleLoader->runner(); }
+  parac_module_runner& getRunner() {
+    assert(m_moduleLoader->runner());
+    return *m_moduleLoader->runner();
+  }
   parac_module_communicator& getCommunicator() {
+    assert(m_moduleLoader->communicator());
     return *m_moduleLoader->communicator();
   }
-  parac_module_solver& getSolver() { return *m_moduleLoader->solver(); }
-  parac_module_broker& getBroker() { return *m_moduleLoader->broker(); }
+  parac_module_solver& getSolver() {
+    assert(m_moduleLoader->solver());
+    return *m_moduleLoader->solver();
+  }
+  parac_module_broker& getBroker() {
+    assert(m_moduleLoader->broker());
+    return *m_moduleLoader->broker();
+  }
 
   paracooba::ThreadRegistryWrapper& getThreadRegistry() {
     return m_threadRegistry;

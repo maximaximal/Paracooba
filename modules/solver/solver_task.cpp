@@ -50,6 +50,7 @@ SolverTask::init(CaDiCaLManager& manager,
   task.serialize = &static_serialize;
   task.userdata = this;
   task.terminate = &static_terminate;
+  task.assess = &static_assess;
 
   task.free_userdata = [](parac_task* t) {
     assert(t);
@@ -308,6 +309,51 @@ SolverTask::static_serialize(parac_task* task, parac_message* tgt_msg) {
   assert(task->userdata);
   SolverTask* t = static_cast<SolverTask*>(task->userdata);
   return t->serialize_to_msg(tgt_msg);
+}
+
+parac_task_state
+SolverTask::static_assess(parac_task* t) {
+  assert(t);
+  assert(t->userdata);
+  SolverTask& self = *static_cast<SolverTask*>(t->userdata);
+  CaDiCaLManager* manager = self.m_manager;
+  assert(manager);
+  const SolverConfig& config = manager->config();
+
+  auto default_assessment_result = parac_task_default_assess(t);
+  if(parac_task_state_is_done(default_assessment_result) &&
+     !(default_assessment_result & PARAC_TASK_OFFLOADED) &&
+     parac_path_length(t->path) <
+       config.DistributeCubeTreeLearntClausesMaxLevel() &&
+     !parac_path_is_root(t->path) && t->result == PARAC_UNSAT) {
+    assert(self.m_cubeSource);
+
+    // Distributing learnt clause!
+    auto cubeRange = self.m_cubeSource->cube(t->path, *manager);
+    assert(cubeRange.size() > 0);
+    Clause clause(cubeRange.begin(), cubeRange.end());
+
+    // Flip literal (De-Morgan rule: Convert AND from cube to OR for clause)
+    for(Literal& l : clause) {
+      l = -l;
+    }
+
+    parac_log(PARAC_SOLVER,
+              PARAC_DEBUG,
+              "Solver for formula with originator {} for path {} (pre-psc: "
+              "{}, post-psc: {}) learned new clause of length {} from solving "
+              "cubes: ({}) "
+              "Distributing to all peers.",
+              manager->originatorId(),
+              t->path,
+              t->pre_path_sorting_critereon,
+              t->post_path_sorting_critereon,
+              clause.size(),
+              fmt::join(clause, " | "));
+
+    manager->applyAndDistributeNewLearnedClause(clause);
+  }
+  return default_assessment_result;
 }
 
 void

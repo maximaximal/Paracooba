@@ -11,9 +11,9 @@ extern "C" {
 #include <stdint.h>
 
 typedef enum parac_module_type {
+  PARAC_MOD_COMMUNICATOR,
   PARAC_MOD_BROKER,
   PARAC_MOD_RUNNER,
-  PARAC_MOD_COMMUNICATOR,
   PARAC_MOD_SOLVER,
   PARAC_MOD__COUNT,
 } parac_module_type;
@@ -77,10 +77,10 @@ typedef struct parac_module {
 
   /// Inserted once pre_init is called. Not available in initial discovery.
   union {
+    struct parac_module_communicator* communicator;
     struct parac_module_broker* broker;
     struct parac_module_runner* runner;
     struct parac_module_solver* solver;
-    struct parac_module_communicator* communicator;
   };
 } parac_module;
 

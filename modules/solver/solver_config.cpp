@@ -104,6 +104,21 @@ SolverConfig::SolverConfig(parac_config* config, parac_id localId) {
     .default_value.uint16 = 1;
 
   parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(
+      Entry::DistributeCubeTreeLearntClausesMaxLevel)],
+    "distribute-tree-learnt-clauses-max-level",
+    "When using --concurrent-cube-tree-count the sibling cube trees may finish "
+    "branches early. This variable controls up until which depth (levels in "
+    "the cube tree) the UNSAT cube should be distributed as learnt clause to "
+    "all other instances. 0 disables distributing learnt cube clauses.");
+  m_config[static_cast<size_t>(Entry::DistributeCubeTreeLearntClausesMaxLevel)]
+    .registrar = PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::DistributeCubeTreeLearntClausesMaxLevel)]
+    .type = PARAC_TYPE_UINT16;
+  m_config[static_cast<size_t>(Entry::DistributeCubeTreeLearntClausesMaxLevel)]
+    .default_value.uint16 = 0;
+
+  parac_config_entry_set_str(
     &m_config[static_cast<size_t>(Entry::FastSplitMultiplicationFactor)],
     "cubing-fast-split-multiplication-factor",
     "The multiplication factor when in fast-split mode (when not enough work "
@@ -153,6 +168,10 @@ SolverConfig::extractFromConfigEntries() {
     m_config[static_cast<size_t>(Entry::SplitMultiplicationFactor)].value.f;
   m_concurrentCubeTreeCount =
     m_config[static_cast<size_t>(Entry::ConcurrentCubeTreeCount)].value.uint16;
+  m_distributeCubeTreeLearntClausesMaxLevel =
+    m_config[static_cast<size_t>(
+               Entry::DistributeCubeTreeLearntClausesMaxLevel)]
+      .value.uint16;
 }
 std::ostream&
 operator<<(std::ostream& o, const SolverConfig& config) {
@@ -161,6 +180,9 @@ operator<<(std::ostream& o, const SolverConfig& config) {
            << ", Resplit:" << config.Resplit()
            << ", DisableLocalKissat:" << config.DisableLocalKissat()
            << ", InitialCubeDepth:" << config.InitialCubeDepth()
+           << ", ConcurrentCubeTreeCount:" << config.ConcurrentCubeTreeCount()
+           << ", DistributeCubeTreeLearntClausesMaxLevel:"
+           << config.DistributeCubeTreeLearntClausesMaxLevel()
            << ", FastSplitMultiplicationFactor:"
            << config.FastSplitMultiplicationFactor()
            << ", SplitMultiplicationFactor:"
