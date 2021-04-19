@@ -16,7 +16,17 @@ if [ "$AWS_BATCH_JOB_MAIN_NODE_INDEX" == "$AWS_BATCH_JOB_NODE_INDEX" ]; then
     # Main node detected!
     echo "main IP: ${ip}"
     aws s3 cp s3://${S3_BKT}/${COMP_S3_PROBLEM_PATH} $DIR/build/problem.cnf
-    time $DIR/build/paracs --cadical-cubes --initial-cube-depth 15 --initial-minimal-cube-depth 12 --resplit "$DIR/build/problem.cnf" --concurrent-cube-tree-count 4 --worker $(nproc) --id $id --tcp-listen-address 0.0.0.0
+    time $DIR/build/paracs \
+        "$DIR/build/problem.cnf" \
+        --resplit \
+        --cadical-cubes \
+        --initial-cube-depth 15 \
+        --initial-minimal-cube-depth 12 \
+        --concurrent-cube-tree-count 4 \
+        --distribute-tree-learnt-clauses-max-level 4 \
+        --worker $(nproc) \
+        --id $id \
+        --tcp-listen-address 0.0.0.0
 else
     echo "c DAEMON NODE: Trying to connect to IP ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS} from local ip $ip"
     $DIR/build/paracs --worker $(nproc) --known-remote ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS} --auto-shutdown-after-finished-client --tcp-listen-address 0.0.0.0 --id $id
