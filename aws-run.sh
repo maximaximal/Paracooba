@@ -19,7 +19,7 @@ if [ "$AWS_BATCH_JOB_MAIN_NODE_INDEX" == "$AWS_BATCH_JOB_NODE_INDEX" ]; then
     time $DIR/build/paracs --cadical-cubes --initial-cube-depth 15 --initial-minimal-cube-depth 12 --resplit "$DIR/build/problem.cnf" --concurrent-cube-tree-count 4 --worker $(nproc) --id $id --tcp-listen-address 0.0.0.0
 else
     echo "c DAEMON NODE: Trying to connect to IP ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS} from local ip $ip"
-    $DIR/build/paracs --worker $(nproc) --known-remote ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS} --auto-shutdown-after-finished-client --tcp-listen-address 0.0.0.0 -t --id $id
+    $DIR/build/paracs --worker $(nproc) --known-remote ${AWS_BATCH_JOB_MAIN_NODE_PRIVATE_IPV4_ADDRESS} --auto-shutdown-after-finished-client --tcp-listen-address 0.0.0.0 --id $id
 fi
 
 # if [ $? -ne 0 ]; then
