@@ -49,7 +49,9 @@ development headers are installed in order to be able to compile the software.
 Minimum tested boost version: 1.65.1
 
 All other dependencies are included in this source-tree (and submodules) and do
-not have to be handled specifically.
+not have to be handled specifically. [Distrac](https://github.com/maximaximal/Distrac)
+can also be excluded from the build, either by simply not cloning the submodule or by
+setting `-DENABLE_DISTRAC=OFF` to CMake.
 
 Building
 --------
