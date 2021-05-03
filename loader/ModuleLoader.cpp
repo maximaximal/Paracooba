@@ -11,6 +11,7 @@
 #include <boost/asio/coroutine.hpp>
 
 #include <boost/dll.hpp>
+#include <boost/dll/import.hpp>
 #include <boost/dll/shared_library.hpp>
 #include <boost/dll/shared_library_load_mode.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -29,7 +30,7 @@ ImportModuleDiscoverFunc(boost::filesystem::path path,
                          const std::string& name) {
   // The line below leads to a UBSan runtime error with clang.
   // Bug-report is online: https://github.com/boostorg/dll/issues/46
-  return boost::dll::import<decltype(parac_module_discover)>(
+  return boost::dll::import_alias<decltype(parac_module_discover)>(
     path / name,
     "parac_module_discover",
     boost::dll::load_mode::append_decorations);

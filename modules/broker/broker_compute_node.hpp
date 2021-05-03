@@ -12,6 +12,7 @@
 #include <variant>
 #include <vector>
 #include <functional>
+#include <optional>
 
 #include <cereal/types/map.hpp>
 #include <cereal/types/string.hpp>

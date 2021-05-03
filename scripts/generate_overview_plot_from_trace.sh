@@ -85,5 +85,6 @@ gen_net_send &
 wait
 
 gnuplot -e 'network_send="/dev/shm/overview/network_send.data"' -e 'XMIN="'$XMIN'"' -e 'XMAX="'$XMAX'"' -e 'utilization="/dev/shm/overview/utilization.data"' -e 'offloads="/dev/shm/overview/offloads.data"' -e 'timings="/dev/shm/overview/timings.data"' $DIR/generate_overview_plot_from_trace_plt.gnuplot > ${T}_plots.png
+gnuplot -e "set output '${T}_offloads.tex'" -e 'network_send="/dev/shm/overview/network_send.data"' -e 'XMIN="'$XMIN'"' -e 'XMAX="'$XMAX'"' -e 'utilization="/dev/shm/overview/utilization.data"' -e 'offloads="/dev/shm/overview/offloads.data"' -e 'timings="/dev/shm/overview/timings.data"' $DIR/generate_offload_plot.gnuplot
 
 #rm -rf /dev/shm/overview

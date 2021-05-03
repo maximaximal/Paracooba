@@ -72,7 +72,7 @@ struct SolverInstance {
   std::unique_ptr<parac::NoncopyOStringstream> configStream;
 };
 
-static_assert(std::is_standard_layout<SolverInstance>());
+//static_assert(std::is_standard_layout<SolverInstance>());
 
 struct SolverUserdata {
   SolverInstanceList instances;

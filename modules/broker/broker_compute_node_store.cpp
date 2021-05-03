@@ -12,6 +12,7 @@
 #include <list>
 #include <mutex>
 #include <vector>
+#include <optional>
 
 #include "broker_compute_node.hpp"
 #include "paracooba/common/status.h"

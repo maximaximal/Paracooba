@@ -178,6 +178,7 @@ macro(parac_module NAME SRCS DISCOVER_SRC_FILE)
 
     set_target_properties(${NAME}_obj PROPERTIES C_STANDARD 11)
     target_compile_features(${NAME}_obj PUBLIC cxx_std_17)
+    set_property(TARGET ${NAME}_obj PROPERTY CXX_STANDARD 17)
 
     set_property(TARGET ${NAME}_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac parac_common parac_modules)
     target_link_libraries(${NAME} PUBLIC parac_modules fmt::fmt)

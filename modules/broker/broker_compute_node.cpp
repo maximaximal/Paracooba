@@ -30,6 +30,7 @@
 #include <cassert>
 #include <initializer_list>
 #include <numeric>
+#include <optional>
 
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/numeric.hpp>
