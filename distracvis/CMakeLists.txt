@@ -7,8 +7,8 @@ set(DISTRACVIS_SRCS
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/modules")
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GTKMM gtkmm-3.0)
 find_package(Magnum COMPONENTS GL Primitives MeshTools Shaders QUIET)
+find_package(GTK2 COMPONENTS gtk gtkmm)
 
 if(Magnum_FOUND AND GTKMM_FOUND)
 
@@ -33,6 +33,8 @@ if(Magnum_FOUND AND GTKMM_FOUND)
         Magnum::Primitives
         Magnum::MeshTools
         Magnum::Shaders
+        GTK2::gtkmm
+        GTK2::gtk
         ${GTKMM_LIBRARIES}
         distrac-analysis
         parac_common)
