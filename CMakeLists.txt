@@ -231,6 +231,13 @@ if(STATIC_BUILDS)
     target_link_libraries(paracs distrac parac_modules parac_loader fmt::fmt Boost::filesystem Boost::coroutine Boost::log Boost::context Boost::program_options Boost::date_time ${CMAKE_DL_LIBS})
 endif()
 
+if(STATIC_BUILDS)
+    add_executable(paraqs $<TARGET_OBJECTS:parac_executable>
+        ${CMAKE_CURRENT_SOURCE_DIR}/loader/StaticModuleLoader.cpp)
+    target_link_libraries(paraqs parac_communicator_static parac_broker_static parac_runner_static parac_solver_qbf_static distrac parac_common_static)
+    target_link_libraries(paraqs distrac parac_modules parac_loader fmt::fmt Boost::filesystem Boost::coroutine Boost::log Boost::context Boost::program_options Boost::date_time ${CMAKE_DL_LIBS})
+endif()
+
 if(ENABLE_TESTS)
     add_subdirectory(test)
 endif()

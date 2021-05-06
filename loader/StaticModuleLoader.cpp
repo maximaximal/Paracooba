@@ -11,7 +11,7 @@ extern parac_status
 parac_module_discover_runner(parac_handle* handle);
 #endif
 
-#ifdef PARAC_USE_STATIC_parac_solver
+#if defined(PARAC_USE_STATIC_parac_solver) || defined(PARAC_USE_STATIC_parac_solver_qbf)
 extern parac_status
 parac_module_discover_solver(parac_handle* handle);
 #endif
@@ -41,7 +41,7 @@ parac_static_module_discover(parac_module_type mod) {
       return nullptr;
 #endif
     case PARAC_MOD_SOLVER:
-#ifdef PARAC_USE_STATIC_parac_solver
+#if defined(PARAC_USE_STATIC_parac_solver) || defined(PARAC_USE_STATIC_parac_solver_qbf)
       return &parac_module_discover_solver;
 #else
       return nullptr;
