@@ -9,11 +9,9 @@
 #include <paracooba/solver/solver.h>
 
 #include <boost/asio/coroutine.hpp>
-
 #include <boost/dll.hpp>
-#include <boost/dll/import.hpp>
-#include <boost/dll/shared_library.hpp>
-#include <boost/dll/shared_library_load_mode.hpp>
+#include <dlfcn.h>
+
 #include <boost/filesystem/operations.hpp>
 #include <boost/system/system_error.hpp>
 
@@ -25,15 +23,48 @@ typedef parac_status (*parac_module_discover_func)(parac_handle*);
 extern parac_module_discover_func
 parac_static_module_discover(parac_module_type mod);
 
-auto
-ImportModuleDiscoverFunc(boost::filesystem::path path,
-                         const std::string& name) {
-  // The line below leads to a UBSan runtime error with clang.
-  // Bug-report is online: https://github.com/boostorg/dll/issues/46
-  return boost::dll::import_alias<decltype(parac_module_discover)>(
-    path / name,
-    "parac_module_discover",
-    boost::dll::load_mode::append_decorations);
+struct DynModule {
+  DynModule(boost::filesystem::path path, const std::string& name) {
+    std::string decorated_name = (path / ("lib" + name + ".so")).string();
+    parac_log(PARAC_LOADER,
+              PARAC_TRACE,
+              "Trying to open library \"{}\" in path \"{}\" as file \"{}\"...",
+              name,
+              path.string(),
+              decorated_name);
+    handle = dlopen(decorated_name.c_str(), RTLD_NOW | RTLD_LOCAL);
+
+    if(handle)
+      discover = reinterpret_cast<parac_module_discover_func>(
+        dlsym(handle, "parac_module_discover"));
+    else {
+      parac_log(PARAC_LOADER,
+                PARAC_TRACE,
+                "Library \"{}\" in path \"{}\" as file \"{}\" could not be "
+                "loaded! Error: {}",
+                name,
+                path.string(),
+                decorated_name,
+                dlerror());
+    }
+  }
+
+  ~DynModule() {
+    if(handle) {
+      dlclose(handle);
+    }
+  }
+
+  operator bool() const { return handle && discover; }
+
+  void* handle = nullptr;
+
+  parac_module_discover_func discover = nullptr;
+};
+
+std::unique_ptr<DynModule>
+OpenDynamicLibrary(boost::filesystem::path path, const std::string& name) {
+  return std::make_unique<DynModule>(path, name);
 }
 
 struct PathSource : public boost::asio::coroutine {
@@ -72,15 +103,13 @@ struct ModuleLoader::Internal {
   Internal(parac_handle& externalHandle)
     : storedHandle(&externalHandle) {}
 
-  std::vector<
-    boost::dll::detail::import_type<decltype(parac_module_discover)>::type>
-    imports;
-
   parac_module_communicator communicator;
   parac_module_broker broker;
   parac_module_runner runner;
   parac_module_solver solver;
   bool exitRequested = false;
+
+  std::vector<std::unique_ptr<DynModule>> imports;
 
   std::variant<parac_handle, parac_handle*> storedHandle;
 
@@ -148,64 +177,56 @@ ModuleLoader::initHandle() {
 
 bool
 ModuleLoader::load(parac_module_type type) {
-
   PathSource pathSource(type);
   while(!pathSource.is_complete()) {
     boost::filesystem::path path = pathSource();
     std::string name = std::string("parac_") + parac_module_type_to_str(type);
-    try {
-      // First, try to discover module in statically linked modules. Afterwards,
-      // try dynamically loading.
+    // First, try to discover module in statically linked modules. Afterwards,
+    // try dynamically loading.
 
-      parac_status status;
+    parac_status status;
 
-      auto static_discover_func = parac_static_module_discover(type);
-      if(static_discover_func) {
-        status = static_discover_func(&handle());
-        auto& mod = *m_modules[type];
+    auto static_discover_func = parac_static_module_discover(type);
+    if(static_discover_func) {
+      status = static_discover_func(&handle());
+      auto& mod = *m_modules[type];
 
-        parac_log(PARAC_LOADER,
-                  PARAC_DEBUG,
-                  "{} named '{}' version {}.{}.{}:{} loaded from statically "
-                  "linked library with status {}",
-                  parac_module_type_to_str(type),
-                  mod.name,
-                  mod.version.major,
-                  mod.version.minor,
-                  mod.version.patch,
-                  mod.version.tweak,
-                  status);
-      } else {
-        auto imported = ImportModuleDiscoverFunc(path, name);
-        status = imported(&handle());
-        m_internal->imports.push_back(std::move(imported));
-
-        auto& mod = *m_modules[type];
-
-        parac_log(PARAC_LOADER,
-                  PARAC_DEBUG,
-                  "{} named '{}' version {}.{}.{}:{} loaded from (generic) "
-                  "SO-path {} with status {}",
-                  parac_module_type_to_str(type),
-                  mod.name,
-                  mod.version.major,
-                  mod.version.minor,
-                  mod.version.patch,
-                  mod.version.tweak,
-                  (path / name).string(),
-                  status);
-      }
-
-      return true;
-    } catch(boost::system::system_error& err) {
-      (void)err;
-      // Ignoring failed loads, because multiple locations are tried.
       parac_log(PARAC_LOADER,
-                PARAC_TRACE,
-                "{} could not be loaded! Message: {}",
+                PARAC_DEBUG,
+                "{} named '{}' version {}.{}.{}:{} loaded from statically "
+                "linked library with status {}",
                 parac_module_type_to_str(type),
-                err.what());
+                mod.name,
+                mod.version.major,
+                mod.version.minor,
+                mod.version.patch,
+                mod.version.tweak,
+                status);
+    } else {
+      auto imported{ OpenDynamicLibrary(path, name) };
+      if(!imported || !(*imported)) {
+        continue;
+      }
+      status = imported->discover(&handle());
+      m_internal->imports.push_back(std::move(imported));
+
+      auto& mod = *m_modules[type];
+
+      parac_log(PARAC_LOADER,
+                PARAC_DEBUG,
+                "{} named '{}' version {}.{}.{}:{} loaded from (generic) "
+                "SO-path {} with status {}",
+                parac_module_type_to_str(type),
+                mod.name,
+                mod.version.major,
+                mod.version.minor,
+                mod.version.patch,
+                mod.version.tweak,
+                (path / name).string(),
+                status);
     }
+
+    return true;
   }
 
   parac_log(PARAC_LOADER,
