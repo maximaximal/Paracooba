@@ -4,6 +4,7 @@ set(PARACOOBA_SOLVER_QBF_SRCS
 
     ${CMAKE_CURRENT_SOURCE_DIR}/generic_qbf_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/depqbf_handle.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/parser_qbf.cpp
     )
 
 parac_module(parac_solver_qbf "${PARACOOBA_SOLVER_QBF_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
@@ -19,22 +20,23 @@ set_property(TARGET parac_solver_qbf_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIE
 #endif()
 
 if(ENABLE_TESTS)
-    #add_library(parac_solver_qbf_test SHARED
-    #    )
+    add_library(parac_solver_qbf_test SHARED
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_qbf_parser.cpp
+        )
 
-    #if(${CMAKE_VERSION} VERSION_GREATER "3.11.0")
-    #    target_link_libraries(parac_solver_qbf_test PRIVATE parac_solver_qbf_obj)
-    #else()
-    #    target_link_libraries(parac_solver_qbf_test PRIVATE parac_solver_qbf)
-    #endif()
+    if(${CMAKE_VERSION} VERSION_GREATER "3.11.0")
+        target_link_libraries(parac_solver_qbf_test PRIVATE parac_solver_qbf_obj)
+    else()
+        target_link_libraries(parac_solver_qbf_test PRIVATE parac_solver_qbf)
+    endif()
 
-    #target_link_libraries(parac_solver_qbf_test PRIVATE fmt cereal)
+    target_link_libraries(parac_solver_qbf_test PRIVATE fmt)
 
-    #target_link_libraries(parac_solver_qbf_test PUBLIC parac_common Catch2::Catch2 )
+    target_link_libraries(parac_solver_qbf_test PUBLIC parac_common Catch2::Catch2 )
 
-    #target_include_directories(parac_solver_qbf_test PRIVATE ${Boost_INCLUDE_DIRS})
+    target_include_directories(parac_solver_qbf_test PRIVATE ${Boost_INCLUDE_DIRS})
 
-    #target_compile_features(parac_solver_qbf_test PUBLIC cxx_std_17)
+    target_compile_features(parac_solver_qbf_test PUBLIC cxx_std_17)
 
-    #set(test_libs ${test_libs} parac_solver_qbf_test CACHE INTERNAL "Libraries for Tests")
+    set(test_libs ${test_libs} parac_solver_qbf_test CACHE INTERNAL "Libraries for Tests")
 endif()

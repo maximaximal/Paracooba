@@ -132,4 +132,12 @@ ApplyFuncToParacTypeUnion(parac_type t, parac_type_union u, Functor f) {
 }
 #endif
 
+#ifdef __FreeBSD__
+#define PARAC_DEFAULT_TEMP_PATH "/tmp"
+#endif
+
+#ifdef __linux__
+#define PARAC_DEFAULT_TEMP_PATH "/dev/shm"
+#endif
+
 #endif

@@ -10,6 +10,7 @@
 #include "paracooba/common/timeout.h"
 #include "paracooba/communicator/communicator.h"
 #include "paracooba/solver/cube_iterator.hpp"
+#include "paracooba/util/string_to_file.hpp"
 
 #include <cadical/cadical.hpp>
 #include <cassert>
@@ -98,23 +99,18 @@ CaDiCaLHandle::solver() {
 
 std::pair<parac_status, std::string>
 CaDiCaLHandle::prepareString(std::string_view iCNF) {
-  auto h = std::hash<std::string_view>{}(iCNF);
-  std::string path =
-    PARAC_DEFAULT_TEMP_PATH "/paracooba-tmp-dimacs-file-" + std::to_string(h);
+  auto [status, path] = StringToFile(iCNF);
+
   parac_log(PARAC_SOLVER,
             PARAC_TRACE,
-            "Writing temp file \"{}\" in order to parse DIMACS from string.",
+            "Wrote temp file \"{}\" in order to parse DIMACS from string.",
             path);
-  {
-    std::ofstream out(path);
-    out << iCNF;
-    out.flush();
-  }
+
   m_internal->pathToDelete = path;
   if(m_internal->handle.input_file) {
     m_internal->handle.input_file = m_internal->pathToDelete.c_str();
   }
-  return { PARAC_OK, path };
+  return { status, path };
 }
 
 parac_status
