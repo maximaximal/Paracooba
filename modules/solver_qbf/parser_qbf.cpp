@@ -236,7 +236,7 @@ Parser::add_clause() {
 Parser::Parser() {}
 Parser::~Parser() {
   if(m_fileToDelete) {
-    // unlink(m_fileToDelete->c_str());
+    unlink(m_fileToDelete->c_str());
   }
 }
 
