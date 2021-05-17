@@ -5,6 +5,7 @@ set(PARACOOBA_SOLVER_QBF_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/generic_qbf_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/depqbf_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/parser_qbf.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/qbf_parser_task.cpp
     )
 
 parac_module(parac_solver_qbf "${PARACOOBA_SOLVER_QBF_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
@@ -14,6 +15,8 @@ get_target_property(CEREAL_INCLUDE_DIRS cereal INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_solver_qbf_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
 
 set_property(TARGET parac_solver_qbf_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES cereal)
+
+set_target_properties(parac_solver_qbf PROPERTIES OUTPUT_NAME "parac_solver")
 
 #if(STATIC_BUILDS)
 #    target_link_libraries(parac_solver_qbf_static PRIVATE )

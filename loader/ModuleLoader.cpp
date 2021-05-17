@@ -12,6 +12,7 @@
 #include <boost/dll.hpp>
 #include <dlfcn.h>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/system/system_error.hpp>
 
@@ -69,11 +70,23 @@ OpenDynamicLibrary(boost::filesystem::path path, const std::string& name) {
 
 struct PathSource : public boost::asio::coroutine {
   PathSource(parac_module_type type)
-    : type(type) {}
+    : type(type) {
+    std::string envvar =
+      "PARAC_MODULEPATH_" +
+      boost::to_upper_copy<std::string>(parac_module_type_to_str(type));
+    const char* path = getenv(envvar.c_str());
+    if(path) {
+      envvar_path = path;
+    }
+  }
 
 #include <boost/asio/yield.hpp>
   boost::filesystem::path operator()() {
     reenter(this) {
+      if(envvar_path != "") {
+        yield return envvar_path;
+      }
+
       yield return boost::filesystem::current_path();
       yield return boost::filesystem::current_path() /
         parac_module_type_to_str(type);
@@ -94,6 +107,7 @@ struct PathSource : public boost::asio::coroutine {
 #include <boost/asio/unyield.hpp>
 
   parac_module_type type;
+  std::string envvar_path = "";
 };
 
 namespace paracooba {
