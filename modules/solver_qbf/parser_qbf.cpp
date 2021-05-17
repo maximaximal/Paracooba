@@ -1,6 +1,8 @@
 #include "parser_qbf.hpp"
 #include "paracooba/common/path.h"
+#include "paracooba/common/status.h"
 
+#include <limits>
 #include <paracooba/common/log.h>
 #include <paracooba/util/string_to_file.hpp>
 #include <paracooba/util/unique_file.hpp>
@@ -19,26 +21,28 @@ msg(const char* fmt, ...) {
   va_list ap;
   char buffer[4096];
   va_start(ap, fmt);
-  std::snprintf(buffer, 4096, fmt, ap);
+  std::vsnprintf(buffer, 4096, fmt, ap);
   va_end(ap);
   parac_log(PARAC_SOLVER, PARAC_TRACE, "Parser message: {}", buffer);
 }
 
 // Be more efficient with file reading through using unlocked IO.
 
-#if !defined(ENABLE_UNLOCKED) and                             \
+#if !defined(DISABLE_UNLOCKED) and                            \
   ((_POSIX_C_SOURCE >= 199309L or defined(_POSIX_C_SOURCE) or \
     defined(_SVID_SOURCE) or defined(_BSD_SOURCE)))
 #define USE_UNLOCKED
 #endif
 
 #ifdef USE_UNLOCKED
-#define getc(FILE) getc_unlocked(FILE)
+#define getc(FILE) fgetc_unlocked(FILE)
 #endif
 
 /* Parsing code from Armin Biere's Bloqqer */
 const char*
 Parser::parse(FILE* ifile) {
+  assert(ifile);
+
   int ch, m, n, i, c, q, lit, sign;
 
   lineno = 1;
@@ -95,8 +99,9 @@ SKIP:
   if(!isdigit(ch))
     goto HERR;
   m = ch - '0';
-  while(isdigit(ch = getc(ifile)))
+  while(isdigit(ch = getc(ifile))) {
     m = 10 * m + (ch - '0');
+  }
   if(ch != ' ')
     goto HERR;
   while((ch = getc(ifile)) == ' ')
@@ -202,7 +207,15 @@ DONE:
 
 void
 Parser::enlarge_lits() {
-  int new_size_lits = size_lits ? 2 * size_lits : 1;
+  msg("Enlarge lits from %d", size_lits);
+  auto max = std::numeric_limits<decltype(size_lits)>::max() - 1;
+  assert(size_lits < max);
+  int64_t new_size = size_lits;
+  new_size = new_size ? 2 * new_size : 1;
+  if(new_size > max) {
+    new_size = max;
+  }
+  int new_size_lits = new_size;
   RSZ(lits, new_size_lits);
   size_lits = new_size_lits;
 }
@@ -210,7 +223,7 @@ Parser::enlarge_lits() {
 void
 Parser::push_literal(int lit) {
   assert(abs(lit) <= num_vars);
-  if(size_lits + 1 >= num_lits)
+  if(num_lits + 1 >= size_lits)
     enlarge_lits();
   lits[num_lits++] = lit;
 }
@@ -224,7 +237,7 @@ Parser::add_quantifier(int lit) {
 void
 Parser::add_clause() {
   assert(lits.size() > 0);
-  if(static_cast<int>(lits.size()) >= num_lits + 1)
+  if(static_cast<int>(lits.size()) <= num_lits + 1)
     enlarge_lits();
   lits[num_lits++] = 0;
   std::copy(
@@ -236,29 +249,53 @@ Parser::add_clause() {
 Parser::Parser() {}
 Parser::~Parser() {
   if(m_fileToDelete) {
+    parac_log(
+      PARAC_SOLVER, PARAC_TRACE, "Delete temp file \"{}\".", *m_fileToDelete);
     unlink(m_fileToDelete->c_str());
   }
 }
 
 parac_status
-Parser::parse(std::string_view input) {
+Parser::prepare(std::string_view input) {
   parac_status status;
 
   if((status = processInputToPath(input)) != PARAC_OK)
     return status;
 
+  return status;
+}
+
+parac_status
+Parser::parse() {
+
+  parac_log(
+    PARAC_SOLVER, PARAC_LOCALERROR, "Starting parsing of file \"{}\".", m_path);
+
   parac::util::UniqueFile f{ fopen(m_path.c_str(), "r") };
+
+  if(!f.get()) {
+    return PARAC_FILE_NOT_FOUND_ERROR;
+  }
 
   auto F = f.get();
 #ifdef USE_UNLOCKED
   flockfile(F);
 #endif
 
-  parse(F);
+  const char* status = parse(F);
 
 #ifdef USE_UNLOCKED
   funlockfile(F);
 #endif
+
+  if(status != nullptr) {
+    parac_log(PARAC_SOLVER,
+              PARAC_LOCALERROR,
+              "Cannot parse file \"{}\"! Error: {}",
+              m_path,
+              status);
+    return PARAC_PARSE_ERROR;
+  }
 
   return PARAC_OK;
 }
@@ -284,7 +321,14 @@ Parser::processInputToPath(std::string_view input) {
               m_path);
   } else {
     m_path = input;
+
+    parac_log(PARAC_SOLVER,
+              PARAC_TRACE,
+              "QBF Parser will work on directly given file \"{}\".",
+              m_path);
   }
+
+  assert(m_path != "");
 
   return PARAC_OK;
 }

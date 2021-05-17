@@ -31,10 +31,12 @@ class Parser {
   using Literals = std::vector<Literal>;
   using Quantifiers = std::vector<Quantifier>;
 
-  parac_status parse(std::string_view input);
+  parac_status prepare(std::string_view input);
+  parac_status parse();
 
   const Literals& literals() const { return m_literals; }
   const Quantifiers& quantifiers() const { return m_quantifiers; }
+  const std::string& path() const { return m_path; }
 
   private:
   struct Internal;

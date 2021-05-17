@@ -8,8 +8,8 @@
 #include <paracooba/common/message_kind.h>
 #include <paracooba/common/noncopy_ostream.hpp>
 #include <paracooba/common/path.h>
-#include <paracooba/common/task_store.h>
 #include <paracooba/common/task.h>
+#include <paracooba/common/task_store.h>
 #include <paracooba/module.h>
 #include <paracooba/runner/runner.h>
 #include <paracooba/solver/solver.h>
@@ -21,6 +21,9 @@
 
 #include <parac_solver_qbf_export.h>
 
+#include "paracooba/common/status.h"
+#include "parser_qbf.hpp"
+#include "qbf_parser_task.hpp"
 #include "solver_qbf_config.hpp"
 
 #include <boost/iostreams/device/array.hpp>
@@ -34,7 +37,7 @@
 #define SOLVER_VERSION_PATCH 0
 #define SOLVER_VERSION_TWEAK 0
 
-using parac::solver_qbf::SolverConfig;
+using namespace parac::solver_qbf;
 
 struct SolverInstance;
 using SolverInstanceList = std::list<SolverInstance>;
@@ -90,7 +93,10 @@ serialize_solver_config_into_msg(parac_module_solver_instance* instance,
 }
 
 static parac_status
-parse_formula_file(parac_module& mod, const char* file, parac_id originatorId) {
+parse_formula_file(parac_module& mod,
+                   const char* file,
+                   parac_id originatorId,
+                   QBFParserTask::FinishedCB finishedCB) {
   assert(mod.handle);
   assert(file);
 
@@ -103,6 +109,37 @@ parse_formula_file(parac_module& mod, const char* file, parac_id originatorId) {
   if(mod.handle->modules[PARAC_MOD_RUNNER]) {
     useLocalWorkers =
       mod.handle->modules[PARAC_MOD_RUNNER]->runner->available_worker_count > 0;
+  }
+
+  if(useLocalWorkers) {
+    parac_task* task =
+      task_store.new_task(&task_store,
+                          nullptr,
+                          parac_path{ .rep = PARAC_PATH_PARSER },
+                          originatorId);
+    if(!task) {
+      return PARAC_GENERIC_ERROR;
+    }
+    parac_log(PARAC_SOLVER,
+              PARAC_DEBUG,
+              "Create QBFParserTask for formula in file \"{}\" from node {}.",
+              file[0] == ':' ? "(inline - given on CLI)" : file,
+              originatorId);
+
+    QBFParserTask* parserTask =
+      new QBFParserTask(*mod.handle, *task, file, std::move(finishedCB));
+
+    task_store.assess_task(&task_store, task);
+  } else {
+    std::unique_ptr<Parser> parser = std::make_unique<Parser>();
+    parac_status status = parser->prepare(file);
+    if(status != PARAC_OK) {
+      finishedCB(status, nullptr);
+      return status;
+    }
+    status = parser->parse();
+    finishedCB(status, nullptr);
+    return status;
   }
 
   return PARAC_OK;
@@ -126,7 +163,33 @@ initiate_root_solver_on_file(parac_module& mod,
   assert(mod.handle->modules[PARAC_MOD_RUNNER]->runner);
   auto& runner = *mod.handle->modules[PARAC_MOD_RUNNER]->runner;
 
-  return PARAC_OK;
+  auto parserDone = [&mod, &task_store, originatorId, instance](
+                      parac_status status,
+                      std::unique_ptr<Parser> parsedFormula) {
+    if(status != PARAC_OK) {
+      parac_log(PARAC_SOLVER,
+                PARAC_FATAL,
+                "Parsing of formula \"{}\" failed with status {}! Exiting.",
+                mod.handle->input_file,
+                status);
+      mod.handle->request_exit(mod.handle);
+      return;
+    }
+
+    SolverUserdata* solverUserdata = static_cast<SolverUserdata*>(mod.userdata);
+    assert(solverUserdata);
+
+    SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
+    i->task_store = &task_store;
+    i->config = solverUserdata->config;
+    i->configured = true;
+
+    // Start root solver.
+  };
+
+  parac_status status = parse_formula_file(mod, file, originatorId, parserDone);
+
+  return status;
 }
 
 static parac_status
@@ -145,7 +208,38 @@ initiate_peer_solver_on_file(
   assert(broker.task_store);
   auto& task_store = *broker.task_store;
 
-  return parse_formula_file(mod, file, originatorId);
+  auto parserDone =
+    [&mod, &task_store, originatorId, instance, cb_userdata, cb](
+      parac_status status, std::unique_ptr<Parser> parsedFormula) {
+      if(status != PARAC_OK) {
+        parac_log(PARAC_SOLVER,
+                  PARAC_FATAL,
+                  "Parsing of formula \"{}\" failed with status {}! Exiting.",
+                  mod.handle->input_file,
+                  status);
+        mod.handle->request_exit(mod.handle);
+        return;
+      }
+
+      parac_log(
+        PARAC_SOLVER,
+        PARAC_TRACE,
+        "Parsing of formula \"{}\" finished! Now sending status to peers "
+        "and waiting for tasks.",
+        parsedFormula->path(),
+        status);
+
+      SolverUserdata* solverUserdata =
+        static_cast<SolverUserdata*>(mod.userdata);
+      assert(solverUserdata);
+
+      SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
+      i->task_store = &task_store;
+
+      cb(instance, cb_userdata, status);
+    };
+
+  return parse_formula_file(mod, file, originatorId, parserDone);
 }
 
 static parac_status
@@ -359,6 +453,11 @@ init(parac_module* mod) {
       assert(thisNode);
       thisNode->solver_instance = instance;
     }
+
+    parac_log(PARAC_SOLVER,
+              PARAC_TRACE,
+              "QBF Solver received input file {}, starting root.",
+              mod->handle->input_file);
 
     status = initiate_root_solver_on_file(
       *mod, instance, mod->handle->input_file, mod->handle->id);
