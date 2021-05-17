@@ -71,7 +71,7 @@ class Parser {
     int lmark, lmark2;             /* marks for lookup */
     int mark, mark2, mark3, mark4; /* primary mark flag */
     int submark;                   /* second subsumption mark flag */
-    int mapped;                    /* index mapped to */
+    int mapped = 0;                /* index mapped to */
     int fixed;                     /* assignment */
     int score, pos;                /* for elimination priority queue */
     int expcopy;                   /* copy in expansion */
@@ -118,11 +118,12 @@ class Parser {
   int nline = 0, szline = 0;
   int remaining = 0;
   int num_vars = 0, num_lits = 0;
-  int size_lits;
+  int size_lits = 0;
   int remaining_clauses_to_parse = 0;
-  int orig_clauses;
-  int orig_num_vars;
-  int units, unates, unets, zombies, eliminated, mapped, outermost_blocked;
+  int orig_clauses = 0;
+  int orig_num_vars = 0;
+  int units = 0, unates = 0, unets = 0, zombies = 0, eliminated = 0, mapped = 0,
+      outermost_blocked = 0;
   int assigned_scope = -1;
   std::string line;
 

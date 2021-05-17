@@ -1,7 +1,11 @@
 #include "parser_qbf.hpp"
+#include "paracooba/common/path.h"
 
 #include <paracooba/common/log.h>
 #include <paracooba/util/string_to_file.hpp>
+#include <paracooba/util/unique_file.hpp>
+
+#include <iostream>
 
 namespace parac::solver_qbf {
 
@@ -407,8 +411,12 @@ Parser::add_clause() {
     first_clause = &clause;
   last_clause = &clause;
 
-  for(int i = 0; i < num_lits; i++)
+  m_literals.reserve(m_literals.size() + num_lits + 1);
+  for(int i = 0; i < num_lits; i++) {
     add_node(&clause, &clause.nodes[i], lits[i]);
+    m_literals.emplace_back(lits[i]);
+  }
+  m_literals.emplace_back(0);
 
   num_lits = 0;
 }
@@ -416,7 +424,7 @@ Parser::add_clause() {
 Parser::Parser() {}
 Parser::~Parser() {
   if(m_fileToDelete) {
-    unlink(m_fileToDelete->c_str());
+    // unlink(m_fileToDelete->c_str());
   }
 }
 
@@ -427,6 +435,9 @@ Parser::parse(std::string_view input) {
   if((status = processInputToPath(input)) != PARAC_OK)
     return status;
 
+  parac::util::UniqueFile f{ fopen(m_path.c_str(), "r") };
+  parse(f.get());
+
   return PARAC_OK;
 }
 
@@ -436,6 +447,7 @@ Parser::processInputToPath(std::string_view input) {
     return PARAC_INVALID_PATH_ERROR;
 
   if(input[0] == ':') {
+    input.remove_prefix(1);
     auto [status, tmp_path] = StringToFile(input);
     if(status != PARAC_OK) {
       return status;
