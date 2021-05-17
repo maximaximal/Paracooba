@@ -9,6 +9,8 @@
 
 namespace parac::solver_qbf {
 
+// Todo: Integrate automatic archive reading
+
 static void
 msg(const char* fmt, ...) {
   if(!parac_log_enabled(PARAC_SOLVER, PARAC_TRACE))
@@ -22,15 +24,22 @@ msg(const char* fmt, ...) {
   parac_log(PARAC_SOLVER, PARAC_TRACE, "Parser message: {}", buffer);
 }
 
-static int
-sign(int lit) {
-  return lit < 0 ? -1 : 1;
-}
+// Be more efficient with file reading through using unlocked IO.
+
+#if !defined(ENABLE_UNLOCKED) and                             \
+  ((_POSIX_C_SOURCE >= 199309L or defined(_POSIX_C_SOURCE) or \
+    defined(_SVID_SOURCE) or defined(_BSD_SOURCE)))
+#define USE_UNLOCKED
+#endif
+
+#ifdef USE_UNLOCKED
+#define getc(FILE) getc_unlocked(FILE)
+#endif
 
 /* Parsing code from Armin Biere's Bloqqer */
 const char*
 Parser::parse(FILE* ifile) {
-  int ch, m, n, i, j, c, q, lit, sign;
+  int ch, m, n, i, c, q, lit, sign;
 
   lineno = 1;
   i = c = q = 0;
@@ -106,30 +115,6 @@ SKIP:
   msg("found header 'p cnf %d %d'", m, n);
   remaining = num_vars = m;
   remaining_clauses_to_parse = n;
-  NEWN(vars, num_vars + 1);
-  if(num_vars)
-    init_variables(1);
-  NEWN(dfsi, 2 * num_vars + 1);
-  dfsi_ptr = dfsi.data() + num_vars;
-  NEWN(mindfsi, 2 * num_vars + 1);
-  mindfsi_ptr = mindfsi.data() + num_vars;
-  orig_num_vars = num_vars;
-  NEWN(repr, 2 * num_vars + 1);
-  repr_ptr = repr.data() + num_vars;
-  NEWN(subst_vals, num_vars + 1);
-  for(j = 0; j < num_vars + 1; j++) {
-    subst_vals[j] = j;
-  }
-  NEWN(fwsigs, num_vars + 1);
-  NEWN(bwsigs, num_vars + 1);
-  NEWN(anchors, num_vars + 1);
-  NEWN(trail, num_vars);
-  NEWN(clause_stack, num_vars);
-  clause_stack_top = 0;
-  clause_stack_size = num_vars;
-  top_of_trail = next_on_trail = trail.data();
-  NEWN(schedule, num_vars);
-  assert(!size_schedule);
 NEXT:
   ch = getc(ifile);
   if(ch == '\n') {
@@ -149,8 +134,6 @@ NEXT:
     if(!force && i < n)
       return "clauses missing";
     orig_clauses = i;
-    if(!q && !c)
-      init_implicit_scope();
     goto DONE;
   }
   if(ch == '-') {
@@ -193,11 +176,6 @@ NEXT:
     return "too many clauses";
   if(q) {
     if(lit) {
-      if(sign < 0)
-        return "negative literal quantified";
-      if(lit2scope(lit)) {
-        return "variable quantified twice";
-      }
       lit *= q;
       add_quantifier(lit);
       if(q > 0)
@@ -207,9 +185,6 @@ NEXT:
     } else
       q = 0;
   } else {
-    if(!q && !c) {
-      init_implicit_scope();
-    }
     if(lit)
       lit *= sign, c++;
     else
@@ -217,114 +192,12 @@ NEXT:
     if(lit)
       push_literal(lit);
     else {
-      if(!empty_clause) {
-        add_clause();
-        if(empty_clause) {
-          orig_clauses = i;
-          goto DONE;
-        }
-      } else {
-        num_lits = 0;
-      }
+      add_clause();
     }
   }
   goto NEXT;
 DONE:
   return 0;
-}
-
-Parser::Var*
-Parser::lit2var(int lit) {
-  assert(lit && abs(lit) <= num_vars);
-  return &vars[abs(lit)];
-}
-
-Parser::Occ*
-Parser::lit2occ(int lit) {
-  Var* v = lit2var(lit);
-  return v->occs + (lit < 0);
-}
-
-Parser::Scope*
-Parser::lit2scope(int lit) {
-  return lit2var(lit)->scope;
-}
-
-void
-Parser::add_var(int idx, Scope* scope) {
-  Var* v;
-  assert(0 < idx && idx <= num_vars);
-  v = lit2var(idx);
-  assert(!v->scope);
-  v->scope = scope;
-  v->next = NULL;
-  v->prev = scope->last;
-
-  if(scope->last)
-    scope->last->next = v;
-  else
-    scope->first = v;
-  scope->last = v;
-  assert(v->tag == FREE);
-  scope->free++;
-}
-
-void
-Parser::init_variables(int start) {
-  int i;
-  assert(0 < start && start <= num_vars);
-  for(i = start; i <= num_vars; i++) {
-    Var* v = &vars[i];
-    v->pos = -1;
-    v->mark = 0;
-    v->mark2 = v->mark3 = v->mark4 = 0;
-    v->mapped = ++mapped;
-    assert(mapped == i);
-  }
-  assert(mapped == num_vars);
-}
-
-void
-Parser::add_outer_most_scope(void) {
-  outer_most_scope = scopes.malloc();
-  outer_most_scope->type = 1;
-  inner_most_scope = outer_most_scope;
-}
-
-void
-Parser::init_implicit_scope(void) {
-  Var* v;
-  int idx;
-  int count = 0;
-  Var* p;
-
-  assert(!implicit_vars);
-  implicit_vars = num_vars - universal_vars - existential_vars;
-  existential_vars += implicit_vars;
-  assert(implicit_vars >= 0);
-  msg("%d universal, %d existential variables (%d implicit)",
-      universal_vars,
-      existential_vars,
-      implicit_vars);
-  if(implicit_vars > 0) {
-
-    if(!outer_most_scope)
-      add_outer_most_scope();
-    for(v = vars.data() + 1; v <= vars.data() + num_vars; v++)
-      if(!v->scope) {
-        idx = v - vars.data();
-        add_var(idx, outer_most_scope);
-      }
-  }
-
-  for(p = outer_most_scope->first; p; p = p->next) {
-    count++;
-  }
-
-  if(count == 0)
-    assigned_scope = 1;
-  else
-    assigned_scope = 0;
 }
 
 void
@@ -337,86 +210,25 @@ Parser::enlarge_lits() {
 void
 Parser::push_literal(int lit) {
   assert(abs(lit) <= num_vars);
-  if(size_lits == num_lits)
+  if(size_lits + 1 >= num_lits)
     enlarge_lits();
   lits[num_lits++] = lit;
 }
 
 void
 Parser::add_quantifier(int lit) {
-  Scope* scope;
-  if(!outer_most_scope)
-    add_outer_most_scope();
-  if(inner_most_scope->type != sign(lit)) {
-    scope = scopes.malloc();
-    scope->outer = inner_most_scope;
-    scope->type = sign(lit);
-    scope->order = inner_most_scope->order + 1;
-    scope->stretch = scope->order;
-    inner_most_scope->inner = scope;
-    inner_most_scope = scope;
-  } else
-    scope = inner_most_scope;
-  add_var(abs(lit), scope);
-}
-
-Parser::Sig
-Parser::lit2sig(int lit) {
-  return 1ull << ((100623947llu * (Parser::Sig)abs(lit)) & 63llu);
-}
-
-Parser::Sig
-Parser::sig_lits() {
-  Sig res = 0ull;
-  int i, lit;
-  for(i = 0; i < num_lits; i++) {
-    lit = lits[i];
-    res |= lit2sig(lit);
-  }
-  return res;
-}
-
-void
-Parser::add_node(Clause* clause, Node* node, int lit) {
-  Occ* occ;
-  assert(clause->nodes.data() <= node &&
-         node < clause->nodes.data() + clause->size);
-  node->clause = clause;
-  node->lit = lit;
-  node->next = NULL;
-  occ = lit2occ(lit);
-  node->prev = occ->last;
-  if(occ->last)
-    occ->last->next = node;
-  else
-    occ->first = node;
-  occ->last = node;
-  occ->count++;
+  m_quantifiers.emplace_back(Quantifier{
+    lit > 0 ? Quantifier::EXISTENTIAL : Quantifier::UNIVERSAL, abs(lit) });
 }
 
 void
 Parser::add_clause() {
-  Clause& clause = clauses.emplace_back();
-  clause.nodes.resize(num_lits);
-  last_clause = &clause;
-
-  clause.count = 1;
-  clause.size = num_lits;
-  clause.prev = last_clause;
-  clause.sig = sig_lits();
-
-  if(last_clause)
-    last_clause->next = &clause;
-  else
-    first_clause = &clause;
-  last_clause = &clause;
-
-  m_literals.reserve(m_literals.size() + num_lits + 1);
-  for(int i = 0; i < num_lits; i++) {
-    add_node(&clause, &clause.nodes[i], lits[i]);
-    m_literals.emplace_back(lits[i]);
-  }
-  m_literals.emplace_back(0);
+  assert(lits.size() > 0);
+  if(static_cast<int>(lits.size()) >= num_lits + 1)
+    enlarge_lits();
+  lits[num_lits++] = 0;
+  std::copy(
+    lits.begin(), lits.begin() + num_lits, std::back_inserter(m_literals));
 
   num_lits = 0;
 }
@@ -436,7 +248,17 @@ Parser::parse(std::string_view input) {
     return status;
 
   parac::util::UniqueFile f{ fopen(m_path.c_str(), "r") };
-  parse(f.get());
+
+  auto F = f.get();
+#ifdef USE_UNLOCKED
+  flockfile(F);
+#endif
+
+  parse(F);
+
+#ifdef USE_UNLOCKED
+  funlockfile(F);
+#endif
 
   return PARAC_OK;
 }

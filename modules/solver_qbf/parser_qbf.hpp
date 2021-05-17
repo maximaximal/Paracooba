@@ -18,16 +18,29 @@ class Parser {
   Parser();
   ~Parser();
 
+  struct Quantifier {
+    enum Type { EXISTENTIAL, UNIVERSAL };
+    Type type;
+    Literal lit;
+
+    constexpr bool operator==(const Quantifier& o) const {
+      return type == o.type && lit == o.lit;
+    }
+  };
+
   using Literals = std::vector<Literal>;
+  using Quantifiers = std::vector<Quantifier>;
 
   parac_status parse(std::string_view input);
 
   const Literals& literals() const { return m_literals; }
+  const Quantifiers& quantifiers() const { return m_quantifiers; }
 
   private:
   struct Internal;
 
-  std::vector<Literal> m_literals;
+  Literals m_literals;
+  Quantifiers m_quantifiers;
 
   std::string m_path;
   std::optional<std::string> m_fileToDelete;
@@ -35,6 +48,10 @@ class Parser {
   parac_status processInputToPath(std::string_view input);
 
   /* ================== PARSING ================== */
+  /* Parsing includes the complete bloqqer code, so optimizations can be added
+   * at a later stage. The parsed literals() and quantifiers() are always the
+   * result of a parsing operation. */
+
   typedef unsigned long long Sig;
   struct Clause;
   struct Node;
@@ -104,15 +121,6 @@ class Parser {
     std::vector<Node> nodes;            /* embedded literal nodes */
   };
 
-  struct Scope {
-    int type;          /* type>0 == existential, type<0 universal */
-    int order;         /* scope order: outer most = 0 */
-    int free;          /* remaining free variables */
-    int stretch;       /* stretches to this scope */
-    Var *first, *last; /* variable list */
-    Scope *outer, *inner;
-  };
-
   int lineno = 1;
   int universal_vars = 0, existential_vars = 0, implicit_vars = 0;
   int nline = 0, szline = 0;
@@ -127,44 +135,18 @@ class Parser {
   int assigned_scope = -1;
   std::string line;
 
-  using IntVec = std::vector<int>;
-
-  IntVec dfsi, mindfsi, repr, subst_vals, lits;
-  int *dfsi_ptr, *mindfsi_ptr, *repr_ptr;
-  std::vector<IntVec*> clause_stack;
-  int clause_stack_size, clause_stack_top;
-  std::vector<Anchor> anchors;
-  std::vector<Var> vars;
-  std::vector<Sig> fwsigs, bwsigs;
-  IntVec trail;
-  int *top_of_trail, *next_on_trail;
-  IntVec schedule;
-  int size_schedule;
-  Scope *inner_most_scope = nullptr, *outer_most_scope = nullptr;
-  Clause *first_clause, *last_clause, *empty_clause, *queue;
-
-  boost::object_pool<Scope> scopes;
+  Literals lits;
 
   std::list<Clause> clauses;
 
   bool force = false;
 
-  IntVec stack;
   const char* parse(FILE* ifile);
-  Var* lit2var(int lit);
-  Occ* lit2occ(int lit);
-  Scope* lit2scope(int lit);
-  void init_variables(int start);
-  void init_implicit_scope();
-  void add_outer_most_scope();
-  void add_var(int idx, Scope* scope);
   void push_literal(int lit);
   void enlarge_lits();
   void add_quantifier(int lit);
   void add_clause();
-  Sig lit2sig(int lit);
   Sig sig_lits();
-  void add_node(Clause* clause, Node* node, int lit);
 
   template<typename T>
   inline void NEWN(T& vec, size_t size) {
