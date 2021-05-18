@@ -275,7 +275,7 @@ MessageSendQueue::send(Entry&& e, bool resend) {
     std::unique_lock lock(m_queuedMutex);
 
     // ACKs already have a correct message number.
-    if(e.header.kind != PARAC_MESSAGE_ACK && !resend) {
+    if(kind != PARAC_MESSAGE_ACK && !resend) {
       e.header.number = m_messageNumber++;
       id = e.header.number;
     }
@@ -283,8 +283,8 @@ MessageSendQueue::send(Entry&& e, bool resend) {
     parac_log(PARAC_COMMUNICATOR,
               PARAC_TRACE,
               "Queuing message of kind {} with id {} to remote {}",
-              e.header.kind,
-              e.header.number,
+              kind,
+              id,
               m_remoteId);
 
     if(resend) {
@@ -292,8 +292,8 @@ MessageSendQueue::send(Entry&& e, bool resend) {
                 PARAC_TRACE,
                 "The message of kind {} with id {} to remote {} is a resend! "
                 "Last sent {}ms ago.",
-                e.header.kind,
-                e.header.number,
+                kind,
+                id,
                 m_remoteId,
                 std::chrono::duration_cast<std::chrono::milliseconds>(
                   std::chrono::steady_clock::now() - e.sent)
@@ -309,7 +309,7 @@ MessageSendQueue::send(Entry&& e, bool resend) {
     } else {
       // Successfully submitted to writer! Now it can be added to the service
       // message counter until it is popped or something else happens.
-      if(parac_message_kind_is_count_tracked(e.header.kind) && !resend) {
+      if(parac_message_kind_is_count_tracked(kind) && !resend) {
         ++m_trackedQueueSize;
         if(m_serviceKnowsAboutWrites) {
           m_service.addOutgoingMessageToCounter();
@@ -317,6 +317,7 @@ MessageSendQueue::send(Entry&& e, bool resend) {
       }
     }
   } else {
+    /* This message seems to be too spammy.
     parac_log(
       PARAC_COMMUNICATOR,
       PARAC_LOCALWARNING,
@@ -325,6 +326,7 @@ MessageSendQueue::send(Entry&& e, bool resend) {
       m_remoteId,
       id,
       kind);
+    */
     m_availableToSendTo = false;
   }
 }
