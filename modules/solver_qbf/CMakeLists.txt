@@ -10,18 +10,22 @@ set(PARACOOBA_SOLVER_QBF_SRCS
     )
 
 parac_module(parac_solver_qbf "${PARACOOBA_SOLVER_QBF_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
-#target_link_libraries(parac_solver_qbf PRIVATE )
+target_link_libraries(parac_solver_qbf PRIVATE libdepqbf)
 
 get_target_property(CEREAL_INCLUDE_DIRS cereal INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_solver_qbf_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
+
+get_target_property(DEPQBF_INCLUDE_DIRS libdepqbf INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(parac_solver_qbf_obj PRIVATE ${DEPQBF_INCLUDE_DIRS})
+add_dependencies(parac_solver_qbf_obj libdepqbf)
 
 set_property(TARGET parac_solver_qbf_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES cereal)
 
 set_target_properties(parac_solver_qbf PROPERTIES OUTPUT_NAME "parac_solver")
 
-#if(STATIC_BUILDS)
-#    target_link_libraries(parac_solver_qbf_static PRIVATE )
-#endif()
+if(STATIC_BUILDS)
+    target_link_libraries(parac_solver_qbf_static PRIVATE libdepqbf)
+endif()
 
 if(ENABLE_TESTS)
     add_library(parac_solver_qbf_test SHARED
@@ -36,7 +40,7 @@ if(ENABLE_TESTS)
 
     target_link_libraries(parac_solver_qbf_test PRIVATE fmt)
 
-    target_link_libraries(parac_solver_qbf_test PUBLIC parac_common Catch2::Catch2 )
+    target_link_libraries(parac_solver_qbf_test PUBLIC parac_common Catch2::Catch2 libdepqbf)
 
     target_include_directories(parac_solver_qbf_test PRIVATE ${Boost_INCLUDE_DIRS})
 

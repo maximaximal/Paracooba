@@ -1,6 +1,3 @@
-# CaDiCal as ExternalProject
-include(ExternalProject)
-
 set(CADICAL_SANITIZER_OPTIONS "")
 
 if(DEBUG_ENABLE_ADDRESS_SANITIZER)
