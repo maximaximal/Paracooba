@@ -46,13 +46,15 @@ parac_status
 QBFParserTask::work(parac_worker worker) {
   parac_log(PARAC_SOLVER,
             PARAC_TRACE,
-            "Starting work on parser task for QBF file \"{}\"",
-            m_parser->path());
+            "Starting work on parser task for QBF file \"{}\" on worker {}.",
+            m_parser->path(),
+            worker);
   parac_status status = m_parser->parse();
   parac_log(PARAC_SOLVER,
             PARAC_TRACE,
-            "Finished work on parser task for QBF file \"{}\"",
-            m_parser->path());
+            "Finished work on parser task for QBF file \"{}\" on worker {}",
+            m_parser->path(),
+            worker);
 
   if(m_finishedCB) {
     m_finishedCB(status, std::move(m_parser));

@@ -54,6 +54,7 @@ struct SolverInstance {
   SolverConfig config;
   parac_task_store* task_store = nullptr;
   SolverInstanceList::iterator it;
+  std::unique_ptr<Parser> parser;
 
   bool configured = false;
 
@@ -126,8 +127,7 @@ parse_formula_file(parac_module& mod,
               file[0] == ':' ? "(inline - given on CLI)" : file,
               originatorId);
 
-    QBFParserTask* parserTask =
-      new QBFParserTask(*mod.handle, *task, file, std::move(finishedCB));
+    new QBFParserTask(*mod.handle, *task, file, std::move(finishedCB));
 
     task_store.assess_task(&task_store, task);
   } else {
@@ -162,6 +162,8 @@ initiate_root_solver_on_file(parac_module& mod,
   assert(mod.handle->modules[PARAC_MOD_RUNNER]);
   assert(mod.handle->modules[PARAC_MOD_RUNNER]->runner);
   auto& runner = *mod.handle->modules[PARAC_MOD_RUNNER]->runner;
+  // Maybe use this later, was taken over from SAT solver module.
+  (void)runner;
 
   auto parserDone = [&mod, &task_store, originatorId, instance](
                       parac_status status,
@@ -183,6 +185,7 @@ initiate_root_solver_on_file(parac_module& mod,
     i->task_store = &task_store;
     i->config = solverUserdata->config;
     i->configured = true;
+    i->parser = std::move(parsedFormula);
 
     // Start root solver.
   };
@@ -235,6 +238,7 @@ initiate_peer_solver_on_file(
 
       SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
       i->task_store = &task_store;
+      i->parser = std::move(parsedFormula);
 
       cb(instance, cb_userdata, status);
     };

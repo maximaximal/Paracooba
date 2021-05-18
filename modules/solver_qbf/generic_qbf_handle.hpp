@@ -3,17 +3,21 @@
 #include <memory>
 #include <string>
 
+#include <paracooba/common/status.h>
+
+#include "qbf_types.hpp"
+
 namespace parac::solver_qbf {
+class Parser;
+
 class GenericSolverHandle {
   public:
   GenericSolverHandle();
-  ~GenericSolverHandle();
+  virtual ~GenericSolverHandle();
 
-  virtual std::unique_ptr<GenericSolverHandle> from_file(
-    const std::string& file_path);
+  virtual void assumeCube(const Cube& cube) = 0;
 
-  virtual std::unique_ptr<GenericSolverHandle> from_generic_handle(
-    GenericSolverHandle& handle);
+  virtual parac_status solve() = 0;
 
   private:
   std::string m_path;

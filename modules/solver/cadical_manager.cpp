@@ -166,8 +166,8 @@ CaDiCaLManager::CaDiCaLManager(parac_module& mod,
       m_parsedFormula->originatorId(),
       workers);
 
-    m_internal->solvers.resize(workers);
-    m_internal->borrowed.resize(workers);
+    ObjectManager<CaDiCaLHandle>::init(
+      workers, [this](size_t idx) { return createHandle(idx); });
 
     m_internal->learnedClausesApplicationStack.resize(workers);
     std::fill(m_internal->learnedClausesApplicationStack.begin(),
@@ -227,28 +227,43 @@ CaDiCaLManager::~CaDiCaLManager() {
 }
 
 CaDiCaLManager::CaDiCaLHandlePtr
-CaDiCaLManager::takeHandleForWorker(parac_worker worker) {
-  auto& s = m_internal->solvers;
-  auto& b = m_internal->borrowed;
+CaDiCaLManager::createHandle(size_t idx) {
+  parac_log(PARAC_SOLVER,
+            PARAC_DEBUG,
+            "Creating copy of root formula in file \"{}\" from {} for worker "
+            "{} because a "
+            "solver object was requested from CaDiCaLManager.",
+            m_parsedFormula->path(),
+            m_parsedFormula->originatorId(),
+            idx);
+  return std::make_unique<CaDiCaLHandle>(*m_parsedFormula);
+}
 
-  assert(worker < s.size());
-  assert(!b[worker]);
+SolverTask*
+CaDiCaLManager::createSolverTask(
+  parac_task& task,
+  std::shared_ptr<cubesource::Source> cubesource) {
+  std::unique_lock lock(Internal::solverTasksMutex);
+  auto& wrapper = Internal::solverTasks.emplace_front();
+  wrapper.t.init(*this, task, cubesource);
+  wrapper.it = Internal::solverTasks.begin();
+  return &wrapper.t;
+}
+void
+CaDiCaLManager::deleteSolverTask(SolverTask* task) {
+  assert(task);
+  Internal::SolverTaskWrapper* taskWrapper =
+    reinterpret_cast<Internal::SolverTaskWrapper*>(
+      reinterpret_cast<std::byte*>(task) -
+      offsetof(Internal::SolverTaskWrapper, t));
+  assert(taskWrapper);
+  std::unique_lock lock(Internal::solverTasksMutex);
+  Internal::solverTasks.erase(taskWrapper->it);
+}
 
-  b[worker] = true;
-
-  if(!s[worker]) {
-    parac_log(PARAC_SOLVER,
-              PARAC_DEBUG,
-              "Creating copy of root formula in file \"{}\" from {} for worker "
-              "{} because a "
-              "solver object was requested from CaDiCaLManager.",
-              m_parsedFormula->path(),
-              m_parsedFormula->originatorId(),
-              worker);
-    s[worker] = std::make_unique<CaDiCaLHandle>(*m_parsedFormula);
-  }
-
-  auto handle = std::move(s[worker]);
+CaDiCaLManager::CaDiCaLHandlePtrWrapper
+CaDiCaLManager::getHandleForWorker(parac_worker worker) {
+  auto handle = get(worker);
 
   // Check if there are new clauses to apply.
   if(m_internal->learnedClausesCount >
@@ -281,59 +296,6 @@ CaDiCaLManager::takeHandleForWorker(parac_worker worker) {
   }
 
   return handle;
-}
-void
-CaDiCaLManager::returnHandleFromWorker(CaDiCaLHandlePtr handle,
-                                       parac_worker worker) {
-  auto& s = m_internal->solvers;
-  auto& b = m_internal->borrowed;
-
-  assert(worker < s.size());
-  assert(b[worker]);
-
-  b[worker] = false;
-
-  s[worker] = std::move(handle);
-}
-
-SolverTask*
-CaDiCaLManager::createSolverTask(
-  parac_task& task,
-  std::shared_ptr<cubesource::Source> cubesource) {
-  std::unique_lock lock(Internal::solverTasksMutex);
-  auto& wrapper = Internal::solverTasks.emplace_front();
-  wrapper.t.init(*this, task, cubesource);
-  wrapper.it = Internal::solverTasks.begin();
-  return &wrapper.t;
-}
-void
-CaDiCaLManager::deleteSolverTask(SolverTask* task) {
-  assert(task);
-  Internal::SolverTaskWrapper* taskWrapper =
-    reinterpret_cast<Internal::SolverTaskWrapper*>(
-      reinterpret_cast<std::byte*>(task) -
-      offsetof(Internal::SolverTaskWrapper, t));
-  assert(taskWrapper);
-  std::unique_lock lock(Internal::solverTasksMutex);
-  Internal::solverTasks.erase(taskWrapper->it);
-}
-
-CaDiCaLManager::CaDiCaLHandlePtrWrapper::CaDiCaLHandlePtrWrapper(
-  CaDiCaLHandlePtr ptr,
-  CaDiCaLManager& mgr,
-  parac_worker worker)
-  : ptr(std::move(ptr))
-  , mgr(mgr)
-  , worker(worker) {}
-
-CaDiCaLManager::CaDiCaLHandlePtrWrapper::~CaDiCaLHandlePtrWrapper() {
-  mgr.returnHandleFromWorker(std::move(ptr), worker);
-}
-
-CaDiCaLManager::CaDiCaLHandlePtrWrapper
-CaDiCaLManager::getHandleForWorker(parac_worker worker) {
-  CaDiCaLHandlePtrWrapper wrapper(takeHandleForWorker(worker), *this, worker);
-  return wrapper;
 }
 
 void

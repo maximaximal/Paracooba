@@ -4,6 +4,7 @@
 
 #include <paracooba/common/types.h>
 #include <paracooba/solver/types.hpp>
+#include <paracooba/util/object_manager.hpp>
 
 struct parac_module;
 struct parac_task;
@@ -22,7 +23,7 @@ namespace cubesource {
 class Source;
 }
 
-class CaDiCaLManager {
+class CaDiCaLManager : private util::ObjectManager<CaDiCaLHandle> {
   public:
   using CaDiCaLHandlePtr = std::unique_ptr<CaDiCaLHandle>;
 
@@ -36,21 +37,8 @@ class CaDiCaLManager {
                                std::shared_ptr<cubesource::Source> cubesource);
   void deleteSolverTask(SolverTask* task);
 
-  struct CaDiCaLHandlePtrWrapper {
-    CaDiCaLHandlePtr ptr;
-    CaDiCaLManager& mgr;
-    parac_worker worker;
-
-    explicit CaDiCaLHandlePtrWrapper(CaDiCaLHandlePtr ptr,
-                                     CaDiCaLManager& mgr,
-                                     parac_worker worker);
-
-    CaDiCaLHandlePtrWrapper(CaDiCaLHandlePtrWrapper&& o) = default;
-    CaDiCaLHandlePtrWrapper(const CaDiCaLHandlePtrWrapper& o) = delete;
-    CaDiCaLHandlePtrWrapper(CaDiCaLHandlePtrWrapper& o) = delete;
-
-    ~CaDiCaLHandlePtrWrapper();
-  };
+  using CaDiCaLHandlePtrWrapper =
+    util::ObjectManager<CaDiCaLHandle>::PtrWrapper;
 
   CaDiCaLHandlePtrWrapper getHandleForWorker(parac_worker worker);
 
@@ -84,6 +72,8 @@ class CaDiCaLManager {
   private:
   struct Internal;
   std::unique_ptr<Internal> m_internal;
+
+  std::unique_ptr<CaDiCaLHandle> createHandle(size_t idx);
 
   parac_module& m_mod;
   CaDiCaLHandlePtr m_parsedFormula;
