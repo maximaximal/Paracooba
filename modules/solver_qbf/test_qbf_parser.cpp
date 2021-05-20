@@ -21,10 +21,10 @@ TEST_CASE("Parse a simple QBF Formula", "[solver_qbf]") {
 
   Parser::Quantifiers quantifiers = parser.quantifiers();
   Parser::Quantifiers quantifiersCheck = Parser::Quantifiers{
-    Parser::Quantifier{ Parser::Quantifier::UNIVERSAL, 1 },
-    Parser::Quantifier{ Parser::Quantifier::UNIVERSAL, 2 },
-    Parser::Quantifier{ Parser::Quantifier::EXISTENTIAL, 3 },
-    Parser::Quantifier{ Parser::Quantifier::EXISTENTIAL, 4 },
+    Parser::Quantifier{ -1 },
+    Parser::Quantifier{ -2 },
+    Parser::Quantifier{ 3 },
+    Parser::Quantifier{ 4 },
   };
 
   auto& lits = parser.literals();

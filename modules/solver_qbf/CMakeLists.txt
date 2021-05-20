@@ -6,7 +6,9 @@ set(PARACOOBA_SOLVER_QBF_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/depqbf_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/parser_qbf.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/qbf_parser_task.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/qbf_solver_task.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/qbf_solver_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/qbf_cube_source.cpp
     )
 
 parac_module(parac_solver_qbf "${PARACOOBA_SOLVER_QBF_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)

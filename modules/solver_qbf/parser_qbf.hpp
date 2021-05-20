@@ -20,11 +20,20 @@ class Parser {
 
   struct Quantifier {
     enum Type { EXISTENTIAL, UNIVERSAL };
-    Type type;
+
+    explicit Quantifier(Literal lit)
+      : lit(lit) {}
+    explicit Quantifier(Literal lit, Type t)
+      : lit(abs(lit) * (t == EXISTENTIAL ? 1 : -1)) {}
+
     Literal lit;
+    inline constexpr Type type() const {
+      return lit > 0 ? EXISTENTIAL : UNIVERSAL;
+    }
+    inline Literal alit() const { return abs(lit); }
 
     constexpr bool operator==(const Quantifier& o) const {
-      return type == o.type && lit == o.lit;
+      return type() == o.type() && lit == o.lit;
     }
   };
 
@@ -34,6 +43,7 @@ class Parser {
   parac_status prepare(std::string_view input);
   parac_status parse();
 
+  Literal highestLiteral() const { return m_highestLit; }
   const Literals& literals() const { return m_literals; }
   const Quantifiers& quantifiers() const { return m_quantifiers; }
   const std::string& path() const { return m_path; }
@@ -122,6 +132,8 @@ class Parser {
     Watch watch{ 0, nullptr, nullptr }; /* forward subsumption watch */
     std::vector<Node> nodes;            /* embedded literal nodes */
   };
+
+  Literal m_highestLit = 0;
 
   int lineno = 1;
   int universal_vars = 0, existential_vars = 0, implicit_vars = 0;

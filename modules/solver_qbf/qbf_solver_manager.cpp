@@ -9,10 +9,10 @@
 
 namespace parac::solver_qbf {
 QBFSolverManager::QBFSolverManager(parac_module& mod,
-                                   ParserPtr parser,
+                                   Parser& parser,
                                    SolverConfig& config)
   : m_mod(mod)
-  , m_parser(std::move(parser))
+  , m_parser(parser)
   , m_config(config) {
   uint32_t workers = 0;
 
@@ -22,7 +22,6 @@ QBFSolverManager::QBFSolverManager(parac_module& mod,
   }
 
   if(workers > 0) {
-    assert(m_parser);
     parac_log(
       PARAC_SOLVER,
       PARAC_DEBUG,
@@ -30,7 +29,7 @@ QBFSolverManager::QBFSolverManager(parac_module& mod,
       "{} "
       "for {} "
       "workers. Copy operation is deferred to when a solver is requested.",
-      m_parser->path(),
+      m_parser.path(),
       config.originatorId(),
       workers);
 
@@ -46,11 +45,23 @@ QBFSolverManager::QBFSolverManager(parac_module& mod,
 
 QBFSolverManager::~QBFSolverManager() {}
 
+QBFSolverManager::OM::PtrWrapper
+QBFSolverManager::get(parac_worker worker) {
+  return OM::get(worker);
+}
+
 std::unique_ptr<GenericSolverHandle>
 QBFSolverManager::createGenericSolverHandle(size_t idx) {
   if(m_config.useDepQBF()) {
-    return std::make_unique<DepQBFHandle>(*m_parser);
+    parac_log(
+      PARAC_SOLVER, PARAC_TRACE, "Create DepQBF Handle for worker {}!", idx);
+    return std::make_unique<DepQBFHandle>(m_parser);
   }
+  parac_log(PARAC_SOLVER,
+            PARAC_FATAL,
+            "Cannot make solver handle for worker {} because no solver was "
+            "selected to be used!",
+            idx);
   return nullptr;
 }
 }

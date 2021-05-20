@@ -14,10 +14,14 @@ class DepQBFHandle : public GenericSolverHandle {
   DepQBFHandle(const Parser& parser);
   virtual ~DepQBFHandle();
 
-  virtual void assumeCube(const Cube& cube);
+  virtual void assumeCube(const CubeIteratorRange& cube);
   virtual parac_status solve();
+  virtual void terminate();
 
   private:
+  const Parser& m_parser;
   std::unique_ptr<QDPLL, void (*)(QDPLL*)> m_qdpll;
+
+  void addParsedQDIMACS();
 };
 }

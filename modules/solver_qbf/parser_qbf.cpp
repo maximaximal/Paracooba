@@ -222,16 +222,21 @@ Parser::enlarge_lits() {
 
 void
 Parser::push_literal(int lit) {
-  assert(abs(lit) <= num_vars);
+  auto alit = abs(lit);
+
+  assert(alit <= num_vars);
   if(num_lits + 1 >= size_lits)
     enlarge_lits();
   lits[num_lits++] = lit;
+
+  if(alit > m_highestLit) {
+    m_highestLit = alit;
+  }
 }
 
 void
 Parser::add_quantifier(int lit) {
-  m_quantifiers.emplace_back(Quantifier{
-    lit > 0 ? Quantifier::EXISTENTIAL : Quantifier::UNIVERSAL, abs(lit) });
+  m_quantifiers.emplace_back(Quantifier(lit));
 }
 
 void

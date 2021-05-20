@@ -84,7 +84,21 @@ parac_task_init(parac_task* t);
 /** @brief Upholds the left and right split invariant and propagates SAT & UNSAT
  */
 parac_task_state
-parac_task_default_assess(struct parac_task* task);
+parac_task_default_assess(struct parac_task* t);
+
+/** @brief Makes task SAT if at least one child task is SAT. UNSAT only if both
+ * children are UNSAT.
+ *
+ * Same as default, but used in QBF solver port.
+ */
+parac_task_state
+parac_task_qbf_existential_assess(struct parac_task* t);
+
+/** @brief Makes task UNSAT if at least one child is UNSAT, makes SAT only if
+ * both children are SAT.
+ */
+parac_task_state
+parac_task_qbf_universal_assess(struct parac_task* t);
 
 /** @brief Specifies the default order between tasks.
  *
@@ -101,7 +115,8 @@ operator|(parac_task_state a, parac_task_state b) {
   return static_cast<parac_task_state>(static_cast<int>(a) |
                                        static_cast<int>(b));
 }
-inline parac_task_state operator&(parac_task_state a, parac_task_state b) {
+inline parac_task_state
+operator&(parac_task_state a, parac_task_state b) {
   return static_cast<parac_task_state>(static_cast<int>(a) &
                                        static_cast<int>(b));
 }

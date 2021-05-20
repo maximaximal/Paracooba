@@ -24,6 +24,8 @@
 #include "paracooba/common/status.h"
 #include "parser_qbf.hpp"
 #include "qbf_parser_task.hpp"
+#include "qbf_solver_manager.hpp"
+#include "qbf_solver_task.hpp"
 #include "solver_qbf_config.hpp"
 
 #include <boost/iostreams/device/array.hpp>
@@ -55,6 +57,7 @@ struct SolverInstance {
   parac_task_store* task_store = nullptr;
   SolverInstanceList::iterator it;
   std::unique_ptr<Parser> parser;
+  std::unique_ptr<QBFSolverManager> manager;
 
   bool configured = false;
 
@@ -186,8 +189,18 @@ initiate_root_solver_on_file(parac_module& mod,
     i->config = solverUserdata->config;
     i->configured = true;
     i->parser = std::move(parsedFormula);
+    i->manager = std::make_unique<QBFSolverManager>(mod, *i->parser, i->config);
 
     // Start root solver.
+    parac_task* root_task = task_store.new_task(
+      &task_store, nullptr, parac_path_unknown(), originatorId);
+    assert(root_task);
+    root_task->path = parac_path_root();
+    new QBFSolverTask(*mod.handle,
+                      *root_task,
+                      *i->manager,
+                      std::make_shared<cubesource::QuantifierTreeCubes>());
+    task_store.assess_task(&task_store, root_task);
   };
 
   parac_status status = parse_formula_file(mod, file, originatorId, parserDone);

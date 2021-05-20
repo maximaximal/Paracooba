@@ -21,8 +21,9 @@ class SolverConfig {
 
   parac_id originatorId() const { return m_originatorId; }
   bool useDepQBF() const { return m_useDepQBF; }
+  int64_t treeDepth() const { return m_treeDepth; }
 
-  enum class Entry { UseDepQBF, _COUNT };
+  enum class Entry { UseDepQBF, TreeDepth, _COUNT };
 
   private:
   parac_config_entry* m_config = nullptr;
@@ -30,12 +31,14 @@ class SolverConfig {
   parac_id m_originatorId = 0;
 
   bool m_useDepQBF = false;
+  uint64_t m_treeDepth;
 
   friend class cereal::access;
   template<class Archive>
   void serialize(Archive& ar) {
     ar(cereal::make_nvp("originatorId", m_originatorId),
-       cereal::make_nvp("useDepQBF", m_useDepQBF));
+       cereal::make_nvp("useDepQBF", m_useDepQBF),
+       cereal::make_nvp("treeDepth", m_treeDepth));
   }
 };
 std::ostream&

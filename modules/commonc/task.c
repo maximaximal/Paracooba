@@ -82,8 +82,34 @@ parac_task_result_packet_get_task_ptr(void* result) {
   return res->task_ptr;
 }
 
-PARAC_COMMON_EXPORT parac_task_state
-parac_task_default_assess(parac_task* t) {
+static bool
+existential_assess(parac_task* t) {
+  if(t->left_result == PARAC_SAT || t->right_result == PARAC_SAT) {
+    t->result = PARAC_SAT;
+    return true;
+  } else if(t->left_result == PARAC_UNSAT && t->right_result == PARAC_UNSAT) {
+    t->result = PARAC_UNSAT;
+    return true;
+  }
+  return false;
+}
+
+static bool
+universal_assess(parac_task* t) {
+  if(t->left_result == PARAC_UNSAT || t->right_result == PARAC_UNSAT) {
+    t->result = PARAC_UNSAT;
+    return true;
+  } else if(t->left_result == PARAC_SAT && t->right_result == PARAC_SAT) {
+    t->result = PARAC_SAT;
+    return true;
+  }
+  return false;
+}
+
+typedef bool (*assess_func)(parac_task*);
+
+static parac_task_state
+shared_assess(parac_task* t, assess_func a) {
   assert(t);
   assert(t->task_store);
 
@@ -95,17 +121,7 @@ parac_task_default_assess(parac_task* t) {
     if(t->state & PARAC_TASK_SPLITS_DONE) {
       t->state &= ~PARAC_TASK_WAITING_FOR_SPLITS;
 
-      bool notify = false;
-
-      // SAT & UNSAT propagation.
-      if(t->left_result == PARAC_SAT || t->right_result == PARAC_SAT) {
-        t->result = PARAC_SAT;
-        notify = true;
-      } else if(t->left_result == PARAC_UNSAT &&
-                t->right_result == PARAC_UNSAT) {
-        t->result = PARAC_UNSAT;
-        notify = true;
-      }
+      bool notify = a(t);
 
       if(notify && t->received_from) {
         notify_result(t);
@@ -118,6 +134,21 @@ parac_task_default_assess(parac_task* t) {
   }
 
   return t->state;
+}
+
+PARAC_COMMON_EXPORT parac_task_state
+parac_task_default_assess(parac_task* t) {
+  return shared_assess(t, existential_assess);
+}
+
+PARAC_COMMON_EXPORT parac_task_state
+parac_task_qbf_existential_assess(parac_task* t) {
+  return shared_assess(t, existential_assess);
+}
+
+PARAC_COMMON_EXPORT parac_task_state
+parac_task_qbf_universal_assess(parac_task* t) {
+  return shared_assess(t, universal_assess);
 }
 
 PARAC_COMMON_EXPORT void
