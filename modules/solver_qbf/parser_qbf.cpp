@@ -272,9 +272,8 @@ Parser::prepare(std::string_view input) {
 
 parac_status
 Parser::parse() {
-
   parac_log(
-    PARAC_SOLVER, PARAC_LOCALERROR, "Starting parsing of file \"{}\".", m_path);
+    PARAC_SOLVER, PARAC_TRACE, "Starting parsing of file \"{}\".", m_path);
 
   parac::util::UniqueFile f{ fopen(m_path.c_str(), "r") };
 
