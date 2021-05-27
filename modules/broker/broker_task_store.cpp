@@ -195,6 +195,26 @@ size_t
 TaskStore::size() const {
   return m_internal->tasks.size();
 }
+
+void
+TaskStore::default_terminate_task(parac_task* t) {
+  assert(t);
+  assert(t->task_store);
+  assert(t->task_store->userdata);
+
+  TaskStore* s = static_cast<TaskStore*>(t->task_store->userdata);
+  auto& i = *s->m_internal;
+
+  if(t->state & PARAC_TASK_WORKING || t->state & PARAC_TASK_OFFLOADED) {
+    return;
+  }
+
+  std::unique_lock lock(i.containerMutex);
+  t->state = PARAC_TASK_DONE;
+  t->result = PARAC_ABORTED;
+  s->assess_task(t);
+}
+
 parac_task*
 TaskStore::newTask(parac_task* parent_task,
                    parac_path new_path,
@@ -226,6 +246,8 @@ TaskStore::newTask(parac_task* parent_task,
   ++m_internal->tasksSize;
 
   manageAutoShutdownTimer();
+
+  task->terminate = default_terminate_task;
 
   return task;
 }
@@ -560,8 +582,8 @@ TaskStore::assess_task(parac_task* task) {
             task->path,
             task->pre_path_sorting_critereon,
             task->post_path_sorting_critereon,
-            task->state,
-            task->result,
+            static_cast<parac_task_state>(task->state),
+            static_cast<parac_status>(task->result),
             m_internal->tasksWaitingForWorkerQueueSize,
             m_internal->tasksSize);
 

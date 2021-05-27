@@ -49,7 +49,6 @@ SolverTask::init(CaDiCaLManager& manager,
   task.work = &static_work;
   task.serialize = &static_serialize;
   task.userdata = this;
-  task.terminate = &static_terminate;
   task.assess = &static_assess;
 
   task.free_userdata = [](parac_task* t) {
@@ -84,6 +83,7 @@ setTimeout(CaDiCaLManager& manager,
 
 parac_status
 SolverTask::work(parac_worker worker) {
+  m_task->terminate = &static_terminate;
 #ifndef NDEBUG
   // Ensure that this is only called once!
   assert(!m_working.exchange(true));

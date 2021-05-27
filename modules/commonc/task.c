@@ -82,10 +82,28 @@ parac_task_result_packet_get_task_ptr(void* result) {
   return res->task_ptr;
 }
 
+static void
+early_abort_task(parac_task* t) {
+  assert(t);
+  if(t->terminate)
+    t->terminate(t);
+}
+
 static bool
-existential_assess(parac_task* t) {
+existential_assess(parac_task* t, bool terminate_children) {
   if(t->left_result == PARAC_SAT || t->right_result == PARAC_SAT) {
     t->result = PARAC_SAT;
+
+    if(terminate_children) {
+      if(t->left_result == PARAC_SAT && t->right_child_ &&
+         !parac_task_state_is_done(t->right_child_->state)) {
+        early_abort_task(t->right_child_);
+      } else if(t->right_result == PARAC_SAT && t->left_child_ &&
+                !parac_task_state_is_done(t->left_child_->state)) {
+        early_abort_task(t->left_child_);
+      }
+    }
+
     return true;
   } else if(t->left_result == PARAC_UNSAT && t->right_result == PARAC_UNSAT) {
     t->result = PARAC_UNSAT;
@@ -95,9 +113,20 @@ existential_assess(parac_task* t) {
 }
 
 static bool
-universal_assess(parac_task* t) {
+universal_assess(parac_task* t, bool terminate_children) {
   if(t->left_result == PARAC_UNSAT || t->right_result == PARAC_UNSAT) {
     t->result = PARAC_UNSAT;
+
+    if(terminate_children) {
+      if(t->left_result == PARAC_UNSAT && t->right_child_ &&
+         !parac_task_state_is_done(t->right_child_->state)) {
+        early_abort_task(t->right_child_);
+      } else if(t->right_result == PARAC_UNSAT && t->left_child_ &&
+                !parac_task_state_is_done(t->left_child_->state)) {
+        early_abort_task(t->left_child_);
+      }
+    }
+
     return true;
   } else if(t->left_result == PARAC_SAT && t->right_result == PARAC_SAT) {
     t->result = PARAC_SAT;
@@ -106,10 +135,10 @@ universal_assess(parac_task* t) {
   return false;
 }
 
-typedef bool (*assess_func)(parac_task*);
+typedef bool (*assess_func)(parac_task*, bool);
 
 static parac_task_state
-shared_assess(parac_task* t, assess_func a) {
+shared_assess(parac_task* t, assess_func a, bool terminate_children) {
   assert(t);
   assert(t->task_store);
 
@@ -121,7 +150,7 @@ shared_assess(parac_task* t, assess_func a) {
     if(t->state & PARAC_TASK_SPLITS_DONE) {
       t->state &= ~PARAC_TASK_WAITING_FOR_SPLITS;
 
-      bool notify = a(t);
+      bool notify = a(t, terminate_children);
 
       if(notify && t->received_from) {
         notify_result(t);
@@ -138,17 +167,17 @@ shared_assess(parac_task* t, assess_func a) {
 
 PARAC_COMMON_EXPORT parac_task_state
 parac_task_default_assess(parac_task* t) {
-  return shared_assess(t, existential_assess);
+  return shared_assess(t, existential_assess, false);
 }
 
 PARAC_COMMON_EXPORT parac_task_state
 parac_task_qbf_existential_assess(parac_task* t) {
-  return shared_assess(t, existential_assess);
+  return shared_assess(t, existential_assess, true);
 }
 
 PARAC_COMMON_EXPORT parac_task_state
 parac_task_qbf_universal_assess(parac_task* t) {
-  return shared_assess(t, universal_assess);
+  return shared_assess(t, universal_assess, true);
 }
 
 PARAC_COMMON_EXPORT void

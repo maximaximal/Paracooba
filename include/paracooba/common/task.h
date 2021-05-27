@@ -46,11 +46,11 @@ typedef void (*parac_task_terminate_func)(struct parac_task*);
 typedef parac_status (*parac_task_free_userdata_func)(struct parac_task*);
 
 typedef struct parac_task {
-  parac_task_state last_state;
-  parac_task_state state;
-  parac_status result;
-  parac_status left_result;
-  parac_status right_result;
+  volatile parac_task_state last_state;
+  volatile parac_task_state state;
+  volatile parac_status result;
+  volatile parac_status left_result;
+  volatile parac_status right_result;
   bool stop;
   uint32_t pre_path_sorting_critereon;
   uint32_t post_path_sorting_critereon;
@@ -63,7 +63,7 @@ typedef struct parac_task {
   void* userdata;
   parac_task_assess_func assess;
   parac_task_work_func work;
-  parac_task_terminate_func terminate;
+  volatile parac_task_terminate_func terminate;
   parac_task_serialize_func serialize;
   parac_task_free_userdata_func free_userdata;
 

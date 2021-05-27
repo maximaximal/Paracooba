@@ -36,7 +36,6 @@ QBFSolverTask::QBFSolverTask(parac_handle& handle,
 
   m_task.assess = GetAssessFunc(qu);
   m_task.work = static_work;
-  m_task.terminate = static_terminate;
   m_task.free_userdata = static_free_userdata;
   m_task.serialize = static_serialize;
   m_task.userdata = this;
@@ -47,6 +46,7 @@ QBFSolverTask::~QBFSolverTask() {}
 
 parac_status
 QBFSolverTask::work(parac_worker worker) {
+  m_task.terminate = static_terminate;
   struct Cleanup {
     QBFSolverTask& t;
     explicit Cleanup(QBFSolverTask& t)
