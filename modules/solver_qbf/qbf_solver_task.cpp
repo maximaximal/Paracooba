@@ -1,10 +1,11 @@
 #include <cassert>
 
+#include <paracooba/common/log.h>
 #include <paracooba/common/message.h>
 #include <paracooba/common/message_kind.h>
+#include <paracooba/common/status.h>
 #include <paracooba/common/task_store.h>
 
-#include "paracooba/common/status.h"
 #include "parser_qbf.hpp"
 #include "qbf_solver_manager.hpp"
 #include "qbf_solver_task.hpp"
@@ -116,6 +117,11 @@ QBFSolverTask::work(parac_worker worker) {
   } else {
     auto c = m_cubeSource->cube(m_task.path, m_manager);
     handle->assumeCube(c);
+    parac_log(PARAC_SOLVER,
+              PARAC_TRACE,
+              "Apply cube {} on path {} to solver!",
+              c,
+              m_task.path);
     return handle->solve();
   }
 }

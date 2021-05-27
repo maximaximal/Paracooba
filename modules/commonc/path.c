@@ -201,7 +201,7 @@ parac_path_to_str(parac_path p, char* out_str) {
 
 PARAC_COMMON_EXPORT void
 parac_path_print(parac_path p) {
-  char buf[PARAC_PATH_MAX_LENGTH];
+  char buf[PARAC_PATH_STR_LENGTH];
   parac_path_to_str(p, buf);
   printf("%s\n", buf);
 }

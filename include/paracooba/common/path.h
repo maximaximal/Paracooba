@@ -12,6 +12,7 @@ extern "C" {
 #include <stdint.h>
 
 #define PARAC_PATH_MAX_LENGTH 58
+#define PARAC_PATH_STR_LENGTH (PARAC_PATH_MAX_LENGTH + 1)
 #define PARAC_PATH_EXPLICITLY_UNKNOWN 0b00111110u
 #define PARAC_PATH_PARSER 0b00111101u
 #define PARAC_PATH_OVERLENGTH 0b00111011u
@@ -168,7 +169,7 @@ class Path : public parac_path {
 
 inline std::string
 to_string(Path const& p) {
-  char str[PARAC_PATH_MAX_LENGTH];
+  char str[PARAC_PATH_STR_LENGTH];
   parac_path_to_str(p, str);
   return std::string(str);
 }
@@ -176,13 +177,13 @@ to_string(Path const& p) {
 
 inline std::ostream&
 operator<<(std::ostream& o, parac_path p) {
-  char str[PARAC_PATH_MAX_LENGTH];
+  char str[PARAC_PATH_STR_LENGTH];
   parac_path_to_str(p, str);
   return o << str;
 }
 inline std::ostream&
 operator<<(std::ostream& o, parac::Path p) {
-  char str[PARAC_PATH_MAX_LENGTH];
+  char str[PARAC_PATH_STR_LENGTH];
   parac_path_to_str(p, str);
   return o << str;
 }
