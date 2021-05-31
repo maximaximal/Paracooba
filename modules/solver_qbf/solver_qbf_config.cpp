@@ -26,7 +26,10 @@ SolverConfig::SolverConfig(parac_config* config, parac_id localId) {
     "Use the Cube-Tree up until the specified depth. 0 Deactivates the limit.");
   m_config[static_cast<size_t>(Entry::TreeDepth)].registrar = PARAC_MOD_SOLVER;
   m_config[static_cast<size_t>(Entry::TreeDepth)].type = PARAC_TYPE_UINT64;
-  m_config[static_cast<size_t>(Entry::TreeDepth)].default_value.uint64 = 0;
+  m_config[static_cast<size_t>(Entry::TreeDepth)].default_value.uint64 =
+    (1 +
+     static_cast<int>(std::log2(10 * std::thread::hardware_concurrency()))) /
+    2;
 }
 
 void
