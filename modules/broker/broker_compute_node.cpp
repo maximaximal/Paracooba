@@ -974,11 +974,18 @@ ComputeNode::static_connectionDropped(parac_compute_node* node) {
   assert(node);
   assert(node->broker_userdata);
   ComputeNode& self = *static_cast<ComputeNode*>(node->broker_userdata);
-  parac_log(PARAC_COMMUNICATOR,
+  parac_log(PARAC_BROKER,
             PARAC_GLOBALWARNING,
             "Connection to remote {} dropped! Undoing all offloads.",
             node->id);
   self.m_taskStore.undoAllOffloadsTo(node);
+
+  parac_log(PARAC_BROKER,
+            PARAC_GLOBALWARNING,
+            "Connection to remote {} dropped! Aborting all tasks received from "
+            "that remote.",
+            node->id);
+  self.m_taskStore.abort_tasks_received_from(node);
 
   if(self.m_store.autoShutdownAfterFirstFinishedClient() &&
      self.description() && !self.description()->daemon) {

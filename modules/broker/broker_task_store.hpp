@@ -51,6 +51,7 @@ class TaskStore {
 
   void abort_tasks_with_parent_and_originator(parac_task* parent,
                                               parac_id originator);
+  void abort_tasks_received_from(parac_compute_node* remote);
 
   private:
   void insert_into_tasksWaitingForWorkerQueue(parac_task* task);

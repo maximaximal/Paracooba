@@ -255,7 +255,7 @@ TaskStore::default_terminate_task(parac_task* t) {
 
   if(right_result == PARAC_PENDING && right_child && right_child->terminate) {
     right_child->parent_task_ = nullptr;
-    right_child->terminate(left_child);
+    right_child->terminate(right_child);
   }
 
   t->state = PARAC_TASK_DONE;
@@ -587,6 +587,26 @@ TaskStore::abort_tasks_with_parent_and_originator(parac_task* parent,
 
   for(const auto& tw : list) {
     auto& t = tw.get();
+    t.terminate(&t);
+  }
+}
+
+void
+TaskStore::abort_tasks_received_from(parac_compute_node* remote) {
+  using It = Internal::TaskList::iterator;
+  It it = m_internal->tasks.begin();
+
+  auto next = [remote, this](It& it) -> bool {
+    std::unique_lock lock(m_internal->containerMutex);
+    while(it != m_internal->tasks.end() && it->t.received_from != remote) {
+      ++it;
+    }
+    return it != m_internal->tasks.end();
+  };
+
+  while(next(it)) {
+    auto& t = it->t;
+    ++it;
     t.terminate(&t);
   }
 }

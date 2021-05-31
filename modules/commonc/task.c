@@ -53,6 +53,10 @@ notify_result(parac_task* t) {
   assert(t->parent_task_);
   assert(t->handle);
 
+  // Never notify of aborted tasks!
+  if(t->result == PARAC_ABORTED)
+    return;
+
   parac_message msg;
   msg.kind = PARAC_MESSAGE_TASK_RESULT;
 
