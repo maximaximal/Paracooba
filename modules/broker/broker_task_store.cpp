@@ -646,7 +646,9 @@ TaskStore::terminateAllTasks() {
   }
   for(auto t : s) {
     auto& task = t.get();
-    if(task.terminate) {
+    // It is only relevant as long as the termination function is not the
+    // default one, as the default tasks are not running anyways.
+    if(task.terminate && task.terminate != TaskStore::default_terminate_task) {
       task.terminate(&task);
     }
   }
