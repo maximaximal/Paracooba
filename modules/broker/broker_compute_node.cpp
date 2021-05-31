@@ -348,6 +348,9 @@ ComputeNode::receiveMessageFrom(parac_message& msg) {
       case PARAC_MESSAGE_OFFLINE_ANNOUNCEMENT:
         receiveMessageOfflineAnnouncement(msg);
         break;
+      case PARAC_MESSAGE_TASK_ABORT:
+        receiveMessageTaskAbort(msg);
+        break;
       default:
         parac_log(PARAC_BROKER,
                   PARAC_GLOBALERROR,
@@ -805,6 +808,24 @@ ComputeNode::receiveMessageOfflineAnnouncement(parac_message& m) {
     m_handle.exit_status = PARAC_UNKNOWN;
     m_handle.request_exit(&m_handle);
   }
+
+  m.cb(&m, PARAC_OK);
+}
+
+void
+ComputeNode::receiveMessageTaskAbort(parac_message& m) {
+  uintptr_t* ptr = reinterpret_cast<uintptr_t*>(m.inline_data);
+  parac_task* virtual_parent_task = reinterpret_cast<parac_task*>(ptr);
+  parac_log(PARAC_BROKER,
+            PARAC_TRACE,
+            "Received message to abort all tasks with parent {} and originator "
+            "{}, received from remote {}.",
+            static_cast<void*>(virtual_parent_task),
+            m.originator_id,
+            m.origin->id);
+
+  m_taskStore.abort_tasks_with_parent_and_originator(virtual_parent_task,
+                                                     m.originator_id);
 
   m.cb(&m, PARAC_OK);
 }

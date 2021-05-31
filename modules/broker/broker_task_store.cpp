@@ -66,10 +66,13 @@ struct TaskStore::Internal {
                                boost::default_user_allocator_new_delete,
                                boost::details::pool::default_mutex,
                                64>;
+  using TaskRef = std::reference_wrapper<parac_task>;
   using TaskList = std::list<Task, Allocator<Task>>;
+  using TaskRefList = std::list<TaskRef, Allocator<TaskRef>>;
 
   struct Task {
     TaskList::iterator it;
+    TaskRefList::iterator workQueueIt;
     parac_task t;
     short refcount = 0;
 
@@ -84,7 +87,6 @@ struct TaskStore::Internal {
       }
     }
   };
-  using TaskRef = std::reference_wrapper<parac_task>;
 
   struct TaskRefCompare {
     bool operator()(const TaskRef& lhs, const TaskRef& rhs) const {
@@ -96,9 +98,10 @@ struct TaskStore::Internal {
   TaskList tasks;
 
   std::list<TaskRef, Allocator<TaskRef>> tasksWaitingForWorkerQueue;
+  using TaskSet = std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>>;
 
-  std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>> tasksBeingWorkedOn;
-  std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>> tasksWaitingForChildren;
+  TaskSet tasksBeingWorkedOn;
+  TaskSet tasksWaitingForChildren;
 
   std::unordered_map<parac_compute_node*,
                      std::unordered_set<Task*,
@@ -203,16 +206,30 @@ TaskStore::default_terminate_task(parac_task* t) {
   assert(t->task_store->userdata);
 
   TaskStore* s = static_cast<TaskStore*>(t->task_store->userdata);
-  auto& i = *s->m_internal;
 
   parac_log(
     PARAC_BROKER, PARAC_TRACE, "Default terminate task on path {}", t->path);
 
-  if(t->state & PARAC_TASK_WORKING || t->state & PARAC_TASK_OFFLOADED) {
+  if(t->state & PARAC_TASK_OFFLOADED) {
+    assert(t->offloaded_to);
+    parac_message_wrapper msg;
+    msg.kind = PARAC_MESSAGE_TASK_ABORT;
+    msg.originator_id = t->originator;
+    msg.data_is_inline = true;
+    msg.data_to_be_freed = false;
+    uintptr_t* ptr = reinterpret_cast<uintptr_t*>(msg.inline_data);
+    *ptr = reinterpret_cast<uintptr_t>(static_cast<void*>(t));
+    t->offloaded_to->send_message_to(t->offloaded_to, &msg);
+
+    // No callback required, the task is just aborted.
+    t->state = PARAC_TASK_DONE;
+    s->assess_task(t);
     return;
   }
 
-  std::unique_lock lock(i.containerMutex);
+  if(t->state & PARAC_TASK_WORKING) {
+    return;
+  }
 
   Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
     reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
@@ -228,6 +245,8 @@ TaskStore::default_terminate_task(parac_task* t) {
 
   t->left_child_ = nullptr;
   t->right_child_ = nullptr;
+  s->remove_from_workQueue(t);
+  s->remove_from_tasksBeingWorkedOn(t);
 
   if(left_result == PARAC_PENDING && left_child && left_child->terminate) {
     left_child->parent_task_ = nullptr;
@@ -241,7 +260,7 @@ TaskStore::default_terminate_task(parac_task* t) {
 
   t->state = PARAC_TASK_DONE;
   t->result = PARAC_ABORTED;
-  s->assess_task(t);
+  s->assess_task(t, true, false);
 }
 
 parac_task*
@@ -323,6 +342,7 @@ TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
       m_internal->offloadedTasks[target].emplace(taskWrapper);
 
       ++taskWrapper->refcount;
+      taskWrapper->workQueueIt = m_internal->tasksWaitingForWorkerQueue.end();
       --m_internal->tasksWaitingForWorkerQueueSize;
 
       returned = &t;
@@ -351,6 +371,7 @@ TaskStore::pop_work() {
     Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
       reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
     ++taskWrapper->refcount;
+    taskWrapper->workQueueIt = m_internal->tasksWaitingForWorkerQueue.end();
     --m_internal->tasksWaitingForWorkerQueueSize;
   }
 
@@ -446,7 +467,7 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
   {
     {
       std::unique_lock lock(m_internal->containerMutex);
-      m_internal->tasksWaitingForWorkerQueue.insert(
+      auto it = m_internal->tasksWaitingForWorkerQueue.insert(
         std::lower_bound(m_internal->tasksWaitingForWorkerQueue.begin(),
                          m_internal->tasksWaitingForWorkerQueue.end(),
                          task,
@@ -454,6 +475,9 @@ TaskStore::insert_into_tasksWaitingForWorkerQueue(parac_task* task) {
                            return parac_task_compare(&l.get(), r);
                          }),
         *task);
+      Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+        reinterpret_cast<std::byte*>(task) - offsetof(Internal::Task, t));
+      taskWrapper->workQueueIt = it;
     }
 
     ++m_internal->tasksWaitingForWorkerQueueSize;
@@ -484,6 +508,18 @@ TaskStore::insert_into_tasksBeingWorkedOn(parac_task* task) {
   assert(task);
   std::unique_lock lock(m_internal->containerMutex);
   m_internal->tasksBeingWorkedOn.insert(*task);
+}
+void
+TaskStore::remove_from_workQueue(parac_task* task) {
+  std::unique_lock lock(m_internal->containerMutex);
+  Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+    reinterpret_cast<std::byte*>(task) - offsetof(Internal::Task, t));
+  if(taskWrapper->workQueueIt != m_internal->tasksWaitingForWorkerQueue.end()) {
+    --m_internal->tasksWaitingForWorkerQueueSize;
+    decrementWorkQueueInComputeNode(m_internal->handle, task->originator);
+    m_internal->tasksWaitingForWorkerQueue.erase(taskWrapper->workQueueIt);
+    taskWrapper->workQueueIt = m_internal->tasksWaitingForWorkerQueue.end();
+  }
 }
 void
 TaskStore::remove_from_tasksBeingWorkedOn(parac_task* task) {
@@ -536,6 +572,26 @@ TaskStore::remove(parac_task* task) {
 }
 
 void
+TaskStore::abort_tasks_with_parent_and_originator(parac_task* parent,
+                                                  parac_id originator) {
+  Internal::TaskRefList list;
+
+  {
+    std::unique_lock lock(m_internal->containerMutex);
+    for(auto& t : m_internal->tasks) {
+      if(t.t.originator == originator && t.t.parent_task_ == parent) {
+        list.emplace_front(t.t);
+      }
+    }
+  }
+
+  for(const auto& tw : list) {
+    auto& t = tw.get();
+    t.terminate(&t);
+  }
+}
+
+void
 TaskStore::autoShutdownTimerExpired(parac_timeout* t) {
   assert(t);
   assert(t->expired_userdata);
@@ -577,11 +633,18 @@ TaskStore::manageAutoShutdownTimer() {
 
 void
 TaskStore::terminateAllTasks() {
-  std::unique_lock lock(m_internal->containerMutex);
+  Internal::TaskSet s;
+
+  {
+    std::unique_lock lock(m_internal->containerMutex);
+    s = m_internal->tasksBeingWorkedOn;
+  }
+
+  parac_log(PARAC_BROKER, PARAC_TRACE, "Terminate all running tasks!");
   for(auto& t : m_internal->tasks) {
     t.t.stop = true;
   }
-  for(auto t : m_internal->tasksBeingWorkedOn) {
+  for(auto t : s) {
     auto& task = t.get();
     if(task.terminate) {
       task.terminate(&task);
@@ -590,7 +653,7 @@ TaskStore::terminateAllTasks() {
 }
 
 void
-TaskStore::assess_task(parac_task* task) {
+TaskStore::assess_task(parac_task* task, bool remove, bool removeParent) {
   assert(task);
 
   // Required so that no concurrent assessments of the same tasks are happening.
@@ -651,7 +714,8 @@ TaskStore::assess_task(parac_task* task) {
     if(task->received_from)
       parent = nullptr;
 
-    remove(task);
+    if(remove)
+      TaskStore::remove(task);
 
     parac_log(PARAC_BROKER,
               PARAC_TRACE,
@@ -679,7 +743,7 @@ TaskStore::assess_task(parac_task* task) {
         return;
       }
 
-      assess_task(parent);
+      assess_task(parent, removeParent, removeParent);
     }
 
     return;

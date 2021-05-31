@@ -37,7 +37,9 @@ class TaskStore {
   void undo_offload(parac_task* t);
   void undoAllOffloadsTo(parac_compute_node* remote);
 
-  void assess_task(parac_task* task);
+  void assess_task(parac_task* task,
+                   bool remove = true,
+                   bool removeParent = true);
 
   parac_task_store& store();
 
@@ -47,17 +49,21 @@ class TaskStore {
 
   void terminateAllTasks();
 
+  void abort_tasks_with_parent_and_originator(parac_task* parent,
+                                              parac_id originator);
+
   private:
   void insert_into_tasksWaitingForWorkerQueue(parac_task* task);
   void insert_into_tasksWaitingForChildren(parac_task* task);
   void insert_into_tasksBeingWorkedOn(parac_task* task);
 
+  void remove_from_workQueue(parac_task* task);
   void remove_from_tasksWaitingForChildren(parac_task* task);
   void remove_from_tasksBeingWorkedOn(parac_task* task);
   void remove(parac_task* task);
 
   static void autoShutdownTimerExpired(parac_timeout* t);
-  static void default_terminate_task(parac_task *t);
+  static void default_terminate_task(parac_task* t);
 
   struct Internal;
   std::unique_ptr<Internal> m_internal;

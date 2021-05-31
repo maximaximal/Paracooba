@@ -34,6 +34,8 @@ parac_message_kind_to_str(parac_message_kind kind) {
       return "Solver-New-Remote-Available";
     case PARAC_MESSAGE_TASK_RESULT:
       return "Task-Result";
+    case PARAC_MESSAGE_TASK_ABORT:
+      return "Task-Abort";
     case PARAC_MESSAGE_FILE:
       return "File";
     case PARAC_MESSAGE_ACK:
