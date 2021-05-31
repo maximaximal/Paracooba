@@ -224,37 +224,40 @@ initiate_peer_solver_on_file(
   assert(broker.task_store);
   auto& task_store = *broker.task_store;
 
-  auto parserDone =
-    [&mod, &task_store, originatorId, instance, cb_userdata, cb](
-      parac_status status, std::unique_ptr<Parser> parsedFormula) {
-      if(status != PARAC_OK) {
-        parac_log(PARAC_SOLVER,
-                  PARAC_FATAL,
-                  "Parsing of formula \"{}\" failed with status {}! Exiting.",
-                  mod.handle->input_file,
-                  status);
-        mod.handle->request_exit(mod.handle);
-        return;
-      }
+  auto parserDone = [&mod,
+                     &task_store,
+                     originatorId,
+                     instance,
+                     cb_userdata,
+                     cb](parac_status status,
+                         std::unique_ptr<Parser> parsedFormula) {
+    if(status != PARAC_OK) {
+      parac_log(PARAC_SOLVER,
+                PARAC_FATAL,
+                "Parsing of formula \"{}\" failed with status {}! Exiting.",
+                mod.handle->input_file,
+                status);
+      mod.handle->request_exit(mod.handle);
+      return;
+    }
 
-      parac_log(
-        PARAC_SOLVER,
-        PARAC_TRACE,
-        "Parsing of formula \"{}\" finished! Now sending status to peers "
-        "and waiting for tasks.",
-        parsedFormula->path(),
-        status);
+    parac_log(PARAC_SOLVER,
+              PARAC_TRACE,
+              "Parsing of formula \"{}\" finished! Now sending status to peers "
+              "and waiting for tasks.",
+              parsedFormula->path(),
+              status);
 
-      SolverUserdata* solverUserdata =
-        static_cast<SolverUserdata*>(mod.userdata);
-      assert(solverUserdata);
+    SolverUserdata* solverUserdata = static_cast<SolverUserdata*>(mod.userdata);
+    assert(solverUserdata);
 
-      SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
-      i->task_store = &task_store;
-      i->parser = std::move(parsedFormula);
+    SolverInstance* i = static_cast<SolverInstance*>(instance->userdata);
+    i->task_store = &task_store;
+    i->parser = std::move(parsedFormula);
+    i->manager = std::make_unique<QBFSolverManager>(mod, *i->parser, i->config);
 
-      cb(instance, cb_userdata, status);
-    };
+    cb(instance, cb_userdata, status);
+  };
 
   return parse_formula_file(mod, file, originatorId, parserDone);
 }
@@ -278,6 +281,7 @@ instance_handle_message(parac_module_solver_instance* instance,
   switch(msg->kind) {
     case PARAC_MESSAGE_SOLVER_TASK: {
       assert(solverInstance->configured);
+      assert(solverInstance->manager);
 
       parac_path_type pathType;
       parac_task* task = nullptr;
@@ -294,6 +298,13 @@ instance_handle_message(parac_module_solver_instance* instance,
         assert(task);
         task->received_from = msg->origin;
         task->parent_task_ = reinterpret_cast<parac_task*>(remoteTask);
+
+        QBFSolverTask* solverTask =
+          new QBFSolverTask(*solverInstance->mod->handle,
+                            *task,
+                            *solverInstance->manager,
+                            nullptr);
+        ia(*solverTask);
       }
 
       task_store->assess_task(task_store, task);
