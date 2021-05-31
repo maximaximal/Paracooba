@@ -46,12 +46,19 @@ QBFSolverTask::~QBFSolverTask() {}
 
 parac_status
 QBFSolverTask::work(parac_worker worker) {
-  m_task.terminate = static_terminate;
   struct Cleanup {
     QBFSolverTask& t;
     explicit Cleanup(QBFSolverTask& t)
-      : t(t) {}
-    ~Cleanup() { t.m_terminationFunc = nullptr; }
+      : t(t) {
+      termfunc = t.m_task.terminate;
+      t.m_task.terminate = static_terminate;
+    }
+    ~Cleanup() {
+      t.m_terminationFunc = nullptr;
+      t.m_task.terminate = termfunc;
+    }
+
+    parac_task_terminate_func termfunc;
   };
   Cleanup cleanup{ *this };
   auto handle = m_manager.get(worker);

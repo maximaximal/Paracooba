@@ -205,11 +205,40 @@ TaskStore::default_terminate_task(parac_task* t) {
   TaskStore* s = static_cast<TaskStore*>(t->task_store->userdata);
   auto& i = *s->m_internal;
 
+  parac_log(
+    PARAC_BROKER, PARAC_TRACE, "Default terminate task on path {}", t->path);
+
   if(t->state & PARAC_TASK_WORKING || t->state & PARAC_TASK_OFFLOADED) {
     return;
   }
 
   std::unique_lock lock(i.containerMutex);
+
+  Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
+    reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
+  // Delete only after final assessment. The reference in this function needs to
+  // be counted too.
+  ++taskWrapper->refcount;
+
+  auto left_result = t->left_result;
+  auto left_child = t->left_child_;
+
+  auto right_result = t->right_result;
+  auto right_child = t->right_child_;
+
+  t->left_child_ = nullptr;
+  t->right_child_ = nullptr;
+
+  if(left_result == PARAC_PENDING && left_child && left_child->terminate) {
+    left_child->parent_task_ = nullptr;
+    left_child->terminate(left_child);
+  }
+
+  if(right_result == PARAC_PENDING && right_child && right_child->terminate) {
+    right_child->parent_task_ = nullptr;
+    right_child->terminate(left_child);
+  }
+
   t->state = PARAC_TASK_DONE;
   t->result = PARAC_ABORTED;
   s->assess_task(t);
@@ -636,8 +665,10 @@ TaskStore::assess_task(parac_task* task) {
 
       if(path.rep == parac_path_get_next_left(parentPath).rep) {
         parent->left_result = result;
+        parent->left_child_ = nullptr;
       } else if(path.rep == parac_path_get_next_right(parentPath).rep) {
         parent->right_result = result;
+        parent->right_child_ = nullptr;
       } else {
         parac_log(PARAC_BROKER,
                   PARAC_GLOBALERROR,
