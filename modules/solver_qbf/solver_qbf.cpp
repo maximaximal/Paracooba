@@ -116,10 +116,12 @@ parse_formula_file(parac_module& mod,
   }
 
   if(useLocalWorkers) {
+    parac_path p;
+    p.rep = PARAC_PATH_PARSER;
     parac_task* task =
       task_store.new_task(&task_store,
                           nullptr,
-                          parac_path{ .rep = PARAC_PATH_PARSER },
+                          p,
                           originatorId);
     if(!task) {
       return PARAC_GENERIC_ERROR;
