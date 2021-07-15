@@ -48,6 +48,10 @@ class Parser {
   const Quantifiers& quantifiers() const { return m_quantifiers; }
   const std::string& path() const { return m_path; }
 
+  bool isTrivial() const;
+  bool isTrivialSAT() const;
+  bool isTrivialUNSAT() const;
+
   private:
   struct Internal;
 

@@ -31,8 +31,10 @@ QBFSolverTask::QBFSolverTask(parac_handle& handle,
   , m_task(task)
   , m_manager(manager)
   , m_cubeSource(std::move(cubeSource)) {
-  Parser::Quantifier qu =
+  Parser::Quantifier qu{ 0 };
+  if(manager.parser().quantifiers().size() > 0) {
     manager.parser().quantifiers()[parac_path_length(task.path)];
+  }
 
   m_task.assess = GetAssessFunc(qu);
   m_task.work = static_work;
@@ -46,6 +48,17 @@ QBFSolverTask::~QBFSolverTask() {}
 
 parac_status
 QBFSolverTask::work(parac_worker worker) {
+  if(m_manager.parser().quantifiers().size() == 0) {
+    if(m_manager.parser().isTrivial()) {
+      if(m_manager.parser().isTrivialSAT()) {
+	return PARAC_SAT;
+      }
+      if(m_manager.parser().isTrivialUNSAT()) {
+	return PARAC_UNSAT;
+      }
+    }
+  }
+
   struct Cleanup {
     QBFSolverTask& t;
     explicit Cleanup(QBFSolverTask& t)

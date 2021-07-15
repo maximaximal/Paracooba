@@ -336,4 +336,14 @@ Parser::processInputToPath(std::string_view input) {
 
   return PARAC_OK;
 }
+
+bool Parser::isTrivial() const {
+  return quantifiers().size() == 0;
+}
+bool Parser::isTrivialSAT() const {
+  return clauses.size() == 0;
+}
+bool Parser::isTrivialUNSAT() const {
+  return clauses.size() == 1 && clauses.front().count == 0;
+}
 }
