@@ -62,6 +62,11 @@ DepQBFHandle::addParsedQDIMACS() {
   // Adjust variable count
   qdpll_adjust_vars(q, m_parser.highestLiteral());
 
+  /* Use the linear ordering of the quantifier prefix. */
+  qdpll_configure(q, "--dep-man=simple");
+  /* Enable incremental solving. */
+  qdpll_configure(q, "--incremental-use");
+
   // Input prefix
   size_t i = 1;
   for(size_t n = 0, nesting = 1; n < m_parser.quantifiers().size();

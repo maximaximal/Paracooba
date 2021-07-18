@@ -33,7 +33,7 @@ QBFSolverTask::QBFSolverTask(parac_handle& handle,
   , m_cubeSource(std::move(cubeSource)) {
   Parser::Quantifier qu{ 0 };
   if(manager.parser().quantifiers().size() > 0) {
-    manager.parser().quantifiers()[parac_path_length(task.path)];
+    qu = manager.parser().quantifiers()[parac_path_length(task.path)];
   }
 
   m_task.assess = GetAssessFunc(qu);
