@@ -22,6 +22,8 @@ class DepQBFHandle : public GenericSolverHandle {
   const Parser& m_parser;
   std::unique_ptr<QDPLL, void (*)(QDPLL*)> m_qdpll;
 
+  volatile bool m_terminated = false;
+
   void addParsedQDIMACS();
 };
 }

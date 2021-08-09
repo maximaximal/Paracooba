@@ -102,19 +102,18 @@ struct TaskStore::Internal {
 
   TaskList tasks;
 
-  //std::list<TaskRef, Allocator<TaskRef>> tasksWaitingForWorkerQueue;
-  //using TaskSet = std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>>;
+  // std::list<TaskRef, Allocator<TaskRef>> tasksWaitingForWorkerQueue;
+  // using TaskSet = std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>>;
   std::list<TaskRef> tasksWaitingForWorkerQueue;
   using TaskSet = std::set<TaskRef, TaskRefCompare>;
 
   TaskSet tasksBeingWorkedOn;
   TaskSet tasksWaitingForChildren;
 
-  std::unordered_map<parac_compute_node*,
-                     std::unordered_set<Task*,
-                                        std::hash<Task*>,
-                                        std::equal_to<Task*>>>
-                                        //Allocator<Task*>>>
+  std::unordered_map<
+    parac_compute_node*,
+    std::unordered_set<Task*, std::hash<Task*>, std::equal_to<Task*>>>
+    // Allocator<Task*>>>
     offloadedTasks;
 
   std::atomic_size_t tasksSize = 0;
@@ -252,7 +251,8 @@ TaskStore::default_terminate_task(parac_task* t) {
 
   t->left_child_ = nullptr;
   t->right_child_ = nullptr;
-  if(taskWrapper->workQueueIt != s->m_internal->tasksWaitingForWorkerQueue.end())
+  if(taskWrapper->workQueueIt !=
+     s->m_internal->tasksWaitingForWorkerQueue.end())
     s->remove_from_workQueue(t);
   s->remove_from_tasksBeingWorkedOn(t);
 
@@ -269,7 +269,7 @@ TaskStore::default_terminate_task(parac_task* t) {
   t->state = PARAC_TASK_DONE;
   t->result = PARAC_ABORTED;
   t->work = nullptr;
-  s->assess_task(t, false, false);
+  s->assess_task(t, true, false);
 }
 
 parac_task*
@@ -552,8 +552,10 @@ TaskStore::remove(parac_task* task) {
     return;
 
   assert(task);
-  assert(task->result == PARAC_ABORTED || !(task->state & PARAC_TASK_WAITING_FOR_SPLITS));
-  assert(task->result == PARAC_ABORTED || !(task->state & PARAC_TASK_WORK_AVAILABLE));
+  assert(task->result == PARAC_ABORTED ||
+         !(task->state & PARAC_TASK_WAITING_FOR_SPLITS));
+  assert(task->result == PARAC_ABORTED ||
+         !(task->state & PARAC_TASK_WORK_AVAILABLE));
   assert(!(task->state & PARAC_TASK_WORKING));
   assert(task->state & PARAC_TASK_DONE);
 
@@ -664,18 +666,12 @@ TaskStore::manageAutoShutdownTimer() {
 
 void
 TaskStore::terminateAllTasks() {
-  Internal::TaskSet s;
-
-  {
-    std::unique_lock lock(m_internal->containerMutex);
-    s = m_internal->tasksBeingWorkedOn;
-  }
-
   parac_log(PARAC_BROKER, PARAC_TRACE, "Terminate all running tasks!");
-  for(auto& t : m_internal->tasks) {
-    t.t.stop = true;
+  std::unique_lock lock(m_internal->containerMutex);
+  for(auto& t : m_internal->tasksWaitingForWorkerQueue) {
+    t.get().stop = true;
   }
-  for(auto t : s) {
+  for(auto t : m_internal->tasksBeingWorkedOn) {
     auto& task = t.get();
     // It is only relevant as long as the termination function is not the
     // default one, as the default tasks are not running anyways.
@@ -756,6 +752,12 @@ TaskStore::assess_task(parac_task* task, bool remove, bool removeParent) {
               path,
               originator,
               result);
+
+    // A task cannot be both done and splitted.
+    assert(result != PARAC_SPLITTED);
+    // A done task must have been aborted in order for the task result not being
+    // either SAT or UNSAT.
+    assert(result != PARAC_UNKNOWN);
 
     if(parent) {
       parac_path parentPath = parent->path;

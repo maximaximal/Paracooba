@@ -27,6 +27,7 @@ DepQBFHandle::assumeCube(const CubeIteratorRange& cube) {
 
 parac_status
 DepQBFHandle::solve() {
+  m_terminated = false;
   QDPLLResult result = qdpll_sat(m_qdpll.get());
   switch(result) {
     case QDPLL_RESULT_SAT:
@@ -34,13 +35,15 @@ DepQBFHandle::solve() {
     case QDPLL_RESULT_UNSAT:
       return PARAC_UNSAT;
     case QDPLL_RESULT_UNKNOWN:
-      return PARAC_UNKNOWN;
+      assert(m_terminated);
+      return PARAC_ABORTED;
   }
   return PARAC_UNKNOWN;
 }
 
 void
 DepQBFHandle::terminate() {
+  m_terminated = true;
   qdpll_terminate(m_qdpll.get());
 }
 
@@ -63,9 +66,9 @@ DepQBFHandle::addParsedQDIMACS() {
   qdpll_adjust_vars(q, m_parser.highestLiteral());
 
   /* Use the linear ordering of the quantifier prefix. */
-  //qdpll_configure(q, "--dep-man=simple");
+  // qdpll_configure(q, "--dep-man=simple");
   /* Enable incremental solving. */
-  //qdpll_configure(q, "--incremental-use");
+  // qdpll_configure(q, "--incremental-use");
 
   // Input prefix
   size_t i = 1;
