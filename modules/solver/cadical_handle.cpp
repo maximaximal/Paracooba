@@ -7,6 +7,7 @@
 #include "solver_assignment.hpp"
 #include "solver_config.hpp"
 
+#include "paracooba/common/task.h"
 #include "paracooba/common/timeout.h"
 #include "paracooba/communicator/communicator.h"
 #include "paracooba/solver/cube_iterator.hpp"
@@ -32,7 +33,7 @@
 namespace parac::solver {
 struct CaDiCaLHandle::Internal {
   Internal(parac_handle& handle,
-           bool& stop,
+           volatile bool* stop,
            parac_id originatorId,
            std::shared_ptr<Cube> pregeneratedCubes = std::make_shared<Cube>(),
            std::shared_ptr<std::vector<size_t>> pregeneratedCubesJumplist =
@@ -61,13 +62,13 @@ struct CaDiCaLHandle::Internal {
 };
 
 CaDiCaLHandle::CaDiCaLHandle(parac_handle& handle,
-                             bool& stop,
+                             volatile bool& stop,
                              parac_id originatorId)
-  : m_internal(std::make_unique<Internal>(handle, stop, originatorId)) {}
+  : m_internal(std::make_unique<Internal>(handle, &stop, originatorId)) {}
 CaDiCaLHandle::CaDiCaLHandle(CaDiCaLHandle& o)
   : m_internal(
       std::make_unique<Internal>(o.m_internal->handle,
-                                 o.m_internal->terminator.stopRef(),
+                                 nullptr,
                                  o.m_internal->originatorId,
                                  o.m_internal->pregeneratedCubes,
                                  o.m_internal->pregeneratedCubesJumplist)) {
@@ -264,12 +265,24 @@ CaDiCaLHandle::applyLearnedClause(const Clause& clause) {
 }
 bool
 CaDiCaLHandle::stoppedGlobally() const {
-  return m_internal->terminator.stopRef();
+  return m_internal->terminator;
 }
 
 parac_status
-CaDiCaLHandle::solve() {
-  if(m_internal->terminator.stopRef()) {
+CaDiCaLHandle::solve(parac_task& task) {
+  assert(m_internal);
+
+  struct Cleanup {
+    CaDiCaLHandle::Internal& internal;
+    Cleanup(parac_task& t, CaDiCaLHandle::Internal& internal)
+      : internal(internal) {
+      internal.terminator.setTerminatedPointer(&t.stop);
+    }
+    ~Cleanup() { internal.terminator.setTerminatedPointer(nullptr); }
+  };
+  Cleanup cleanup(task, *m_internal);
+
+  if(m_internal->terminator) {
     return PARAC_ABORTED;
   }
 
@@ -388,7 +401,7 @@ CaDiCaLHandle::resplitCube(parac_path p,
 
   Literal lit_to_split = std::abs(m_internal->solver.lookahead());
 
-  if(m_internal->terminator.stopRef()) {
+  if(m_internal->terminator) {
     m_lookaheadTimeout = nullptr;
     return { PARAC_ABORTED, {} };
   }

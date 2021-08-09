@@ -9,6 +9,7 @@
 struct parac_path;
 struct parac_handle;
 struct parac_timeout;
+struct parac_task;
 
 namespace CaDiCaL {
 class Solver;
@@ -21,7 +22,9 @@ class SolverConfig;
 
 class CaDiCaLHandle {
   public:
-  CaDiCaLHandle(parac_handle& handle, bool& stop, parac_id originatorId);
+  CaDiCaLHandle(parac_handle& handle,
+                volatile bool& stop,
+                parac_id originatorId);
   CaDiCaLHandle(CaDiCaLHandle& o);
   ~CaDiCaLHandle();
 
@@ -40,17 +43,17 @@ class CaDiCaLHandle {
   size_t getPregeneratedCubesCount() const;
   size_t getNormalizedPathLength() const;
 
-  void applyCubeAsAssumption(const CubeIteratorRange &cube);
-  void applyCubeAsAssumption(const Cube &cube);
+  void applyCubeAsAssumption(const CubeIteratorRange& cube);
+  void applyCubeAsAssumption(const Cube& cube);
 
-  void applyLearnedClause(const Clause &clause);
+  void applyLearnedClause(const Clause& clause);
   bool stoppedGlobally() const;
 
   /** @brief Calls solve on the internal CaDiCaL Solver instance.
    *
    * @returns PARAC_ABORTED, PARAC_SAT, PARAC_UNSAT, or PARAC_UNKNOWN
    */
-  parac_status solve();
+  parac_status solve(parac_task& task);
 
   void terminate();
 
@@ -66,9 +69,8 @@ class CaDiCaLHandle {
    *
    * The split must then be -lit and +lit.
    */
-  std::pair<parac_status, Literal> resplitCube(parac_path p,
-                                               Cube currentCube,
-                                               const SolverConfig& solverConfig);
+  std::pair<parac_status, Literal>
+  resplitCube(parac_path p, Cube currentCube, const SolverConfig& solverConfig);
 
   parac_status lookahead(size_t depth, size_t min_depth);
 

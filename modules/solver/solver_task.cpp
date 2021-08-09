@@ -152,10 +152,6 @@ SolverTask::work(parac_worker worker) {
 
     s = PARAC_PENDING;
   } else {
-    if(handle.stoppedGlobally()) {
-      return PARAC_ABORTED;
-    }
-
     auto& config = m_manager->config();
     uint64_t averageSolvingTime = m_manager->averageSolvingTimeMS();
     m_fastSplit.tick(m_manager->waitingSolverTasks() <= 1);
@@ -163,9 +159,6 @@ SolverTask::work(parac_worker worker) {
     uint64_t duration = multiplicationFactor * averageSolvingTime;
 
     auto cube = m_cubeSource->cube(m_task->path, *m_manager);
-    if(handle.stoppedGlobally()) {
-      return PARAC_ABORTED;
-    }
     handle.applyCubeAsAssumption(cube);
 
     s = PARAC_UNKNOWN;
@@ -606,7 +599,7 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
 
   m_interruptSolving = false;
   auto start = std::chrono::steady_clock::now();
-  parac_status s = handle.solve();
+  parac_status s = handle.solve(*m_task);
   auto end = std::chrono::steady_clock::now();
 
   if(handle.stoppedGlobally()) {

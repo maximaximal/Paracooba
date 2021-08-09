@@ -51,7 +51,7 @@ typedef struct parac_task {
   volatile parac_status result;
   volatile parac_status left_result;
   volatile parac_status right_result;
-  bool stop;
+  volatile bool stop;
   uint32_t pre_path_sorting_critereon;
   uint32_t post_path_sorting_critereon;
   parac_path path;

@@ -7,19 +7,25 @@
 namespace parac::solver {
 class CaDiCaLTerminator : public CaDiCaL::Terminator {
   public:
-  explicit CaDiCaLTerminator(bool& terminated)
+  explicit CaDiCaLTerminator(volatile bool* terminated = nullptr)
     : m_terminated(terminated) {}
+  void setTerminatedPointer(volatile bool* terminated) {
+    m_terminated = terminated;
+  }
+
   virtual ~CaDiCaLTerminator() {}
 
-  virtual bool terminate() { return m_terminated || m_locallyTerminated; }
+  virtual bool terminate() override { return *this; }
 
-  bool& stopRef() const { return m_terminated; }
+  operator bool() const {
+    return m_locallyTerminated || (m_terminated && *m_terminated);
+  }
   void terminateLocally(bool terminate = true) {
     m_locallyTerminated = terminate;
   }
 
   private:
-  bool& m_terminated;
+  volatile bool* m_terminated;
   std::atomic_bool m_locallyTerminated = false;
 };
 }

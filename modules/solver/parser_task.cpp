@@ -13,7 +13,7 @@
 
 namespace parac::solver {
 struct ParserTask::Internal {
-  Internal(parac_handle& handle, bool& stop, parac_id originatorId)
+  Internal(parac_handle& handle, volatile bool& stop, parac_id originatorId)
     : handle(handle)
     , handlePtr(std::make_unique<CaDiCaLHandle>(handle, stop, originatorId)) {}
   parac_handle& handle;
