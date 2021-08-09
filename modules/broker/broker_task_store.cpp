@@ -66,9 +66,14 @@ struct TaskStore::Internal {
                                boost::default_user_allocator_new_delete,
                                boost::details::pool::default_mutex,
                                64>;
+  /*
   using TaskRef = std::reference_wrapper<parac_task>;
   using TaskList = std::list<Task, Allocator<Task>>;
   using TaskRefList = std::list<TaskRef, Allocator<TaskRef>>;
+  */
+  using TaskRef = std::reference_wrapper<parac_task>;
+  using TaskList = std::list<Task>;
+  using TaskRefList = std::list<TaskRef>;
 
   struct Task {
     TaskList::iterator it;
@@ -97,8 +102,10 @@ struct TaskStore::Internal {
 
   TaskList tasks;
 
-  std::list<TaskRef, Allocator<TaskRef>> tasksWaitingForWorkerQueue;
-  using TaskSet = std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>>;
+  //std::list<TaskRef, Allocator<TaskRef>> tasksWaitingForWorkerQueue;
+  //using TaskSet = std::set<TaskRef, TaskRefCompare, Allocator<TaskRef>>;
+  std::list<TaskRef> tasksWaitingForWorkerQueue;
+  using TaskSet = std::set<TaskRef, TaskRefCompare>;
 
   TaskSet tasksBeingWorkedOn;
   TaskSet tasksWaitingForChildren;
@@ -106,8 +113,8 @@ struct TaskStore::Internal {
   std::unordered_map<parac_compute_node*,
                      std::unordered_set<Task*,
                                         std::hash<Task*>,
-                                        std::equal_to<Task*>,
-                                        Allocator<Task*>>>
+                                        std::equal_to<Task*>>>
+                                        //Allocator<Task*>>>
     offloadedTasks;
 
   std::atomic_size_t tasksSize = 0;
@@ -245,7 +252,8 @@ TaskStore::default_terminate_task(parac_task* t) {
 
   t->left_child_ = nullptr;
   t->right_child_ = nullptr;
-  s->remove_from_workQueue(t);
+  if(taskWrapper->workQueueIt != s->m_internal->tasksWaitingForWorkerQueue.end())
+    s->remove_from_workQueue(t);
   s->remove_from_tasksBeingWorkedOn(t);
 
   if(left_result == PARAC_PENDING && left_child && left_child->terminate) {
@@ -260,7 +268,8 @@ TaskStore::default_terminate_task(parac_task* t) {
 
   t->state = PARAC_TASK_DONE;
   t->result = PARAC_ABORTED;
-  s->assess_task(t, true, false);
+  t->work = nullptr;
+  s->assess_task(t, false, false);
 }
 
 parac_task*
@@ -271,6 +280,7 @@ TaskStore::newTask(parac_task* parent_task,
   auto& taskWrapper = m_internal->tasks.emplace_front();
   parac_task* task = &taskWrapper.t;
   taskWrapper.it = m_internal->tasks.begin();
+  taskWrapper.workQueueIt = m_internal->tasksWaitingForWorkerQueue.end();
   parac_task_init(task);
   task->parent_task_ = parent_task;
   task->task_store = &m_internal->store;
@@ -542,8 +552,9 @@ TaskStore::remove(parac_task* task) {
     return;
 
   assert(task);
-  assert(!(task->state & PARAC_TASK_WAITING_FOR_SPLITS));
-  assert(!(task->state & PARAC_TASK_WORK_AVAILABLE));
+  assert(task->result == PARAC_ABORTED || !(task->state & PARAC_TASK_WAITING_FOR_SPLITS));
+  assert(task->result == PARAC_ABORTED || !(task->state & PARAC_TASK_WORK_AVAILABLE));
+  assert(!(task->state & PARAC_TASK_WORKING));
   assert(task->state & PARAC_TASK_DONE);
 
   // Remove references to now removed path.

@@ -44,7 +44,10 @@ QBFSolverTask::QBFSolverTask(parac_handle& handle,
 
   task.state = PARAC_TASK_WORK_AVAILABLE;
 }
-QBFSolverTask::~QBFSolverTask() {}
+QBFSolverTask::~QBFSolverTask() {
+  if(m_cleanupSelfPointer)
+    *m_cleanupSelfPointer = nullptr;
+}
 
 parac_status
 QBFSolverTask::work(parac_worker worker) {
@@ -60,22 +63,29 @@ QBFSolverTask::work(parac_worker worker) {
   }
 
   struct Cleanup {
-    QBFSolverTask& t;
-    explicit Cleanup(QBFSolverTask& t)
-      : t(t) {
+    explicit Cleanup(QBFSolverTask& t, QBFSolverManager &manager, parac_worker worker)
+      : t(&t), handle(manager.get(worker)) {
       termfunc = t.m_task.terminate;
       t.m_task.terminate = static_terminate;
+      auto &handle = this->handle;
+      t.m_terminationFunc = [&handle]() { handle->terminate(); };
+      t.m_cleanupSelfPointer = &this->t;
     }
     ~Cleanup() {
-      t.m_terminationFunc = nullptr;
-      t.m_task.terminate = termfunc;
+      if(this->t) {
+	QBFSolverTask &t = *((QBFSolverTask*) this->t);
+        t.m_terminationFunc = nullptr;
+        t.m_task.terminate = termfunc;
+	t.m_cleanupSelfPointer = nullptr;
+      }
     }
 
+    volatile QBFSolverTask* t;
     parac_task_terminate_func termfunc;
+    QBFSolverManager::PtrWrapper handle;
   };
-  Cleanup cleanup{ *this };
-  auto handle = m_manager.get(worker);
-  m_terminationFunc = [&handle]() { handle->terminate(); };
+  Cleanup cleanup{ *this, m_manager, worker };
+  auto &handle = cleanup.handle;
 
   bool split_left = false, split_right = false;
   if(m_cubeSource->split(
@@ -106,6 +116,7 @@ QBFSolverTask::work(parac_worker worker) {
       new QBFSolverTask(
         m_handle, *l, m_manager, m_cubeSource->leftChild(m_cubeSource));
       m_task.left_result = PARAC_PENDING;
+      if(l->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED)
       m_task.task_store->assess_task(m_task.task_store, l);
     } else {
       m_task.left_result = PARAC_UNSAT;
@@ -128,7 +139,8 @@ QBFSolverTask::work(parac_worker worker) {
       new QBFSolverTask(
         m_handle, *r, m_manager, m_cubeSource->rightChild(m_cubeSource));
       m_task.right_result = PARAC_PENDING;
-      m_task.task_store->assess_task(m_task.task_store, r);
+      if(r->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED)
+        m_task.task_store->assess_task(m_task.task_store, r);
     } else {
       m_task.right_result = PARAC_UNSAT;
     }
@@ -202,6 +214,8 @@ QBFSolverTask::static_free_userdata(parac_task* task) {
   assert(task->userdata);
   QBFSolverTask* self = static_cast<QBFSolverTask*>(task->userdata);
   delete self;
+  task->userdata = nullptr;
+  task->free_userdata = nullptr;
   return PARAC_OK;
 }
 }

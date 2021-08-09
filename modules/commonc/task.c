@@ -179,12 +179,12 @@ parac_task_default_assess(parac_task* t) {
 
 PARAC_COMMON_EXPORT parac_task_state
 parac_task_qbf_existential_assess(parac_task* t) {
-  return shared_assess(t, existential_assess, true);
+  return shared_assess(t, existential_assess, false);
 }
 
 PARAC_COMMON_EXPORT parac_task_state
 parac_task_qbf_universal_assess(parac_task* t) {
-  return shared_assess(t, universal_assess, true);
+  return shared_assess(t, universal_assess, false);
 }
 
 PARAC_COMMON_EXPORT void

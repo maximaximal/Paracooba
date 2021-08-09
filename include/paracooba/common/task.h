@@ -62,10 +62,10 @@ typedef struct parac_task {
 
   void* userdata;
   parac_task_assess_func assess;
-  parac_task_work_func work;
+  volatile parac_task_work_func work;
   volatile parac_task_terminate_func terminate;
   parac_task_serialize_func serialize;
-  parac_task_free_userdata_func free_userdata;
+  volatile parac_task_free_userdata_func free_userdata;
 
   /* Parent task when local, when received from remote it is the task ptr on
      the remote system. */

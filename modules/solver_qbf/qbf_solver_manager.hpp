@@ -13,6 +13,7 @@ class SolverConfig;
 class QBFSolverManager : private util::ObjectManager<GenericSolverHandle> {
   public:
   using OM = util::ObjectManager<GenericSolverHandle>;
+  using PtrWrapper = OM::PtrWrapper;
   QBFSolverManager(parac_module& mod, Parser& parser, SolverConfig& config);
   ~QBFSolverManager();
 

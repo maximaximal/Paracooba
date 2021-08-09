@@ -82,13 +82,17 @@ Worker::run() {
     }
 #endif
 
+    parac_status result;
     if(m_currentTask->work) {
-      m_currentTask->result = m_currentTask->work(m_currentTask, m_workerId);
+      result = m_currentTask->work(m_currentTask, m_workerId);
+      if(result != PARAC_ABORTED)
+        m_currentTask->result = result;
     }
 
-    m_currentTask->state = static_cast<parac_task_state>(m_currentTask->state &
-                                                         ~PARAC_TASK_WORKING) |
-                           PARAC_TASK_DONE;
+    if(result != PARAC_ABORTED)
+      m_currentTask->state = static_cast<parac_task_state>(m_currentTask->state &
+                                                           ~PARAC_TASK_WORKING) |
+                             PARAC_TASK_DONE;
 
 #ifdef ENABLE_DISTRAC
     if(m_mod.handle->distrac) {
@@ -110,7 +114,7 @@ Worker::run() {
     }
 #endif
 
-    if(!(m_currentTask->state & PARAC_TASK_SPLITTED)) {
+    if(result != PARAC_ABORTED && !(m_currentTask->state & PARAC_TASK_SPLITTED)) {
       m_taskStore.assess_task(&m_taskStore, m_currentTask);
     }
   }

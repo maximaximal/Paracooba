@@ -48,5 +48,6 @@ class QBFSolverTask {
   }
 
   std::unique_ptr<NoncopyOStringstream> m_serializationOutStream;
+  volatile QBFSolverTask** m_cleanupSelfPointer = nullptr;
 };
 }
