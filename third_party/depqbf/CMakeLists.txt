@@ -1,7 +1,7 @@
 ExternalProject_Add(depqbf
     PREFIX depqbf
     URL ${CMAKE_CURRENT_SOURCE_DIR}/depqbf-version-6.03.tar.xz
-    URL_HASH SHA256=8eeeea17aa7a716d6f4856837e221dcc5808123136006ca14f4a551b29f1a24a
+    URL_HASH SHA256=8e8b0ac186392f924d70298e610e8d03707189a57dd3dcb9a89194061768ae1f
     BUILD_IN_SOURCE 1
     BUILD_COMMAND bash -c "CXX=${CMAKE_CXX_COMPILER} CFLAGS=\"-fPIC -fvisibility=hidden\" CXXFLAGS=\"-fPIC -fvisibility=hidden\" ./compile.sh"
     UPDATE_COMMAND ""
