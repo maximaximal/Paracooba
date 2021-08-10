@@ -206,15 +206,16 @@ TaskStore::size() const {
 }
 
 void
-TaskStore::default_terminate_task(parac_task* t) {
+TaskStore::default_terminate_task(volatile parac_task* t) {
   assert(t);
   assert(t->task_store);
   assert(t->task_store->userdata);
 
   TaskStore* s = static_cast<TaskStore*>(t->task_store->userdata);
 
-  parac_log(
-    PARAC_BROKER, PARAC_TRACE, "Default terminate task on path {}", t->path);
+  parac_path p = ((parac_task*)t)->path;
+
+  parac_log(PARAC_BROKER, PARAC_TRACE, "Default terminate task on path {}", p);
 
   if(t->state & PARAC_TASK_OFFLOADED) {
     assert(t->offloaded_to);
@@ -224,21 +225,26 @@ TaskStore::default_terminate_task(parac_task* t) {
     msg.data_is_inline = true;
     msg.data_to_be_freed = false;
     uintptr_t* ptr = reinterpret_cast<uintptr_t*>(msg.inline_data);
-    *ptr = reinterpret_cast<uintptr_t>(static_cast<void*>(t));
+    *ptr = reinterpret_cast<uintptr_t>(static_cast<volatile void*>(t));
     t->offloaded_to->send_message_to(t->offloaded_to, &msg);
 
     // No callback required, the task is just aborted.
     t->state = PARAC_TASK_DONE;
-    s->assess_task(t);
+    s->assess_task((parac_task*)t);
     return;
   }
+
+  t->state = PARAC_TASK_DONE;
+  t->result = PARAC_ABORTED;
+  t->work = nullptr;
+  t->stop = true;
 
   if(t->state & PARAC_TASK_WORKING) {
     return;
   }
 
   Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
-    reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
+    reinterpret_cast<std::byte*>((void*)t) - offsetof(Internal::Task, t));
   // Delete only after final assessment. The reference in this function needs to
   // be counted too.
   ++taskWrapper->refcount;
@@ -253,8 +259,8 @@ TaskStore::default_terminate_task(parac_task* t) {
   t->right_child_ = nullptr;
   if(taskWrapper->workQueueIt !=
      s->m_internal->tasksWaitingForWorkerQueue.end())
-    s->remove_from_workQueue(t);
-  s->remove_from_tasksBeingWorkedOn(t);
+    s->remove_from_workQueue((parac_task*)t);
+  s->remove_from_tasksBeingWorkedOn((parac_task*)t);
 
   if(left_result == PARAC_PENDING && left_child && left_child->terminate) {
     left_child->parent_task_ = nullptr;
@@ -266,10 +272,7 @@ TaskStore::default_terminate_task(parac_task* t) {
     right_child->terminate(right_child);
   }
 
-  t->state = PARAC_TASK_DONE;
-  t->result = PARAC_ABORTED;
-  t->work = nullptr;
-  s->assess_task(t, true, false);
+  s->assess_task((parac_task*)t, false, false);
 }
 
 parac_task*
@@ -565,9 +568,15 @@ TaskStore::remove(parac_task* task) {
   if(task->right_child_)
     task->right_child_->parent_task_ = nullptr;
 
+  parac_log(PARAC_BROKER,
+            PARAC_TRACE,
+            "Remove task on path {} with address {}",
+            task->path,
+            static_cast<void*>(&task));
+
   if(task->parent_task_ && !task->received_from) {
     Internal::Task* parentWrapper = reinterpret_cast<Internal::Task*>(
-      reinterpret_cast<std::byte*>(task->parent_task_) -
+      reinterpret_cast<std::byte*>((void*)task->parent_task_) -
       offsetof(Internal::Task, t));
     --parentWrapper->refcount;
 
@@ -738,7 +747,7 @@ TaskStore::assess_task(parac_task* task, bool remove, bool removeParent) {
     auto path = task->path;
     auto result = task->result;
     auto originator = task->originator;
-    parac_task* parent = task->parent_task_;
+    parac_task* parent = (parac_task*)task->parent_task_;
 
     if(task->received_from)
       parent = nullptr;

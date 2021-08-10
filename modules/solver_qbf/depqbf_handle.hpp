@@ -23,6 +23,7 @@ class DepQBFHandle : public GenericSolverHandle {
   std::unique_ptr<QDPLL, void (*)(QDPLL*)> m_qdpll;
 
   volatile bool m_terminated = false;
+  volatile bool m_running = false;
 
   void addParsedQDIMACS();
 };

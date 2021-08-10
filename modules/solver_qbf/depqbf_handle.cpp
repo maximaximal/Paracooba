@@ -27,24 +27,42 @@ DepQBFHandle::assumeCube(const CubeIteratorRange& cube) {
 
 parac_status
 DepQBFHandle::solve() {
-  m_terminated = false;
+  if(m_terminated) {
+    m_terminated = false;
+    return PARAC_ABORTED;
+  }
+
+  m_running = true;
   QDPLLResult result = qdpll_sat(m_qdpll.get());
+  m_running = false;
+
   switch(result) {
     case QDPLL_RESULT_SAT:
       return PARAC_SAT;
     case QDPLL_RESULT_UNSAT:
       return PARAC_UNSAT;
     case QDPLL_RESULT_UNKNOWN:
+      if(!m_terminated) {
+        parac_log(PARAC_SOLVER,
+                  PARAC_FATAL,
+                  "DepQBF solving formula {} returned UNKNOWN even though it "
+                  "was not aborted!",
+                  m_parser.path());
+      }
       assert(m_terminated);
+      m_terminated = false;
       return PARAC_ABORTED;
   }
+  m_terminated = false;
   return PARAC_UNKNOWN;
 }
 
 void
 DepQBFHandle::terminate() {
-  m_terminated = true;
-  qdpll_terminate(m_qdpll.get());
+  if(m_running) {
+    m_terminated = true;
+    qdpll_terminate(m_qdpll.get());
+  }
 }
 
 static QDPLLQuantifierType

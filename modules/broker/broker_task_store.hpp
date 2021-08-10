@@ -64,7 +64,7 @@ class TaskStore {
   void remove(parac_task* task);
 
   static void autoShutdownTimerExpired(parac_timeout* t);
-  static void default_terminate_task(parac_task* t);
+  static void default_terminate_task(volatile parac_task* t);
 
   struct Internal;
   std::unique_ptr<Internal> m_internal;

@@ -19,7 +19,7 @@ class KissatTask {
 
   private:
   static parac_status static_work(parac_task* task, parac_worker worker);
-  static void static_terminate(parac_task* task);
+  static void static_terminate(volatile parac_task* task);
   static parac_status static_free_userdata(parac_task* task);
 
   parac_status work(parac_worker worker);

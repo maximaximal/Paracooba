@@ -63,7 +63,7 @@ notify_result(parac_task* t) {
   memset(msg.inline_data, 0, PARAC_MESSAGE_INLINE_DATA_SIZE);
 
   parac_task_result_packet* res = (void*)msg.inline_data;
-  res->task_ptr = t->parent_task_;
+  res->task_ptr = (void*)t->parent_task_;
   res->result = t->result;
 
   msg.data_to_be_freed = false;
@@ -87,7 +87,7 @@ parac_task_result_packet_get_task_ptr(void* result) {
 }
 
 static void
-early_abort_task(parac_task* t) {
+early_abort_task(volatile parac_task* t) {
   assert(t);
   if(t->terminate)
     t->terminate(t);
@@ -151,14 +151,14 @@ shared_assess(parac_task* t, assess_func a, bool terminate_children) {
   assert(t->task_store);
 
   if(t->state & PARAC_TASK_SPLITTED) {
-    if(t->left_result != PARAC_PENDING && t->right_result != PARAC_PENDING) {
+    bool notify = a(t, terminate_children);
+    if((t->left_result != PARAC_PENDING && t->right_result != PARAC_PENDING) ||
+       (t->result != PARAC_PENDING && t->result != PARAC_SPLITTED)) {
       t->state |= PARAC_TASK_SPLITS_DONE;
       t->state &= ~PARAC_TASK_WAITING_FOR_SPLITS;
     }
 
     if(t->state & PARAC_TASK_SPLITS_DONE || terminate_children) {
-      bool notify = a(t, terminate_children);
-
       if(notify && t->received_from) {
         notify_result(t);
       }
@@ -166,6 +166,9 @@ shared_assess(parac_task* t, assess_func a, bool terminate_children) {
   } else {
     if(t->received_from && (t->result != PARAC_PENDING)) {
       notify_result(t);
+    } else if(t->result != PARAC_PENDING) {
+      t->state |= PARAC_TASK_DONE;
+      t->state &= ~PARAC_TASK_WORK_AVAILABLE;
     }
   }
 
@@ -179,12 +182,12 @@ parac_task_default_assess(parac_task* t) {
 
 PARAC_COMMON_EXPORT parac_task_state
 parac_task_qbf_existential_assess(parac_task* t) {
-  return shared_assess(t, existential_assess, true);
+  return shared_assess(t, existential_assess, false);
 }
 
 PARAC_COMMON_EXPORT parac_task_state
 parac_task_qbf_universal_assess(parac_task* t) {
-  return shared_assess(t, universal_assess, true);
+  return shared_assess(t, universal_assess, false);
 }
 
 PARAC_COMMON_EXPORT void

@@ -48,7 +48,7 @@ class SolverTask {
   static parac_status static_work(parac_task* task, parac_worker worker);
   static parac_status static_serialize(parac_task* task,
                                        parac_message* tgt_msg);
-  static void static_terminate(parac_task* task);
+  static void static_terminate(volatile parac_task* task);
   static parac_task_state static_assess(parac_task* t);
 
   parac_path& path();

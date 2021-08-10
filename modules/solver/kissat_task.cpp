@@ -52,7 +52,7 @@ KissatTask::static_work(parac_task* task, parac_worker worker) {
   return self->work(worker);
 }
 void
-KissatTask::static_terminate(parac_task* task) {
+KissatTask::static_terminate(volatile parac_task* task) {
   assert(task);
   assert(task->userdata);
   KissatTask* self = static_cast<KissatTask*>(task->userdata);

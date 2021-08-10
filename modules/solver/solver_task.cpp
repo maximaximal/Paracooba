@@ -358,7 +358,7 @@ SolverTask::static_assess(parac_task* t) {
 }
 
 void
-SolverTask::static_terminate(parac_task* task) {
+SolverTask::static_terminate(volatile parac_task* task) {
   assert(task);
   assert(task->userdata);
   SolverTask* t = static_cast<SolverTask*>(task->userdata);
