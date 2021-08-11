@@ -52,10 +52,11 @@ typedef struct parac_task {
   volatile parac_status left_result;
   volatile parac_status right_result;
   volatile bool stop;
+  volatile bool *delete_notification;
   uint32_t pre_path_sorting_critereon;
   uint32_t post_path_sorting_critereon;
   parac_path path;
-  parac_worker worker;
+  volatile parac_worker worker;
   struct parac_compute_node* received_from;
   struct parac_compute_node* offloaded_to;
   parac_id originator;

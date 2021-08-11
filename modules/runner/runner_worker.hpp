@@ -45,6 +45,8 @@ class Worker {
   parac_worker m_workerId;
   bool m_idle = false;
 
+  volatile bool m_deleteNotifier = false;
+
   std::atomic_bool m_working;
   std::unique_ptr<parac_thread_registry_handle> m_threadRegistryHandle;
 

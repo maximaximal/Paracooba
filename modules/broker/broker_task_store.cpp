@@ -96,6 +96,9 @@ struct TaskStore::Internal {
       if(t.free_userdata) {
         t.free_userdata(&t);
       }
+      if(t.delete_notification) {
+        *t.delete_notification = true;
+      }
     }
   };
 
@@ -574,7 +577,7 @@ TaskStore::remove(parac_task* task) {
 
   --taskWrapper->refcount;
 
-  //if(taskWrapper->refcount > 0)
+  // if(taskWrapper->refcount > 0)
   //  return;
 
   assert(task);

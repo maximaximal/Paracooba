@@ -216,6 +216,7 @@ parac_task_init(parac_task* t) {
   t->worker = 0;
   t->pre_path_sorting_critereon = 0;
   t->post_path_sorting_critereon = 0;
+  t->delete_notification = NULL;
 }
 
 PARAC_COMMON_EXPORT

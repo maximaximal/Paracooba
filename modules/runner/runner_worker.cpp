@@ -1,5 +1,6 @@
 #include <cassert>
 
+#include "paracooba/common/status.h"
 #include "paracooba/common/thread_registry.h"
 #include "runner_worker.hpp"
 
@@ -59,6 +60,10 @@ Worker::run() {
     m_idle = false;
 
     m_currentTask->worker = m_workerId;
+    m_deleteNotifier = false;
+    m_currentTask->delete_notification = &m_deleteNotifier;
+    parac_id originator = m_currentTask->originator;
+    parac_path p = m_currentTask->path;
 
     assert(!(m_currentTask->state & PARAC_TASK_WORK_AVAILABLE));
 
@@ -82,17 +87,20 @@ Worker::run() {
     }
 #endif
 
-    parac_status result;
+    parac_status result = PARAC_ABORTED;
     if(m_currentTask->work) {
       result = m_currentTask->work(m_currentTask, m_workerId);
-      if(result != PARAC_ABORTED)
+      if(result != PARAC_ABORTED && result != PARAC_PENDING &&
+         !m_deleteNotifier) {
         m_currentTask->result = result;
+      }
     }
 
-    if(result != PARAC_ABORTED)
-      m_currentTask->state = static_cast<parac_task_state>(m_currentTask->state &
-                                                           ~PARAC_TASK_WORKING) |
+    if(result != PARAC_ABORTED && !m_deleteNotifier) {
+      m_currentTask->state = static_cast<parac_task_state>(
+                               m_currentTask->state & ~PARAC_TASK_WORKING) |
                              PARAC_TASK_DONE;
+    }
 
 #ifdef ENABLE_DISTRAC
     if(m_mod.handle->distrac) {
@@ -100,12 +108,12 @@ Worker::run() {
         (distrac_current_time(m_mod.handle->distrac) - startOfProcessing) /
         (1000);
       distrac_parac_path dp;
-      dp.rep = m_currentTask->path.rep;
+      dp.rep = p.rep;
       parac_ev_finish_processing_task finish_processing_task{
-        m_currentTask->originator,
+        originator,
         dp,
         static_cast<uint16_t>(m_workerId),
-        static_cast<uint16_t>(m_currentTask->result),
+        static_cast<uint16_t>(result),
         diff
       };
       distrac_push(m_mod.handle->distrac,
@@ -114,7 +122,11 @@ Worker::run() {
     }
 #endif
 
-    if(result != PARAC_ABORTED && !(m_currentTask->state & PARAC_TASK_SPLITTED)) {
+    if(!m_deleteNotifier)
+      m_currentTask->delete_notification = NULL;
+
+    if(result != PARAC_ABORTED && !m_deleteNotifier &&
+       !(m_currentTask->state & PARAC_TASK_SPLITTED)) {
       m_taskStore.assess_task(&m_taskStore, m_currentTask);
     }
   }
