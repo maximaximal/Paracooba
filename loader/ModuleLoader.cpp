@@ -192,9 +192,8 @@ ModuleLoader::initHandle() {
 bool
 ModuleLoader::load(parac_module_type type) {
   PathSource pathSource(type);
-  while(!pathSource.is_complete()) {
-    boost::filesystem::path path = pathSource();
-    std::string name = std::string("parac_") + parac_module_type_to_str(type);
+
+  {
     // First, try to discover module in statically linked modules. Afterwards,
     // try dynamically loading.
 
@@ -216,29 +215,36 @@ ModuleLoader::load(parac_module_type type) {
                 mod.version.patch,
                 mod.version.tweak,
                 status);
-    } else {
-      auto imported{ OpenDynamicLibrary(path, name) };
-      if(!imported || !(*imported)) {
-        continue;
-      }
-      status = imported->discover(&handle());
-      m_internal->imports.push_back(std::move(imported));
 
-      auto& mod = *m_modules[type];
-
-      parac_log(PARAC_LOADER,
-                PARAC_DEBUG,
-                "{} named '{}' version {}.{}.{}:{} loaded from (generic) "
-                "SO-path {} with status {}",
-                parac_module_type_to_str(type),
-                mod.name,
-                mod.version.major,
-                mod.version.minor,
-                mod.version.patch,
-                mod.version.tweak,
-                (path / name).string(),
-                status);
+      return true;
     }
+  }
+
+  while(!pathSource.is_complete()) {
+    parac_status status;
+    std::string name = std::string("parac_") + parac_module_type_to_str(type);
+    boost::filesystem::path path = pathSource();
+    auto imported{ OpenDynamicLibrary(path, name) };
+    if(!imported || !(*imported)) {
+      continue;
+    }
+    status = imported->discover(&handle());
+    m_internal->imports.push_back(std::move(imported));
+
+    auto& mod = *m_modules[type];
+
+    parac_log(PARAC_LOADER,
+              PARAC_DEBUG,
+              "{} named '{}' version {}.{}.{}:{} loaded from (generic) "
+              "SO-path {} with status {}",
+              parac_module_type_to_str(type),
+              mod.name,
+              mod.version.major,
+              mod.version.minor,
+              mod.version.patch,
+              mod.version.tweak,
+              (path / name).string(),
+              status);
 
     return true;
   }

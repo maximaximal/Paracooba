@@ -22,6 +22,17 @@ typedef parac_status (*parac_module_discover_func)(parac_handle*);
 extern parac_module_discover_func
 parac_static_module_discover(parac_module_type mod);
 
+struct ParacWorkerCountSetter {
+  ParacWorkerCountSetter(size_t workers) { setWorkerCount(workers); }
+  ~ParacWorkerCountSetter() {
+    setWorkerCount(std::thread::hardware_concurrency());
+  }
+
+  void setWorkerCount(size_t workers) {
+    setenv("PARAC_WORKER_COUNT", std::to_string(workers).c_str(), 1);
+  }
+};
+
 class ParacoobaMock : public parac_handle {
   public:
   ParacoobaMock(

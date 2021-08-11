@@ -6,6 +6,8 @@ set(TEST_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/test_connect_daemon_and_client.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/test_master_daemon_sat.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/test_task_store.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_qbf_exists_forall_unsat.cpp
 )
 
 add_executable(parac_test ${TEST_SRCS})
