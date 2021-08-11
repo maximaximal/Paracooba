@@ -814,10 +814,8 @@ TaskStore::assess_task(parac_task* task, bool remove, bool removeParent) {
 
       if(path.rep == parac_path_get_next_left(parentPath).rep) {
         parent->left_result = result;
-        parent->left_child_ = nullptr;
       } else if(path.rep == parac_path_get_next_right(parentPath).rep) {
         parent->right_result = result;
-        parent->right_child_ = nullptr;
       } else {
         parac_log(PARAC_BROKER,
                   PARAC_GLOBALERROR,

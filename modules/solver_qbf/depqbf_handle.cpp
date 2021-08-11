@@ -38,8 +38,10 @@ DepQBFHandle::solve() {
 
   switch(result) {
     case QDPLL_RESULT_SAT:
+      m_terminated = false;
       return PARAC_SAT;
     case QDPLL_RESULT_UNSAT:
+      m_terminated = false;
       return PARAC_UNSAT;
     case QDPLL_RESULT_UNKNOWN:
       if(!m_terminated) {
@@ -53,7 +55,6 @@ DepQBFHandle::solve() {
       m_terminated = false;
       return PARAC_ABORTED;
   }
-  m_terminated = false;
   return PARAC_UNKNOWN;
 }
 
@@ -74,6 +75,7 @@ QTypeFromParserQuantifier(Parser::Quantifier q) {
       return QDPLL_QTYPE_FORALL;
   }
   return QDPLL_QTYPE_UNDEF;
+  assert(false);
 }
 
 void

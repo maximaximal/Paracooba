@@ -1,5 +1,6 @@
 #include <cassert>
 
+#include <elf.h>
 #include <paracooba/common/log.h>
 #include <paracooba/common/message.h>
 #include <paracooba/common/message_kind.h>
@@ -45,6 +46,7 @@ QBFSolverTask::QBFSolverTask(parac_handle& handle,
   task.state = PARAC_TASK_WORK_AVAILABLE;
 }
 QBFSolverTask::~QBFSolverTask() {
+  std::unique_lock lock(m_terminationMutex);
   if(m_cleanupSelfPointer)
     *m_cleanupSelfPointer = nullptr;
 }
@@ -73,13 +75,16 @@ QBFSolverTask::work(parac_worker worker) {
       , handle(manager.get(worker)) {
       termfunc = t.m_task.terminate;
       t.m_task.terminate = static_terminate;
-      auto& handle = this->handle;
-      t.m_terminationFunc = [&handle]() { handle->terminate(); };
+      t.m_terminationFunc = [this]() {
+        handle->terminate();
+      };
       t.m_cleanupSelfPointer = &this->t;
     }
     ~Cleanup() {
       if(this->t) {
         QBFSolverTask& t = *((QBFSolverTask*)this->t);
+        std::unique_lock lock(t.m_terminationMutex);
+
         t.m_terminationFunc = nullptr;
         t.m_task.terminate = termfunc;
         t.m_cleanupSelfPointer = nullptr;
@@ -160,11 +165,19 @@ QBFSolverTask::work(parac_worker worker) {
               "Apply cube {} on path {} to solver!",
               c,
               m_task.path);
-    return handle->solve();
+    parac_status r = handle->solve();
+    if(r == PARAC_ABORTED) {
+      std::unique_lock lock(m_terminationMutex);
+      cleanup.t = nullptr;
+      m_cleanupSelfPointer = nullptr;
+      m_terminationFunc = nullptr;
+    }
+    return r;
   }
 }
 void
 QBFSolverTask::terminate() {
+  std::unique_lock lock(m_terminationMutex);
   if(m_terminationFunc) {
     m_terminationFunc();
   }

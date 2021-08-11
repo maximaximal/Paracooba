@@ -3,6 +3,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <mutex>
 
 #include <paracooba/common/noncopy_ostream.hpp>
 #include <paracooba/common/status.h>
@@ -40,6 +41,7 @@ class QBFSolverTask {
 
   std::function<void()> m_terminationFunc;
   std::shared_ptr<cubesource::Source> m_cubeSource;
+  std::mutex m_terminationMutex;
 
   friend class ::cereal::access;
   template<class Archive>
