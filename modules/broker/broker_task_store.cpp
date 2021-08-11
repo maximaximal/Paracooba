@@ -27,6 +27,11 @@
 
 #include <boost/pool/pool_alloc.hpp>
 
+// The memory pool optimizes performance but may cause issues while debugging,
+// as the same memory is re-used for multiple tasks.
+
+//#define USE_MEMORY_POOL
+
 namespace parac::broker {
 static ComputeNodeStore&
 extractComputeNodeStore(parac_handle& h) {
@@ -60,20 +65,21 @@ struct TaskStore::Internal {
   parac_task_store& store;
 
   struct Task;
+#ifdef USE_MEMORY_POOL
   template<typename T>
   using Allocator =
     boost::fast_pool_allocator<T,
                                boost::default_user_allocator_new_delete,
                                boost::details::pool::default_mutex,
                                64>;
-  /*
   using TaskRef = std::reference_wrapper<parac_task>;
   using TaskList = std::list<Task, Allocator<Task>>;
   using TaskRefList = std::list<TaskRef, Allocator<TaskRef>>;
-  */
+#else
   using TaskRef = std::reference_wrapper<parac_task>;
   using TaskList = std::list<Task>;
   using TaskRefList = std::list<TaskRef>;
+#endif
 
   struct Task {
     TaskList::iterator it;
@@ -110,11 +116,19 @@ struct TaskStore::Internal {
   TaskSet tasksBeingWorkedOn;
   TaskSet tasksWaitingForChildren;
 
+#ifdef USE_MEMORY_POOL
+  std::unordered_map<parac_compute_node*,
+                     std::unordered_set<Task*,
+                                        std::hash<Task*>,
+                                        std::equal_to<Task*>,
+                                        Allocator<Task*>>>
+    offloadedTasks;
+#else
   std::unordered_map<
     parac_compute_node*,
     std::unordered_set<Task*, std::hash<Task*>, std::equal_to<Task*>>>
-    // Allocator<Task*>>>
     offloadedTasks;
+#endif
 
   std::atomic_size_t tasksSize = 0;
   std::atomic_size_t tasksWaitingForWorkerQueueSize = 0;
@@ -255,8 +269,15 @@ TaskStore::default_terminate_task(volatile parac_task* t) {
   auto right_result = t->right_result;
   auto right_child = t->right_child_;
 
-  t->left_child_ = nullptr;
-  t->right_child_ = nullptr;
+  if(t->left_child_) {
+    t->left_child_->parent_task_ = nullptr;
+    t->left_child_ = nullptr;
+  }
+  if(t->right_child_) {
+    t->right_child_->parent_task_ = nullptr;
+    t->right_child_ = nullptr;
+  }
+
   if(taskWrapper->workQueueIt !=
      s->m_internal->tasksWaitingForWorkerQueue.end())
     s->remove_from_workQueue((parac_task*)t);
@@ -302,6 +323,8 @@ TaskStore::newTask(parac_task* parent_task,
               new_path.rep) {
       parent_task->right_child_ = task;
     }
+    assert(parent_task->left_child_ || parent_task->right_child_);
+    assert(!parent_task->stop);
   }
 
   ++m_internal->tasksSize;
@@ -551,8 +574,8 @@ TaskStore::remove(parac_task* task) {
 
   --taskWrapper->refcount;
 
-  if(taskWrapper->refcount > 0)
-    return;
+  //if(taskWrapper->refcount > 0)
+  //  return;
 
   assert(task);
   assert(task->result == PARAC_ABORTED ||
@@ -568,11 +591,18 @@ TaskStore::remove(parac_task* task) {
   if(task->right_child_)
     task->right_child_->parent_task_ = nullptr;
 
+  bool hadleftchild = task->left_child_;
+  bool hadrightchild = task->right_child_;
+
   parac_log(PARAC_BROKER,
             PARAC_TRACE,
-            "Remove task on path {} with address {}",
+            "Remove task on path {} with address {}. Had left child: {}, had "
+            "right child: {}. Had parent task: {}",
             task->path,
-            static_cast<void*>(&task));
+            static_cast<void*>(task),
+            hadleftchild,
+            hadrightchild,
+            static_cast<void*>((parac_task*)task->parent_task_));
 
   if(task->parent_task_ && !task->received_from) {
     Internal::Task* parentWrapper = reinterpret_cast<Internal::Task*>(
@@ -580,10 +610,15 @@ TaskStore::remove(parac_task* task) {
       offsetof(Internal::Task, t));
     --parentWrapper->refcount;
 
-    if(task->parent_task_->left_child_ == task)
+    assert(!(task->parent_task_->left_child_ == task &&
+             task->parent_task_->right_child_ == task));
+
+    if(task->parent_task_->left_child_ == task) {
       task->parent_task_->left_child_ = nullptr;
-    if(task->parent_task_->right_child_ == task)
+    }
+    if(task->parent_task_->right_child_ == task) {
       task->parent_task_->right_child_ = nullptr;
+    }
   }
 
   --m_internal->tasksSize;
@@ -770,6 +805,9 @@ TaskStore::assess_task(parac_task* task, bool remove, bool removeParent) {
 
     if(parent) {
       parac_path parentPath = parent->path;
+
+      assert(path.rep == parac_path_get_next_left(parentPath).rep ||
+             path.rep == parac_path_get_next_right(parentPath).rep);
 
       if(path.rep == parac_path_get_next_left(parentPath).rep) {
         parent->left_result = result;
