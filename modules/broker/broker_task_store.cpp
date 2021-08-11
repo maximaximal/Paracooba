@@ -574,6 +574,7 @@ TaskStore::remove(parac_task* task) {
   assert(taskWrapper);
 
   std::unique_lock lock(m_internal->containerMutex);
+  std::unique_lock assessLock(m_internal->assessMutex);
 
   --taskWrapper->refcount;
 
