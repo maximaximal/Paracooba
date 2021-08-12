@@ -91,7 +91,7 @@ Worker::run() {
     if(m_currentTask->work) {
       result = m_currentTask->work(m_currentTask, m_workerId);
       if(result != PARAC_ABORTED && result != PARAC_PENDING &&
-         !m_deleteNotifier) {
+         !m_deleteNotifier && m_currentTask->result == PARAC_PENDING) {
         m_currentTask->result = result;
       }
     }

@@ -100,12 +100,10 @@ existential_assess(parac_task* t, bool terminate_children) {
 
     if(terminate_children) {
       if(t->left_result == PARAC_SAT && t->right_child_ &&
-         !(parac_task_state_is_done(t->right_child_->state) &&
-           !(t->right_child_->state & PARAC_TASK_SPLITTED))) {
+         !(parac_task_state_is_done(t->right_child_->state))) {
         early_abort_task(t->right_child_);
       } else if(t->right_result == PARAC_SAT && t->left_child_ &&
-                !(parac_task_state_is_done(t->left_child_->state) &&
-                  !(t->left_child_->state & PARAC_TASK_SPLITTED))) {
+                !(parac_task_state_is_done(t->left_child_->state))) {
         early_abort_task(t->left_child_);
       }
     }
@@ -125,12 +123,10 @@ universal_assess(parac_task* t, bool terminate_children) {
 
     if(terminate_children) {
       if(t->left_result == PARAC_UNSAT && t->right_child_ &&
-         !(parac_task_state_is_done(t->right_child_->state) &&
-           !(t->right_child_->state & PARAC_TASK_SPLITTED))) {
+         !(parac_task_state_is_done(t->right_child_->state))) {
         early_abort_task(t->right_child_);
       } else if(t->right_result == PARAC_UNSAT && t->left_child_ &&
-                !(parac_task_state_is_done(t->left_child_->state) &&
-                  !(t->left_child_->state & PARAC_TASK_SPLITTED))) {
+                !(parac_task_state_is_done(t->left_child_->state))) {
         early_abort_task(t->left_child_);
       }
     }
@@ -156,6 +152,8 @@ shared_assess(parac_task* t, assess_func a, bool terminate_children) {
        (t->result != PARAC_PENDING && t->result != PARAC_SPLITTED)) {
       t->state |= PARAC_TASK_SPLITS_DONE;
       t->state &= ~PARAC_TASK_WAITING_FOR_SPLITS;
+
+      assert(t->result != PARAC_TASK_SPLITTED);
     }
 
     if(t->state & PARAC_TASK_SPLITS_DONE || terminate_children) {

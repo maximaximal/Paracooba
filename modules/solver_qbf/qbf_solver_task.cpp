@@ -7,6 +7,7 @@
 #include <paracooba/common/status.h>
 #include <paracooba/common/task_store.h>
 
+#include "paracooba/common/path.h"
 #include "parser_qbf.hpp"
 #include "qbf_solver_manager.hpp"
 #include "qbf_solver_task.hpp"
@@ -33,8 +34,17 @@ QBFSolverTask::QBFSolverTask(parac_handle& handle,
   , m_manager(manager)
   , m_cubeSource(std::move(cubeSource)) {
   Parser::Quantifier qu{ 0 };
-  if(manager.parser().quantifiers().size() > 0) {
+  if(manager.parser().quantifiers().size() > parac_path_length(task.path)) {
     qu = manager.parser().quantifiers()[parac_path_length(task.path)];
+  } else {
+    parac_log(PARAC_SOLVER,
+              PARAC_TRACE,
+              "QBF Solver reached limit of quantifier prefix! Task on path {} "
+              "has longer path "
+              "length ({}+1) than the quantifier prefix ({})!",
+              task.path,
+              parac_path_length(task.path),
+              manager.parser().quantifiers().size());
   }
 
   m_task.assess = GetAssessFunc(qu);
@@ -75,9 +85,7 @@ QBFSolverTask::work(parac_worker worker) {
       , handle(manager.get(worker)) {
       termfunc = t.m_task.terminate;
       t.m_task.terminate = static_terminate;
-      t.m_terminationFunc = [this]() {
-        handle->terminate();
-      };
+      t.m_terminationFunc = [this]() { handle->terminate(); };
       t.m_cleanupSelfPointer = &this->t;
     }
     ~Cleanup() {
@@ -177,7 +185,10 @@ QBFSolverTask::work(parac_worker worker) {
 }
 void
 QBFSolverTask::terminate() {
-  std::unique_lock lock(m_terminationMutex);
+  std::unique_lock<std::mutex> lock(m_terminationMutex, std::try_to_lock);
+  if(!lock.owns_lock())
+    return;
+
   if(m_terminationFunc) {
     m_terminationFunc();
   }
