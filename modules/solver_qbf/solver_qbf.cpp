@@ -527,7 +527,7 @@ mod_exit(parac_module* mod) {
 }
 
 extern "C" PARAC_SOLVER_QBF_EXPORT parac_status
-parac_module_discover_solver(parac_handle* handle) {
+parac_module_discover_solver_qbf(parac_handle* handle) {
   assert(handle);
 
   parac_module* mod = handle->prepare(handle, PARAC_MOD_SOLVER);

@@ -23,8 +23,6 @@ add_dependencies(parac_solver_qbf_obj libdepqbf)
 
 set_property(TARGET parac_solver_qbf_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES cereal)
 
-set_target_properties(parac_solver_qbf PROPERTIES OUTPUT_NAME "parac_solver")
-
 if(STATIC_BUILDS)
     target_link_libraries(parac_solver_qbf_static PRIVATE libdepqbf)
 endif()

@@ -15,7 +15,7 @@ TEST_CASE("Single threaded QBF formula that goes EXISTS 1 FORALL 2",
           "[integration][communicator][broker][solver][runner][qbf]") {
   ParacWorkerCountSetter workerCount(1);
 
-  setenv("PARAC_MODULEPATH_SOLVER", "./modules/solver_qbf/", 1);
+  setenv("PARAC_MODULEPATH_SOLVER", "./modules/solver_qbf/libparac_solver_qbf.so", 1);
   ParacoobaMock master(1, test_qdimacs_str);
   unsetenv("PARAC_MODULEPATH_SOLVER");
 

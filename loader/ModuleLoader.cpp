@@ -26,7 +26,12 @@ parac_static_module_discover(parac_module_type mod);
 
 struct DynModule {
   DynModule(boost::filesystem::path path, const std::string& name) {
-    std::string decorated_name = (path / ("lib" + name + ".so")).string();
+    std::string decorated_name;
+    if(boost::filesystem::is_regular_file(path)) {
+      decorated_name = path.string();
+    } else {
+      decorated_name = (path / ("lib" + name + ".so")).string();
+    }
     parac_log(PARAC_LOADER,
               PARAC_TRACE,
               "Trying to open library \"{}\" in path \"{}\" as file \"{}\"...",
