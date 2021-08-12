@@ -100,9 +100,12 @@ existential_assess(parac_task* t, bool terminate_children) {
 
     if(terminate_children) {
       if(t->left_result == PARAC_SAT && t->right_child_ &&
+         t->right_result != PARAC_PENDING && t->right_result != PARAC_ABORTED &&
          !(parac_task_state_is_done(t->right_child_->state))) {
         early_abort_task(t->right_child_);
-      } else if(t->right_result == PARAC_SAT && t->left_child_ &&
+      } else if(t->right_result == PARAC_SAT &&
+                t->left_result != PARAC_PENDING &&
+                t->left_result != PARAC_ABORTED && t->left_child_ &&
                 !(parac_task_state_is_done(t->left_child_->state))) {
         early_abort_task(t->left_child_);
       }
@@ -123,9 +126,12 @@ universal_assess(parac_task* t, bool terminate_children) {
 
     if(terminate_children) {
       if(t->left_result == PARAC_UNSAT && t->right_child_ &&
+         t->right_result != PARAC_PENDING && t->right_result != PARAC_ABORTED &&
          !(parac_task_state_is_done(t->right_child_->state))) {
         early_abort_task(t->right_child_);
       } else if(t->right_result == PARAC_UNSAT && t->left_child_ &&
+                t->left_result != PARAC_PENDING &&
+                t->left_result != PARAC_ABORTED &&
                 !(parac_task_state_is_done(t->left_child_->state))) {
         early_abort_task(t->left_child_);
       }
