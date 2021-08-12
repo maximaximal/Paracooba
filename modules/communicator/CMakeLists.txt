@@ -27,6 +27,8 @@ target_include_directories(parac_communicator_obj PRIVATE ${BOOST_INCLUDE_DIRECT
 
 set_property(TARGET parac_solver_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES distrac)
 
+target_link_libraries(parac_communicator PUBLIC Boost::filesystem)
+
 if(ENABLE_TESTS)
     add_library(parac_communicator_test SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/test_message_send_queue.cpp)

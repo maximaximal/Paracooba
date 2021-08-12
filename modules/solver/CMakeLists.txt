@@ -12,6 +12,7 @@ set(PARACOOBA_SOLVER_SRCS
 
 parac_module(parac_solver "${PARACOOBA_SOLVER_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
 target_link_libraries(parac_solver PRIVATE libcadical libkissat)
+target_link_libraries(parac_solver PUBLIC Boost::filesystem)
 
 get_target_property(CEREAL_INCLUDE_DIRS cereal INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_solver_obj PRIVATE ${CEREAL_INCLUDE_DIRS})
