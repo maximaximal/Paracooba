@@ -30,7 +30,7 @@
 // The memory pool optimizes performance but may cause issues while debugging,
 // as the same memory is re-used for multiple tasks.
 
-//#define USE_MEMORY_POOL
+#define USE_MEMORY_POOL
 
 namespace parac::broker {
 static ComputeNodeStore&
