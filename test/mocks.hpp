@@ -22,15 +22,35 @@ typedef parac_status (*parac_module_discover_func)(parac_handle*);
 extern parac_module_discover_func
 parac_static_module_discover(parac_module_type mod);
 
-struct ParacWorkerCountSetter {
-  ParacWorkerCountSetter(size_t workers) { setWorkerCount(workers); }
-  ~ParacWorkerCountSetter() {
-    setWorkerCount(std::thread::hardware_concurrency());
+template<typename T>
+struct ParacConfigSetter {
+  ParacConfigSetter(const char* name, T value)
+    : name(name) {
+    set(value);
   }
+  ~ParacConfigSetter() { unsetenv(name); }
 
-  void setWorkerCount(size_t workers) {
-    setenv("PARAC_WORKER_COUNT", std::to_string(workers).c_str(), 1);
+  void set(T value) {
+    if constexpr(std::is_same<T, const char*>::value) {
+      setenv(name, value, 1);
+    } else {
+      setenv(name, std::to_string(value).c_str(), 1);
+    }
   }
+  const char* name;
+};
+
+struct ParacWorkerCountSetter : public ParacConfigSetter<size_t> {
+  ParacWorkerCountSetter(size_t workers)
+    : ParacConfigSetter("PARAC_WORKER_COUNT", workers) {}
+};
+struct ParacTreeDepthSetter : public ParacConfigSetter<size_t> {
+  ParacTreeDepthSetter(size_t td)
+    : ParacConfigSetter("PARAC_TREE_DEPTH", td) {}
+};
+struct ParacSolverModuleSetter : public ParacConfigSetter<const char*> {
+  ParacSolverModuleSetter(const char* mod)
+    : ParacConfigSetter("PARAC_MODULEPATH_SOLVER", mod) {}
 };
 
 class ParacoobaMock : public parac_handle {

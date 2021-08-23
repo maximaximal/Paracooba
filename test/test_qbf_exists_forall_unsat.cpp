@@ -91,16 +91,12 @@ static std::vector<TestStruct> TestsVec = {
 TEST_CASE("QBF formulas that go EXISTS 1 FORALL 2",
           "[integration][communicator][broker][solver][runner][solver_qbf]") {
   ParacWorkerCountSetter workerCount(GENERATE(1, 2));
-
-  setenv("PARAC_MODULEPATH_SOLVER",
-         "./modules/solver_qbf/libparac_solver_qbf.so",
-         1);
   auto t = GENERATE(from_range(TestsVec));
+  ParacSolverModuleSetter solverModSetter("./modules/solver_qbf/libparac_solver_qbf.so");
+  ParacTreeDepthSetter tdSetter(t.td);
+
   CAPTURE(t.name);
-  setenv("PARAC_TREE_DEPTH", std::to_string(t.td).c_str(), 1);
   ParacoobaMock master(1, t.s.data());
-  unsetenv("PARAC_MODULEPATH_SOLVER");
-  unsetenv("PARAC_TREE_DEPTH");
 
   // Do NOT load the SAT solver module!
   std::string solverName = master.modules[PARAC_MOD_SOLVER]->name;
