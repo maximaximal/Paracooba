@@ -325,6 +325,8 @@ CaDiCaLHandle::takeSolverAssignment() {
 
 std::pair<parac_status, std::optional<std::pair<Cube, Cube>>>
 CaDiCaLHandle::resplitOnce(parac_path path, Cube literals) {
+  m_internal->terminator.terminateLocally(false);
+
   parac_log(
     PARAC_CUBER, PARAC_TRACE, "CNF formula for path {} splitted.", path);
   parac_log(
@@ -379,6 +381,8 @@ std::pair<parac_status, Literal>
 CaDiCaLHandle::resplitCube(parac_path p,
                            Cube currentCube,
                            const SolverConfig& solverConfig) {
+  m_internal->terminator.terminateLocally(false);
+
   applyCubeAsAssumption(currentCube);
 
   assert(!m_lookaheadTimeout);
