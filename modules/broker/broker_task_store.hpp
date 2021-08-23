@@ -32,7 +32,7 @@ class TaskStore {
   parac_task* pop_offload(parac_compute_node* target,
                           TaskChecker check = nullptr);
   /** @brief Pop task for working. */
-  parac_task* pop_work();
+  parac_task* pop_work(volatile bool* delete_notification = nullptr);
 
   void undo_offload(parac_task* t);
   void undoAllOffloadsTo(parac_compute_node* remote);

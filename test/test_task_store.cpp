@@ -48,17 +48,17 @@ TEST_CASE("Test Task Store: Manipulating Tasks",
   REQUIRE(task->state == PARAC_TASK_NEW);
 
   REQUIRE(store->pop_offload(store, this_node) == nullptr);
-  REQUIRE(store->pop_work(store) == nullptr);
+  REQUIRE(store->pop_work(store, nullptr) == nullptr);
 
   task->state = PARAC_TASK_WORK_AVAILABLE;
   store->assess_task(store, task);
 
-  REQUIRE(store->pop_work(store) == task);
+  REQUIRE(store->pop_work(store, nullptr) == task);
   task->state =
     static_cast<parac_task_state>(task->state & ~PARAC_TASK_WORKING);
 
   REQUIRE(store->pop_offload(store, this_node) == nullptr);
-  REQUIRE(store->pop_work(store) == nullptr);
+  REQUIRE(store->pop_work(store, nullptr) == nullptr);
 
   task->result = PARAC_PENDING;
   task->right_result = PARAC_UNSAT;

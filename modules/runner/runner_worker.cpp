@@ -61,7 +61,6 @@ Worker::run() {
 
     m_currentTask->worker = m_workerId;
     m_deleteNotifier = false;
-    m_currentTask->delete_notification = &m_deleteNotifier;
     parac_id originator = m_currentTask->originator;
     parac_path p = m_currentTask->path;
 
@@ -137,7 +136,7 @@ Worker::run() {
 
 parac_task*
 Worker::getNextTask() {
-  auto work = m_taskStore.pop_work(&m_taskStore);
+  auto work = m_taskStore.pop_work(&m_taskStore, &m_deleteNotifier);
   if(work) {
     return work;
   }
@@ -145,7 +144,7 @@ Worker::getNextTask() {
   std::unique_lock lock(m_notifierMutex);
 
   while(!m_stop) {
-    auto work = m_taskStore.pop_work(&m_taskStore);
+    auto work = m_taskStore.pop_work(&m_taskStore, &m_deleteNotifier);
     if(work) {
       return work;
     }
@@ -168,7 +167,7 @@ Worker::getNextTask() {
         return nullptr;
       m_notifier.wait(lock);
     }
-    work = m_taskStore.pop_work(&m_taskStore);
+    work = m_taskStore.pop_work(&m_taskStore, &m_deleteNotifier);
     if(work && !m_stop) {
       // Only this thread has been woken up and catched the notifier! Return
       // next task.

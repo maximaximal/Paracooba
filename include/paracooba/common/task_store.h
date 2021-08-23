@@ -31,7 +31,8 @@ typedef struct parac_task* (*parac_task_store_pop_offload)(
   struct parac_task_store*,
   struct parac_compute_node*);
 typedef struct parac_task* (*parac_task_store_pop_work)(
-  struct parac_task_store*);
+  struct parac_task_store*,
+  volatile bool* delete_notification);
 typedef void (*parac_task_store_ping_on_work)(struct parac_task_store*);
 
 typedef struct parac_task_store {

@@ -195,10 +195,11 @@ TaskStore::TaskStore(parac_handle& handle,
     assert(target);
     return static_cast<TaskStore*>(store->userdata)->pop_offload(target);
   };
-  s.pop_work = [](parac_task_store* store) {
+  s.pop_work = [](parac_task_store* store, volatile bool* delete_notification) {
     assert(store);
     assert(store->userdata);
-    return static_cast<TaskStore*>(store->userdata)->pop_work();
+    return static_cast<TaskStore*>(store->userdata)
+      ->pop_work(delete_notification);
   };
   s.assess_task = [](parac_task_store* store, parac_task* task) {
     assert(store);
@@ -393,7 +394,7 @@ TaskStore::pop_offload(parac_compute_node* target, TaskChecker check) {
   return returned;
 }
 parac_task*
-TaskStore::pop_work() {
+TaskStore::pop_work(volatile bool* delete_notification) {
   parac_task* t = nullptr;
   {
     std::unique_lock lock(m_internal->containerMutex);
@@ -406,6 +407,7 @@ TaskStore::pop_work() {
     t->state =
       static_cast<parac_task_state>(t->state & ~PARAC_TASK_WORK_AVAILABLE);
     t->state = t->state | PARAC_TASK_WORKING;
+    t->delete_notification = delete_notification;
 
     Internal::Task* taskWrapper = reinterpret_cast<Internal::Task*>(
       reinterpret_cast<std::byte*>(t) - offsetof(Internal::Task, t));
