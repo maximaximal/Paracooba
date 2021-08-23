@@ -66,10 +66,7 @@ Worker::run() {
 
     assert(!(m_currentTask->state & PARAC_TASK_WORK_AVAILABLE));
 
-    parac_log(PARAC_RUNNER,
-              PARAC_TRACE,
-              "Starting work on path {}",
-              m_currentTask->path);
+    parac_log(PARAC_RUNNER, PARAC_TRACE, "Starting work on path {}", p);
 
     int64_t startOfProcessing;
 
@@ -94,6 +91,12 @@ Worker::run() {
         m_currentTask->result = result;
       }
     }
+
+    parac_log(PARAC_RUNNER,
+              PARAC_TRACE,
+              "Ending work on path {} with result {}",
+              p,
+              result);
 
     if(result != PARAC_ABORTED && !m_deleteNotifier) {
       m_currentTask->state = static_cast<parac_task_state>(

@@ -594,6 +594,10 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
   }
 
   if(m_task->stop) {
+    if(m_timeout && !m_interruptSolving) {
+      m_timeout->cancel(m_timeout);
+      m_timeout = nullptr;
+    }
     return { PARAC_ABORTED, 0 };
   }
 
@@ -602,13 +606,13 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
   parac_status s = handle.solve(*m_task);
   auto end = std::chrono::steady_clock::now();
 
-  if(handle.stoppedGlobally()) {
-    return { PARAC_ABORTED, 0 };
-  }
-
   if(m_timeout && !m_interruptSolving) {
     m_timeout->cancel(m_timeout);
     m_timeout = nullptr;
+  }
+
+  if(handle.stoppedGlobally()) {
+    return { PARAC_ABORTED, 0 };
   }
 
   uint64_t solverRuntimeMS =

@@ -282,11 +282,11 @@ CaDiCaLHandle::solve(parac_task& task) {
   };
   Cleanup cleanup(task, *m_internal);
 
+  m_internal->terminator.terminateLocally(false);
+
   if(m_internal->terminator) {
     return PARAC_ABORTED;
   }
-
-  m_internal->terminator.terminateLocally(false);
 
   int r = m_internal->solver.solve();
   switch(r) {
