@@ -1,3 +1,11 @@
+The code written in this repository including the SAT solver is MIT licensed.
+The QBF solver links to GPLv3 licensed DepQBF and is therefore GPLv3 licensed.
+The interface between the solver module and the rest of the software is generic
+and not considered direct usage, so the rest of the software is considered to
+still be MIT. This has not been examined in more detail though, so no guarantee
+for this can be given yet. If one wants to be certain that no GPLv3 code is
+included, the QBF solver module must be removed.
+
 The MIT License (MIT)
 =====================
 
@@ -23,4 +31,3 @@ HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
-
