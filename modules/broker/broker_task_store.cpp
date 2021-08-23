@@ -328,7 +328,9 @@ TaskStore::newTask(parac_task* parent_task,
       parent_task->right_child_ = task;
     }
     assert(parent_task->left_child_ || parent_task->right_child_);
-    assert(!parent_task->stop);
+    if(parent_task->stop) {
+      return nullptr;
+    }
   }
 
   ++m_internal->tasksSize;

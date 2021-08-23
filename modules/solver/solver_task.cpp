@@ -124,6 +124,8 @@ SolverTask::work(parac_worker worker) {
                                      m_task,
                                      parac_path_get_next_left(m_task->path),
                                      m_task->originator);
+      if(!l)
+        return PARAC_ABORTED;
       create(*l, *m_manager, m_cubeSource->leftChild(m_cubeSource));
       assert(m_task->task_store);
       m_task->left_result = PARAC_PENDING;
@@ -143,6 +145,8 @@ SolverTask::work(parac_worker worker) {
                                      m_task,
                                      parac_path_get_next_right(m_task->path),
                                      m_task->originator);
+      if(!r)
+        return PARAC_ABORTED;
       create(*r, *m_manager, m_cubeSource->rightChild(m_cubeSource));
       m_task->right_result = PARAC_PENDING;
       m_task->task_store->assess_task(m_task->task_store, r);
@@ -400,6 +404,8 @@ makeTaskFromCube(CaDiCaLManager* manager,
 
   parac_task* new_task = parent->task_store->new_task(
     parent->task_store, parent, path, parent->originator);
+  if(!new_task)
+    return nullptr;
   assert(new_task);
   SolverTask::create(*new_task,
                      *manager,
