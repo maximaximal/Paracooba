@@ -8,10 +8,9 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/modules"
 
 find_package(PkgConfig REQUIRED)
 find_package(Magnum COMPONENTS GL Primitives MeshTools Shaders QUIET)
-find_package(GTK2 COMPONENTS gtk gtkmm)
+pkg_check_modules(GTK3 gtk+-3.0 gtkmm-3.0)
 
-if(Magnum_FOUND AND GTKMM_FOUND)
-
+if(Magnum_FOUND AND GTK3_FOUND)
     if(MAGNUM_TARGET_GLES AND NOT MAGNUM_TARGET_DESKTOP_GLES)
         find_package(Magnum REQUIRED EglContext)
     elseif(CORRADE_TARGET_WINDOWS)
@@ -33,15 +32,13 @@ if(Magnum_FOUND AND GTKMM_FOUND)
         Magnum::Primitives
         Magnum::MeshTools
         Magnum::Shaders
-        GTK2::gtkmm
-        GTK2::gtk
-        ${GTKMM_LIBRARIES}
+        ${GTK3_LIBRARIES}
         distrac-analysis
         parac_common)
 
     target_compile_features(distracvis PRIVATE cxx_std_17)
 
-    target_include_directories(distracvis SYSTEM PRIVATE ${GTKMM_INCLUDE_DIRS})
+    target_include_directories(distracvis SYSTEM PRIVATE ${GTK3_INCLUDE_DIRS})
 
     set_property(TARGET distracvis PROPERTY RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/")
 else()
