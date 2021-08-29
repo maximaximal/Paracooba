@@ -1,4 +1,4 @@
-set terminal epslatex size 9cm, 4cm
+#set terminal epslatex size 9cm, 4cm
 #set terminal pngcairo size 18cm, 10cm
 
 set lmargin at screen 0.1
@@ -11,4 +11,3 @@ set xlabel "t"
 set ylabel "compute node id"
 
 plot for [i=0:*] offloads index i using 1:2:3:4:yticlabels(2) with vectors notitle
-
