@@ -7,6 +7,7 @@ set xrange [XMIN:XMAX]
 set key autotitle columnheader
 
 unset xtics
+set title "Offloads"
 set xlabel "t"
 set ylabel "compute node id"
 

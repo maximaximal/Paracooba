@@ -43,18 +43,20 @@ function gen_offloads() {
 
 gen_offloads
 
+OUTT="${T//./_}"
+
 gnuplot -e 'XMIN="'$XMIN'"' -e 'XMAX="'$XMAX'"' -e 'offloads="/dev/shm/offloads/offloads.data"' \
-    -e 'set terminal epslatex size 20, 10cm; set output "'${T}_offloads.tex'"' \
+    -e 'set terminal epslatex size 20cm, 10cm; set output "'${OUTT}_offloads.tex'"' \
     $DIR/generate_offload_plot.gnuplot
 
 gnuplot -e 'XMIN="'$XMIN'"' -e 'XMAX="'$XMAX'"' -e 'offloads="/dev/shm/offloads/offloads.data"' \
     -e 'set terminal pngcairo size 20cm, 10cm' \
-    $DIR/generate_offload_plot.gnuplot > ${T}_offloads.png &
+    $DIR/generate_offload_plot.gnuplot > ${OUTT}_offloads.png &
 
 wait
 
-echo "Output: ${T}_offloads.tex"
-echo "Output: ${T}_offloads.png"
+echo "Output: ${OUTT}_offloads.tex"
+echo "Output: ${OUTT}_offloads.png"
 
 #wait
 

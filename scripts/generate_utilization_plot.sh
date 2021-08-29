@@ -43,8 +43,10 @@ function gen_util() {
 
 gen_util
 
+OUTT="${T//./_}"
+
 gnuplot -e 'XMIN="'$XMIN'"' -e 'XMAX="'$XMAX'"' -e 'utilization="/dev/shm/utilization/utilization.data"' \
-    -e 'set terminal epslatex size 20cm, 10cm; set output "'${T}_utilization.tex'"' \
+    -e 'set terminal epslatex size 20cm, 10cm; set output "'${OUTT}_utilization.tex'"' \
     $DIR/generate_utilization_plot.gnuplot &
 gnuplot -e 'XMIN="'$XMIN'"' -e 'XMAX="'$XMAX'"' -e 'utilization="/dev/shm/utilization/utilization.data"' \
     -e 'set terminal pngcairo size 20cm, 10cm' \
