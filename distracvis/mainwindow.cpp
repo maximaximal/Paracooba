@@ -20,7 +20,9 @@ MainWindow::MainWindow(Magnum::Platform::GLContext& context,
   m_box_treeVisAndSlider.add(m_timeSlider);
 
   m_box_root.add(m_box_treeVisAndSlider);
-  m_box_root.add(m_sidebar);
+
+  // Sidebar currently has no use.
+  // m_box_root.add(m_sidebar);
 
   m_box_root.show_all();
 

@@ -251,6 +251,7 @@ TreeVisWidget::onRealize() {
   GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
   GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
   GL::Renderer::setDepthFunction(GL::Renderer::DepthFunction::Greater);
+  GL::Renderer::setClearColor(Magnum::Color4(1, 1, 1));
 
   m_internal = std::make_unique<Internal>();
 
@@ -300,7 +301,7 @@ TreeVisWidget::onRender(const Glib::RefPtr<Gdk::GLContext>& context) {
   gtkmmDefaultFramebuffer.clear(GL::FramebufferClear::Color |
                                 GL::FramebufferClear::Depth);
 
-  auto color = Color3::fromHsv({ 35.0_degf, 1.0f, 1.0f });
+  auto color = Color3::fromHsv({ 35.0_degf, 1.0f, 0 });
 
   if(m_queueUpdateShownTimespan) {
     updateShownTimespan();
