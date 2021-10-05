@@ -7,8 +7,11 @@ set(DISTRACVIS_SRCS
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/modules")
 
 find_package(PkgConfig REQUIRED)
-find_package(Magnum COMPONENTS GL Primitives MeshTools Shaders QUIET)
 pkg_check_modules(GTK3 gtk+-3.0 gtkmm-3.0)
+
+if(GTK3_FOUND)
+    find_package(Magnum COMPONENTS GL Primitives MeshTools Shaders QUIET)
+endif()
 
 if(Magnum_FOUND AND GTK3_FOUND)
     if(MAGNUM_TARGET_GLES AND NOT MAGNUM_TARGET_DESKTOP_GLES)
