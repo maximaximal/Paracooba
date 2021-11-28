@@ -57,6 +57,7 @@ typedef struct parac_task {
   uint32_t post_path_sorting_critereon;
   parac_path path;
   volatile parac_worker worker;
+  volatile int32_t extended_child_count;
   struct parac_compute_node* received_from;
   struct parac_compute_node* offloaded_to;
   parac_id originator;

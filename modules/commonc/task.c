@@ -120,7 +120,19 @@ existential_assess(parac_task* t, bool terminate_children) {
 }
 
 static bool
+universal_assess_extended(parac_task* t, bool terminate_children) {
+  assert(t);
+  assert(t->extended_child_count >= 0);
+
+  // Extended assess means, that the left child is an array with
+  // t->extended_child_count length!
+
+}
+
+static bool
 universal_assess(parac_task* t, bool terminate_children) {
+  assert(t);
+  assert(t->extended_child_count == -1);
   if(t->left_result == PARAC_UNSAT || t->right_result == PARAC_UNSAT) {
     t->result = PARAC_UNSAT;
 
@@ -218,6 +230,7 @@ parac_task_init(parac_task* t) {
   t->stop = false;
   t->terminate = NULL;
   t->worker = 0;
+  t->extended_child_count = -1;
   t->pre_path_sorting_critereon = 0;
   t->post_path_sorting_critereon = 0;
   t->delete_notification = NULL;
