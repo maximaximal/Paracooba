@@ -16,6 +16,7 @@ extern "C" {
 #define PARAC_PATH_EXPLICITLY_UNKNOWN 0b00111110u
 #define PARAC_PATH_PARSER 0b00111101u
 #define PARAC_PATH_OVERLENGTH 0b00111011u
+#define PARAC_PATH_EXTENDED 0b00111100
 #define PARAC_PATH_BITS 58u
 #define PARAC_PATH_LENGTH_BITS 6u
 
@@ -72,6 +73,9 @@ parac_path
 parac_path_get_next_right(parac_path p);
 
 parac_path
+parac_path_get_next_extended(parac_path p);
+
+parac_path
 parac_path_cleanup(parac_path p);
 
 parac_status
@@ -91,6 +95,9 @@ parac_path_root();
 
 bool
 parac_path_is_overlength(parac_path p);
+
+bool
+parac_path_is_extended(parac_path p);
 
 parac_path_length_type
 parac_path_length(parac_path p);
@@ -120,31 +127,38 @@ class Path : public parac_path {
   using type = parac_path_type;
   using length_type = parac_path_length_type;
 
-  Path() = default;
-  Path(const Path& o) = default;
-  Path(parac_path p) { rep = p.rep; }
-  Path(parac_path_type p) { rep = p; }
+  inline Path() = default;
+  inline Path(const Path& o) = default;
+  inline Path(parac_path p) { rep = p.rep; }
+  inline Path(parac_path_type p) { rep = p; }
 
   template<typename T>
-  static Path build(T p, length_type l) {
+  inline static Path build(T p, length_type l) {
     return parac_path_build(p, l);
   }
 
-  Path left() const { return parac_path_get_next_left(*this); }
-  Path right() const { return parac_path_get_next_right(*this); }
-  Path parent() const { return parac_path_get_parent(*this); }
-  Path sibling() const { return parac_path_get_sibling(*this); }
-  type shifted() const { return parac_path_get_shifted(*this); }
-  type depth_shifted() const { return parac_path_get_depth_shifted(*this); }
-  type left_aligned() const { return parac_path_left_aligned(*this); }
+  inline Path left() const { return parac_path_get_next_left(*this); }
+  inline Path right() const { return parac_path_get_next_right(*this); }
+  inline Path next_extended() const {
+    return parac_path_get_next_extended(*this);
+  }
+  inline Path parent() const { return parac_path_get_parent(*this); }
+  inline Path sibling() const { return parac_path_get_sibling(*this); }
+  inline type shifted() const { return parac_path_get_shifted(*this); }
+  inline type depth_shifted() const {
+    return parac_path_get_depth_shifted(*this);
+  }
+  inline type left_aligned() const { return parac_path_left_aligned(*this); }
 
   struct BoolWrapper {
     public:
-    BoolWrapper(Path& path, length_type pos)
+    inline BoolWrapper(Path& path, length_type pos)
       : m_path(path)
       , m_pos(pos) {}
-    operator bool() const { return parac_path_get_assignment(m_path, m_pos); }
-    void operator=(bool val) {
+    inline operator bool() const {
+      return parac_path_get_assignment(m_path, m_pos);
+    }
+    inline void operator=(bool val) {
       m_path = parac_path_set_assignment(m_path, m_pos, val);
     }
 
@@ -153,18 +167,20 @@ class Path : public parac_path {
     length_type m_pos;
   };
 
-  BoolWrapper operator[](parac_path_length_type pos) {
+  inline BoolWrapper operator[](parac_path_length_type pos) {
     return BoolWrapper(*this, pos);
   }
-  bool operator[](parac_path_length_type pos) const {
+  inline bool operator[](parac_path_length_type pos) const {
     return parac_path_get_assignment(*this, pos);
   }
 
-  parac_path_length_type length() const { return parac_path_length(*this); }
-  void operator=(parac_path p) { rep = p.rep; }
-  bool operator==(const parac_path& p) const { return rep == p.rep; }
-  operator uint64_t() const { return rep; }
-  bool operator<(const Path& o) const { return length() < o.length(); }
+  inline parac_path_length_type length() const {
+    return parac_path_length(*this);
+  }
+  inline void operator=(parac_path p) { rep = p.rep; }
+  inline bool operator==(const parac_path& p) const { return rep == p.rep; }
+  inline operator uint64_t() const { return rep; }
+  inline bool operator<(const Path& o) const { return length() < o.length(); }
 };
 
 inline std::string

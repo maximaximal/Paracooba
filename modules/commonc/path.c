@@ -15,6 +15,7 @@ static const parac_path_type long1 = 1u;
 PARAC_COMMON_EXPORT parac_path_type
 parac_path_left_aligned(parac_path p) {
   assert(!parac_path_is_overlength(p));
+  assert(!parac_path_is_extended(p));
   parac_path_type path = p.path_;
   return path << PARAC_PATH_LENGTH_BITS;
 }
@@ -22,6 +23,7 @@ parac_path_left_aligned(parac_path p) {
 PARAC_COMMON_EXPORT bool
 parac_path_get_assignment(parac_path p, parac_path_length_type d) {
   assert(!parac_path_is_overlength(p));
+  assert(!parac_path_is_extended(p));
   assert(d <= PARAC_PATH_MAX_LENGTH);
   assert(d >= 1);
   return p.rep & (long1 << ((sizeof(parac_path) * 8) - 1 - (d - 1)));
@@ -30,6 +32,7 @@ parac_path_get_assignment(parac_path p, parac_path_length_type d) {
 PARAC_COMMON_EXPORT parac_path
 parac_path_set_assignment(parac_path p, parac_path_length_type d, bool v) {
   assert(!parac_path_is_overlength(p));
+  assert(!parac_path_is_extended(p));
   assert(d >= 1);
   assert(d <= PARAC_PATH_MAX_LENGTH);
 
@@ -46,12 +49,14 @@ parac_path_is_root(parac_path p) {
 PARAC_COMMON_EXPORT parac_path_type
 parac_path_get_shifted(parac_path p) {
   assert(!parac_path_is_overlength(p));
+  assert(!parac_path_is_extended(p));
   return p.rep >> 6u;
 }
 
 PARAC_COMMON_EXPORT parac_path_type
 parac_path_get_depth_shifted(parac_path p) {
   assert(!parac_path_is_overlength(p));
+  assert(!parac_path_is_extended(p));
   assert(p.length_ <= PARAC_PATH_MAX_LENGTH);
   if(p.length_ == 0)
     return 0;
@@ -70,6 +75,7 @@ parac_path_get_parent(parac_path p) {
 PARAC_COMMON_EXPORT parac_path
 parac_path_get_sibling(parac_path p) {
   assert(!parac_path_is_overlength(p));
+  assert(!parac_path_is_extended(p));
   return parac_path_set_assignment(
     p, p.length_, !parac_path_get_assignment(p, p.length_));
 }
@@ -77,6 +83,13 @@ parac_path_get_sibling(parac_path p) {
 static parac_path
 parac_path_get_next(parac_path p, int n) {
   assert(p.rep != PARAC_PATH_EXPLICITLY_UNKNOWN);
+
+  // Remove the extended if it is set! Extended paths may only be reconverted
+  // into overlength, but never into normal paths. Information is gone.
+  if(parac_path_is_extended(p)) {
+    p.overlength_tag_ = PARAC_PATH_OVERLENGTH;
+    parac_path_cleanup(p);
+  }
 
   if(parac_path_is_overlength(p)) {
     ++p.overlength_length_;
@@ -104,6 +117,14 @@ parac_path_get_next_left(parac_path p) {
 PARAC_COMMON_EXPORT parac_path
 parac_path_get_next_right(parac_path p) {
   return parac_path_get_next(p, 1);
+}
+
+PARAC_COMMON_EXPORT parac_path
+parac_path_get_next_extended(parac_path p) {
+  parac_path_length_type l = parac_path_length(p);
+  p.overlength_tag_ = PARAC_PATH_EXTENDED;
+  p.overlength_length_ = l + 1;
+  return p;
 }
 
 PARAC_COMMON_EXPORT parac_path
@@ -163,6 +184,12 @@ parac_path_to_str(parac_path p, char* out_str) {
     out_str[i++] = 'r';
     out_str[i++] = ')';
     out_str[i++] = '\0';
+    return;
+  } else if(parac_path_is_extended(p)) {
+    parac_path_length_type length = parac_path_length(p);
+    size_t i =
+      snprintf(out_str, PARAC_PATH_MAX_LENGTH, "(extended | %lu)", length);
+    out_str[i] = '\0';
     return;
   } else if(parac_path_is_overlength(p)) {
     parac_path_length_type length = p.overlength_length_;
@@ -246,9 +273,14 @@ parac_path_is_overlength(parac_path p) {
   return p.overlength_tag_ == PARAC_PATH_OVERLENGTH;
 }
 
+PARAC_COMMON_EXPORT bool
+parac_path_is_extended(parac_path p) {
+  return p.overlength_tag_ == PARAC_PATH_EXTENDED;
+}
+
 PARAC_COMMON_EXPORT parac_path_length_type
 parac_path_length(parac_path p) {
-  if(parac_path_is_overlength(p)) {
+  if(parac_path_is_overlength(p) || parac_path_is_extended(p)) {
     return p.overlength_length_;
   } else {
     return p.length_;

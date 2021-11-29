@@ -23,8 +23,12 @@ TEST_CASE("Path Manipulation", "[commonc][path]") {
   REQUIRE(to_string(test_path_str) == "(root)");
   test_path_str.length_ = 0b00111110;
   REQUIRE(to_string(test_path_str) == "(explicitly unknown)");
-  test_path_str.length_ = 60;
-  REQUIRE(to_string(test_path_str) == "(invalid path)");
+  test_path_str.overlength_tag_ = PARAC_PATH_EXTENDED;
+  test_path_str.overlength_length_ = 2;
+  REQUIRE(to_string(test_path_str) == "(extended | 2)");
+  REQUIRE(to_string(test_path_str.left()) == "(overlength | 3 | l/r 0)");
+  REQUIRE(to_string(test_path_str.right()) == "(overlength | 3 | l/r 1)");
+  REQUIRE(to_string(test_path_str.next_extended()) == "(extended | 3)");
   test_path_str.length_ = 58;
   REQUIRE(to_string(test_path_str.left()) == "(overlength | 59 | l/r 0)");
   REQUIRE(to_string(test_path_str.right()) == "(overlength | 59 | l/r 1)");

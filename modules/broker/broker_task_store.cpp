@@ -321,13 +321,17 @@ TaskStore::newTask(parac_task* parent_task,
       reinterpret_cast<std::byte*>(parent_task) - offsetof(Internal::Task, t));
     ++(parentWrapper->refcount);
 
-    if(parac_path_get_next_left(parent_task->path).rep == new_path.rep) {
-      parent_task->left_child_ = task;
-    } else if(parac_path_get_next_right(parent_task->path).rep ==
-              new_path.rep) {
-      parent_task->right_child_ = task;
+    // Extended tasks don't have left or right children! Responsibility to
+    // assign a path->extended_children array is with the caller.
+    if(!parac_path_is_extended(new_path)) {
+      if(parac_path_get_next_left(parent_task->path).rep == new_path.rep) {
+        parent_task->left_child_ = task;
+      } else if(parac_path_get_next_right(parent_task->path).rep ==
+                new_path.rep) {
+        parent_task->right_child_ = task;
+      }
+      assert(parent_task->left_child_ || parent_task->right_child_);
     }
-    assert(parent_task->left_child_ || parent_task->right_child_);
     if(parent_task->stop) {
       return nullptr;
     }
@@ -814,21 +818,24 @@ TaskStore::assess_task(parac_task* task, bool remove, bool removeParent) {
     if(parent) {
       parac_path parentPath = parent->path;
 
-      assert(path.rep == parac_path_get_next_left(parentPath).rep ||
-             path.rep == parac_path_get_next_right(parentPath).rep);
+      if(!parac_path_is_extended(path)) {
+        assert(path.rep == parac_path_get_next_left(parentPath).rep ||
+               path.rep == parac_path_get_next_right(parentPath).rep);
 
-      if(path.rep == parac_path_get_next_left(parentPath).rep) {
-        parent->left_result = result;
-      } else if(path.rep == parac_path_get_next_right(parentPath).rep) {
-        parent->right_result = result;
-      } else {
-        parac_log(PARAC_BROKER,
-                  PARAC_GLOBALERROR,
-                  "Task on path {} specified parent path on path {}, but is no "
-                  "direct child of parent! Ignoring parent.",
-                  path,
-                  parentPath);
-        return;
+        if(path.rep == parac_path_get_next_left(parentPath).rep) {
+          parent->left_result = result;
+        } else if(path.rep == parac_path_get_next_right(parentPath).rep) {
+          parent->right_result = result;
+        } else {
+          parac_log(
+            PARAC_BROKER,
+            PARAC_GLOBALERROR,
+            "Task on path {} specified parent path on path {}, but is no "
+            "direct child of parent! Ignoring parent.",
+            path,
+            parentPath);
+          return;
+        }
       }
 
       assess_task(parent, removeParent, removeParent);

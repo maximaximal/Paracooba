@@ -49,10 +49,8 @@ typedef struct parac_task {
   volatile parac_task_state last_state;
   volatile parac_task_state state;
   volatile parac_status result;
-  volatile parac_status left_result;
-  volatile parac_status right_result;
   volatile bool stop;
-  volatile bool *delete_notification;
+  volatile bool* delete_notification;
   uint32_t pre_path_sorting_critereon;
   uint32_t post_path_sorting_critereon;
   parac_path path;
@@ -72,8 +70,18 @@ typedef struct parac_task {
   /* Parent task when local, when received from remote it is the task ptr on
      the remote system. */
   volatile struct parac_task* parent_task_;
-  volatile struct parac_task* left_child_;
-  volatile struct parac_task* right_child_;
+  union {
+    struct {
+      volatile struct parac_task* left_child_;
+      volatile struct parac_task* right_child_;
+
+      volatile parac_status left_result;
+      volatile parac_status right_result;
+    };
+    struct {
+      struct parac_task** extended_children;
+    };
+  };
   struct parac_task_store* task_store;
 
   /* Used in utility functions where only a pointer to task is available */
