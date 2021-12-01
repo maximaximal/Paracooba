@@ -23,7 +23,16 @@ class SolverConfig {
   bool useDepQBF() const { return m_useDepQBF; }
   int64_t treeDepth() const { return m_treeDepth; }
 
-  enum class Entry { UseDepQBF, TreeDepth, _COUNT };
+  bool integerBasedSplitsEnabled() const {
+    return m_integerBasedSplits.size() > 0;
+  }
+  const std::vector<int>& integerBasedSplits() const {
+    return m_integerBasedSplits;
+  }
+  size_t integerBasedSplitsCurrentIndex(size_t currentCubeLength) const;
+  size_t integerBasedSplitsCurrentLength(size_t index) const;
+
+  enum class Entry { UseDepQBF, TreeDepth, IntegerBasedSplits, _COUNT };
 
   private:
   parac_config_entry* m_config = nullptr;
@@ -32,13 +41,15 @@ class SolverConfig {
 
   bool m_useDepQBF = false;
   uint64_t m_treeDepth;
+  std::vector<int> m_integerBasedSplits;
 
   friend class cereal::access;
   template<class Archive>
   void serialize(Archive& ar) {
     ar(cereal::make_nvp("originatorId", m_originatorId),
        cereal::make_nvp("useDepQBF", m_useDepQBF),
-       cereal::make_nvp("treeDepth", m_treeDepth));
+       cereal::make_nvp("treeDepth", m_treeDepth),
+       cereal::make_nvp("integerBasedSplits", m_integerBasedSplits));
   }
 };
 std::ostream&

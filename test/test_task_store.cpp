@@ -189,8 +189,12 @@ TEST_CASE("Test Task Store: Manipulating Extended Tasks",
   parac_task* subtasks[3] = { store->new_task(store, task, extp, 0),
                               store->new_task(store, task, extp, 0),
                               store->new_task(store, task, extp, 0) };
+  parac_status subtasks_results[] = { PARAC_PENDING,
+                                      PARAC_PENDING,
+                                      PARAC_PENDING };
   task->extended_children = subtasks;
-  task->extended_child_count = 3;
+  task->extended_children_results = subtasks_results;
+  task->extended_children_count = 3;
   task->assess = &parac_task_qbf_universal_assess;
 
   for(parac_task* subtask : subtasks) {
@@ -238,6 +242,9 @@ TEST_CASE("Test Task Store: Manipulating Extended Tasks",
   for(parac_task* subtask : subtasks) {
     subtask->result = PARAC_SAT;
     subtask->state = PARAC_TASK_DONE | PARAC_TASK_SPLITS_DONE;
+  }
+  for(parac_status& s : subtasks_results) {
+    s = PARAC_SAT;
   }
 
   store->assess_task(store, task);

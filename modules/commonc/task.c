@@ -101,29 +101,25 @@ typedef struct assessment_result {
 bool
 existential_assess_extended(parac_task* t, bool terminate_children) {
   assert(t);
-  assert(t->extended_child_count >= 0);
+  assert(t->extended_children_count >= 0);
+  assert(t->extended_children);
+  assert(t->extended_children_results);
 
   // No change!
   if(t->result == PARAC_SAT || t->result == PARAC_UNSAT)
     return false;
 
   // Extended assess means, that the left child is an array with
-  // t->extended_child_count length!
+  // t->extended_children_count length!
   if(t->extended_children) {
     // First, decide our state and if it changed.
     int32_t unsat = 0;
-    for(size_t i = 0; i < t->extended_child_count; ++i) {
-      volatile parac_task* c = t->extended_children[i];
-      if(!c || c->result == PARAC_PENDING || c->result == PARAC_ABORTED ||
-         !parac_task_state_is_done(c->state))
-        continue;
-
-      assert(parac_path_is_extended(c->path));
-
-      if(c->state == PARAC_SAT) {
+    for(size_t i = 0; i < t->extended_children_count; ++i) {
+      parac_status result = t->extended_children_results[i];
+      if(result == PARAC_SAT) {
         t->result = PARAC_SAT;
         break;
-      } else if(c->state != PARAC_UNSAT) {
+      } else if(result == PARAC_UNSAT) {
         unsat += 1;
       }
     }
@@ -132,19 +128,18 @@ existential_assess_extended(parac_task* t, bool terminate_children) {
     if(t->result == PARAC_SAT) {
       if(terminate_children) {
         // All other children must be killed.
-        for(size_t i = 0; i < t->extended_child_count; ++i) {
-          for(size_t i = 0; i < t->extended_child_count; ++i) {
-            volatile parac_task* c = t->extended_children[i];
-            if(!c || c->result == PARAC_PENDING || c->result == PARAC_ABORTED ||
-               !parac_task_state_is_done(c->state))
-              continue;
+        for(size_t i = 0; i < t->extended_children_count; ++i) {
+          volatile parac_task* c = t->extended_children[i];
+          parac_status r = t->extended_children_results[i];
+          if(!c || r == PARAC_PENDING || r == PARAC_ABORTED ||
+             parac_task_state_is_done(c->state))
+            continue;
 
-            early_abort_task(c);
-          }
+          early_abort_task(c);
         }
       }
       return true;
-    } else if(unsat == t->extended_child_count) {
+    } else if(unsat == t->extended_children_count) {
       t->result = PARAC_UNSAT;
       return true;
     }
@@ -181,29 +176,26 @@ existential_assess(parac_task* t, bool terminate_children) {
 static bool
 universal_assess_extended(parac_task* t, bool terminate_children) {
   assert(t);
-  assert(t->extended_child_count >= 0);
+  assert(t->extended_children_count >= 0);
+  assert(t->extended_children);
+  assert(t->extended_children_results);
 
   // No change!
   if(t->result == PARAC_SAT || t->result == PARAC_UNSAT)
     return false;
 
   // Extended assess means, that the left child is an array with
-  // t->extended_child_count length!
+  // t->extended_children_count length!
   if(t->extended_children) {
     // First, decide our state and if it changed.
     int32_t sat = 0;
-    for(size_t i = 0; i < t->extended_child_count; ++i) {
-      volatile parac_task* c = t->extended_children[i];
-      if(!c || c->result == PARAC_PENDING || c->result == PARAC_ABORTED ||
-         !parac_task_state_is_done(c->state))
-        continue;
+    for(size_t i = 0; i < t->extended_children_count; ++i) {
+      parac_status result = t->extended_children_results[i];
 
-      assert(parac_path_is_extended(c->path));
-
-      if(c->state == PARAC_UNSAT) {
+      if(result == PARAC_UNSAT) {
         t->result = PARAC_UNSAT;
         break;
-      } else if(c->state != PARAC_SAT) {
+      } else if(result == PARAC_SAT) {
         sat += 1;
       }
     }
@@ -212,19 +204,18 @@ universal_assess_extended(parac_task* t, bool terminate_children) {
     if(t->result == PARAC_UNSAT) {
       if(terminate_children) {
         // All other children must be killed.
-        for(size_t i = 0; i < t->extended_child_count; ++i) {
-          for(size_t i = 0; i < t->extended_child_count; ++i) {
-            volatile parac_task* c = t->extended_children[i];
-            if(!c || c->result == PARAC_PENDING || c->result == PARAC_ABORTED ||
-               !parac_task_state_is_done(c->state))
-              continue;
+        for(size_t i = 0; i < t->extended_children_count; ++i) {
+          volatile parac_task* c = t->extended_children[i];
+          parac_status r = t->extended_children_results[i];
+          if(!c || r == PARAC_PENDING || r == PARAC_ABORTED ||
+             parac_task_state_is_done(c->state))
+            continue;
 
-            early_abort_task(c);
-          }
+          early_abort_task(c);
         }
       }
       return true;
-    } else if(sat == t->extended_child_count) {
+    } else if(sat == t->extended_children_count) {
       t->result = PARAC_SAT;
       return true;
     }
@@ -235,7 +226,7 @@ universal_assess_extended(parac_task* t, bool terminate_children) {
 static bool
 universal_assess(parac_task* t, bool terminate_children) {
   assert(t);
-  assert(t->extended_child_count == -1);
+  assert(t->extended_children_count == -1);
   if(t->left_result == PARAC_UNSAT || t->right_result == PARAC_UNSAT) {
     t->result = PARAC_UNSAT;
 
@@ -302,7 +293,7 @@ PARAC_COMMON_EXPORT parac_task_state
 parac_task_qbf_existential_assess(parac_task* t) {
   assert(t);
   return shared_assess(t,
-                       t->extended_child_count == -1
+                       t->extended_children_count == -1
                          ? existential_assess
                          : existential_assess_extended,
                        true);
@@ -312,7 +303,7 @@ PARAC_COMMON_EXPORT parac_task_state
 parac_task_qbf_universal_assess(parac_task* t) {
   assert(t);
   return shared_assess(t,
-                       t->extended_child_count == -1
+                       t->extended_children_count == -1
                          ? universal_assess
                          : universal_assess_extended,
                        true);
@@ -342,8 +333,10 @@ parac_task_init(parac_task* t) {
   t->stop = false;
   t->terminate = NULL;
   t->worker = 0;
-  t->extended_child_count = -1;
+  t->extended_children_count = -1;
+  t->extended_children_parent_index = -1;
   t->extended_children = NULL;
+  t->extended_children_results = NULL;
   t->pre_path_sorting_critereon = 0;
   t->post_path_sorting_critereon = 0;
   t->delete_notification = NULL;

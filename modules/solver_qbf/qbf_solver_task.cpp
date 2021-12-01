@@ -106,9 +106,13 @@ QBFSolverTask::work(parac_worker worker) {
   Cleanup cleanup{ *this, m_manager, worker };
   auto& handle = cleanup.handle;
 
-  bool split_left = false, split_right = false;
-  if(m_cubeSource->split(
-       m_task.path, m_manager, *handle, split_left, split_right) &&
+  bool split_left = false, split_right = false, split_extended = false;
+  if(m_cubeSource->split(m_task.path,
+                         m_manager,
+                         *handle,
+                         split_left,
+                         split_right,
+                         split_extended) &&
      (!m_manager.config().treeDepth() ||
       static_cast<parac_path_length_type>(m_manager.config().treeDepth()) >
         parac_path_length(m_task.path))) {
@@ -116,7 +120,7 @@ QBFSolverTask::work(parac_worker worker) {
     // cubes). In this case, just split the task and create new tasks.
 
     m_task.state =
-      PARAC_TASK_SPLITTED | PARAC_TASK_WAITING_FOR_SPLITS | PARAC_TASK_DONE;
+      m_task.state | PARAC_TASK_SPLITTED | PARAC_TASK_WAITING_FOR_SPLITS;
 
     if(split_left) {
       parac_log(PARAC_SOLVER,
@@ -131,13 +135,14 @@ QBFSolverTask::work(parac_worker worker) {
                                     parac_path_get_next_left(m_task.path),
                                     m_task.originator);
 
+      m_task.left_result = PARAC_PENDING;
+
       assert(l);
       new QBFSolverTask(
         m_handle, *l, m_manager, m_cubeSource->leftChild(m_cubeSource));
-      m_task.left_result = PARAC_PENDING;
       if(l->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED)
         m_task.task_store->assess_task(m_task.task_store, l);
-    } else {
+    } else if(!split_extended) {
       m_task.left_result = PARAC_UNSAT;
     }
 
@@ -154,14 +159,47 @@ QBFSolverTask::work(parac_worker worker) {
                                     parac_path_get_next_right(m_task.path),
                                     m_task.originator);
 
+      m_task.right_result = PARAC_PENDING;
+
       assert(r);
       new QBFSolverTask(
         m_handle, *r, m_manager, m_cubeSource->rightChild(m_cubeSource));
-      m_task.right_result = PARAC_PENDING;
-      if(r->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED)
+      if(r->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED) {
         m_task.task_store->assess_task(m_task.task_store, r);
-    } else {
+      }
+    } else if(!split_extended) {
       m_task.right_result = PARAC_UNSAT;
+    }
+
+    if(split_extended) {
+      assert(!split_left);
+      assert(!split_right);
+
+      auto sources = m_cubeSource->children(m_cubeSource);
+      m_extended_subtasks_arr.resize(sources.size());
+      m_extended_subtasks_results_arr.resize(sources.size());
+      m_task.extended_children = m_extended_subtasks_arr.data();
+      m_task.extended_children_results = m_extended_subtasks_results_arr.data();
+      m_task.extended_children_count = sources.size();
+      for(size_t i = 0; i < sources.size(); ++i) {
+        assert(m_task.task_store);
+        parac_task* t =
+          m_task.task_store->new_task(m_task.task_store,
+                                      &m_task,
+                                      parac_path_get_next_extended(m_task.path),
+                                      m_task.originator);
+        t->extended_children_parent_index = i;
+        m_task.extended_children[i] = t;
+        m_task.extended_children_results[i] = PARAC_PENDING;
+        assert(t);
+        new QBFSolverTask(m_handle, *t, m_manager, sources[i]);
+        if(t->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED) {
+          m_task.task_store->assess_task(m_task.task_store, t);
+        } else {
+          m_task.extended_children_results[i] = PARAC_ABORTED;
+          break;
+        }
+      }
     }
 
     return PARAC_SPLITTED;
@@ -186,8 +224,9 @@ QBFSolverTask::work(parac_worker worker) {
 void
 QBFSolverTask::terminate() {
   std::unique_lock<std::mutex> lock(m_terminationMutex, std::try_to_lock);
-  if(!lock.owns_lock())
+  if(!lock.owns_lock()) {
     return;
+  }
 
   if(m_terminationFunc) {
     m_terminationFunc();
@@ -236,12 +275,23 @@ QBFSolverTask::static_terminate(volatile parac_task* task) {
   assert(task);
   assert(task->userdata);
   QBFSolverTask* self = static_cast<QBFSolverTask*>(task->userdata);
-  if(task->left_child_) {
-    task->left_child_->parent_task_ = nullptr;
+  parac_path p;
+  p.rep = task->path.rep;
+  if(parac_path_is_extended(p)) {
+    for(size_t i = 0; i < task->extended_children_count; ++i) {
+      if(task->extended_children[i]) {
+        task->extended_children[i]->parent_task_ = nullptr;
+      }
+    }
+  } else {
+    if(task->left_child_) {
+      task->left_child_->parent_task_ = nullptr;
+    }
+    if(task->right_child_) {
+      task->right_child_->parent_task_ = nullptr;
+    }
   }
-  if(task->right_child_) {
-    task->right_child_->parent_task_ = nullptr;
-  }
+
   return self->terminate();
 }
 parac_status

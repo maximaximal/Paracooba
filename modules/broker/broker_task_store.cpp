@@ -267,34 +267,55 @@ TaskStore::default_terminate_task(volatile parac_task* t) {
   // be counted too.
   ++taskWrapper->refcount;
 
-  auto left_result = t->left_result;
-  auto left_child = t->left_child_;
+  parac_status left_result, right_result;
+  volatile parac_task *left_child, *right_child;
+  if(parac_path_is_extended(p)) {
+    assert(t->extended_children_results);
+    for(size_t i = 0; i < t->extended_children_count; ++i) {
+      if(t->extended_children[i]) {
+        t->extended_children_results[i] = t->extended_children[i]->result;
+        t->extended_children[i]->parent_task_ = nullptr;
+      }
+    }
+  } else {
+    left_result = t->left_result;
+    left_child = t->left_child_;
 
-  auto right_result = t->right_result;
-  auto right_child = t->right_child_;
+    right_result = t->right_result;
+    right_child = t->right_child_;
 
-  if(t->left_child_) {
-    t->left_child_->parent_task_ = nullptr;
-    t->left_child_ = nullptr;
+    if(t->left_child_) {
+      t->left_child_->parent_task_ = nullptr;
+      t->left_child_ = nullptr;
+    }
+    if(t->right_child_) {
+      t->right_child_->parent_task_ = nullptr;
+      t->right_child_ = nullptr;
+    }
   }
-  if(t->right_child_) {
-    t->right_child_->parent_task_ = nullptr;
-    t->right_child_ = nullptr;
-  }
-
   if(taskWrapper->workQueueIt !=
      s->m_internal->tasksWaitingForWorkerQueue.end())
     s->remove_from_workQueue((parac_task*)t);
   s->remove_from_tasksBeingWorkedOn((parac_task*)t);
 
-  if(left_result == PARAC_PENDING && left_child && left_child->terminate) {
-    left_child->parent_task_ = nullptr;
-    left_child->terminate(left_child);
-  }
+  if(parac_path_is_extended(p)) {
+    for(size_t i = 0; i < t->extended_children_count; ++i) {
+      if(t->extended_children[i] && t->extended_children[i]->terminate) {
+        t->extended_children[i]->terminate(t->extended_children[i]);
+        t->extended_children_results[i] = PARAC_ABORTED;
+        t->extended_children[i] = nullptr;
+      }
+    }
+  } else {
+    if(left_result == PARAC_PENDING && left_child && left_child->terminate) {
+      left_child->parent_task_ = nullptr;
+      left_child->terminate(left_child);
+    }
 
-  if(right_result == PARAC_PENDING && right_child && right_child->terminate) {
-    right_child->parent_task_ = nullptr;
-    right_child->terminate(right_child);
+    if(right_result == PARAC_PENDING && right_child && right_child->terminate) {
+      right_child->parent_task_ = nullptr;
+      right_child->terminate(right_child);
+    }
   }
 
   s->assess_task((parac_task*)t, false, false);
@@ -598,13 +619,22 @@ TaskStore::remove(parac_task* task) {
   assert(task->state & PARAC_TASK_DONE);
 
   // Remove references to now removed path.
-  if(task->left_child_)
-    task->left_child_->parent_task_ = nullptr;
-  if(task->right_child_)
-    task->right_child_->parent_task_ = nullptr;
+  bool hadleftchild = false, hadrightchild = false;
+  if(task->extended_children_count == -1) {
+    if(task->left_child_)
+      task->left_child_->parent_task_ = nullptr;
+    if(task->right_child_)
+      task->right_child_->parent_task_ = nullptr;
 
-  bool hadleftchild = task->left_child_;
-  bool hadrightchild = task->right_child_;
+    hadleftchild = task->left_child_;
+    hadrightchild = task->right_child_;
+  } else {
+    for(size_t i = 0; i < task->extended_children_count; ++i) {
+      if(task->extended_children[i]) {
+        task->extended_children[i]->parent_task_ = nullptr;
+      }
+    }
+  }
 
   parac_log(PARAC_BROKER,
             PARAC_TRACE,
@@ -622,14 +652,20 @@ TaskStore::remove(parac_task* task) {
       offsetof(Internal::Task, t));
     --parentWrapper->refcount;
 
-    assert(!(task->parent_task_->left_child_ == task &&
-             task->parent_task_->right_child_ == task));
+    volatile parac_task* p = task->parent_task_;
+    if(p->extended_children_count == -1) {
+      assert(!(p->left_child_ == task && p->right_child_ == task));
 
-    if(task->parent_task_->left_child_ == task) {
-      task->parent_task_->left_child_ = nullptr;
-    }
-    if(task->parent_task_->right_child_ == task) {
-      task->parent_task_->right_child_ = nullptr;
+      if(p->left_child_ == task) {
+        p->left_child_ = nullptr;
+      }
+      if(p->right_child_ == task) {
+        p->right_child_ = nullptr;
+      }
+    } else {
+      assert(task->extended_children_parent_index < p->extended_children_count);
+      assert(p->extended_children);
+      p->extended_children[task->extended_children_parent_index] = nullptr;
     }
   }
 
@@ -729,10 +765,27 @@ TaskStore::terminateAllTasks() {
   }
   for(auto t : m_internal->tasksBeingWorkedOn) {
     auto& task = t.get();
+    task.stop = true;
     // It is only relevant as long as the termination function is not the
     // default one, as the default tasks are not running anyways.
     if(task.terminate && task.terminate != TaskStore::default_terminate_task) {
+      parac_log(
+        PARAC_BROKER,
+        PARAC_TRACE,
+        "Terminating task on path {} from originator {} with address {} "
+        "using non-default termination function.",
+        task.path,
+        task.originator,
+        static_cast<void*>(&task));
       task.terminate(&task);
+    } else {
+      parac_log(PARAC_BROKER,
+                PARAC_TRACE,
+                "Task on path {} from originator {} with address {} "
+                "has default termination function, no other call required.",
+                task.path,
+                task.originator,
+                static_cast<void*>(&task));
     }
   }
 }
@@ -799,6 +852,10 @@ TaskStore::assess_task(parac_task* task, bool remove, bool removeParent) {
     if(task->received_from)
       parent = nullptr;
 
+    int32_t parentExtendedIndex = -1;
+    if(parent && parac_path_is_extended(path))
+      parentExtendedIndex = task->extended_children_parent_index;
+
     if(remove)
       TaskStore::remove(task);
 
@@ -818,7 +875,12 @@ TaskStore::assess_task(parac_task* task, bool remove, bool removeParent) {
     if(parent) {
       parac_path parentPath = parent->path;
 
-      if(!parac_path_is_extended(path)) {
+      if(parac_path_is_extended(path)) {
+        assert(parentExtendedIndex >= 0);
+        assert(parentExtendedIndex < parent->extended_children_count);
+        assert(parent->extended_children_results);
+        parent->extended_children_results[parentExtendedIndex] = result;
+      } else {
         assert(path.rep == parac_path_get_next_left(parentPath).rep ||
                path.rep == parac_path_get_next_right(parentPath).rep);
 

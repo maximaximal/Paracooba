@@ -33,7 +33,8 @@ class Source {
                      QBFSolverManager& mgr,
                      GenericSolverHandle& handle,
                      bool& left,
-                     bool& right) = 0;
+                     bool& right,
+                     bool& extended) = 0;
   virtual const char* name() const = 0;
   virtual std::unique_ptr<Source> copy() const = 0;
 
@@ -43,6 +44,11 @@ class Source {
   virtual std::shared_ptr<Source> rightChild(std::shared_ptr<Source> self) {
     return self;
   };
+
+  virtual std::vector<std::shared_ptr<Source>> children(
+    std::shared_ptr<Source> self) {
+    return { leftChild(self), rightChild(self) };
+  }
 
   virtual uint32_t prePathSortingCritereon() const { return 0; }
 
@@ -65,13 +71,16 @@ class QuantifierTreeCubes : public Source {
                      QBFSolverManager& mgr,
                      GenericSolverHandle& handle,
                      bool& left,
-                     bool& right) override;
+                     bool& right,
+                     bool& extended) override;
   virtual const char* name() const override { return "QuantifierTreeCubes"; }
   virtual std::unique_ptr<Source> copy() const override;
 
   template<class Archive>
   void serialize(Archive& ar) {
     ar(m_currentCube);
+    ar(m_splittingLiterals);
+    ar(m_splitCount);
   }
 
   virtual std::shared_ptr<Source> leftChild(
@@ -79,9 +88,13 @@ class QuantifierTreeCubes : public Source {
   virtual std::shared_ptr<Source> rightChild(
     std::shared_ptr<Source> self) override;
 
+  virtual std::vector<std::shared_ptr<Source>> children(
+    std::shared_ptr<Source> self) override;
+
   private:
   Cube m_currentCube;
-  Literal m_splittingLiteral = 0;
+  Cube m_splittingLiterals;
+  size_t m_splitCount = 0;
 };
 }
 }

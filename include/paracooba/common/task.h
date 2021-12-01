@@ -51,11 +51,12 @@ typedef struct parac_task {
   volatile parac_status result;
   volatile bool stop;
   volatile bool* delete_notification;
+  volatile parac_worker worker;
+  volatile int32_t extended_children_count;
+  volatile int32_t extended_children_parent_index;
   uint32_t pre_path_sorting_critereon;
   uint32_t post_path_sorting_critereon;
   parac_path path;
-  volatile parac_worker worker;
-  volatile int32_t extended_child_count;
   struct parac_compute_node* received_from;
   struct parac_compute_node* offloaded_to;
   parac_id originator;
@@ -80,6 +81,7 @@ typedef struct parac_task {
     };
     struct {
       struct parac_task** extended_children;
+      parac_status* volatile extended_children_results;
     };
   };
   struct parac_task_store* task_store;

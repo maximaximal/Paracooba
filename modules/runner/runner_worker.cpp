@@ -84,7 +84,7 @@ Worker::run() {
 #endif
 
     parac_status result = PARAC_ABORTED;
-    if(m_currentTask->work) {
+    if(m_currentTask->work && !m_deleteNotifier) {
       result = m_currentTask->work(m_currentTask, m_workerId);
       if(result != PARAC_ABORTED && result != PARAC_PENDING &&
          !m_deleteNotifier && m_currentTask->result == PARAC_PENDING) {
@@ -171,7 +171,7 @@ Worker::getNextTask() {
       m_notifier.wait(lock);
     }
     work = m_taskStore.pop_work(&m_taskStore, &m_deleteNotifier);
-    if(work && !m_stop) {
+    if(work && !m_stop && !work->stop) {
       // Only this thread has been woken up and catched the notifier! Return
       // next task.
 #ifdef ENABLE_DISTRAC

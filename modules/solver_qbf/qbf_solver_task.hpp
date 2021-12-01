@@ -30,6 +30,11 @@ class QBFSolverTask {
   parac_task& m_task;
   QBFSolverManager& m_manager;
 
+  /// Only exists if the subtasks are extended, then this array is used to store
+  /// the subtasks for the parac_task* array.
+  std::vector<parac_task*> m_extended_subtasks_arr;
+  std::vector<parac_status> m_extended_subtasks_results_arr;
+
   parac_status work(parac_worker worker);
   void terminate();
   parac_status serialize_to_msg(parac_message* tgt);

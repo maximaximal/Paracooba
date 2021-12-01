@@ -110,7 +110,7 @@ SolverTask::work(parac_worker worker) {
     // cubes). In this case, just split the task and create new tasks.
 
     m_task->state =
-      PARAC_TASK_SPLITTED | PARAC_TASK_WAITING_FOR_SPLITS | PARAC_TASK_DONE;
+      m_task->state | PARAC_TASK_SPLITTED | PARAC_TASK_WAITING_FOR_SPLITS;
 
     if(split_left) {
       parac_log(PARAC_SOLVER,

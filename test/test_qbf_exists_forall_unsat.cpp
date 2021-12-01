@@ -21,6 +21,14 @@ e 5 6 0
 -2 0
 )";
 
+static std::string test_qdimacs_str_blocky = R"(:p cnf 6 2
+e 1 2 0
+a 3 4 0
+e 5 6 0
+2 0
+-2 0
+)";
+
 static std::string test_qdimacs_str_qbffam_parity_10 = R"(:p cnf 20 38
 e 1 2 3 4 5 6 7 8 9 10 0
 a 11 0
@@ -85,14 +93,38 @@ static std::vector<TestStruct> TestsVec = {
               "Parity 10 from qbffam, td11" },
   TestStruct{ test_qdimacs_str_qbffam_parity_10,
               12,
-              "Parity 10 from qbffam, td12" }
+              "Parity 10 from qbffam, td12" },
+  TestStruct{ test_qdimacs_str_blocky, 2, "Blocky Test, td2" }
 };
 
 TEST_CASE("QBF formulas that go EXISTS 1 FORALL 2",
           "[integration][communicator][broker][solver][runner][solver_qbf]") {
   ParacWorkerCountSetter workerCount(GENERATE(1, 2));
   auto t = GENERATE(from_range(TestsVec));
-  ParacSolverModuleSetter solverModSetter("./modules/solver_qbf/libparac_solver_qbf.so");
+  ParacSolverModuleSetter solverModSetter(
+    "./modules/solver_qbf/libparac_solver_qbf.so");
+  ParacTreeDepthSetter tdSetter(t.td);
+
+  CAPTURE(t.name);
+  ParacoobaMock master(1, t.s.data());
+
+  // Do NOT load the SAT solver module!
+  std::string solverName = master.modules[PARAC_MOD_SOLVER]->name;
+  REQUIRE(solverName != "cpp_cubetree_splitter");
+
+  master.getThreadRegistry().wait();
+
+  REQUIRE(master.exit_status == PARAC_UNSAT);
+}
+
+TEST_CASE("QBF formula that has EXISTS FORALL EXISTS blocks and extended paths "
+          "in first two layers",
+          "[integration][communicator][broker][solver][runner][solver_qbf]["
+          "extended_path]") {
+  ParacWorkerCountSetter workerCount(GENERATE(1, 2));
+  auto t = GENERATE(from_range(TestsVec));
+  ParacSolverModuleSetter solverModSetter(
+    "./modules/solver_qbf/libparac_solver_qbf.so");
   ParacTreeDepthSetter tdSetter(t.td);
 
   CAPTURE(t.name);
