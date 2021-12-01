@@ -596,13 +596,6 @@ TaskStore::remove_from_workQueue(parac_task* task) {
 void
 TaskStore::remove_from_tasksBeingWorkedOn(parac_task* task) {
   assert(task);
-  parac_log(PARAC_BROKER,
-            PARAC_TRACE,
-            "Remove task on path {} from originator {} with address {} from "
-            "tasks being worked on.",
-            task->path,
-            task->originator,
-            static_cast<void*>(task));
   std::unique_lock lock(m_internal->containerMutex);
   m_internal->tasksBeingWorkedOn.erase(*task);
 }
