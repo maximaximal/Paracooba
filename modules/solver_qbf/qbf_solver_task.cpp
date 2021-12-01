@@ -188,11 +188,26 @@ QBFSolverTask::work(parac_worker worker) {
                                       &m_task,
                                       parac_path_get_next_extended(m_task.path),
                                       m_task.originator);
+
+        if(parac_log_enabled(PARAC_SOLVER, PARAC_TRACE)) {
+          auto cube = sources[i]->cube(t->path, m_manager);
+          parac_log(PARAC_SOLVER,
+                    PARAC_TRACE,
+                    "Task on path {} split to path next {} with cube {}",
+                    m_task.path,
+                    parac_path_get_next_extended(m_task.path),
+                    cube);
+        }
+
         t->extended_children_parent_index = i;
         m_task.extended_children[i] = t;
         m_task.extended_children_results[i] = PARAC_PENDING;
         assert(t);
         new QBFSolverTask(m_handle, *t, m_manager, sources[i]);
+      }
+      // Start them all at once when the tasks are already in the array!
+      for(size_t i = 0; i < sources.size(); ++i) {
+        parac_task* t = m_task.extended_children[i];
         if(t->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED) {
           m_task.task_store->assess_task(m_task.task_store, t);
         } else {

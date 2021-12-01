@@ -66,7 +66,13 @@ Worker::run() {
 
     assert(!(m_currentTask->state & PARAC_TASK_WORK_AVAILABLE));
 
-    parac_log(PARAC_RUNNER, PARAC_TRACE, "Starting work on path {}", p);
+    parac_log(
+      PARAC_RUNNER,
+      PARAC_TRACE,
+      "Starting work task on path {} with address {} from originator {}",
+      p,
+      static_cast<void*>(m_currentTask),
+      m_currentTask->originator);
 
     int64_t startOfProcessing;
 

@@ -104,8 +104,12 @@ struct TaskStore::Internal {
 
   struct TaskRefCompare {
     bool operator()(const TaskRef& lhs, const TaskRef& rhs) const {
-      return static_cast<parac::Path&>(lhs.get().path) >
-             static_cast<parac::Path&>(rhs.get().path);
+      Path l = static_cast<parac::Path&>(lhs.get().path);
+      Path r = static_cast<parac::Path&>(rhs.get().path);
+      if(l == r)
+        return &lhs.get() > &rhs.get();
+      else
+        return l > r;
     }
   };
 
@@ -592,6 +596,13 @@ TaskStore::remove_from_workQueue(parac_task* task) {
 void
 TaskStore::remove_from_tasksBeingWorkedOn(parac_task* task) {
   assert(task);
+  parac_log(PARAC_BROKER,
+            PARAC_TRACE,
+            "Remove task on path {} from originator {} with address {} from "
+            "tasks being worked on.",
+            task->path,
+            task->originator,
+            static_cast<void*>(task));
   std::unique_lock lock(m_internal->containerMutex);
   m_internal->tasksBeingWorkedOn.erase(*task);
 }
@@ -758,8 +769,13 @@ TaskStore::manageAutoShutdownTimer() {
 
 void
 TaskStore::terminateAllTasks() {
-  parac_log(PARAC_BROKER, PARAC_TRACE, "Terminate all running tasks!");
   std::unique_lock lock(m_internal->containerMutex);
+  parac_log(PARAC_BROKER,
+            PARAC_TRACE,
+            "Terminate all running tasks! Currently, {} tasks are in the "
+            "tasksBeingWorkedOn list.",
+            m_internal->tasksBeingWorkedOn.size());
+
   for(auto& t : m_internal->tasksWaitingForWorkerQueue) {
     t.get().stop = true;
   }
@@ -805,13 +821,15 @@ TaskStore::assess_task(parac_task* task, bool remove, bool removeParent) {
 
   parac_log(PARAC_BROKER,
             PARAC_TRACE,
-            "Assessing task on path {} (pre-psc: {}, post-psc: {}) to state "
+            "Assessing task on path {} (pre-psc: {}, post-psc: {}) with "
+            "address {} to state "
             "{}. Current result {}. Work "
             "available in store: "
             "{}, tasks in store: {}",
             task->path,
             task->pre_path_sorting_critereon,
             task->post_path_sorting_critereon,
+            static_cast<void*>(task),
             static_cast<parac_task_state>(task->state),
             static_cast<parac_status>(task->result),
             m_internal->tasksWaitingForWorkerQueueSize,
