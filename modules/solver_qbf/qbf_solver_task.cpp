@@ -34,16 +34,18 @@ QBFSolverTask::QBFSolverTask(parac_handle& handle,
   , m_manager(manager)
   , m_cubeSource(std::move(cubeSource)) {
   Parser::Quantifier qu{ 0 };
-  if(manager.parser().quantifiers().size() > parac_path_length(task.path)) {
-    qu = manager.parser().quantifiers()[parac_path_length(task.path)];
+  const size_t cubeSize = m_cubeSource->cubeSize();
+
+  if(manager.parser().quantifiers().size() > cubeSize) {
+    qu = manager.parser().quantifiers()[cubeSize];
   } else {
     parac_log(PARAC_SOLVER,
               PARAC_TRACE,
               "QBF Solver reached limit of quantifier prefix! Task on path {} "
-              "has longer path "
-              "length ({}+1) than the quantifier prefix ({})!",
+              "has longer cube "
+              "size ({}+1) than the quantifier prefix ({})!",
               task.path,
-              parac_path_length(task.path),
+              cubeSize,
               manager.parser().quantifiers().size());
   }
 

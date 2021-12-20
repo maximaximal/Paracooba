@@ -28,6 +28,7 @@ class Source {
   Source() = default;
   virtual ~Source() = default;
 
+  virtual size_t cubeSize() const = 0;
   virtual CubeIteratorRange cube(parac_path p, QBFSolverManager& mgr) = 0;
   virtual bool split(parac_path p,
                      QBFSolverManager& mgr,
@@ -63,6 +64,7 @@ class QuantifierTreeCubes : public Source {
   explicit QuantifierTreeCubes(const QuantifierTreeCubes& o) = default;
   virtual ~QuantifierTreeCubes();
 
+  virtual size_t cubeSize() const override { return m_currentCube.size(); }
   virtual CubeIteratorRange cube(parac_path p, QBFSolverManager& mgr) override;
 
   /** @brief Traverse the quantifier tree provided by the QBF parser and look if
