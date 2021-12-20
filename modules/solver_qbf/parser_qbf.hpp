@@ -155,8 +155,6 @@ class Parser {
 
   Literals lits;
 
-  std::list<Clause> clauses;
-
   bool force = false;
 
   const char* parse(FILE* ifile);

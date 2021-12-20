@@ -241,7 +241,12 @@ Parser::add_quantifier(int lit) {
 
 void
 Parser::add_clause() {
-  assert(lits.size() > 0);
+  // Can happen with preprocessed formulas.
+  if(lits.empty()) {
+    m_literals.emplace_back(0);
+    return;
+  }
+
   if(static_cast<int>(lits.size()) <= num_lits + 1)
     enlarge_lits();
   lits[num_lits++] = 0;
@@ -337,13 +342,16 @@ Parser::processInputToPath(std::string_view input) {
   return PARAC_OK;
 }
 
-bool Parser::isTrivial() const {
+bool
+Parser::isTrivial() const {
   return quantifiers().size() == 0;
 }
-bool Parser::isTrivialSAT() const {
-  return clauses.size() == 0;
+bool
+Parser::isTrivialSAT() const {
+  return m_literals.size() == 0;
 }
-bool Parser::isTrivialUNSAT() const {
-  return clauses.size() == 1 && clauses.front().count == 0;
+bool
+Parser::isTrivialUNSAT() const {
+  return m_literals.size() == 1 && m_literals[0] == 0;
 }
 }
