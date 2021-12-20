@@ -278,10 +278,10 @@ main(int argc, char* argv[]) {
           }
           std ::cout << " 0" << std::endl;
 	}
-        break;
+        return 10;
       case PARAC_UNSAT:
         std::cout << "s UNSATISFIABLE" << std::endl;
-        break;
+        return 20;
       case PARAC_UNKNOWN:
       case PARAC_ABORTED:
       default:
