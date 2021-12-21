@@ -274,6 +274,11 @@ TaskStore::default_terminate_task(volatile parac_task* t) {
   parac_status left_result, right_result;
   volatile parac_task *left_child, *right_child;
   if(parac_path_is_extended(p)) {
+    // This means we are already in teardown and recovery wouldn't be useful.
+    // Just directly return, paracooba is already done.
+    if(!t->extended_children_results)
+      return;
+
     assert(t->extended_children_results);
     for(size_t i = 0; i < t->extended_children_count; ++i) {
       if(t->extended_children[i]) {
