@@ -134,6 +134,9 @@ parac_config_parse_env(parac_config* config) {
     for(size_t i = 0; i < size; ++i) {
       parac_config_entry* e = &entries[i];
 
+      assert(e);
+      assert(e->name);
+
       size_t uppercase_name_len = strlen(e->name) + 6 + 1;
       char uppercase_name[uppercase_name_len];
       uppercase_name[uppercase_name_len - 1] = '\0';

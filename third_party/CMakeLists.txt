@@ -19,3 +19,5 @@ if(ENABLE_DISTRAC)
 else()
     add_library(distrac INTERFACE)
 endif()
+
+add_subdirectory(cowipasir)

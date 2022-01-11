@@ -21,6 +21,10 @@ get_target_property(DEPQBF_INCLUDE_DIRS libdepqbf INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(parac_solver_qbf_obj PRIVATE ${DEPQBF_INCLUDE_DIRS})
 add_dependencies(parac_solver_qbf_obj libdepqbf)
 
+get_target_property(COWIPASIR_INCLUDE_DIRS cowipasir INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(parac_solver_qbf_obj PRIVATE ${COWIPASIR_INCLUDE_DIRS})
+add_dependencies(parac_solver_qbf_obj cowipasir)
+
 set_property(TARGET parac_solver_qbf_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES cereal)
 
 if(STATIC_BUILDS)

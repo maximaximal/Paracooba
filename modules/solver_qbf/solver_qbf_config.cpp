@@ -8,6 +8,8 @@
 #include <thread>
 #include <type_traits>
 
+#include <boost/algorithm/string.hpp>
+
 namespace parac::solver_qbf {
 SolverConfig::SolverConfig(parac_config* config, parac_id localId) {
   m_config = parac_config_reserve(config, static_cast<size_t>(Entry::_COUNT));
@@ -44,6 +46,17 @@ SolverConfig::SolverConfig(parac_config* config, parac_id localId) {
   m_config[static_cast<size_t>(Entry::IntegerBasedSplits)]
     .default_value.string_vector.strings = nullptr;
   m_config[static_cast<size_t>(Entry::IntegerBasedSplits)]
+    .default_value.string_vector.size = 0;
+
+  parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(Entry::CowSolvers)],
+    "cowsolvers",
+    "Defines CowIPASIR solvers to use as additional portfolio backends");
+  m_config[static_cast<size_t>(Entry::CowSolvers)].registrar = PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::CowSolvers)].type = PARAC_TYPE_VECTOR_STR;
+  m_config[static_cast<size_t>(Entry::CowSolvers)]
+    .default_value.string_vector.strings = nullptr;
+  m_config[static_cast<size_t>(Entry::CowSolvers)]
     .default_value.string_vector.size = 0;
 }
 
@@ -99,6 +112,32 @@ SolverConfig::extractFromConfigEntries() {
                 PARAC_DEBUG,
                 "Specified int-splits: {}",
                 fmt::join(m_integerBasedSplits, " "));
+    }
+  }
+
+  parseCowSolversCLI(m_config[static_cast<size_t>(Entry::CowSolvers)]);
+}
+
+SolverConfig::CowSolver::CowSolver(const std::string& cli) {
+  std::vector<std::string> split;
+  boost::algorithm::split(split, std::string(cli), boost::is_any_of(":|"));
+  if(split.size() < 1) {
+    parac_log(PARAC_SOLVER,
+              PARAC_FATAL,
+              "Invalid CowIPASIR Solver Config! Require this format: \"<path "
+              "to executable>[:<argv>][:<envp>][:<SAT_regex>:<UNSAT "
+              "regex>]\". Arguments may be empty. Empty SAT and UNSAT regexes "
+              "mean just the exit code is used.");
+  }
+}
+
+void
+SolverConfig::parseCowSolversCLI(const parac_config_entry& e) {
+  auto& arr = e.value.string_vector.strings;
+  auto& count = e.value.string_vector.size;
+  if(count > 0) {
+    for(size_t i = 0; i < count; ++i) {
+      CowSolver& solver = m_cowSolvers.emplace_back(arr[i]);
     }
   }
 }
@@ -160,5 +199,23 @@ operator<<(std::ostream& o, const SolverConfig& config) {
     o << " disabled";
   }
   return o;
+}
+
+std::ostream&
+operator<<(std::ostream& o, const std::vector<std::string>& v) {
+  if(v.empty())
+    return o << "(none)";
+
+  for(const auto& e : v) {
+    o << " " << e;
+  }
+  return o;
+}
+
+std::ostream&
+operator<<(std::ostream& o, const SolverConfig::CowSolver& c) {
+  return o << "path: " << c.path << ", argv:" << c.argv << ", envp:" << c.envp
+           << ", SAT_regex: " << c.SAT_regex.value_or("(default)")
+           << ", UNSAT_regex: " << c.UNSAT_regex.value_or("(default)");
 }
 }

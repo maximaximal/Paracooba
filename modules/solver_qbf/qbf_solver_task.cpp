@@ -139,7 +139,6 @@ QBFSolverTask::work(parac_worker worker) {
 
       m_task.left_result = PARAC_PENDING;
 
-      assert(l);
       new QBFSolverTask(
         m_handle, *l, m_manager, m_cubeSource->leftChild(m_cubeSource));
       if(l->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED)
@@ -163,11 +162,12 @@ QBFSolverTask::work(parac_worker worker) {
 
       m_task.right_result = PARAC_PENDING;
 
-      assert(r);
-      new QBFSolverTask(
-        m_handle, *r, m_manager, m_cubeSource->rightChild(m_cubeSource));
-      if(r->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED) {
-        m_task.task_store->assess_task(m_task.task_store, r);
+      if(r) {
+        new QBFSolverTask(
+          m_handle, *r, m_manager, m_cubeSource->rightChild(m_cubeSource));
+        if(r->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED) {
+          m_task.task_store->assess_task(m_task.task_store, r);
+        }
       }
     } else if(!split_extended) {
       m_task.right_result = PARAC_UNSAT;
