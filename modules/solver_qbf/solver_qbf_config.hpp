@@ -54,6 +54,9 @@ class SolverConfig {
     std::optional<std::string> SAT_regex;
     std::optional<std::string> UNSAT_regex;
 
+    std::shared_ptr<const char*[]> argv_cstyle;
+    std::shared_ptr<const char*[]> envp_cstyle;
+
     friend class cereal::access;
     template<class Archive>
     void serialize(Archive& ar) {

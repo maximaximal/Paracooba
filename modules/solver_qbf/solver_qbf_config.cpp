@@ -4,6 +4,7 @@
 #include "paracooba/common/types.h"
 
 #include <cmath>
+#include <filesystem>
 #include <stdexcept>
 #include <thread>
 #include <type_traits>
@@ -118,6 +119,17 @@ SolverConfig::extractFromConfigEntries() {
   parseCowSolversCLI(m_config[static_cast<size_t>(Entry::CowSolvers)]);
 }
 
+template<class S, class T>
+static inline void
+apply_vector_into_cstyle(S const& src, T& tgt) {
+  tgt = std::make_unique<const char*[]>(src.size() + 1);
+  auto t = tgt.get();
+  for(size_t i = 0; i < src.size(); ++i) {
+    t[i] = src[i].c_str();
+  }
+  t[src.size()] = NULL;
+}
+
 SolverConfig::CowSolver::CowSolver(const std::string& cli) {
   std::vector<std::string> split;
   boost::algorithm::split(split, std::string(cli), boost::is_any_of(":|"));
@@ -129,6 +141,42 @@ SolverConfig::CowSolver::CowSolver(const std::string& cli) {
               "regex>]\". Arguments may be empty. Empty SAT and UNSAT regexes "
               "mean just the exit code is used.");
   }
+
+  path = split[0];
+
+  if(!std::filesystem::exists(path)) {
+    parac_log(PARAC_SOLVER,
+              PARAC_FATAL,
+              "CowIPASIR solver with path {} doesn't exist!",
+              path);
+    path = "";
+  }
+
+  if(split.size() >= 2) {
+    boost::algorithm::split(argv, split[1], boost::is_any_of(" "));
+
+    if(argv.size() > 0) {
+      apply_vector_into_cstyle(argv, argv_cstyle);
+    }
+  }
+  if(split.size() >= 3) {
+    boost::algorithm::split(argv, split[2], boost::is_any_of(" "));
+
+    if(envp.size() > 0) {
+      apply_vector_into_cstyle(envp, envp_cstyle);
+    }
+  }
+  if(split.size() == 4) {
+    parac_log(PARAC_SOLVER,
+              PARAC_FATAL,
+              "Require either none of SAT_regex and UNSAT_regex for CowIPASIR "
+              "Solver with path {} or both!",
+              path);
+  }
+  if(split.size() == 5) {
+    SAT_regex = split[4];
+    UNSAT_regex = split[5];
+  }
 }
 
 void
@@ -138,6 +186,9 @@ SolverConfig::parseCowSolversCLI(const parac_config_entry& e) {
   if(count > 0) {
     for(size_t i = 0; i < count; ++i) {
       CowSolver& solver = m_cowSolvers.emplace_back(arr[i]);
+      if(solver.path == "") {
+        m_cowSolvers.erase(m_cowSolvers.begin() + (m_cowSolvers.size() - 1));
+      }
     }
   }
 }
