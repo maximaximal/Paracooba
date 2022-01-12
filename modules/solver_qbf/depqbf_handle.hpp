@@ -14,9 +14,10 @@ class DepQBFHandle : public GenericSolverHandle {
   DepQBFHandle(const Parser& parser);
   virtual ~DepQBFHandle();
 
-  virtual void assumeCube(const CubeIteratorRange& cube);
-  virtual parac_status solve();
-  virtual void terminate();
+  virtual void assumeCube(const CubeIteratorRange& cube) override;
+  virtual parac_status solve() override;
+  virtual void terminate() override;
+  virtual const char* name() const override { return "DepQBFHandle"; };
 
   private:
   const Parser& m_parser;

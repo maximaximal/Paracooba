@@ -4,6 +4,7 @@
 
 #include "depqbf_handle.hpp"
 #include "parser_qbf.hpp"
+#include "portfolio_qbf_handle.hpp"
 #include "qbf_solver_manager.hpp"
 #include "solver_qbf_config.hpp"
 
@@ -55,7 +56,15 @@ QBFSolverManager::createGenericSolverHandle(size_t idx) {
   if(m_config.useDepQBF()) {
     parac_log(
       PARAC_SOLVER, PARAC_TRACE, "Create DepQBF Handle for worker {}!", idx);
-    return std::make_unique<DepQBFHandle>(m_parser);
+
+    auto vec =
+      PortfolioQBFHandle::SolverHandleFactoryVector{ [](const Parser& p) {
+        return std::make_unique<DepQBFHandle>(p);
+      } };
+
+    // return vec[0](m_parser);
+
+    return std::make_unique<PortfolioQBFHandle>(m_mod, m_parser, vec);
   }
   parac_log(PARAC_SOLVER,
             PARAC_FATAL,

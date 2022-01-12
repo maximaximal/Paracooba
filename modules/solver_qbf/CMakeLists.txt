@@ -4,6 +4,7 @@ set(PARACOOBA_SOLVER_QBF_SRCS
 
     ${CMAKE_CURRENT_SOURCE_DIR}/generic_qbf_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/depqbf_handle.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/portfolio_qbf_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/parser_qbf.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/qbf_parser_task.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/qbf_solver_task.cpp

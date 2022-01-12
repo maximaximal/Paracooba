@@ -228,6 +228,8 @@ QBFSolverTask::work(parac_worker worker) {
               "Apply cube {} on path {} to solver!",
               c,
               m_task.path);
+    if(m_task.stop)
+      return PARAC_ABORTED;
     parac_status r = handle->solve();
     if(r == PARAC_ABORTED) {
       std::unique_lock lock(m_terminationMutex);
