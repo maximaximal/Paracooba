@@ -50,7 +50,7 @@ class PortfolioQBFHandle : public GenericSolverHandle {
 
   const Handles m_handles;
   volatile bool m_handleRunning = true;
-  volatile bool m_terminating = false;
+  volatile bool m_terminating = false, m_globallyTerminating = false;
   volatile bool m_working = false;
 
   parac_status handleRun(Handle& h);
@@ -60,6 +60,6 @@ class PortfolioQBFHandle : public GenericSolverHandle {
   void resetReadyness();
   void waitForAllToBeReady();
   void beReady();
-  void terminateAllBut(Handle &h);
+  void terminateAllBut(Handle& h);
 };
 }

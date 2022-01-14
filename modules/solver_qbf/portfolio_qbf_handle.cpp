@@ -91,6 +91,8 @@ PortfolioQBFHandle::~PortfolioQBFHandle() {
 
 void
 PortfolioQBFHandle::assumeCube(const CubeIteratorRange& cube) {
+  if(m_terminating || m_globallyTerminating)
+    return;
   m_working = true;
   m_cubeIteratorRange = &cube;
   resetReadyness();
@@ -98,25 +100,33 @@ PortfolioQBFHandle::assumeCube(const CubeIteratorRange& cube) {
   waitForAllToBeReady();
   m_cubeIteratorRange = nullptr;
   m_working = false;
+  m_terminating = false;
+  m_globallyTerminating = false;
 }
 parac_status
 PortfolioQBFHandle::solve() {
-  parac_log(PARAC_SOLVER, PARAC_DEBUG, "solve()");
+  if(m_terminating || m_globallyTerminating)
+    return PARAC_ABORTED;
   m_working = true;
   m_solveResult = PARAC_ABORTED;
   resetReadyness();
-  parac_log(PARAC_SOLVER, PARAC_DEBUG, "notify all()");
   m_cond.notify_all();
   waitForAllToBeReady();
-  parac_log(PARAC_SOLVER, PARAC_DEBUG, "ready!");
+  if(m_globallyTerminating) {
+    m_terminating = false;
+    m_globallyTerminating = false;
+    return PARAC_ABORTED;
+  }
+  m_terminating = false;
+  m_globallyTerminating = false;
   std::unique_lock lock(m_solveResultMutex);
   m_working = false;
-  parac_log(PARAC_SOLVER, PARAC_DEBUG, "after mutex!");
   return m_solveResult;
 }
 void
 PortfolioQBFHandle::terminate() {
   m_terminating = true;
+  m_globallyTerminating = true;
   for(auto& h : *m_handles) {
     if(h.solver_handle) {
       h.solver_handle->terminate();
@@ -157,10 +167,18 @@ PortfolioQBFHandle::handleRun(Handle& h) {
     }
 
     // If already terminating here, the solver handle should directly be ended!
-    // The outside world doesn't know about this internal state machine.
-    if(!m_handleRunning || m_terminating) {
+    // The outside world doesn't know about this internal state machine. Only if
+    // not already working though.
+    if(!m_handleRunning || (m_terminating && !m_working)) {
       beReady();
       return PARAC_ABORTED;
+    }
+
+    // Some other thread woke up early / this thread slept longer and the whole
+    // solver handle was already aborted! Back to running.
+    if(m_terminating) {
+      beReady();
+      continue;
     }
 
     if(m_cubeIteratorRange) {
@@ -168,8 +186,8 @@ PortfolioQBFHandle::handleRun(Handle& h) {
       h.solver_handle->assumeCube(*m_cubeIteratorRange);
 
       {
-        std::unique_lock lock(m_waitMutex);
         beReady();
+        std::unique_lock lock(m_waitMutex);
         m_cond.wait(lock);
       }
     }
@@ -189,7 +207,7 @@ PortfolioQBFHandle::handleRun(Handle& h) {
     parac_status s = h.solver_handle->solve();
     if(!m_terminating) {
       parac_log(PARAC_SOLVER,
-                PARAC_TRACE,
+                PARAC_DEBUG,
                 "Inner PortfolioQBFHandle with id {} and solver {} to finished "
                 "solving with result {}!",
                 h.i,
@@ -202,7 +220,7 @@ PortfolioQBFHandle::handleRun(Handle& h) {
     } else {
       parac_log(
         PARAC_SOLVER,
-        PARAC_TRACE,
+        PARAC_DEBUG,
         "Inner PortfolioQBFHandle with id {} and solver {} was terminated.",
         h.i,
         h.solver_handle->name());
@@ -232,25 +250,37 @@ PortfolioQBFHandle::computeName() {
 void
 PortfolioQBFHandle::resetReadyness() {
   m_readyHandles = 0;
+  m_terminating = false;
+  m_globallyTerminating = false;
 }
 void
 PortfolioQBFHandle::waitForAllToBeReady() {
-  int readyHandles = m_readyHandles;
   if(!m_handleRunning || m_terminating)
     return;
 
-  do {
-    std::unique_lock lock(m_readyHandlesMutex);
+  std::unique_lock lock(m_readyHandlesMutex);
+  while(m_readyHandles != m_handles->size() && m_handleRunning &&
+        !m_terminating) {
     m_readynessCond.wait(lock);
-    readyHandles = m_readyHandles;
-  } while(readyHandles != m_handles->size() && m_handleRunning &&
-          !m_terminating);
+
+    if(m_readyHandles != m_handles->size()) {
+      parac_log(PARAC_SOLVER,
+                PARAC_DEBUG,
+                "waitForAllToBeReady readyHandles: {} m_handles->size(): {} "
+                "m_terminating: {} m_handleRunning: {} globalTerm: {}",
+                m_readyHandles,
+                m_handles->size(),
+                m_terminating,
+                m_handleRunning,
+                m_globallyTerminating);
+    }
+  }
 }
 void
 PortfolioQBFHandle::beReady() {
   std::unique_lock lock(m_readyHandlesMutex);
   ++m_readyHandles;
-  m_readynessCond.notify_one();
+  m_readynessCond.notify_all();
 }
 void
 PortfolioQBFHandle::terminateAllBut(Handle& ignore) {
