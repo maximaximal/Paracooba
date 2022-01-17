@@ -119,10 +119,7 @@ parse_formula_file(parac_module& mod,
     parac_path p;
     p.rep = PARAC_PATH_PARSER;
     parac_task* task =
-      task_store.new_task(&task_store,
-                          nullptr,
-                          p,
-                          originatorId);
+      task_store.new_task(&task_store, nullptr, p, originatorId);
     if(!task) {
       return PARAC_GENERIC_ERROR;
     }
@@ -507,6 +504,13 @@ mod_request_exit(parac_module* mod) {
   assert(mod);
   assert(mod->solver);
   assert(mod->handle);
+
+  if(mod->userdata) {
+    SolverUserdata* userdata = static_cast<SolverUserdata*>(mod->userdata);
+    for(auto& i : userdata->instances) {
+      i.manager->requestExit();
+    }
+  }
 
   return PARAC_OK;
 }

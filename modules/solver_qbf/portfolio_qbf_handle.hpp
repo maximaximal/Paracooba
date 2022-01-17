@@ -39,11 +39,10 @@ class PortfolioQBFHandle : public GenericSolverHandle {
   std::condition_variable m_cond;
   std::condition_variable m_readynessCond;
 
-  std::mutex m_readyHandlesMutex;
   int m_readyHandles = 0;
 
   std::mutex m_waitMutex;
-  const CubeIteratorRange* m_cubeIteratorRange = nullptr;
+  const CubeIteratorRange* volatile m_cubeIteratorRange = nullptr;
 
   std::mutex m_solveResultMutex;
   volatile parac_status m_solveResult;
@@ -53,12 +52,16 @@ class PortfolioQBFHandle : public GenericSolverHandle {
   volatile bool m_terminating = false, m_globallyTerminating = false;
   volatile bool m_working = false;
 
+  volatile bool m_setCubeIteratorRange = false;
+  volatile bool m_setStartSolve = false;
+
   parac_status handleRun(Handle& h);
-  parac_status handleWork(Handle& h);
+
+  Cube m_cube;
 
   std::string computeName();
   void resetReadyness();
-  void waitForAllToBeReady();
+  void waitForAllToBeReady(std::unique_lock<std::mutex>& lock);
   void beReady();
   void terminateAllBut(Handle& h);
 };

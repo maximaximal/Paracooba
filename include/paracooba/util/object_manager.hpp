@@ -1,7 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstddef>
+#include <forward_list>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -16,6 +19,7 @@ class ObjectManager {
     Ptr ptr;
     ObjectManager& mgr;
     size_t idx;
+    volatile bool shouldReturn = true;
 
     explicit PtrWrapper(Ptr ptr, ObjectManager& mgr, size_t idx)
       : ptr(std::move(ptr))
@@ -26,7 +30,10 @@ class ObjectManager {
     PtrWrapper(PtrWrapper&& o) = default;
     PtrWrapper(const PtrWrapper& o) = delete;
     PtrWrapper(PtrWrapper& o) = delete;
-    ~PtrWrapper() { mgr.give(idx, std::move(ptr)); }
+    ~PtrWrapper() {
+      if(shouldReturn)
+        mgr.give(idx, std::move(ptr));
+    }
 
     inline T* operator->() { return ptr.get(); }
     inline T& operator*() { return *ptr; }
@@ -35,7 +42,44 @@ class ObjectManager {
   using CreationFunc = std::function<Ptr(size_t)>;
 
   ObjectManager() = default;
-  ~ObjectManager() = default;
+  ~ObjectManager() {
+    // Busy wait until all (created) pointers were returned, which should happen
+    // fast.
+    clearAll();
+  }
+
+  void terminateAll() {
+    for(size_t i = 0; i < objs.size(); ++i) {
+      auto& o = objs[i];
+      if(o.created) {
+        assert(o.nonOwningPtr);
+        o.nonOwningPtr->terminate();
+      }
+    }
+  }
+
+  void clearAll() {
+    while(std::any_of(objs.begin(), objs.end(), [](auto& o) -> bool {
+      return o.created && o.ptr == nullptr;
+    })) {
+      terminateAll();
+    }
+
+    for(auto& o : objs) {
+      o.nonOwningPtr = nullptr;
+      o.created = false;
+      o.ptr = nullptr;
+    }
+  }
+
+  using ScheduleCB = std::function<void(ObjectManager&)>;
+
+  void scheduleAfterAllObjectsWereReturned(ScheduleCB cb) {
+    if(m_lent > 0)
+      m_scheduleAfterAllObjectsWereReturned.push_front(cb);
+    else
+      cb(*this);
+  }
 
   void init(size_t size, CreationFunc create) {
     assert(objs.size() == 0);
@@ -49,11 +93,23 @@ class ObjectManager {
   struct Internal {
     // Prevent false sharing by enlarging the struct
     Ptr ptr;
+    T* nonOwningPtr = nullptr;
     int64_t created = false;
   };
 
   std::vector<Internal> objs;
   CreationFunc create;
+  volatile size_t m_lent = 0;
+
+  std::forward_list<ScheduleCB> m_scheduleAfterAllObjectsWereReturned;
+  inline void workOnScheduleAfterAllObjectsWereReturned() {
+    while(!m_scheduleAfterAllObjectsWereReturned.empty()) {
+      auto& cb = m_scheduleAfterAllObjectsWereReturned.front();
+      m_scheduleAfterAllObjectsWereReturned.pop_front();
+
+      cb(*this);
+    }
+  }
 
   Ptr take(size_t idx) {
     assert(idx < objs.size());
@@ -63,9 +119,12 @@ class ObjectManager {
     if(!internal_obj.created) {
       auto obj = create(idx);
       assert(obj);
+      internal_obj.nonOwningPtr = obj.get();
       internal_obj.ptr = std::move(obj);
       internal_obj.created = true;
     }
+
+    m_lent++;
 
     return std::move(internal_obj.ptr);
   }
@@ -77,6 +136,11 @@ class ObjectManager {
     assert(internal_obj.created);
     assert(!internal_obj.ptr);
     internal_obj.ptr = std::move(obj);
+
+    m_lent--;
+    if(m_lent == 0) {
+      workOnScheduleAfterAllObjectsWereReturned();
+    }
   }
 };
 }
