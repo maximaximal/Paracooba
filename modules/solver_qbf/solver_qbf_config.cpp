@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <filesystem>
+#include <sstream>
 #include <stdexcept>
 #include <thread>
 #include <type_traits>
@@ -67,15 +68,6 @@ SolverConfig::extractFromConfigEntries() {
     m_config[static_cast<size_t>(Entry::UseDepQBF)].value.boolean_switch;
   m_treeDepth = m_config[static_cast<size_t>(Entry::TreeDepth)].value.uint64;
 
-  // Choose one solver so that solving works correctly.
-  if(!m_useDepQBF) {
-    parac_log(
-      PARAC_SOLVER,
-      PARAC_TRACE,
-      "Did not specify any QBF solver to use! Using DepQBF by default.");
-    m_useDepQBF = true;
-  }
-
   auto& intSplitsE = m_config[static_cast<size_t>(Entry::IntegerBasedSplits)];
   auto& intSplitsArr = intSplitsE.value.string_vector.strings;
   auto& intSplitsCount = intSplitsE.value.string_vector.size;
@@ -117,6 +109,15 @@ SolverConfig::extractFromConfigEntries() {
   }
 
   parseCowSolversCLI(m_config[static_cast<size_t>(Entry::CowSolvers)]);
+
+  // Choose one or more solvers.
+  if(!m_useDepQBF && m_cowSolvers.size() == 0) {
+    parac_log(
+      PARAC_SOLVER,
+      PARAC_DEBUG,
+      "Did not specify any QBF solver to use! Using DepQBF by default.");
+    m_useDepQBF = true;
+  }
 }
 
 template<class S, class T>
@@ -128,6 +129,13 @@ apply_vector_into_cstyle(S const& src, T& tgt) {
     t[i] = src[i].c_str();
   }
   t[src.size()] = NULL;
+}
+
+std::string
+SolverConfig::CowSolver::name() const {
+  std::stringstream s;
+  s << *this;
+  return s.str();
 }
 
 SolverConfig::CowSolver::CowSolver(const std::string& cli) {
@@ -235,6 +243,16 @@ SolverConfig::integerBasedSplitsCurrentIndex(size_t currentCubeLength) const {
     currentCubeLength -= bits;
   }
   return i;
+}
+
+size_t
+SolverConfig::fullyRealizedTreeDepth() const {
+  size_t d = 0;
+  for(size_t i = 0; i < m_integerBasedSplits.size(); ++i) {
+    size_t bits = integerBasedSplitsCurrentLength(i);
+    d += bits;
+  }
+  return d;
 }
 
 std::ostream&

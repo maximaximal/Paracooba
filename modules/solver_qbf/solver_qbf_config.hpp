@@ -33,6 +33,8 @@ class SolverConfig {
   size_t integerBasedSplitsCurrentIndex(size_t currentCubeLength) const;
   size_t integerBasedSplitsCurrentLength(size_t index) const;
 
+  size_t fullyRealizedTreeDepth() const;
+
   enum class Entry {
     UseDepQBF,
     TreeDepth,
@@ -56,6 +58,8 @@ class SolverConfig {
 
     std::shared_ptr<const char*[]> argv_cstyle;
     std::shared_ptr<const char*[]> envp_cstyle;
+
+    std::string name() const;
 
     friend class cereal::access;
     template<class Archive>

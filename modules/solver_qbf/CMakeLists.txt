@@ -3,6 +3,7 @@ set(PARACOOBA_SOLVER_QBF_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/solver_qbf_config.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/generic_qbf_handle.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cowsolver_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/depqbf_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/portfolio_qbf_handle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/parser_qbf.cpp
@@ -28,8 +29,11 @@ add_dependencies(parac_solver_qbf_obj cowipasir)
 
 set_property(TARGET parac_solver_qbf_obj APPEND PROPERTY INTERFACE_LINK_LIBRARIES cereal)
 
+target_link_libraries(parac_solver_qbf PRIVATE cowipasir)
+
 if(STATIC_BUILDS)
     target_link_libraries(parac_solver_qbf_static PRIVATE libdepqbf)
+    target_link_libraries(parac_solver_qbf_static PRIVATE cowipasir)
 endif()
 
 if(ENABLE_TESTS)
@@ -45,7 +49,7 @@ if(ENABLE_TESTS)
 
     target_link_libraries(parac_solver_qbf_test PRIVATE fmt)
 
-    target_link_libraries(parac_solver_qbf_test PUBLIC parac_common Catch2::Catch2 libdepqbf)
+    target_link_libraries(parac_solver_qbf_test PUBLIC parac_common Catch2::Catch2 libdepqbf cowipasir)
 
     target_include_directories(parac_solver_qbf_test PRIVATE ${Boost_INCLUDE_DIRS})
 
