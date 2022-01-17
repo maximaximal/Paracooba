@@ -53,24 +53,28 @@ QBFSolverManager::get(parac_worker worker) {
 
 std::unique_ptr<GenericSolverHandle>
 QBFSolverManager::createGenericSolverHandle(size_t idx) {
+  PortfolioQBFHandle::SolverHandleFactoryVector vec;
   if(m_config.useDepQBF()) {
-    parac_log(
-      PARAC_SOLVER, PARAC_TRACE, "Create DepQBF Handle for worker {}!", idx);
+    vec.emplace_back(
+      [](const Parser& p) { return std::make_unique<DepQBFHandle>(p); });
+  }
 
-    auto vec =
-      PortfolioQBFHandle::SolverHandleFactoryVector{ [](const Parser& p) {
-        return std::make_unique<DepQBFHandle>(p);
-      } };
+  for(const auto& cowSolver : m_config.cowSolvers()) {
+  }
 
-    // return vec[0](m_parser);
-
+  if(vec.size() == 1) {
+    return std::move(vec[0](m_parser));
+  } else {
     return std::make_unique<PortfolioQBFHandle>(m_mod, m_parser, vec);
   }
-  parac_log(PARAC_SOLVER,
-            PARAC_FATAL,
-            "Cannot make solver handle for worker {} because no solver was "
-            "selected to be used!",
-            idx);
-  return nullptr;
+
+  if(vec.empty()) {
+    parac_log(PARAC_SOLVER,
+              PARAC_FATAL,
+              "Cannot make solver handle for worker {} because no solver was "
+              "selected to be used!",
+              idx);
+    return nullptr;
+  }
 }
 }

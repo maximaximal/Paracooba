@@ -12,9 +12,12 @@ TEST_CASE("Starting and Waiting For Threads", "[commonc][thread_registry]") {
 
   parac_thread_registry_add_starting_callback(
     &registry, [](parac_thread_registry_handle* handle) {
-      passed = !handle->running && handle->thread_id == 1;
+      if(!passed) {
+        passed = !handle->running && handle->thread_id == 1;
+      }
     });
 
+  passed = false;
   REQUIRE(!passed);
 
   parac_status status = parac_thread_registry_create(

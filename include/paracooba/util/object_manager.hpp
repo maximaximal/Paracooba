@@ -74,13 +74,6 @@ class ObjectManager {
 
   using ScheduleCB = std::function<void(ObjectManager&)>;
 
-  void scheduleAfterAllObjectsWereReturned(ScheduleCB cb) {
-    if(m_lent > 0)
-      m_scheduleAfterAllObjectsWereReturned.push_front(cb);
-    else
-      cb(*this);
-  }
-
   void init(size_t size, CreationFunc create) {
     assert(objs.size() == 0);
     objs.resize(size);
@@ -99,17 +92,6 @@ class ObjectManager {
 
   std::vector<Internal> objs;
   CreationFunc create;
-  volatile size_t m_lent = 0;
-
-  std::forward_list<ScheduleCB> m_scheduleAfterAllObjectsWereReturned;
-  inline void workOnScheduleAfterAllObjectsWereReturned() {
-    while(!m_scheduleAfterAllObjectsWereReturned.empty()) {
-      auto& cb = m_scheduleAfterAllObjectsWereReturned.front();
-      m_scheduleAfterAllObjectsWereReturned.pop_front();
-
-      cb(*this);
-    }
-  }
 
   Ptr take(size_t idx) {
     assert(idx < objs.size());
@@ -124,8 +106,6 @@ class ObjectManager {
       internal_obj.created = true;
     }
 
-    m_lent++;
-
     return std::move(internal_obj.ptr);
   }
 
@@ -136,11 +116,6 @@ class ObjectManager {
     assert(internal_obj.created);
     assert(!internal_obj.ptr);
     internal_obj.ptr = std::move(obj);
-
-    m_lent--;
-    if(m_lent == 0) {
-      workOnScheduleAfterAllObjectsWereReturned();
-    }
   }
 };
 }

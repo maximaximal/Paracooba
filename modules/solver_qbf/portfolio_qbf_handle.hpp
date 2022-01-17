@@ -2,6 +2,7 @@
 
 #include <condition_variable>
 #include <functional>
+#include <queue>
 
 #include "generic_qbf_handle.hpp"
 
@@ -32,35 +33,95 @@ class PortfolioQBFHandle : public GenericSolverHandle {
   struct Handle;
   using Handles = std::unique_ptr<std::vector<Handle>>;
 
+  struct Event {
+    enum Type {
+      Assume,
+      Solve,
+      Terminate,
+      Destruct,
+      Undefined,
+    };
+
+    static inline constexpr bool typeHasCube(Type t) {
+      switch(t) {
+        case Assume:
+          return true;
+        default:
+          return false;
+      }
+    }
+    static inline constexpr const char* typeToStr(Type t) {
+      switch(t) {
+        case Assume:
+          return "Assume";
+        case Solve:
+          return "Solve";
+        case Terminate:
+          return "Terminate";
+        case Destruct:
+          return "Destruct";
+        case Undefined:
+          return "Undefined";
+      }
+    }
+
+    int64_t eventNumber = -1;
+
+    Type type = Undefined;
+
+    /// Only valid if Assume or Solve Event
+    Cube cube;
+
+    Event() noexcept {};
+    Event(Type t) noexcept
+      : type(t) {}
+    Event(Type t, const CubeIteratorRange& cubeItRange)
+      : type(t)
+      , cube(cubeItRange.begin(), cubeItRange.end()) {}
+
+    Event& operator=(const Event& o) {
+      eventNumber = o.eventNumber;
+      type = o.type;
+      if(typeHasCube(o.type))
+        cube = o.cube;
+      return *this;
+    }
+  };
+
+  /** @brief Pops a new event from the event queue.
+   * @return true to continue, false to exit the worker thread.
+   */
+  bool popEvent(Event& tgt);
+  int64_t pushEvent(const Event& e, std::unique_lock<std::mutex>& lock);
+  void pushEventAndWait(const Event& e);
+  std::mutex m_eventsMutex;
+  std::queue<Event> m_events;
+  std::condition_variable m_eventsConditionVariable;
+  std::condition_variable m_eventsReverseConditionVariable;
+  size_t m_handlesThatReceivedCurrentEvent = 0;
+  size_t m_handlesThatProcessedCurrentEvent = 0;
+
   std::string m_name;
   parac_module& m_mod;
   const Parser* m_parser = nullptr;
 
-  std::condition_variable m_cond;
-  std::condition_variable m_readynessCond;
+  int64_t m_eventCount = 0;
+  int64_t m_mostRecentHandledEvent = -1;
 
-  int m_readyHandles = 0;
-
-  std::mutex m_waitMutex;
-  const CubeIteratorRange* volatile m_cubeIteratorRange = nullptr;
+  size_t m_readyHandles = 0;
 
   std::mutex m_solveResultMutex;
   volatile parac_status m_solveResult;
+  volatile size_t m_solveResultProducerIndex;
 
   const Handles m_handles;
   volatile bool m_handleRunning = true;
-  volatile bool m_terminating = false, m_globallyTerminating = false;
+  volatile bool m_terminating = false;
   volatile bool m_working = false;
-
-  volatile bool m_setCubeIteratorRange = false;
-  volatile bool m_setStartSolve = false;
 
   parac_status handleRun(Handle& h);
 
-  Cube m_cube;
-
   std::string computeName();
-  void resetReadyness();
   void waitForAllToBeReady(std::unique_lock<std::mutex>& lock);
   void beReady();
   void terminateAllBut(Handle& h);

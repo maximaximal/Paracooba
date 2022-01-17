@@ -166,9 +166,13 @@ void
 parac_thread_registry_wait_for_exit(parac_thread_registry* registry) {
   struct parac_thread_handle_list_entry* handle = registry->threads->first;
   while(handle) {
-    if(handle->entry.registry_handle &&
-       handle->entry.registry_handle->running) {
-      thrd_join(handle->entry.thread, NULL);
+    if(handle->entry.thread != 0) {
+      int* exit_code = NULL;
+      if(handle->entry.registry_handle) {
+        exit_code = &handle->entry.registry_handle->exit_status;
+      }
+      thrd_join(handle->entry.thread, exit_code);
+      handle->entry.thread = 0;
     }
     handle = handle->next;
   }
@@ -187,6 +191,7 @@ parac_thread_registry_wait_for_exit_of_thread(
   assert(handle->thread_handle);
 
   if(handle->running) {
-    thrd_join(handle->thread_handle->thread, NULL);
+    thrd_join(handle->thread_handle->thread, &handle->exit_status);
+    handle->thread_handle->thread = 0;
   }
 }

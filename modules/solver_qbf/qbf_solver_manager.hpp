@@ -24,8 +24,7 @@ class QBFSolverManager : private util::ObjectManager<GenericSolverHandle> {
 
   void terminateAll() { OM::terminateAll(); }
   void requestExit() {
-    OM::scheduleAfterAllObjectsWereReturned([&](OM& om) { om.clearAll(); });
-    terminateAll();
+    clearAll();
   }
 
   private:

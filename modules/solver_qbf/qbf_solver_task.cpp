@@ -297,7 +297,7 @@ QBFSolverTask::static_terminate(volatile parac_task* task) {
   parac_path p;
   p.rep = task->path.rep;
   if(parac_path_is_extended(p) && task->extended_children) {
-    for(size_t i = 0; i < task->extended_children_count; ++i) {
+    for(int32_t i = 0; i < task->extended_children_count; ++i) {
       if(task->extended_children[i]) {
         task->extended_children[i]->parent_task_ = nullptr;
       }

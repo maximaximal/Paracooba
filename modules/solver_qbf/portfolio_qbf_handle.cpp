@@ -30,6 +30,8 @@ struct PortfolioQBFHandle::Handle {
   SolverHandleFactory solver_handle_factory;
   SolverHandle solver_handle;
   size_t i;
+  PortfolioQBFHandle::Event event;
+  bool previousWasAssume = false;
 
   enum State { StateWait, StateAssume, StateSolve, StateEnd };
 
@@ -48,6 +50,7 @@ struct PortfolioQBFHandle::Handle {
       case StateEnd:
         return StateEnd;
     }
+    return StateEnd;
   }
 
   ~Handle() { parac_thread_registry_wait_for_exit_of_thread(&thread_handle); }
@@ -63,8 +66,6 @@ PortfolioQBFHandle::PortfolioQBFHandle(
       solverHandleFactories.size())) {
   assert(mod.handle);
   parac_handle& handle = *mod.handle;
-
-  resetReadyness();
 
   auto& handles = *m_handles;
   for(uintptr_t i = 0; i < solverHandleFactories.size(); ++i) {
@@ -86,10 +87,12 @@ PortfolioQBFHandle::PortfolioQBFHandle(
       &h.thread_handle);
   }
 
-  parac_log(
-    PARAC_SOLVER, PARAC_DEBUG, "Begin waiting for all handles to be ready...");
+  parac_log(PARAC_SOLVER,
+            PARAC_DEBUG,
+            "Begin waiting for all {} handles to be ready...",
+            solverHandleFactories.size());
 
-  std::unique_lock lock(m_waitMutex);
+  std::unique_lock lock(m_eventsMutex);
   waitForAllToBeReady(lock);
   m_name = computeName();
 
@@ -100,113 +103,109 @@ PortfolioQBFHandle::PortfolioQBFHandle(
 }
 PortfolioQBFHandle::~PortfolioQBFHandle() {
   m_handleRunning = false;
-  parac_log(PARAC_SOLVER,
-            PARAC_LOCALWARNING,
-            "PortfolioQBFHandle beginning to destruct.");
+  parac_log(
+    PARAC_SOLVER, PARAC_DEBUG, "PortfolioQBFHandle beginning to destruct.");
   terminate();
-  parac_log(PARAC_SOLVER,
-            PARAC_LOCALWARNING,
-            "PortfolioQBFHandle beginning to destruct. After terminate");
-
-  // Don't destruct while working!
-  if(m_working) {
-    parac_log(PARAC_SOLVER,
-              PARAC_TRACE,
-              "Destructing PortfolioQBFHandle, waiting for work to end.");
-    while(m_working) {
-    };
-  }
-
-  if(std::any_of(m_handles->begin(), m_handles->end(), [](const auto& h) {
-       return h.thread_handle.running;
-     })) {
-    parac_log(PARAC_SOLVER,
-              PARAC_LOCALWARNING,
-              "Some working handles still exist for {}! Repeating condition "
-              "variable notification until they stop.",
-              m_name);
-    do {
-      m_cond.notify_all();
-    } while(std::any_of(m_handles->begin(),
-                        m_handles->end(),
-                        [](const auto& h) { return h.thread_handle.running; }));
-  } else {
-    parac_log(PARAC_SOLVER,
-              PARAC_LOCALWARNING,
-              "No running handles in {}! Iterating.",
-              m_name);
-    for(const auto& h : *m_handles) {
-      parac_log(PARAC_SOLVER,
-                PARAC_LOCALWARNING,
-                "Handle {} Active {}",
-                h.i,
-                h.thread_handle.running);
-    }
-  }
-
+  pushEventAndWait(Event(Event::Destruct));
   m_handles->clear();
   parac_log(PARAC_SOLVER, PARAC_DEBUG, "Destructed PortfolioQBFHandle!");
 }
 
 void
 PortfolioQBFHandle::assumeCube(const CubeIteratorRange& cube) {
-  if(m_terminating || m_globallyTerminating)
-    return;
-  std::unique_lock lock(m_waitMutex);
-  m_cube.assign(cube.begin(), cube.end());
   m_working = true;
-  resetReadyness();
-  m_setCubeIteratorRange = true;
-  parac_log(PARAC_SOLVER,
-            PARAC_LOCALWARNING,
-            "Wanna Assume",
-            m_setCubeIteratorRange);
-  m_cond.notify_all();
+  m_terminating = false;
+
+  std::unique_lock eventsLock(m_eventsMutex);
+  pushEvent(Event(Event::Assume, cube), eventsLock);
 }
 parac_status
 PortfolioQBFHandle::solve() {
-  if(m_terminating || m_globallyTerminating)
-    return PARAC_ABORTED;
-  std::unique_lock lock(m_waitMutex);
-  parac_log(PARAC_SOLVER,
-            PARAC_LOCALWARNING,
-            "Wanna Solve! Assumed: {}!",
-            m_setCubeIteratorRange);
-  if(!m_setCubeIteratorRange) {
-    m_solveResult = PARAC_ABORTED;
-    m_working = true;
-    resetReadyness();
-    m_setStartSolve = true;
-    m_cond.notify_all();
-  }
-  waitForAllToBeReady(lock);
-  m_setCubeIteratorRange = false;
-  m_working = false;
   m_terminating = false;
-  m_setStartSolve = false;
-
+  pushEventAndWait(Event(Event::Solve));
   parac_status s = m_solveResult;
-  parac_log(
-    PARAC_SOLVER, PARAC_LOCALWARNING, "Solver finished with result {}!", s);
+  parac_log(PARAC_SOLVER,
+            PARAC_TRACE,
+            "Portfolio Solver {} finished with result {} from solver id {} "
+            "with name {}!",
+            m_name,
+            s,
+            m_solveResultProducerIndex,
+            (*m_handles)[m_solveResultProducerIndex].solver_handle->name());
 
-  if(m_globallyTerminating) {
-    m_working = false;
-    return PARAC_ABORTED;
-  }
   m_terminating = false;
   m_working = false;
   return m_solveResult;
 }
 void
 PortfolioQBFHandle::terminate() {
-  m_terminating = true;
-  for(auto& h : *m_handles) {
-    if(h.solver_handle) {
-      h.solver_handle->terminate();
+  // Only do the termination stuff once!
+  if(!m_terminating) {
+    m_terminating = true;
+    {
+      std::unique_lock lock(m_eventsMutex);
+      pushEvent(Event(Event::Terminate), lock);
+    }
+    for(auto& h : *m_handles) {
+      if(h.solver_handle) {
+        h.solver_handle->terminate();
+      }
     }
   }
-  m_cond.notify_all();
-  m_readynessCond.notify_all();
+}
+
+int64_t
+PortfolioQBFHandle::pushEvent(const Event& e,
+                              std::unique_lock<std::mutex>& lock) {
+  m_events.emplace(e);
+  int64_t n = m_eventCount++;
+  m_events.back().eventNumber = n;
+  m_eventsConditionVariable.notify_all();
+  return n;
+}
+void
+PortfolioQBFHandle::pushEventAndWait(const Event& e) {
+  std::unique_lock lock(m_eventsMutex);
+  int64_t n = pushEvent(e, lock);
+
+  while(m_mostRecentHandledEvent < n) {
+    m_eventsReverseConditionVariable.wait(lock);
+  }
+}
+
+bool
+PortfolioQBFHandle::popEvent(Event& tgt) {
+  auto oldEvNum = tgt.eventNumber;
+
+  std::unique_lock lock(m_eventsMutex);
+
+  if(++m_handlesThatProcessedCurrentEvent == m_handles->size()) {
+    m_handlesThatProcessedCurrentEvent = 0;
+    m_mostRecentHandledEvent = tgt.eventNumber;
+    m_eventsReverseConditionVariable.notify_all();
+  }
+
+  while(true) {
+    if(!m_events.empty()) {
+      const auto& front = m_events.front();
+      if(front.eventNumber > oldEvNum) {
+        tgt = front;
+
+        if(++m_handlesThatReceivedCurrentEvent == m_handles->size()) {
+          m_handlesThatReceivedCurrentEvent = 0;
+          m_events.pop();
+        }
+
+        return tgt.type != Event::Destruct;
+      }
+    }
+
+    m_eventsConditionVariable.wait(lock);
+  }
+
+  assert(m_events.empty());
+
+  return false;
 }
 
 PortfolioQBFHandle::Handle::State
@@ -218,22 +217,37 @@ PortfolioQBFHandle::Handle::StateWaitFunc(PortfolioQBFHandle& self) {
     i,
     solver_handle->name());
 
-  std::unique_lock lock(self.m_waitMutex);
-
-  while(self.m_handleRunning) {
-    if(self.m_setCubeIteratorRange)
-      return StateAssume;
-    if(self.m_setStartSolve)
-      return StateSolve;
-
+  while(self.popEvent(event)) {
     parac_log(PARAC_SOLVER,
               PARAC_DEBUG,
-              "Inner PortfolioQBFHandle with id {} and solver {} now in state "
-              "Wait. Trigger Wait.",
+              "Inner PortfolioQBFHandle with id {} and solver {} received "
+              "event of type {} in state Wait.",
               i,
-              solver_handle->name());
+              solver_handle->name(),
+              Event::typeToStr(event.type));
 
-    self.m_cond.wait(lock);
+    switch(event.type) {
+      case Event::Assume:
+        previousWasAssume = true;
+        return StateAssume;
+      case Event::Solve:
+        // If the previous command was to assume, the assume state already
+        // solves now. This is to stop issues with aborts putting the solver
+        // into an invalid state when the terminate comes before the solver
+        // could start solving.
+        if(previousWasAssume) {
+          previousWasAssume = false;
+          continue;
+        }
+        return StateSolve;
+      case Event::Terminate:
+        previousWasAssume = false;
+        continue;
+      case Event::Destruct:
+      case Event::Undefined:
+        previousWasAssume = false;
+        return StateEnd;
+    }
   }
 
   return StateEnd;
@@ -248,7 +262,7 @@ PortfolioQBFHandle::Handle::StateAssumeFunc(PortfolioQBFHandle& self) {
     i,
     solver_handle->name());
   solver_handle->assumeCube(
-    CubeIteratorRange(self.m_cube.begin(), self.m_cube.end()));
+    CubeIteratorRange(event.cube.begin(), event.cube.end()));
   return StateSolve;
 }
 
@@ -265,9 +279,7 @@ PortfolioQBFHandle::Handle::StateSolveFunc(PortfolioQBFHandle& self) {
   std::unique_lock lock(self.m_solveResultMutex, std::try_to_lock);
 
   if(lock.owns_lock()) {
-    if(!self.m_terminating) {
-      self.terminateAllBut(*this);
-    }
+    self.terminateAllBut(*this);
     parac_log(PARAC_SOLVER,
               PARAC_DEBUG,
               "Inner PortfolioQBFHandle with id {} and solver {} to finished "
@@ -276,9 +288,9 @@ PortfolioQBFHandle::Handle::StateSolveFunc(PortfolioQBFHandle& self) {
               solver_handle->name(),
               s);
     self.m_solveResult = s;
+    self.m_solveResultProducerIndex = i;
   }
 
-  self.beReady();
   return StateWait;
 }
 
@@ -311,11 +323,19 @@ PortfolioQBFHandle::handleRun(Handle& h) {
       s = h.executeState(s, *this);
     }
 
-    parac_log(PARAC_SOLVER,
-              PARAC_DEBUG,
-              "Inner PortfolioQBFHandle with id {} and solver {} exiting.",
-              h.i,
-              h.solver_handle->name());
+    parac_log(
+      PARAC_SOLVER,
+      PARAC_DEBUG,
+      "Inner PortfolioQBFHandle with id {} and solver {} exiting. Event: {}",
+      h.i,
+      h.solver_handle->name(),
+      Event::typeToStr(h.event.type));
+
+    if(h.event.type == Event::Destruct) {
+      std::unique_lock lock(m_eventsMutex);
+      m_mostRecentHandledEvent = m_eventCount - 1;
+      m_eventsReverseConditionVariable.notify_all();
+    }
   } catch(...) {
   }
 
@@ -333,12 +353,6 @@ PortfolioQBFHandle::computeName() {
   return name.str();
 }
 void
-PortfolioQBFHandle::resetReadyness() {
-  m_readyHandles = 0;
-  m_terminating = false;
-  m_globallyTerminating = false;
-}
-void
 PortfolioQBFHandle::waitForAllToBeReady(std::unique_lock<std::mutex>& lock) {
   if(!m_handleRunning || m_terminating) {
     m_readyHandles = 0;
@@ -347,20 +361,19 @@ PortfolioQBFHandle::waitForAllToBeReady(std::unique_lock<std::mutex>& lock) {
 
   while(m_readyHandles != m_handles->size() && m_handleRunning &&
         !m_terminating) {
-    m_readynessCond.wait(lock);
+    m_eventsConditionVariable.wait(lock);
   }
 
   m_readyHandles = 0;
 }
 void
 PortfolioQBFHandle::beReady() {
-  std::unique_lock lock(m_waitMutex);
+  std::unique_lock lock(m_eventsMutex);
   ++m_readyHandles;
-  m_readynessCond.notify_all();
+  m_eventsConditionVariable.notify_all();
 }
 void
 PortfolioQBFHandle::terminateAllBut(Handle& ignore) {
-  m_terminating = true;
   for(auto& h : *m_handles) {
     if(&h == &ignore)
       continue;
