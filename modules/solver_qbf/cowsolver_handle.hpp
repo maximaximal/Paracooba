@@ -28,7 +28,7 @@ class CowSolverHandle : public GenericSolverHandle {
                       cowSolver.argv_cstyle.get(),
                       cowSolver.envp_cstyle.get(),
                       config.fullyRealizedTreeDepth(),
-                      cowSolver.name(),
+                      "CowSolver {" + cowSolver.name() + "}",
                       cowSolver.SAT_regex,
                       cowSolver.UNSAT_regex) {}
 

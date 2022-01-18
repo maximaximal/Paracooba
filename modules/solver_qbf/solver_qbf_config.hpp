@@ -16,7 +16,7 @@ class SolverConfig {
   public:
   SolverConfig() = default;
   explicit SolverConfig(parac_config* config, parac_id localId);
-  ~SolverConfig() = default;
+  ~SolverConfig();
 
   void extractFromConfigEntries();
 
@@ -40,6 +40,7 @@ class SolverConfig {
     TreeDepth,
     IntegerBasedSplits,
     CowSolvers,
+    CowIPASIRDebug,
     _COUNT
   };
 
@@ -83,6 +84,7 @@ class SolverConfig {
   uint64_t m_treeDepth;
   std::vector<int> m_integerBasedSplits;
   std::vector<CowSolver> m_cowSolvers;
+  bool m_cowipasirDebug = false;
 
   friend class cereal::access;
   template<class Archive>

@@ -60,12 +60,30 @@ SolverConfig::SolverConfig(parac_config* config, parac_id localId) {
     .default_value.string_vector.strings = nullptr;
   m_config[static_cast<size_t>(Entry::CowSolvers)]
     .default_value.string_vector.size = 0;
+
+  parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(Entry::CowIPASIRDebug)],
+    "cowipasir-debug",
+    "Activate (very verbose) CowIPASIR debug output");
+  m_config[static_cast<size_t>(Entry::CowIPASIRDebug)].registrar =
+    PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::CowIPASIRDebug)].type = PARAC_TYPE_SWITCH;
+  m_config[static_cast<size_t>(Entry::CowIPASIRDebug)]
+    .default_value.boolean_switch = false;
+}
+
+SolverConfig::~SolverConfig() {
+  if(m_cowipasirDebug) {
+    unsetenv("COWIPASIR_DEBUG");
+  }
 }
 
 void
 SolverConfig::extractFromConfigEntries() {
   m_useDepQBF =
     m_config[static_cast<size_t>(Entry::UseDepQBF)].value.boolean_switch;
+  m_cowipasirDebug =
+    m_config[static_cast<size_t>(Entry::CowIPASIRDebug)].value.boolean_switch;
   m_treeDepth = m_config[static_cast<size_t>(Entry::TreeDepth)].value.uint64;
 
   auto& intSplitsE = m_config[static_cast<size_t>(Entry::IntegerBasedSplits)];
@@ -117,6 +135,10 @@ SolverConfig::extractFromConfigEntries() {
       PARAC_DEBUG,
       "Did not specify any QBF solver to use! Using DepQBF by default.");
     m_useDepQBF = true;
+  }
+
+  if(m_cowipasirDebug) {
+    setenv("COWIPASIR_DEBUG", "1", 1);
   }
 }
 

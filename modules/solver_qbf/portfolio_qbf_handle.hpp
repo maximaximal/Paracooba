@@ -109,6 +109,7 @@ class PortfolioQBFHandle : public GenericSolverHandle {
   int64_t m_mostRecentHandledEvent = -1;
 
   size_t m_readyHandles = 0;
+  volatile int64_t m_eventAlreadySolved = -1;
 
   std::mutex m_solveResultMutex;
   volatile parac_status m_solveResult;

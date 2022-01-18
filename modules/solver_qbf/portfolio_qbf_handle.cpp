@@ -70,6 +70,7 @@ PortfolioQBFHandle::PortfolioQBFHandle(
   auto& handles = *m_handles;
   for(uintptr_t i = 0; i < solverHandleFactories.size(); ++i) {
     Handle& h = handles[i];
+    h.i = i;
     h.thread_handle.userdata = this;
     h.solver_handle_factory = std::move(solverHandleFactories[i]);
 
@@ -122,6 +123,7 @@ PortfolioQBFHandle::assumeCube(const CubeIteratorRange& cube) {
 parac_status
 PortfolioQBFHandle::solve() {
   m_terminating = false;
+  m_solveResult = PARAC_ABORTED;
   pushEventAndWait(Event(Event::Solve));
   parac_status s = m_solveResult;
   parac_log(PARAC_SOLVER,
@@ -194,6 +196,10 @@ PortfolioQBFHandle::popEvent(Event& tgt) {
         if(++m_handlesThatReceivedCurrentEvent == m_handles->size()) {
           m_handlesThatReceivedCurrentEvent = 0;
           m_events.pop();
+
+          // Others that have been waiting for this moment must now be notified
+          // again.
+          m_eventsConditionVariable.notify_all();
         }
 
         return tgt.type != Event::Destruct;
@@ -278,7 +284,9 @@ PortfolioQBFHandle::Handle::StateSolveFunc(PortfolioQBFHandle& self) {
   parac_status s = solver_handle->solve();
   std::unique_lock lock(self.m_solveResultMutex, std::try_to_lock);
 
-  if(lock.owns_lock()) {
+  if(lock.owns_lock() && self.m_eventAlreadySolved < event.eventNumber) {
+    self.m_eventAlreadySolved = event.eventNumber;
+
     self.terminateAllBut(*this);
     parac_log(PARAC_SOLVER,
               PARAC_DEBUG,
