@@ -248,9 +248,13 @@ SolverConfig::integerBasedSplitsCurrentIndex(size_t currentCubeLength) const {
 size_t
 SolverConfig::fullyRealizedTreeDepth() const {
   size_t d = 0;
-  for(size_t i = 0; i < m_integerBasedSplits.size(); ++i) {
-    size_t bits = integerBasedSplitsCurrentLength(i);
-    d += bits;
+  for(size_t i = 0; i < m_treeDepth; ++i) {
+    if(i < m_integerBasedSplits.size()) {
+      size_t bits = integerBasedSplitsCurrentLength(i);
+      d += bits;
+    } else {
+      ++d;
+    }
   }
   return d;
 }

@@ -84,7 +84,6 @@ class ObjectManager {
 
   private:
   struct Internal {
-    // Prevent false sharing by enlarging the struct
     Ptr ptr;
     T* nonOwningPtr = nullptr;
     int64_t created = false;

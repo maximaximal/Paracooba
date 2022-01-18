@@ -35,7 +35,7 @@ CowSolverHandle::CowSolverHandle(const Parser& parser,
   }
 
   for(auto q : parser.quantifiers()) {
-    cowipasir_assume(m_cowipasir.get(), q.lit);
+    cowipasir_quantify(m_cowipasir.get(), q.lit);
   }
   for(auto l : parser.literals()) {
     cowipasir_add(m_cowipasir.get(), l);
@@ -53,6 +53,10 @@ CowSolverHandle::assumeCube(const CubeIteratorRange& cube) {
     return;
 
   for(auto l : cube) {
+    // We don't need the 0 here.
+    if(l == 0)
+      continue;
+
     cowipasir_assume(m_cowipasir.get(), l);
   }
 }
