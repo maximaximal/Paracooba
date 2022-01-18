@@ -162,25 +162,17 @@ SolverConfig::CowSolver::name() const {
 
 SolverConfig::CowSolver::CowSolver(const std::string& cli) {
   std::vector<std::string> split;
-  boost::algorithm::split(split, std::string(cli), boost::is_any_of(":|"));
+  boost::algorithm::split(split, std::string(cli), boost::is_any_of("@"));
   if(split.size() < 1) {
     parac_log(PARAC_SOLVER,
               PARAC_FATAL,
               "Invalid CowIPASIR Solver Config! Require this format: \"<path "
-              "to executable>[:<argv>][:<envp>][:<SAT_regex>:<UNSAT "
+              "to executable>[@<argv>][@<envp>][@<SAT_regex>@<UNSAT "
               "regex>]\". Arguments may be empty. Empty SAT and UNSAT regexes "
               "mean just the exit code is used.");
   }
 
   path = split[0];
-
-  if(!std::filesystem::exists(path)) {
-    parac_log(PARAC_SOLVER,
-              PARAC_FATAL,
-              "CowIPASIR solver with path {} doesn't exist!",
-              path);
-    path = "";
-  }
 
   if(split.size() >= 2) {
     boost::algorithm::split(argv, split[1], boost::is_any_of(" "));
@@ -190,7 +182,7 @@ SolverConfig::CowSolver::CowSolver(const std::string& cli) {
     }
   }
   if(split.size() >= 3) {
-    boost::algorithm::split(argv, split[2], boost::is_any_of(" "));
+    boost::algorithm::split(envp, split[2], boost::is_any_of(" "));
 
     if(envp.size() > 0) {
       apply_vector_into_cstyle(envp, envp_cstyle);
