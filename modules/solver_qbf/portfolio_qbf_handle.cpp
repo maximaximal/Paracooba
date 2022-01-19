@@ -282,6 +282,17 @@ PortfolioQBFHandle::Handle::StateSolveFunc(PortfolioQBFHandle& self) {
     solver_handle->name());
 
   parac_status s = solver_handle->solve();
+
+  if(s != PARAC_SAT && s != PARAC_UNSAT && s != PARAC_ABORTED) {
+    parac_log(PARAC_SOLVER,
+              PARAC_LOCALERROR,
+              "Inner PortfolioQBFHandle with id {} and solver {} returned "
+              "unsupported status {}! Ignoring this result.",
+              i,
+              solver_handle->name(),
+              s);
+  }
+
   std::unique_lock lock(self.m_solveResultMutex, std::try_to_lock);
 
   if(lock.owns_lock() && self.m_eventAlreadySolved < event.eventNumber) {
