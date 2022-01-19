@@ -63,6 +63,7 @@ class PortfolioQBFHandle : public GenericSolverHandle {
         case Undefined:
           return "Undefined";
       }
+      return "Unknown";
     }
 
     int64_t eventNumber = -1;
