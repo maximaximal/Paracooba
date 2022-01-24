@@ -70,12 +70,11 @@ solve_inner(cowipasir_solver* s, volatile bool& terminated) {
       return PARAC_SAT;
     case 20:
       return PARAC_UNSAT;
-    case 0:
-      if(terminated)
-        return PARAC_ABORTED;
-      else
-        return PARAC_UNKNOWN;
   }
+
+  if(terminated)
+    return PARAC_ABORTED;
+
   return PARAC_UNKNOWN;
 }
 
