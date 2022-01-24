@@ -68,17 +68,15 @@ QBFSolverManager::createGenericSolverHandle(size_t idx) {
 
   if(vec.size() == 1) {
     return std::move(vec[0](m_parser));
-  } else {
+  } else if(vec.size() > 1) {
     return std::make_unique<PortfolioQBFHandle>(m_mod, m_parser, vec);
   }
 
-  if(vec.empty()) {
-    parac_log(PARAC_SOLVER,
-              PARAC_FATAL,
-              "Cannot make solver handle for worker {} because no solver was "
-              "selected to be used!",
-              idx);
-    return nullptr;
-  }
+  parac_log(PARAC_SOLVER,
+            PARAC_FATAL,
+            "Cannot make solver handle for worker {} because no solver was "
+            "selected to be used!",
+            idx);
+  return nullptr;
 }
 }
