@@ -39,17 +39,17 @@ class SolverConfig {
     UseDepQBF,
     TreeDepth,
     IntegerBasedSplits,
-    CowSolvers,
-    CowIPASIRDebug,
+    QuapiSolvers,
+    QuapiDebug,
     _COUNT
   };
 
-  struct CowSolver {
-    /** @brief Create CowSolver config instance from a single CLI arg.
+  struct QuapiSolver {
+    /** @brief Create QuapiSolver config instance from a single CLI arg.
      *
      */
-    CowSolver() = default;
-    CowSolver(const std::string& cliParam);
+    QuapiSolver() = default;
+    QuapiSolver(const std::string& cliParam);
 
     std::string path;
     std::vector<std::string> argv;
@@ -73,7 +73,9 @@ class SolverConfig {
     }
   };
 
-  const std::vector<CowSolver>& cowSolvers() const { return m_cowSolvers; }
+  const std::vector<QuapiSolver>& quapiSolvers() const {
+    return m_quapiSolvers;
+  }
 
   private:
   parac_config_entry* m_config = nullptr;
@@ -83,8 +85,8 @@ class SolverConfig {
   bool m_useDepQBF = false;
   uint64_t m_treeDepth;
   std::vector<int> m_integerBasedSplits;
-  std::vector<CowSolver> m_cowSolvers;
-  bool m_cowipasirDebug = false;
+  std::vector<QuapiSolver> m_quapiSolvers;
+  bool m_quapiDebug = false;
 
   friend class cereal::access;
   template<class Archive>
@@ -92,14 +94,15 @@ class SolverConfig {
     ar(cereal::make_nvp("originatorId", m_originatorId),
        cereal::make_nvp("useDepQBF", m_useDepQBF),
        cereal::make_nvp("treeDepth", m_treeDepth),
-       cereal::make_nvp("cowsolvers", m_cowSolvers),
+       cereal::make_nvp("quapisolvers", m_quapiSolvers),
+       cereal::make_nvp("quapidebug", m_quapiDebug),
        cereal::make_nvp("integerBasedSplits", m_integerBasedSplits));
   }
 
-  void parseCowSolversCLI(const parac_config_entry& e);
+  void parseQuapiSolversCLI(const parac_config_entry& e);
 };
 std::ostream&
 operator<<(std::ostream& o, const SolverConfig& config);
 std::ostream&
-operator<<(std::ostream& o, const SolverConfig::CowSolver& cowSolver);
+operator<<(std::ostream& o, const SolverConfig::QuapiSolver& s);
 }

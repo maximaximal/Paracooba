@@ -51,30 +51,30 @@ SolverConfig::SolverConfig(parac_config* config, parac_id localId) {
     .default_value.string_vector.size = 0;
 
   parac_config_entry_set_str(
-    &m_config[static_cast<size_t>(Entry::CowSolvers)],
-    "cowsolvers",
-    "Defines CowIPASIR solvers to use as additional portfolio backends");
-  m_config[static_cast<size_t>(Entry::CowSolvers)].registrar = PARAC_MOD_SOLVER;
-  m_config[static_cast<size_t>(Entry::CowSolvers)].type = PARAC_TYPE_VECTOR_STR;
-  m_config[static_cast<size_t>(Entry::CowSolvers)]
+    &m_config[static_cast<size_t>(Entry::QuapiSolvers)],
+    "quapisolvers",
+    "Defines QuAPI solvers to use as additional portfolio backends");
+  m_config[static_cast<size_t>(Entry::QuapiSolvers)].registrar =
+    PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::QuapiSolvers)].type =
+    PARAC_TYPE_VECTOR_STR;
+  m_config[static_cast<size_t>(Entry::QuapiSolvers)]
     .default_value.string_vector.strings = nullptr;
-  m_config[static_cast<size_t>(Entry::CowSolvers)]
+  m_config[static_cast<size_t>(Entry::QuapiSolvers)]
     .default_value.string_vector.size = 0;
 
-  parac_config_entry_set_str(
-    &m_config[static_cast<size_t>(Entry::CowIPASIRDebug)],
-    "cowipasir-debug",
-    "Activate (very verbose) CowIPASIR debug output");
-  m_config[static_cast<size_t>(Entry::CowIPASIRDebug)].registrar =
-    PARAC_MOD_SOLVER;
-  m_config[static_cast<size_t>(Entry::CowIPASIRDebug)].type = PARAC_TYPE_SWITCH;
-  m_config[static_cast<size_t>(Entry::CowIPASIRDebug)]
+  parac_config_entry_set_str(&m_config[static_cast<size_t>(Entry::QuapiDebug)],
+                             "quapi-debug",
+                             "Activate (very verbose) QuAPI debug output");
+  m_config[static_cast<size_t>(Entry::QuapiDebug)].registrar = PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::QuapiDebug)].type = PARAC_TYPE_SWITCH;
+  m_config[static_cast<size_t>(Entry::QuapiDebug)]
     .default_value.boolean_switch = false;
 }
 
 SolverConfig::~SolverConfig() {
-  if(m_cowipasirDebug) {
-    unsetenv("COWIPASIR_DEBUG");
+  if(m_quapiDebug) {
+    unsetenv("QUAPI_DEBUG");
   }
 }
 
@@ -82,8 +82,8 @@ void
 SolverConfig::extractFromConfigEntries() {
   m_useDepQBF =
     m_config[static_cast<size_t>(Entry::UseDepQBF)].value.boolean_switch;
-  m_cowipasirDebug =
-    m_config[static_cast<size_t>(Entry::CowIPASIRDebug)].value.boolean_switch;
+  m_quapiDebug =
+    m_config[static_cast<size_t>(Entry::QuapiDebug)].value.boolean_switch;
   m_treeDepth = m_config[static_cast<size_t>(Entry::TreeDepth)].value.uint64;
 
   auto& intSplitsE = m_config[static_cast<size_t>(Entry::IntegerBasedSplits)];
@@ -126,10 +126,10 @@ SolverConfig::extractFromConfigEntries() {
     }
   }
 
-  parseCowSolversCLI(m_config[static_cast<size_t>(Entry::CowSolvers)]);
+  parseQuapiSolversCLI(m_config[static_cast<size_t>(Entry::QuapiSolvers)]);
 
   // Choose one or more solvers.
-  if(!m_useDepQBF && m_cowSolvers.size() == 0) {
+  if(!m_useDepQBF && m_quapiSolvers.size() == 0) {
     parac_log(
       PARAC_SOLVER,
       PARAC_DEBUG,
@@ -137,8 +137,8 @@ SolverConfig::extractFromConfigEntries() {
     m_useDepQBF = true;
   }
 
-  if(m_cowipasirDebug) {
-    setenv("COWIPASIR_DEBUG", "1", 1);
+  if(m_quapiDebug) {
+    setenv("QUAPI_DEBUG", "1", 1);
   }
 }
 
@@ -154,19 +154,19 @@ apply_vector_into_cstyle(S const& src, T& tgt) {
 }
 
 std::string
-SolverConfig::CowSolver::name() const {
+SolverConfig::QuapiSolver::name() const {
   std::stringstream s;
   s << *this;
   return s.str();
 }
 
-SolverConfig::CowSolver::CowSolver(const std::string& cli) {
+SolverConfig::QuapiSolver::QuapiSolver(const std::string& cli) {
   std::vector<std::string> split;
   boost::algorithm::split(split, std::string(cli), boost::is_any_of("@"));
   if(split.size() < 1) {
     parac_log(PARAC_SOLVER,
               PARAC_FATAL,
-              "Invalid CowIPASIR Solver Config! Require this format: \"<path "
+              "Invalid QuapiSolver Solver Config! Require this format: \"<path "
               "to executable>[@<argv>][@<envp>][@<SAT_regex>@<UNSAT "
               "regex>]\". Arguments may be empty. Empty SAT and UNSAT regexes "
               "mean just the exit code is used.");
@@ -191,7 +191,7 @@ SolverConfig::CowSolver::CowSolver(const std::string& cli) {
   if(split.size() == 4) {
     parac_log(PARAC_SOLVER,
               PARAC_FATAL,
-              "Require either none of SAT_regex and UNSAT_regex for CowIPASIR "
+              "Require either none of SAT_regex and UNSAT_regex for QuAPI "
               "Solver with path {} or both!",
               path);
   }
@@ -202,14 +202,15 @@ SolverConfig::CowSolver::CowSolver(const std::string& cli) {
 }
 
 void
-SolverConfig::parseCowSolversCLI(const parac_config_entry& e) {
+SolverConfig::parseQuapiSolversCLI(const parac_config_entry& e) {
   auto& arr = e.value.string_vector.strings;
   auto& count = e.value.string_vector.size;
   if(count > 0) {
     for(size_t i = 0; i < count; ++i) {
-      CowSolver& solver = m_cowSolvers.emplace_back(arr[i]);
+      QuapiSolver& solver = m_quapiSolvers.emplace_back(arr[i]);
       if(solver.path == "") {
-        m_cowSolvers.erase(m_cowSolvers.begin() + (m_cowSolvers.size() - 1));
+        m_quapiSolvers.erase(m_quapiSolvers.begin() +
+                             (m_quapiSolvers.size() - 1));
       }
     }
   }
@@ -300,7 +301,7 @@ operator<<(std::ostream& o, const std::vector<std::string>& v) {
 }
 
 std::ostream&
-operator<<(std::ostream& o, const SolverConfig::CowSolver& c) {
+operator<<(std::ostream& o, const SolverConfig::QuapiSolver& c) {
   return o << "path: " << c.path << ", argv:" << c.argv << ", envp:" << c.envp
            << ", SAT_regex: " << c.SAT_regex.value_or("(default)")
            << ", UNSAT_regex: " << c.UNSAT_regex.value_or("(default)");

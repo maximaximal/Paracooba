@@ -2,11 +2,11 @@
 #include <paracooba/module.h>
 #include <paracooba/runner/runner.h>
 
-#include "cowsolver_handle.hpp"
 #include "depqbf_handle.hpp"
 #include "parser_qbf.hpp"
 #include "portfolio_qbf_handle.hpp"
 #include "qbf_solver_manager.hpp"
+#include "quapisolver_handle.hpp"
 #include "solver_qbf_config.hpp"
 
 namespace parac::solver_qbf {
@@ -60,9 +60,10 @@ QBFSolverManager::createGenericSolverHandle(size_t idx) {
       [](const Parser& p) { return std::make_unique<DepQBFHandle>(p); });
   }
 
-  for(const auto& cowSolver : m_config.cowSolvers()) {
-    vec.emplace_back([this, cowSolver](const Parser& p) {
-      return std::make_unique<CowSolverHandle>(m_parser, m_config, cowSolver);
+  for(const auto& quapiSolver : m_config.quapiSolvers()) {
+    vec.emplace_back([this, quapiSolver](const Parser& p) {
+      return std::make_unique<QuapiSolverHandle>(
+        m_parser, m_config, quapiSolver);
     });
   }
 
