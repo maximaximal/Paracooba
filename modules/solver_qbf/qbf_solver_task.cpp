@@ -139,7 +139,6 @@ QBFSolverTask::work(parac_worker worker) {
 
       m_task.left_result = PARAC_PENDING;
 
-      assert(l);
       new QBFSolverTask(
         m_handle, *l, m_manager, m_cubeSource->leftChild(m_cubeSource));
       if(l->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED)
@@ -163,11 +162,12 @@ QBFSolverTask::work(parac_worker worker) {
 
       m_task.right_result = PARAC_PENDING;
 
-      assert(r);
-      new QBFSolverTask(
-        m_handle, *r, m_manager, m_cubeSource->rightChild(m_cubeSource));
-      if(r->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED) {
-        m_task.task_store->assess_task(m_task.task_store, r);
+      if(r) {
+        new QBFSolverTask(
+          m_handle, *r, m_manager, m_cubeSource->rightChild(m_cubeSource));
+        if(r->result != PARAC_ABORTED && m_task.result != PARAC_ABORTED) {
+          m_task.task_store->assess_task(m_task.task_store, r);
+        }
       }
     } else if(!split_extended) {
       m_task.right_result = PARAC_UNSAT;
@@ -228,6 +228,8 @@ QBFSolverTask::work(parac_worker worker) {
               "Apply cube {} on path {} to solver!",
               c,
               m_task.path);
+    if(m_task.stop)
+      return PARAC_ABORTED;
     parac_status r = handle->solve();
     if(r == PARAC_ABORTED) {
       std::unique_lock lock(m_terminationMutex);
@@ -295,7 +297,7 @@ QBFSolverTask::static_terminate(volatile parac_task* task) {
   parac_path p;
   p.rep = task->path.rep;
   if(parac_path_is_extended(p) && task->extended_children) {
-    for(size_t i = 0; i < task->extended_children_count; ++i) {
+    for(int32_t i = 0; i < task->extended_children_count; ++i) {
       if(task->extended_children[i]) {
         task->extended_children[i]->parent_task_ = nullptr;
       }

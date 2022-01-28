@@ -25,7 +25,8 @@ parac_static_module_discover(parac_module_type mod);
 template<typename T>
 struct ParacConfigSetter {
   ParacConfigSetter(const char* name, T value)
-    : name(name) {
+    : name(name)
+    , value(value) {
     set(value);
   }
   ~ParacConfigSetter() { unsetenv(name); }
@@ -38,6 +39,7 @@ struct ParacConfigSetter {
     }
   }
   const char* name;
+  T value;
 };
 
 struct ParacWorkerCountSetter : public ParacConfigSetter<size_t> {

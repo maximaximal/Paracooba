@@ -1,3 +1,6 @@
 [submodule "third_party/distrac"]
 	path = third_party/distrac
 	url = https://github.com/maximaximal/Distrac.git
+[submodule "third_party/cowipasir"]
+	path = third_party/cowipasir
+	url = git@gitlab.sai.jku.at:maximaximal/cowipasir.git

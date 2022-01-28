@@ -22,6 +22,9 @@ class QBFSolverManager : private util::ObjectManager<GenericSolverHandle> {
   const SolverConfig& config() const { return m_config; }
   const Parser& parser() const { return m_parser; }
 
+  void terminateAll() { OM::terminateAll(); }
+  void requestExit() { clearAll(); }
+
   private:
   parac_module& m_mod;
   Parser& m_parser;

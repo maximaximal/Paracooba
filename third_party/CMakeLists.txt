@@ -1,5 +1,6 @@
 # CaDiCal as ExternalProject
 include(ExternalProject)
+include(FetchContent)
 
 add_subdirectory(cadical)
 add_subdirectory(kissat)
@@ -19,3 +20,5 @@ if(ENABLE_DISTRAC)
 else()
     add_library(distrac INTERFACE)
 endif()
+
+add_subdirectory(quapi)

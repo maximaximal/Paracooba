@@ -23,6 +23,8 @@ class GenericSolverHandle {
 
   virtual void terminate() = 0;
 
+  virtual const char* name() const = 0;
+
   private:
   std::string m_path;
 };

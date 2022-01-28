@@ -4,7 +4,9 @@
 
 #include "depqbf_handle.hpp"
 #include "parser_qbf.hpp"
+#include "portfolio_qbf_handle.hpp"
 #include "qbf_solver_manager.hpp"
+#include "quapisolver_handle.hpp"
 #include "solver_qbf_config.hpp"
 
 namespace parac::solver_qbf {
@@ -52,11 +54,25 @@ QBFSolverManager::get(parac_worker worker) {
 
 std::unique_ptr<GenericSolverHandle>
 QBFSolverManager::createGenericSolverHandle(size_t idx) {
+  PortfolioQBFHandle::SolverHandleFactoryVector vec;
   if(m_config.useDepQBF()) {
-    parac_log(
-      PARAC_SOLVER, PARAC_TRACE, "Create DepQBF Handle for worker {}!", idx);
-    return std::make_unique<DepQBFHandle>(m_parser);
+    vec.emplace_back(
+      [](const Parser& p) { return std::make_unique<DepQBFHandle>(p); });
   }
+
+  for(const auto& quapiSolver : m_config.quapiSolvers()) {
+    vec.emplace_back([this, quapiSolver](const Parser& p) {
+      return std::make_unique<QuapiSolverHandle>(
+        m_parser, m_config, quapiSolver);
+    });
+  }
+
+  if(vec.size() == 1) {
+    return std::move(vec[0](m_parser));
+  } else if(vec.size() > 1) {
+    return std::make_unique<PortfolioQBFHandle>(m_mod, m_parser, vec);
+  }
+
   parac_log(PARAC_SOLVER,
             PARAC_FATAL,
             "Cannot make solver handle for worker {} because no solver was "

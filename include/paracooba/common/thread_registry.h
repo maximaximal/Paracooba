@@ -30,6 +30,8 @@ typedef struct parac_thread_registry {
   parac_id belongs_to_id;
 } parac_thread_registry;
 
+typedef struct parac_thread_handle parac_thread_handle;
+
 typedef struct parac_thread_registry_handle {
   uint16_t thread_id;
   bool stop;
@@ -38,6 +40,7 @@ typedef struct parac_thread_registry_handle {
   struct parac_module* starter;
   void* userdata;
   parac_thread_registry* registry;
+  parac_thread_handle* thread_handle;
   parac_thread_registry_start_func start_func;
   parac_thread_registry_stop_notifier stop_notifier;
 } parac_thread_registry_handle;
@@ -65,6 +68,10 @@ parac_thread_registry_stop(parac_thread_registry* registry);
 
 void
 parac_thread_registry_wait_for_exit(parac_thread_registry* registry);
+
+void
+parac_thread_registry_wait_for_exit_of_thread(
+  parac_thread_registry_handle* handle);
 
 #ifdef __cplusplus
 }

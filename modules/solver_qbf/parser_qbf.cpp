@@ -254,6 +254,7 @@ Parser::add_clause() {
     lits.begin(), lits.begin() + num_lits, std::back_inserter(m_literals));
 
   num_lits = 0;
+  ++m_clauseCount;
 }
 
 Parser::Parser() {}

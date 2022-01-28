@@ -18,8 +18,8 @@
 
 static atomic_bool global_exit = false;
 
-typedef struct thread_handle {
-  parac_thread_registry_handle* registry_handle;
+typedef struct parac_thread_handle {
+  parac_thread_registry_handle* volatile registry_handle;
   thrd_t thread;
 } thread_handle;
 
@@ -89,6 +89,10 @@ run_wrapper(parac_thread_registry_handle* handle) {
 
   handle->running = true;
   returncode = handle->start_func(handle);
+
+  if(global_exit)
+    return returncode;
+
   handle->running = false;
   return returncode;
 }
@@ -116,6 +120,7 @@ parac_thread_registry_create(parac_thread_registry* registry,
   handle->starter = starter;
   handle->start_func = start_func;
   handle->registry = registry;
+  handle->thread_handle = thandle;
 
   int success =
     thrd_create(&thandle->thread, (int (*)(void*))run_wrapper, handle);
@@ -161,9 +166,32 @@ void
 parac_thread_registry_wait_for_exit(parac_thread_registry* registry) {
   struct parac_thread_handle_list_entry* handle = registry->threads->first;
   while(handle) {
-    thrd_join(handle->entry.thread,
-              &handle->entry.registry_handle->exit_status);
+    if(handle->entry.thread != 0) {
+      int* exit_code = NULL;
+      if(handle->entry.registry_handle) {
+        exit_code = &handle->entry.registry_handle->exit_status;
+      }
+      thrd_join(handle->entry.thread, exit_code);
+      handle->entry.thread = 0;
+    }
     handle = handle->next;
   }
-  parac_thread_handle_list_free(registry->threads);
+}
+
+PARAC_COMMON_EXPORT void
+parac_thread_registry_wait_for_exit_of_thread(
+  parac_thread_registry_handle* handle) {
+  assert(handle);
+
+  handle->thread_handle->registry_handle = NULL;
+
+  if(global_exit)
+    return;
+
+  assert(handle->thread_handle);
+
+  if(handle->running) {
+    thrd_join(handle->thread_handle->thread, &handle->exit_status);
+    handle->thread_handle->thread = 0;
+  }
 }

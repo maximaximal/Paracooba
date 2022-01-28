@@ -44,6 +44,7 @@ class Parser {
   parac_status parse();
 
   Literal highestLiteral() const { return m_highestLit; }
+  int clauseCount() const { return m_clauseCount; }
   const Literals& literals() const { return m_literals; }
   const Quantifiers& quantifiers() const { return m_quantifiers; }
   const std::string& path() const { return m_path; }
@@ -138,6 +139,7 @@ class Parser {
   };
 
   Literal m_highestLit = 0;
+  int m_clauseCount = 0;
 
   int lineno = 1;
   int universal_vars = 0, existential_vars = 0, implicit_vars = 0;
