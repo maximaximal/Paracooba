@@ -1,6 +1,6 @@
 FetchContent_Declare(quapi
-  URL       ${CMAKE_CURRENT_SOURCE_DIR}/quapi-4ce76e29.tar.bz2
-  URL_HASH  SHA256=0fbfff8fe36e6b32070fb4dbc40de6e81cf15226cabcf3804b8224c0c26a5581
+  URL       ${CMAKE_CURRENT_SOURCE_DIR}/quapi-dffee29c.tar.bz2
+  URL_HASH  SHA256=7ecd2090e510c579e148d50df46d1490397f5d6f4d9ef84b5ba1ddfca26c74dd
 )
 
 FetchContent_GetProperties(quapi)
