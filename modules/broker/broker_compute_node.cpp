@@ -904,10 +904,10 @@ ComputeNode::doNotifyOfNewRemotes() {
 
   *m_knownRemotesOstream = NoncopyOStringstream();
 
-  if(parac_log_enabled(PARAC_BROKER, PARAC_TRACE)) {
+  if(parac_log_enabled(PARAC_BROKER, PARAC_DEBUG)) {
     for(auto& connectionStringPair : m_newRemotesToNotifyAbout) {
       parac_log(PARAC_BROKER,
-                PARAC_TRACE,
+                PARAC_DEBUG,
                 "Notify node {} of new remote {} with connection string {}",
                 m_node.id,
                 connectionStringPair.first,

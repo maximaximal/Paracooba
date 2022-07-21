@@ -627,7 +627,8 @@ SolverTask::solveOrConditionallyAbort(const SolverConfig& config,
 
   parac_log(PARAC_CUBER,
             PARAC_TRACE,
-            "Stopped solving after roughly {}ms. Interrupted: {}. Status: {}",
+            "Stopped solving {} after roughly {}ms. Interrupted: {}. Status: {}",
+	    path(),
             solverRuntimeMS,
             m_interruptSolving,
             s);
