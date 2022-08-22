@@ -87,7 +87,9 @@ TimeoutController::setTimeout(uint64_t ms,
   elem->timeout.expired_userdata = userdata;
   elem->timeout.expired = expiery_cb;
   elem->timeout.cancel = [](parac_timeout* t) {
-    assert(t);
+    if(!t)
+      return;
+
     assert(t->cancel_userdata);
 
     TimeoutController* c = static_cast<TimeoutController*>(t->cancel_userdata);
