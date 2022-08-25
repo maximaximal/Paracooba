@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=para              # Job name
 #SBATCH --time=02:00:00              # Time limit hrs:min:sec
-#SBATCH --output=parallel.log        # Standard output and error log
+#SBATCH --output=parallel-%j.log     # Standard output and error log
 
 PARACOOBA=$1
 INPUT=$2
 LEADERNODE=$SLURMD_NODENAME
-WORKERS=$SLURM_CPUS_PER_TASK
+WORKERS=$((SLURM_CPUS_PER_TASK / 2))
 
 if [[ -x "${PARACOOBA}" ]]; then
 	echo "c Using paracooba executable $PARACOOBA"
@@ -30,6 +30,8 @@ srun -w"$SLURMD_NODENAME" -n1 -N1 --threads-per-core=2 -c$SLURM_CPUS_PER_TASK $P
 PID=$!
 
 trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
+
+sleep 2
 
 for (( i = 2 ; i <= $SLURM_JOB_NUM_NODES ; i++ ))
 do
