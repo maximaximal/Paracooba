@@ -8,6 +8,8 @@ set(PARACOOBA_SOLVER_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/solver_config.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/kissat_task.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sat_handler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/generic_sat_handle.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/portfolio_sat_handle.cpp
     )
 
 parac_module(parac_solver "${PARACOOBA_SOLVER_SRCS}" ${CMAKE_CURRENT_SOURCE_DIR}/discover.c)
