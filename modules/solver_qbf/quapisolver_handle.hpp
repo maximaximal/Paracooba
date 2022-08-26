@@ -40,10 +40,9 @@ class QuapiSolverHandle : public GenericSolverHandle {
   virtual const char* name() const override { return m_name.c_str(); };
 
   private:
+  std::unique_ptr<quapi_solver, void (*)(quapi_solver*)> m_quapi;
   std::string m_name;
-
   volatile bool m_terminated = false;
 
-  std::unique_ptr<quapi_solver, void (*)(quapi_solver*)> m_quapi;
 };
 }
