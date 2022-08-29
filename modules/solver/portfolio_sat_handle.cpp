@@ -58,10 +58,10 @@ struct PortfolioSATHandle::Handle {
 
 PortfolioSATHandle::PortfolioSATHandle(
   parac_module& mod,
-  const Parser& parser,
+  CaDiCaLHandle& cadicalHandle,
   SolverHandleFactoryVector& solverHandleFactories)
   : m_mod(mod)
-  , m_parser(&parser)
+  , m_cadicalHandle(&cadicalHandle)
   , m_handles(std::make_unique<std::vector<PortfolioSATHandle::Handle>>(
       solverHandleFactories.size())) {
   assert(mod.handle);
@@ -100,7 +100,7 @@ PortfolioSATHandle::PortfolioSATHandle(
   parac_log(
     PARAC_SOLVER, PARAC_DEBUG, "All handles initialized, {} ready.", m_name);
 
-  m_parser = nullptr;
+  m_cadicalHandle = nullptr;
 }
 PortfolioSATHandle::~PortfolioSATHandle() {
   m_handleRunning = false;
@@ -262,6 +262,7 @@ PortfolioSATHandle::Handle::StateWaitFunc(PortfolioSATHandle& self) {
 
 PortfolioSATHandle::Handle::State
 PortfolioSATHandle::Handle::StateAssumeFunc(PortfolioSATHandle& self) {
+  (void)self;
   parac_log(
     PARAC_SOLVER,
     PARAC_DEBUG,
@@ -323,9 +324,9 @@ PortfolioSATHandle::handleRun(Handle& h) {
               "solver from factory.",
               h.i);
 
-    assert(m_parser);
+    assert(m_cadicalHandle);
 
-    h.solver_handle = h.solver_handle_factory(*m_parser);
+    h.solver_handle = h.solver_handle_factory(*m_cadicalHandle);
 
     parac_log(
       PARAC_SOLVER,

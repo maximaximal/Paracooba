@@ -3,6 +3,7 @@
 #include "paracooba/common/status.h"
 #include "paracooba/common/types.h"
 #include "paracooba/solver/types.hpp"
+#include "portfolio_sat_handle.hpp"
 #include <memory>
 #include <string>
 
@@ -16,7 +17,7 @@ class Solver;
 }
 
 namespace parac::solver {
-class CubeIteratorRange;
+struct CubeIteratorRange;
 class SolverAssignment;
 class SolverConfig;
 
@@ -25,7 +26,7 @@ class CaDiCaLHandle {
   CaDiCaLHandle(parac_handle& handle,
                 volatile bool& stop,
                 parac_id originatorId);
-  CaDiCaLHandle(CaDiCaLHandle& o);
+  CaDiCaLHandle(CaDiCaLHandle& o, const SolverConfig& cfg);
   ~CaDiCaLHandle();
 
   CaDiCaL::Solver& solver();
@@ -85,8 +86,9 @@ class CaDiCaLHandle {
 
   private:
   struct Internal;
-  std::unique_ptr<Internal> m_internal;
-  std::unique_ptr<SolverAssignment> m_solverAssignment;
+  std::shared_ptr<Internal> m_internal;
+  std::unique_ptr<PortfolioSATHandle> m_portfolioSATHandle;
+  std::reference_wrapper<GenericSolverHandle> m_solverHandle;
 
   void generateJumplist();
 

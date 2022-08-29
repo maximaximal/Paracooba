@@ -1,9 +1,14 @@
-#include "solver_config.hpp"
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+
 #include "paracooba/common/config.h"
+#include "paracooba/common/log.h"
 #include "paracooba/common/types.h"
+#include "solver_config.hpp"
 
 #include <cmath>
 #include <thread>
+#include <sstream>
 
 namespace parac::solver {
 SolverConfig::SolverConfig(parac_config* config, parac_id localId) {
@@ -141,6 +146,19 @@ SolverConfig::SolverConfig(parac_config* config, parac_id localId) {
   m_config[static_cast<size_t>(Entry::SplitMultiplicationFactor)]
     .default_value.f = m_splitMultiplicationFactor;
 
+  parac_config_entry_set_str(
+    &m_config[static_cast<size_t>(Entry::QuapiSolvers)],
+    "quapisolvers",
+    "Defines QuAPI solvers to use as additional portfolio backends");
+  m_config[static_cast<size_t>(Entry::QuapiSolvers)].registrar =
+    PARAC_MOD_SOLVER;
+  m_config[static_cast<size_t>(Entry::QuapiSolvers)].type =
+    PARAC_TYPE_VECTOR_STR;
+  m_config[static_cast<size_t>(Entry::QuapiSolvers)]
+    .default_value.string_vector.strings = nullptr;
+  m_config[static_cast<size_t>(Entry::QuapiSolvers)]
+    .default_value.string_vector.size = 0;
+
   m_originatorId = localId;
 }
 
@@ -172,6 +190,80 @@ SolverConfig::extractFromConfigEntries() {
     m_config[static_cast<size_t>(
                Entry::DistributeCubeTreeLearntClausesMaxLevel)]
       .value.uint16;
+
+  parseQuapiSolversCLI(m_config[static_cast<size_t>(Entry::QuapiSolvers)]);
+}
+template<class S, class T>
+static inline void
+apply_vector_into_cstyle(S const& src, T& tgt) {
+  tgt = std::make_unique<const char*[]>(src.size() + 1);
+  auto t = tgt.get();
+  for(size_t i = 0; i < src.size(); ++i) {
+    t[i] = src[i].c_str();
+  }
+  t[src.size()] = NULL;
+}
+
+std::string
+SolverConfig::QuapiSolver::name() const {
+  std::stringstream s;
+  s << *this;
+  return s.str();
+}
+SolverConfig::QuapiSolver::QuapiSolver(const std::string& cli) {
+  std::vector<std::string> split;
+  boost::algorithm::split(split, std::string(cli), boost::is_any_of("@"));
+  if(split.size() < 1) {
+    parac_log(PARAC_SOLVER,
+              PARAC_FATAL,
+              "Invalid QuapiSolver Solver Config! Require this format: \"<path "
+              "to executable>[@<argv>][@<envp>][@<SAT_regex>@<UNSAT "
+              "regex>]\". Arguments may be empty. Empty SAT and UNSAT regexes "
+              "mean just the exit code is used.");
+  }
+
+  path = split[0];
+
+  if(split.size() >= 2) {
+    boost::algorithm::split(argv, split[1], boost::is_any_of(" "));
+
+    if(argv.size() > 0) {
+      apply_vector_into_cstyle(argv, argv_cstyle);
+    }
+  }
+  if(split.size() >= 3) {
+    boost::algorithm::split(envp, split[2], boost::is_any_of(" "));
+
+    if(envp.size() > 0) {
+      apply_vector_into_cstyle(envp, envp_cstyle);
+    }
+  }
+  if(split.size() == 4) {
+    parac_log(PARAC_SOLVER,
+              PARAC_FATAL,
+              "Require either none of SAT_regex and UNSAT_regex for QuAPI "
+              "Solver with path {} or both!",
+              path);
+  }
+  if(split.size() == 5) {
+    SAT_regex = split[4];
+    UNSAT_regex = split[5];
+  }
+}
+
+void
+SolverConfig::parseQuapiSolversCLI(const parac_config_entry& e) {
+  auto& arr = e.value.string_vector.strings;
+  auto& count = e.value.string_vector.size;
+  if(count > 0) {
+    for(size_t i = 0; i < count; ++i) {
+      QuapiSolver& solver = m_quapiSolvers.emplace_back(arr[i]);
+      if(solver.path == "") {
+        m_quapiSolvers.erase(m_quapiSolvers.begin() +
+                             (m_quapiSolvers.size() - 1));
+      }
+    }
+  }
 }
 std::ostream&
 operator<<(std::ostream& o, const SolverConfig& config) {
@@ -187,5 +279,21 @@ operator<<(std::ostream& o, const SolverConfig& config) {
            << config.FastSplitMultiplicationFactor()
            << ", SplitMultiplicationFactor:"
            << config.SplitMultiplicationFactor();
+}
+std::ostream&
+operator<<(std::ostream& o, const std::vector<std::string>& v) {
+  if(v.empty())
+    return o << "(none)";
+
+  for(const auto& e : v) {
+    o << " " << e;
+  }
+  return o;
+}
+std::ostream&
+operator<<(std::ostream& o, const SolverConfig::QuapiSolver& c) {
+  return o << "path: " << c.path << ", argv:" << c.argv << ", envp:" << c.envp
+           << ", SAT_regex: " << c.SAT_regex.value_or("(default)")
+           << ", UNSAT_regex: " << c.UNSAT_regex.value_or("(default)");
 }
 }

@@ -1,15 +1,18 @@
 #include "cadical_handle.hpp"
 #include "cadical_terminator.hpp"
+#include "generic_sat_handle.hpp"
 #include "paracooba/common/log.h"
 #include "paracooba/common/path.h"
 #include "paracooba/common/status.h"
 #include "paracooba/module.h"
+#include "quapisolver_sat_handle.hpp"
 #include "solver_assignment.hpp"
 #include "solver_config.hpp"
 
 #include "paracooba/common/task.h"
 #include "paracooba/common/timeout.h"
 #include "paracooba/communicator/communicator.h"
+#include "paracooba/module.h"
 #include "paracooba/solver/cube_iterator.hpp"
 #include "paracooba/util/string_to_file.hpp"
 
@@ -31,7 +34,16 @@
 #endif
 
 namespace parac::solver {
-struct CaDiCaLHandle::Internal {
+template<typename T>
+static void
+applyCubeAsAssumptionToSolver(const T& cube, CaDiCaL::Solver& s) {
+  for(auto lit : cube) {
+    assert(lit != 0);
+    s.assume(lit);
+  }
+}
+
+struct CaDiCaLHandle::Internal : public GenericSolverHandle {
   Internal(parac_handle& handle,
            volatile bool* stop,
            parac_id originatorId,
@@ -59,19 +71,55 @@ struct CaDiCaLHandle::Internal {
   parac_id originatorId;
   std::shared_ptr<std::vector<Literal>> pregeneratedCubes;
   std::shared_ptr<std::vector<size_t>> pregeneratedCubesJumplist;
+  std::unique_ptr<SolverAssignment> m_solverAssignment;
+
+  virtual void assumeCube(const CubeIteratorRange& c) override {
+    applyCubeAsAssumptionToSolver(c, solver);
+  }
+  virtual parac_status solve() override {
+    int r = solver.solve();
+    switch(r) {
+      case 0:
+        return PARAC_ABORTED;
+      case 10:
+        parac_log(
+          PARAC_SOLVER,
+          PARAC_TRACE,
+          "Satisfying assignment found! Encoding before returning result.");
+        m_solverAssignment = std::make_unique<SolverAssignment>();
+        m_solverAssignment->SerializeAssignmentFromSolver(vars, solver);
+        parac_log(PARAC_SOLVER,
+                  PARAC_TRACE,
+                  "Finished encoding satisfying result! Encoded {} variables.",
+                  m_solverAssignment->varCount());
+        return PARAC_SAT;
+      case 20:
+        return PARAC_UNSAT;
+      default:
+        return PARAC_UNKNOWN;
+    }
+  }
+
+  virtual void terminate() override {
+    terminator.terminateLocally();
+    solver.terminate();
+  }
+  virtual const char* name() const override { return "CaDiCaL-Embedded"; }
 };
 
 CaDiCaLHandle::CaDiCaLHandle(parac_handle& handle,
                              volatile bool& stop,
                              parac_id originatorId)
-  : m_internal(std::make_unique<Internal>(handle, &stop, originatorId)) {}
-CaDiCaLHandle::CaDiCaLHandle(CaDiCaLHandle& o)
+  : m_internal(std::make_unique<Internal>(handle, &stop, originatorId))
+  , m_solverHandle(*m_internal) {}
+CaDiCaLHandle::CaDiCaLHandle(CaDiCaLHandle& o, const SolverConfig& cfg)
   : m_internal(
       std::make_unique<Internal>(o.m_internal->handle,
                                  nullptr,
                                  o.m_internal->originatorId,
                                  o.m_internal->pregeneratedCubes,
-                                 o.m_internal->pregeneratedCubesJumplist)) {
+                                 o.m_internal->pregeneratedCubesJumplist))
+  , m_solverHandle(*m_internal) {
   // Copy from other solver to this one.
   o.solver().copy(solver());
 
@@ -81,6 +129,28 @@ CaDiCaLHandle::CaDiCaLHandle(CaDiCaLHandle& o)
   m_internal->incremental = o.m_internal->incremental;
   m_internal->path = o.m_internal->path;
   m_internal->originatorId = o.m_internal->originatorId;
+
+  // This is also the place where one must check whether portfolio leave solving
+  // mode should be used.  Check the configuration for additional solvers and
+  // initiate QuAPI with these additional solvers by copying what was parsed in
+  // CaDiCaL.
+  if(cfg.quapiSolvers().size()) {
+    PortfolioSATHandle::SolverHandleFactoryVector f;
+    f.reserve(cfg.quapiSolvers().size() + 1);
+    f.emplace_back([this](CaDiCaLHandle& h) {
+      (void)h;
+      return m_internal;
+    });
+    for(auto& s : cfg.quapiSolvers()) {
+      f.emplace_back(
+        [cfg, s](CaDiCaLHandle& h) -> PortfolioSATHandle::SolverHandle {
+          return std::make_unique<QuapiSolverHandle>(h, cfg, s);
+        });
+    }
+    m_portfolioSATHandle = std::make_unique<PortfolioSATHandle>(
+      *m_internal->handle.modules[PARAC_MOD_SOLVER], *this, f);
+    m_solverHandle = *m_portfolioSATHandle;
+  }
 }
 CaDiCaLHandle::~CaDiCaLHandle() {
   if(m_internal->pathToDelete != "") {
@@ -238,23 +308,14 @@ CaDiCaLHandle::generateJumplist() {
     m_internal->normalizedPathLength);
 }
 
-template<typename T>
-static void
-applyCubeAsAssumptionToSolver(const T& cube, CaDiCaL::Solver& s) {
-  for(auto lit : cube) {
-    assert(lit != 0);
-    s.assume(lit);
-  }
-}
-
 void
 CaDiCaLHandle::applyCubeAsAssumption(const CubeIteratorRange& cube) {
-  applyCubeAsAssumptionToSolver(cube, m_internal->solver);
+  m_solverHandle.get().assumeCube(cube);
 }
 
 void
 CaDiCaLHandle::applyCubeAsAssumption(const Cube& cube) {
-  applyCubeAsAssumptionToSolver(cube, m_internal->solver);
+  m_solverHandle.get().assumeCube(CubeIteratorRange(cube.begin(), cube.end()));
 }
 
 void
@@ -288,39 +349,17 @@ CaDiCaLHandle::solve(parac_task& task) {
     return PARAC_ABORTED;
   }
 
-  int r = m_internal->solver.solve();
-  switch(r) {
-    case 0:
-      return PARAC_ABORTED;
-    case 10:
-      parac_log(
-        PARAC_SOLVER,
-        PARAC_TRACE,
-        "Satisfying assignment found! Encoding before returning result.");
-      m_solverAssignment = std::make_unique<SolverAssignment>();
-      m_solverAssignment->SerializeAssignmentFromSolver(m_internal->vars,
-                                                        m_internal->solver);
-      parac_log(PARAC_SOLVER,
-                PARAC_TRACE,
-                "Finished encoding satisfying result! Encoded {} variables.",
-                m_solverAssignment->varCount());
-      return PARAC_SAT;
-    case 20:
-      return PARAC_UNSAT;
-    default:
-      return PARAC_UNKNOWN;
-  }
+  return m_solverHandle.get().solve();
 }
 
 void
 CaDiCaLHandle::terminate() {
-  m_internal->terminator.terminateLocally();
-  m_internal->solver.terminate();
+  return m_solverHandle.get().terminate();
 }
 
 std::unique_ptr<SolverAssignment>
 CaDiCaLHandle::takeSolverAssignment() {
-  return std::move(m_solverAssignment);
+  return std::move(m_internal->m_solverAssignment);
 }
 
 std::pair<parac_status, std::optional<std::pair<Cube, Cube>>>

@@ -236,7 +236,7 @@ CaDiCaLManager::createHandle(size_t idx) {
             m_parsedFormula->path(),
             m_parsedFormula->originatorId(),
             idx);
-  return std::make_unique<CaDiCaLHandle>(*m_parsedFormula);
+  return std::make_unique<CaDiCaLHandle>(*m_parsedFormula, config());
 }
 
 SolverTask*

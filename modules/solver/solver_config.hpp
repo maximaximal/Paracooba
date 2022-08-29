@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 #include <cereal/access.hpp>
 #include <cereal/types/vector.hpp>
@@ -23,6 +24,7 @@ class SolverConfig {
     DeactivatePredefinedCubes,
     CaDiCaLCubes,
     Resplit,
+    QuapiSolvers,
     InitialCubeDepth,
     InitialMinimalCubeDepth,
     InitialSplitTimeoutMS,
@@ -53,6 +55,39 @@ class SolverConfig {
   parac_id OriginatorId() const { return m_originatorId; }
   uint32_t InitialSplitTimeoutMS() const { return m_initialSplitTimeoutMS; }
 
+  struct QuapiSolver {
+    /** @brief Create QuapiSolver config instance from a single CLI arg.
+     *
+     */
+    QuapiSolver() = default;
+    QuapiSolver(const std::string& cliParam);
+
+    std::string path;
+    std::vector<std::string> argv;
+    std::vector<std::string> envp;
+    std::optional<std::string> SAT_regex;
+    std::optional<std::string> UNSAT_regex;
+
+    std::shared_ptr<const char*[]> argv_cstyle;
+    std::shared_ptr<const char*[]> envp_cstyle;
+
+    std::string name() const;
+
+    friend class cereal::access;
+    template<class Archive>
+    void serialize(Archive& ar) {
+      ar(cereal::make_nvp("path", path),
+         cereal::make_nvp("argv", argv),
+         cereal::make_nvp("envp", envp),
+         cereal::make_nvp("SAT_regex", SAT_regex),
+         cereal::make_nvp("UNSAT_regex", UNSAT_regex));
+    }
+  };
+
+  const std::vector<QuapiSolver>& quapiSolvers() const {
+    return m_quapiSolvers;
+  }
+
   private:
   parac_config_entry* m_config = nullptr;
 
@@ -68,6 +103,7 @@ class SolverConfig {
   float m_splitMultiplicationFactor = 2;
   parac_id m_originatorId = 0;
   uint32_t m_initialSplitTimeoutMS = 30000;
+  std::vector<QuapiSolver> m_quapiSolvers;
 
   friend class cereal::access;
   template<class Archive>
@@ -86,9 +122,14 @@ class SolverConfig {
        cereal::make_nvp("splitMultiplicationFactor",
                         m_splitMultiplicationFactor),
        cereal::make_nvp("initialSplitTimeoutMS", m_initialSplitTimeoutMS),
-       cereal::make_nvp("originatorId", m_originatorId));
+       cereal::make_nvp("originatorId", m_originatorId),
+       cereal::make_nvp("quapisolvers", m_quapiSolvers));
   }
+
+  void parseQuapiSolversCLI(const parac_config_entry& e);
 };
 std::ostream&
 operator<<(std::ostream& o, const SolverConfig& config);
+std::ostream&
+operator<<(std::ostream& o, const SolverConfig::QuapiSolver& s);
 }

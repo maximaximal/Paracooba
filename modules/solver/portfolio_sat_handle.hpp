@@ -11,16 +11,16 @@ struct parac_thread_registry;
 struct parac_thread_registry_handle;
 
 namespace parac::solver {
-class Parser;
+class CaDiCaLHandle;
 
 class PortfolioSATHandle : public GenericSolverHandle {
   public:
-  using SolverHandle = std::unique_ptr<GenericSolverHandle>;
-  using SolverHandleFactory = std::function<SolverHandle(const Parser&)>;
+  using SolverHandle = std::shared_ptr<GenericSolverHandle>;
+  using SolverHandleFactory = std::function<SolverHandle(CaDiCaLHandle&)>;
   using SolverHandleFactoryVector = std::vector<SolverHandleFactory>;
 
   PortfolioSATHandle(parac_module& mod,
-                     const Parser& parser,
+                     CaDiCaLHandle& h,
                      SolverHandleFactoryVector& handles);
   ~PortfolioSATHandle();
 
@@ -104,7 +104,7 @@ class PortfolioSATHandle : public GenericSolverHandle {
 
   std::string m_name;
   parac_module& m_mod;
-  const Parser* m_parser = nullptr;
+  CaDiCaLHandle* m_cadicalHandle = nullptr;
 
   int64_t m_eventCount = 0;
   int64_t m_mostRecentHandledEvent = -1;
