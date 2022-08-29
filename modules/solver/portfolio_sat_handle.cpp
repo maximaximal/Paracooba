@@ -292,23 +292,23 @@ PortfolioSATHandle::Handle::StateSolveFunc(PortfolioSATHandle& self) {
               i,
               solver_handle->name(),
               s);
-  }
+  } else {
+    std::unique_lock lock(self.m_solveResultMutex, std::try_to_lock);
 
-  std::unique_lock lock(self.m_solveResultMutex, std::try_to_lock);
+    if(lock.owns_lock() && self.m_eventAlreadySolved < event.eventNumber) {
+      self.m_eventAlreadySolved = event.eventNumber;
 
-  if(lock.owns_lock() && self.m_eventAlreadySolved < event.eventNumber) {
-    self.m_eventAlreadySolved = event.eventNumber;
-
-    self.terminateAllBut(*this);
-    parac_log(PARAC_SOLVER,
-              PARAC_DEBUG,
-              "Inner PortfolioSATHandle with id {} and solver {} to finished "
-              "solving with result {}!",
-              i,
-              solver_handle->name(),
-              s);
-    self.m_solveResult = s;
-    self.m_solveResultProducerIndex = i;
+      self.terminateAllBut(*this);
+      parac_log(PARAC_SOLVER,
+                PARAC_DEBUG,
+                "Inner PortfolioSATHandle with id {} and solver {} to finished "
+                "solving with result {}!",
+                i,
+                solver_handle->name(),
+                s);
+      self.m_solveResult = s;
+      self.m_solveResultProducerIndex = i;
+    }
   }
 
   return StateWait;
