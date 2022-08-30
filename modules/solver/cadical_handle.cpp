@@ -148,7 +148,7 @@ CaDiCaLHandle::CaDiCaLHandle(CaDiCaLHandle& o, const SolverConfig& cfg)
         });
     }
     m_portfolioSATHandle = std::make_unique<PortfolioSATHandle>(
-      *m_internal->handle.modules[PARAC_MOD_SOLVER], *this, f);
+      *m_internal->handle.modules[PARAC_MOD_SOLVER], o, f);
     m_solverHandle = *m_portfolioSATHandle;
   }
 }

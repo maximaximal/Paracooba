@@ -21,6 +21,10 @@ int
 countClausesInCadical(CaDiCaL::Solver& s) {
   ClauseCounter c;
   s.traverse_clauses(c);
+  parac_log(PARAC_SOLVER,
+            PARAC_TRACE,
+            "Clause walker gathered {} clauses from CaDiCaL.",
+            c.clausecount);
   return c.clausecount;
 }
 
@@ -65,6 +69,7 @@ QuapiSolverHandle::QuapiSolverHandle(CaDiCaLHandle& cadicalHandle,
         for(int l : c) {
           quapi_add(s, l);
         }
+        quapi_add(s, 0);
         return true;
       }
     };
@@ -138,6 +143,10 @@ QuapiSolverHandle::solve() {
 void
 QuapiSolverHandle::terminate() {
   m_terminated = true;
+  parac_log(
+    PARAC_SOLVER, PARAC_DEBUG, "Terminating QuapiSolverHandle {}", name());
   quapi_terminate(m_quapi.get());
+  parac_log(
+    PARAC_SOLVER, PARAC_DEBUG, "Terminated QuapiSolverHandle {}", name());
 }
 }
