@@ -375,7 +375,15 @@ CaDiCaLHandle::resplitOnce(parac_path path, Cube literals) {
 
   applyCubeAsAssumption(literals);
 
-  Literal lit_to_split = m_internal->solver.lookahead();
+  CaDiCaL::Solver::CubesWithStatus cubesWithStatus =
+    m_internal->solver.generate_cubes(1, 1);
+
+  Literal lit_to_split = 0;
+  if(cubesWithStatus.cubes.size() > 0 && cubesWithStatus.cubes[0].size() > 0) {
+    lit_to_split =
+      cubesWithStatus.cubes[0][cubesWithStatus.cubes[0].size() - 1];
+  }
+
   m_internal->solver.reset_assumptions();
   if(lit_to_split == 0) {
     if(m_internal->solver.state() == CaDiCaL::SATISFIED) {
@@ -442,8 +450,9 @@ CaDiCaLHandle::resplitCube(parac_path p,
                  handle->terminate();
                });
 
-  Literal lit_to_split = std::abs(m_internal->solver.lookahead());
-
+  CaDiCaL::Solver::CubesWithStatus cubesWithStatus{
+    m_internal->solver.generate_cubes(1, 1)
+  };
   if(m_internal->terminator) {
     m_lookaheadTimeout = nullptr;
     return { PARAC_ABORTED, {} };
@@ -452,6 +461,12 @@ CaDiCaLHandle::resplitCube(parac_path p,
   if(m_lookaheadTimeout) {
     m_lookaheadTimeout->cancel(m_lookaheadTimeout);
     m_lookaheadTimeout = nullptr;
+  }
+  Literal lit_to_split = 0;
+
+  if(cubesWithStatus.cubes.size() > 0 && cubesWithStatus.cubes[0].size() > 0) {
+    lit_to_split =
+      std::abs(cubesWithStatus.cubes[0][cubesWithStatus.cubes[0].size() - 1]);
   }
 
   m_internal->solver.reset_assumptions();
