@@ -315,7 +315,9 @@ CaDiCaLHandle::applyCubeAsAssumption(const CubeIteratorRange& cube) {
 
 void
 CaDiCaLHandle::applyCubeAsAssumption(const Cube& cube) {
-  m_solverHandle.get().assumeCube(CubeIteratorRange(cube.begin(), cube.end()));
+  if(cube.size() > 0)
+    m_solverHandle.get().assumeCube(
+      CubeIteratorRange(cube.begin(), cube.end()));
 }
 
 void
