@@ -115,7 +115,7 @@ QBFSolverTask::work(parac_worker worker) {
                          split_left,
                          split_right,
                          split_extended) &&
-     (!m_manager.config().treeDepth() ||
+     (m_manager.config().treeDepth() == -1 ||
       static_cast<parac_path_length_type>(m_manager.config().treeDepth()) >
         parac_path_length(m_task.path))) {
     // The split may already be known from the cube source (think of predefined

@@ -83,7 +83,7 @@ class SolverConfig {
   parac_id m_originatorId = 0;
 
   bool m_useDepQBF = false;
-  uint64_t m_treeDepth;
+  int64_t m_treeDepth;
   std::vector<int> m_integerBasedSplits;
   std::vector<QuapiSolver> m_quapiSolvers;
   bool m_quapiDebug = false;
