@@ -28,7 +28,7 @@ class QuapiSolverHandle : public GenericSolverHandle {
                         quapiSolver.path,
                         quapiSolver.argv_cstyle.get(),
                         quapiSolver.envp_cstyle.get(),
-                        config.InitialMinimalCubeDepth() + 10,
+                        config.InitialMinimalCubeDepth(),
                         "QuapiSolver {" + quapiSolver.name() + "}",
                         quapiSolver.SAT_regex,
                         quapiSolver.UNSAT_regex) {}
